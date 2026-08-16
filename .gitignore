@@ -1,0 +1,6 @@
+/conveyor
+*.db
+*.db-journal
+.conveyor/
+node_modules/
+web/dist/
