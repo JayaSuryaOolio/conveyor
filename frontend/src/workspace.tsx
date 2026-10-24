@@ -1,11 +1,11 @@
 import {useEffect, useState} from 'react'
-import {ActionIcon, Anchor, Badge, Button, Code, Divider, Group, Indicator, Paper, Select, Stack, Text, TextInput, Title, Tooltip} from '@mantine/core'
+import {ActionIcon, Anchor, Badge, Button, Code, Divider, Group, Indicator, Paper, Stack, Text, TextInput, Title, Tooltip} from '@mantine/core'
 import {useClipboard} from '@mantine/hooks'
-import {IconCheck, IconCopy, IconPencil, IconPlus, IconStar, IconTerminal, IconTerminal2, IconX} from '@tabler/icons-react'
-import {Actions, AppIcons, EnsureWorkspace, Link, ListApps, ListTasks, OpenApp, RunAction, Sessions, SetTaskRepo, SpotlightRoot, SpotlightStop, TermStart, Unlink} from '../wailsjs/go/ui/App'
+import {IconCheck, IconCopy, IconPencil, IconStar, IconTerminal, IconTerminal2, IconX} from '@tabler/icons-react'
+import {Actions, AppIcons, EnsureWorkspace, ListApps, OpenApp, RunAction, Sessions, SetTaskRepo, SpotlightRoot, SpotlightStop, TermStart} from '../wailsjs/go/ui/App'
 import {core, store, ui} from '../wailsjs/go/models'
 import {BrowserOpenURL} from '../wailsjs/runtime/runtime'
-import {AppIcon, Nav, StatusBadge, StatusSelect, Time, errMsg} from './components'
+import {AppIcon, StatusSelect, Time, errMsg} from './components'
 import {TaskAgent, TaskSettings} from './forms'
 import {useData} from './util'
 
@@ -125,66 +125,7 @@ function RepoFields({k, r, reload, children}: {k: string; r: store.TaskRepo; rel
     )
 }
 
-// Link choices as seen from this task: [value, label, kind, this task is the link's from side].
-const LINK_CHOICES: [string, string, string, boolean][] = [
-    ['blocks', 'blocks', 'blocks', true], ['blocked', 'is blocked by', 'blocks', false],
-    ['relates', 'relates to', 'relates', true],
-    ['duplicates', 'duplicates', 'duplicates', true], ['duplicated', 'is duplicated by', 'duplicates', false],
-]
-
-/** Parent, sub-tasks and links of a task, with add / remove for links. */
-function Relations({k, status, rel, nav, reload}: {k: string; status: string; rel: store.Relations; nav: Nav; reload: () => void}) {
-    const {data: tasks} = useData(ListTasks, [])
-    const [choice, setChoice] = useState('blocks')
-    const [other, setOther] = useState<string | null>(null)
-    const open = (s: string) => s !== 'done' && s !== 'cancelled'
-    const blockers = rel.links.filter(l => l.kind === 'blocks' && !l.from && open(l.task.status))
-    const link = (task: store.TaskRef) => (
-        <Anchor size="xs" component="button" ta="left" onClick={() => nav({name: 'task', key: task.key})}>{task.key}</Anchor>
-    )
-    const add = () => {
-        const [, , kind, from] = LINK_CHOICES.find(c => c[0] === choice)!
-        if (other) (from ? Link(k, kind, other) : Link(other, kind, k)).then(() => { setOther(null); reload() }).catch(errMsg)
-    }
-    const labels = [...new Set(rel.links.map(l => l.label))]
-    return (
-        <Stack gap={6}>
-            <Title order={6}>Relations</Title>
-            {status === 'todo' && blockers.length > 0 && <Text size="xs" c="orange">Not launched: blocked by {blockers.map(l => l.task.key).join(', ')}</Text>}
-            {rel.parent && <Group gap={6} wrap="nowrap"><Text size="xs" c="dimmed">Parent</Text>{link(rel.parent)}<StatusBadge status={rel.parent.status}/></Group>}
-            {rel.children.length > 0 && <Text size="xs" c="dimmed">Sub-tasks</Text>}
-            {rel.children.map(c => (
-                <Group key={c.key} gap={6} wrap="nowrap" justify="space-between">
-                    <Group gap={6} wrap="nowrap" miw={0}>{link(c)}<Text size="xs" lineClamp={1} title={c.title}>{c.title}</Text></Group>
-                    <StatusBadge status={c.status}/>
-                </Group>
-            ))}
-            {labels.map(label => (
-                <Stack key={label} gap={2}>
-                    <Text size="xs" c="dimmed">{label}</Text>
-                    {rel.links.filter(l => l.label === label).map(l => (
-                        <Group key={l.kind + l.task.key} gap={6} wrap="nowrap" justify="space-between">
-                            <Group gap={6} wrap="nowrap" miw={0}>{link(l.task)}<Text size="xs" lineClamp={1} title={l.task.title}>{l.task.title}</Text></Group>
-                            <Group gap={4} wrap="nowrap">
-                                <StatusBadge status={l.task.status}/>
-                                <ActionIcon variant="subtle" color="gray" size="xs" aria-label="Remove link"
-                                            onClick={() => (l.from ? Unlink(k, l.kind, l.task.key) : Unlink(l.task.key, l.kind, k)).then(reload).catch(errMsg)}><IconX size={12}/></ActionIcon>
-                            </Group>
-                        </Group>
-                    ))}
-                </Stack>
-            ))}
-            <Group gap={4} wrap="nowrap">
-                <Select size="xs" w={118} allowDeselect={false} value={choice} onChange={v => v && setChoice(v)} data={LINK_CHOICES.map(c => ({value: c[0], label: c[1]}))}/>
-                <Select size="xs" searchable clearable placeholder="Task" style={{flex: 1}} value={other} onChange={setOther}
-                        data={(tasks ?? []).filter(x => x.key !== k).map(x => ({value: x.key, label: `${x.key} ${x.title}`}))}/>
-                <ActionIcon variant="default" size="md" aria-label="Add link" disabled={!other} onClick={add}><IconPlus size={14}/></ActionIcon>
-            </Group>
-        </Stack>
-    )
-}
-
-export function TaskSidebar({t, rel, runs, nav, reload, onTerm}: {t: store.Task; rel: store.Relations; runs: store.Run[]; nav: Nav; reload: () => void; onTerm: (t: ui.TermInfo) => void}) {
+export function TaskSidebar({t, runs, reload, onTerm}: {t: store.Task; runs: store.Run[]; reload: () => void; onTerm: (t: ui.TermInfo) => void}) {
     const k = t.key
     const repos = t.repos ?? []
     const {data: actions, error: actionsError, reload: reloadActions} = useData(() => Actions(k), [k])
@@ -206,8 +147,6 @@ export function TaskSidebar({t, rel, runs, nav, reload, onTerm}: {t: store.Task;
             </Group>
             <Group justify="space-between"><Text size="xs" c="dimmed">Created</Text><Time iso={t.created_at}/></Group>
             <Group justify="space-between"><Text size="xs" c="dimmed">Updated</Text><Time iso={t.updated_at}/></Group>
-            <Divider/>
-            <Relations k={k} status={t.status} rel={rel} nav={nav} reload={reload}/>
             <Divider/>
             <Title order={6}>Repos</Title>
             {actionsError && <Text size="xs" c="red">Failed to load actions: {actionsError}</Text>}

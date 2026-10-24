@@ -259,11 +259,14 @@ func (a *App) GetTask(key string) (TaskDetail, error) {
 	return TaskDetail{Task: t, Comments: cs, Runs: rs, Relations: rel}, nil
 }
 
-// Link records "from <kind> to" (blocks, relates, duplicates).
+// Link records "from <kind> to" (blocks, relates).
 func (a *App) Link(from, kind, to string) error { return a.svc.Link(from, kind, to) }
 
 // Unlink removes "from <kind> to".
 func (a *App) Unlink(from, kind, to string) error { return a.svc.Unlink(from, kind, to) }
+
+// SetParent makes parent (empty: none) the parent of the task; keys don't change.
+func (a *App) SetParent(key, parent string) error { return a.svc.SetParent(key, parent) }
 
 // CreateTask creates a task and returns its key.
 func (a *App) CreateTask(in core.NewTaskInput) (string, error) {
