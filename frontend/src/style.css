@@ -10,3 +10,4 @@ html, body, #root { height: 100%; margin: 0; }
 .md-ref { font-family: var(--mantine-font-family-monospace); font-size: .92em; padding: 0 3px; border-radius: 3px; }
 .md-ref-file { color: var(--mantine-color-blue-text); background: var(--mantine-color-blue-light); }
 .md-ref-cmd { color: var(--mantine-color-violet-text); background: var(--mantine-color-violet-light); }
+a.md-ref-file { text-decoration: none; cursor: pointer; } a.md-ref-file:hover { text-decoration: underline; }

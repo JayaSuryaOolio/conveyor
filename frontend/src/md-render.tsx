@@ -1,8 +1,9 @@
-import {useEffect, useState} from 'react'
-import {Modal} from '@mantine/core'
+import {useContext, useEffect, useState} from 'react'
+import {Menu, Modal} from '@mantine/core'
 import Md from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import {Home} from '../wailsjs/go/ui/App'
+import {FileOpeners, Home, OpenFile, ShowError} from '../wailsjs/go/ui/App'
+import {TaskKey} from './markdown'
 import {BrowserOpenURL} from '../wailsjs/runtime/runtime'
 
 let homeP: Promise<string> | undefined
@@ -55,6 +56,26 @@ const remarkRefs = () => (tree: Node) => {
     walk(tree)
 }
 
+/** An @file mention inside a task: click to open it in a configured editor or reveal it in Finder. */
+function FileRef({children}: {children?: React.ReactNode}) {
+    const key = useContext(TaskKey)
+    const [apps, setApps] = useState<string[]>()
+    const [err, setErr] = useState('')
+    const ref = String(children)
+    if (!key) return <span className="md-ref md-ref-file">{children}</span>
+    return (
+        <Menu position="bottom-start" withinPortal onOpen={() => FileOpeners(key, ref).then(a => { setApps(a); setErr('') }, e => { setApps([]); setErr(String(e)) })}>
+            <Menu.Target><a href="#" className="md-ref md-ref-file" onClick={e => e.preventDefault()}>{children}</a></Menu.Target>
+            <Menu.Dropdown>
+                <Menu.Label>{err || 'Open ' + ref}</Menu.Label>
+                {apps?.map(a => (
+                    <Menu.Item key={a} onClick={() => OpenFile(key, ref, a).catch(e => ShowError(String(e)))}>{a === 'Finder' ? 'Reveal in Finder' : a}</Menu.Item>
+                ))}
+            </Menu.Dropdown>
+        </Menu>
+    )
+}
+
 const plugins = [remarkGfm, remarkRefs]
 const components = {
     // Never navigate the webview: hand links to the system browser.
@@ -62,6 +83,8 @@ const components = {
         <a href={href} onClick={e => { e.preventDefault(); if (href) BrowserOpenURL(href) }}>{children}</a>
     ),
     img: Img,
+    span: ({className, children}: {className?: string; children?: React.ReactNode}) =>
+        className === 'md-ref md-ref-file' ? <FileRef>{children}</FileRef> : <span className={className}>{children}</span>,
 }
 
 export default function MdRender({children}: {children: string}) {

@@ -50,8 +50,8 @@ export function ApplyLearnings(arg1) {
   return window['go']['ui']['App']['ApplyLearnings'](arg1);
 }
 
-export function Completions(arg1, arg2) {
-  return window['go']['ui']['App']['Completions'](arg1, arg2);
+export function Complete(arg1, arg2, arg3, arg4) {
+  return window['go']['ui']['App']['Complete'](arg1, arg2, arg3, arg4);
 }
 
 export function Confirm(arg1) {
@@ -88,6 +88,10 @@ export function EnsureWorkspace(arg1) {
 
 export function ExportState() {
   return window['go']['ui']['App']['ExportState']();
+}
+
+export function FileOpeners(arg1, arg2) {
+  return window['go']['ui']['App']['FileOpeners'](arg1, arg2);
 }
 
 export function GetPromptDefaults() {
@@ -148,6 +152,10 @@ export function Move(arg1, arg2) {
 
 export function OpenApp(arg1, arg2, arg3) {
   return window['go']['ui']['App']['OpenApp'](arg1, arg2, arg3);
+}
+
+export function OpenFile(arg1, arg2, arg3) {
+  return window['go']['ui']['App']['OpenFile'](arg1, arg2, arg3);
 }
 
 export function PreviewBrief(arg1) {

@@ -52,52 +52,6 @@ export namespace core {
 	        this.next = source["next"];
 	    }
 	}
-	export class Command {
-	    name: string;
-	    description: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new Command(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.name = source["name"];
-	        this.description = source["description"];
-	    }
-	}
-	export class Completions {
-	    files: string[];
-	    commands: Command[];
-	
-	    static createFrom(source: any = {}) {
-	        return new Completions(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.files = source["files"];
-	        this.commands = this.convertValues(source["commands"], Command);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
 	export class NewTaskInput {
 	    Title: string;
 	    Description: string;
@@ -205,6 +159,22 @@ export namespace core {
 		    }
 		    return a;
 		}
+	}
+	export class Suggestion {
+	    insert: string;
+	    label: string;
+	    hint: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Suggestion(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.insert = source["insert"];
+	        this.label = source["label"];
+	        this.hint = source["hint"];
+	    }
 	}
 
 }
