@@ -42,15 +42,15 @@ export function NewTask({nav, close}: {nav: Nav; close: () => void}) {
 }
 
 /** Select of the Claude agents available to the given repos; "" means none. */
-export function AgentSelect({repos, value, onChange}: {repos: string[]; value: string; onChange: (a: string) => void}) {
+export function AgentSelect({repos, value, onChange, size}: {repos: string[]; value: string; onChange: (a: string) => void; size?: string}) {
     const {data} = useData(() => ListAgents(repos), [repos.join(',')])
     const names = [...new Set((data ?? []).map(a => a.name))]
     if (value && !names.includes(value)) names.push(value)
-    return <Select placeholder="Agent: none" aria-label="Claude agent" clearable data={names} value={value || null} onChange={v => onChange(v ?? '')}/>
+    return <Select size={size} placeholder="Agent: none" aria-label="Claude agent" clearable data={names} value={value || null} onChange={v => onChange(v ?? '')}/>
 }
 
 export function TaskAgent({k, repos, agent}: {k: string; repos: string[]; agent: string}) {
-    return <AgentSelect repos={repos} value={agent} onChange={a => SetTaskAgent(k, a).catch(errMsg)}/>
+    return <AgentSelect size="xs" repos={repos} value={agent} onChange={a => SetTaskAgent(k, a).catch(errMsg)}/>
 }
 
 export function Repos() {
