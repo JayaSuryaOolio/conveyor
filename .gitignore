@@ -3,5 +3,8 @@
 *.db-journal
 .conveyor/
 node_modules/
-web/dist/
 .DS_Store
+frontend/node_modules
+frontend/dist/*
+!frontend/dist/.gitkeep
+build/bin
