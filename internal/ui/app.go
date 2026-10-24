@@ -278,14 +278,17 @@ func (a *App) CreateTask(in core.NewTaskInput) (string, error) {
 	return t.Key, err
 }
 
-// AddComment posts a human comment.
-func (a *App) AddComment(key, body string) error {
+// AddComment posts a human comment; after ("", "ask" or "note") applies once a PR of the task is merged.
+func (a *App) AddComment(key, body, after string) error {
 	if body == "" {
 		return fmt.Errorf("comment is empty")
 	}
-	_, err := a.svc.AddComment(key, store.AuthorHuman, body)
+	_, err := a.svc.AddComment(key, store.AuthorHuman, body, core.AfterMerge(after))
 	return err
 }
+
+// MergedPR is the merged PR a comment on the task would trip over, or "".
+func (a *App) MergedPR(key string) (string, error) { return a.svc.MergedPR(key) }
 
 // Move changes a task's status as a human.
 func (a *App) Move(key, status string) error { return a.svc.Move(key, store.Status(status)) }
