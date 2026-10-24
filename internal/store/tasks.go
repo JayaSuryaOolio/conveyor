@@ -156,7 +156,9 @@ func UpdateTaskStatus(db *sql.DB, id int64, to Status, actor Actor) (Task, error
 		if err := ValidateTransition(from, to, actor); err != nil {
 			return err
 		}
-		res, err := tx.Exec(`UPDATE tasks SET status=?, updated_at=? WHERE id=? AND status=?`, to, now(), id, from)
+		// A human leaving failed (requeue) gets a fresh failure budget.
+		reset := from == StatusFailed && actor == ActorHuman
+		res, err := tx.Exec(`UPDATE tasks SET status=?, consecutive_failures=CASE WHEN ? THEN 0 ELSE consecutive_failures END, updated_at=? WHERE id=? AND status=?`, to, reset, now(), id, from)
 		if err != nil {
 			return fmt.Errorf("update status: %w", err)
 		}
