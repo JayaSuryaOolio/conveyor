@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"io"
@@ -9,12 +10,13 @@ import (
 	"text/tabwriter"
 
 	"github.com/JayaSuryaOolio/conveyor/internal/core"
+	"github.com/JayaSuryaOolio/conveyor/internal/gh"
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 )
 
-func init() { register("task", runTask, "manage tasks (new|list|show|comment|move|cancel|done)") }
+func init() { register("task", runTask, "manage tasks (new|list|show|comment|move|cancel|done|sync)") }
 
-const taskUsage = "usage: conveyor task new|list|show|comment|move|cancel|done ..."
+const taskUsage = "usage: conveyor task new|list|show|comment|move|cancel|done|sync ..."
 
 func runTask(home string, args []string) error {
 	if len(args) == 0 {
@@ -40,6 +42,11 @@ func runTask(home string, args []string) error {
 				return fmt.Errorf("unknown status %q", rest[1])
 			}
 			return s.Move(rest[0], to)
+		case "sync":
+			if len(rest) != 1 {
+				return fmt.Errorf("usage: conveyor task sync KEY")
+			}
+			return taskSync(s, rest[0])
 		case "cancel", "done":
 			if len(rest) != 1 {
 				return fmt.Errorf("usage: conveyor task %s KEY", cmd)
@@ -209,4 +216,23 @@ func taskComment(s *core.Service, args []string) error {
 	}
 	_, err := s.AddComment(args[0], store.AuthorHuman, body)
 	return err
+}
+
+// taskSync refreshes PR state from gh and prints it.
+func taskSync(s *core.Service, key string) error {
+	t, err := store.GetTaskByKey(s.DB, key)
+	if err != nil {
+		return err
+	}
+	if err := gh.SyncTask(context.Background(), s.DB, t); err != nil {
+		return err
+	}
+	if t, err = store.GetTaskByKey(s.DB, key); err != nil {
+		return err
+	}
+	fmt.Fprintf(out, "%s  status: %s\n", t.Key, t.Status)
+	for _, r := range t.Repos {
+		fmt.Fprintf(out, "%s  %s  %s\n", r.RepoName, deref(r.PRState), deref(r.PRURL))
+	}
+	return nil
 }
