@@ -8,12 +8,12 @@ import (
 )
 
 const taskCols = `id, key, title, description, status, priority, model, agent, source, external_key,
- external_url, parent_id, consecutive_failures, created_at, updated_at`
+ external_url, parent_id, consecutive_failures, created_at, updated_at, created_by`
 
 func scanTask(r interface{ Scan(...any) error }) (Task, error) {
 	var t Task
 	err := r.Scan(&t.ID, &t.Key, &t.Title, &t.Description, &t.Status, &t.Priority, &t.Model, &t.Agent, &t.Source,
-		&t.ExternalKey, &t.ExternalURL, &t.ParentID, &t.ConsecutiveFailures, &t.CreatedAt, &t.UpdatedAt)
+		&t.ExternalKey, &t.ExternalURL, &t.ParentID, &t.ConsecutiveFailures, &t.CreatedAt, &t.UpdatedAt, &t.CreatedBy)
 	return t, err
 }
 
@@ -98,9 +98,9 @@ func CreateTask(db *sql.DB, t Task, repos []TaskRepo) (Task, error) {
 			}
 		}
 		res, err := tx.Exec(`INSERT INTO tasks (key, title, description, status, priority, model, agent, source, external_key,
- external_url, parent_id, consecutive_failures, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+ external_url, parent_id, consecutive_failures, created_at, updated_at, created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 			t.Key, t.Title, t.Description, t.Status, t.Priority, t.Model, t.Agent, t.Source, t.ExternalKey,
-			t.ExternalURL, t.ParentID, t.ConsecutiveFailures, t.CreatedAt, t.UpdatedAt)
+			t.ExternalURL, t.ParentID, t.ConsecutiveFailures, t.CreatedAt, t.UpdatedAt, t.CreatedBy)
 		if err != nil {
 			return fmt.Errorf("insert task: %w", err)
 		}
