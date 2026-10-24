@@ -67,13 +67,43 @@ func TestRenderGolden(t *testing.T) {
 func TestPrompts(t *testing.T) {
 	tk := store.Task{Key: "CV-2", Title: "T"}
 	d := []store.Comment{{Author: "human", Body: "a"}, {Author: "system", Body: "b"}}
-	if got, want := FreshPrompt(tk, "/b.md", nil), "You are working on Conveyor task CV-2: T. Read /b.md first and follow it."; got != want {
+	if got, want := FreshPrompt(tk, "/b.md", nil, ""), "You are working on Conveyor task CV-2: T. Read /b.md first and follow it."; got != want {
 		t.Errorf("fresh %q", got)
 	}
-	if got := FreshPrompt(tk, "/b.md", d); !strings.HasSuffix(got, "\n- [human] a\n- [system] b") {
+	if got := FreshPrompt(tk, "/b.md", d, ""); !strings.HasSuffix(got, "\n- [human] a\n- [system] b") {
 		t.Errorf("fresh delta %q", got)
 	}
-	if got, want := ResumePrompt(tk, "/b.md", d), "New comments on CV-2:\n- [human] a\n- [system] b\n(The brief at /b.md is up to date.)"; got != want {
+	if got, want := ResumePrompt(tk, "/b.md", d, ""), "New comments on CV-2:\n- [human] a\n- [system] b\n(The brief at /b.md is up to date.)"; got != want {
 		t.Errorf("resume %q", got)
+	}
+}
+
+func TestSettingsShapeBrief(t *testing.T) {
+	dir := t.TempDir()
+	db, err := store.Open(filepath.Join(dir, "c.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	tk := store.Task{Key: "CV-3", Title: "T"}
+	store.SetSetting(db, "brief_extra_rules", "- Be kind.")
+	store.SetSetting(db, "pr_comment_prefix", "bot: ")
+	got, err := Build(db, tk)
+	if err != nil || !strings.Contains(got, "with `bot: `.\n- Be kind.\n\n## Older history") {
+		t.Fatalf("rules not applied (%v):\n%s", err, got)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "workspaces")); err == nil {
+		t.Fatal("Build must not write")
+	}
+	store.SetSetting(db, "pr_comment_prefix", "")
+	if got, _ = Build(db, tk); strings.Contains(got, "Start every comment") {
+		t.Fatal("empty prefix should drop the rule")
+	}
+	d := []store.Comment{{Author: "human", Body: "a"}}
+	if got := FreshPrompt(tk, "/b.md", d, "{key}|{title}|{brief}|{comments}"); got != "CV-3|T|/b.md|- [human] a" {
+		t.Errorf("custom fresh %q", got)
+	}
+	if got := ResumePrompt(tk, "/b.md", d, "{key}!"); got != "CV-3!" {
+		t.Errorf("custom resume %q", got)
 	}
 }

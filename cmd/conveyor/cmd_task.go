@@ -55,8 +55,11 @@ func runTask(home string, args []string) error {
 		case "open":
 			return taskOpen(s, rest)
 		case "brief":
+			if len(rest) == 2 && rest[1] == "--preview" {
+				return taskBriefPreview(s, rest[0])
+			}
 			if len(rest) != 1 {
-				return fmt.Errorf("usage: conveyor task brief KEY")
+				return fmt.Errorf("usage: conveyor task brief KEY [--preview]")
 			}
 			return taskBrief(s, rest[0])
 		case "sync":
@@ -364,4 +367,18 @@ func taskBrief(s *core.Service, key string) error {
 	}
 	_, err = out.Write(b)
 	return err
+}
+
+// taskBriefPreview prints the brief and fresh prompt a launch would use, without writing BRIEF.md.
+func taskBriefPreview(s *core.Service, key string) error {
+	t, err := store.GetTaskByKey(s.DB, key)
+	if err != nil {
+		return err
+	}
+	text, prompt, err := brief.Preview(s.DB, s.Home, t)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(out, "%s\n--- fresh prompt ---\n%s\n", text, prompt)
+	return nil
 }
