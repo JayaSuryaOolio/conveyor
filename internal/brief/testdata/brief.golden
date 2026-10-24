@@ -69,7 +69,7 @@ spawn: child task title (repeatable line)
 - Work only inside the worktrees listed above.
 - Open at most one PR per repo.
 - Never push to the default branch.
-- Prefer the repo's own commands and skills over ad-hoc steps. When one matches what you are doing (e.g. creating a PR, adding tests, writing a changeset), use it: run the slash command via the Skill tool, or Read the command file and follow it.
+- The repo's CLAUDE.md, skills, commands and agents are the authority on how to work in it (build, test, commit, PR, changesets). Use them over your own defaults and over generic user-level skills; where they disagree with this brief, follow the repo, except for the worktree, PR and status block rules here.
 - Start every comment or reply you post on a PR or issue with `ai agent: `.
 
 ## Older history
