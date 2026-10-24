@@ -14,6 +14,10 @@ export function AddAgent(arg1, arg2, arg3, arg4) {
   return window['go']['ui']['App']['AddAgent'](arg1, arg2, arg3, arg4);
 }
 
+export function AddAutomation(arg1) {
+  return window['go']['ui']['App']['AddAutomation'](arg1);
+}
+
 export function AddComment(arg1, arg2) {
   return window['go']['ui']['App']['AddComment'](arg1, arg2);
 }
@@ -40,6 +44,14 @@ export function Confirm(arg1) {
 
 export function CreateTask(arg1) {
   return window['go']['ui']['App']['CreateTask'](arg1);
+}
+
+export function DeleteAutomation(arg1) {
+  return window['go']['ui']['App']['DeleteAutomation'](arg1);
+}
+
+export function DescribeSchedule(arg1) {
+  return window['go']['ui']['App']['DescribeSchedule'](arg1);
 }
 
 export function DispatcherState() {
@@ -124,4 +136,8 @@ export function SetTaskRepo(arg1, arg2, arg3, arg4) {
 
 export function ShowError(arg1) {
   return window['go']['ui']['App']['ShowError'](arg1);
+}
+
+export function UpdateAutomation(arg1) {
+  return window['go']['ui']['App']['UpdateAutomation'](arg1);
 }
