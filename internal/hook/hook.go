@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/JayaSuryaOolio/conveyor/internal/core"
 	"github.com/JayaSuryaOolio/conveyor/internal/statusblock"
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 	"github.com/JayaSuryaOolio/conveyor/internal/transcript"
@@ -159,6 +160,9 @@ func onStop(db *sql.DB, task store.Task, run store.Run, p payload) error {
 		if err := store.RecordEvent(db, task.ID, "spawn", s); err != nil {
 			return err
 		}
+	}
+	if _, err := core.SpawnChildren(db, task, block.Spawn); err != nil {
+		return err
 	}
 
 	if task.Status != store.StatusRunning {

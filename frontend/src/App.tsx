@@ -1,7 +1,9 @@
 import {useEffect, useRef, useState} from 'react'
-import {DispatcherState} from '../wailsjs/go/ui/App'
+import {DispatcherState, Learnings} from '../wailsjs/go/ui/App'
 import {Nav} from './components'
 import {NewTask, Repos, Settings} from './forms'
+import {LearningsPage} from './learnings'
+import {useData} from './util'
 import {Board, Focus, TaskPage} from './views'
 
 type View = {name: string; key?: string}
@@ -12,6 +14,8 @@ export default function App() {
     const [q, setQ] = useState('')
     const search = useRef<HTMLInputElement>(null)
     const [dispatcher, setDispatcher] = useState('')
+    const {data: learnings} = useData(Learnings, [])
+    const proposed = learnings?.filter(l => l.status === 'proposed').length ?? 0
     const nav: Nav = v => setView(v)
 
     useEffect(() => {
@@ -44,9 +48,9 @@ export default function App() {
         <>
             <header>
                 <b>Conveyor</b>
-                {['board', 'focus', 'repos', 'settings'].map(n => (
+                {['board', 'focus', 'learnings', 'repos', 'settings'].map(n => (
                     <a key={n} href="#" className={view.name === n ? 'active' : ''}
-                       onClick={e => { e.preventDefault(); setView({name: n}) }}>{n}</a>
+                       onClick={e => { e.preventDefault(); setView({name: n}) }}>{n}{n === 'learnings' && proposed > 0 && <span className="chip">{proposed}</span>}</a>
                 ))}
                 <span className="muted badge" title="Whether this app is running the dispatcher">{dispatcher}</span>
                 <input ref={search} className="search" placeholder="Search (/)" value={q} onChange={e => setQ(e.target.value)}/>
@@ -56,6 +60,7 @@ export default function App() {
                 {view.name === 'board' && <Board nav={nav} q={q}/>}
                 {view.name === 'focus' && <Focus nav={nav} q={q}/>}
                 {view.name === 'task' && <TaskPage k={view.key!} nav={nav}/>}
+                {view.name === 'learnings' && <LearningsPage nav={nav}/>}
                 {view.name === 'repos' && <Repos/>}
                 {view.name === 'settings' && <Settings/>}
             </main>
