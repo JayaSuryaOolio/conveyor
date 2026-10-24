@@ -23,7 +23,7 @@ conveyor task list [--status todo,running] --json
 conveyor task show KEY --thread --runs [--json]
 conveyor task brief KEY --preview     # what the agent is told
 conveyor task log KEY [--follow]      # live session output
-conveyor task new "t" --repo r [--desc ..] [--todo] [--parent KEY] (--repo optional with --parent: defaults to the parent's repos) [--model m] [--agent a]
+conveyor task new "t" --repo r [--desc ..] [--todo] [--parent KEY] (--repo/--agent optional with --parent: default to the parent's) [--model m] [--agent a]
 conveyor task comment KEY "text"      conveyor task move KEY <status>
 conveyor task set KEY [--branch b] [--pr url] [--model m] [--desc d]   # --desc: backlog only
 conveyor task link KEY blocks|relates OTHER     conveyor task unlink KEY kind OTHER

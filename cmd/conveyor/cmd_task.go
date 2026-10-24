@@ -104,7 +104,7 @@ func taskNew(s *core.Service, args []string) error {
 	descFile := fs.String("desc-file", "", "read description from file")
 	todo := fs.Bool("todo", false, "start in todo instead of backlog")
 	model := fs.String("model", "", "model override")
-	agent := fs.String("agent", "", "Claude subagent name (see conveyor agent list)")
+	agent := fs.String("agent", "", "Claude subagent name (see conveyor agent list; sub-tasks default to the parent's)")
 	parent := fs.String("parent", "", "parent task key (the new task becomes its sub-task, e.g. CV-1A)")
 	prio := fs.Int("priority", 0, "priority (higher first)")
 	pos, err := parseArgs(fs, args)

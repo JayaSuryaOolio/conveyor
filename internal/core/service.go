@@ -83,6 +83,9 @@ func (s *Service) CreateTask(in NewTaskInput) (store.Task, error) {
 			}
 		}
 	}
+	if in.Agent == "" && parent != nil && parent.Agent != nil {
+		in.Agent = *parent.Agent // like repos: a sub-task starts with its parent's agent
+	}
 	if len(in.Repos) == 0 {
 		return store.Task{}, fmt.Errorf("at least one repo is required")
 	}
