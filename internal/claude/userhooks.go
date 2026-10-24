@@ -159,9 +159,5 @@ func SetUserHooks(path, conveyorBin, home string, install bool) error {
 	if err != nil {
 		return err
 	}
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, append(b, '\n'), mode); err != nil {
-		return err
-	}
-	return os.Rename(tmp, path)
+	return writeAtomic(path, append(b, '\n'), mode)
 }

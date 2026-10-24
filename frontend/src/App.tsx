@@ -80,7 +80,7 @@ export default function App() {
                     <Text mt="auto" size="xs" c="dimmed" title="Whether this app is running the dispatcher">{dispatcher}</Text>
                 </Stack>
             </AppShell.Navbar>
-            <AppShell.Main key={view.name + (view.key ?? '')} h="100vh" style={{overflow: 'auto'}}>
+            <AppShell.Main key={view.name + (view.key ?? '')} h="100vh" style={{overflow: view.name === 'task' ? 'hidden' : 'auto'}}>
                 {view.name === 'board' && <Board nav={nav} q={q}/>}
                 {view.name === 'focus' && <Focus nav={nav} q={q}/>}
                 {view.name === 'task' && <TaskPage k={view.key!} nav={nav}/>}

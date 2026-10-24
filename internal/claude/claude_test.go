@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -181,5 +182,26 @@ func TestCommandStrings(t *testing.T) {
 	want := `claude --settings '/my dir/s.json' 'Read /my dir/brief.md first, then wait for my instructions.' --add-dir '/a b' --add-dir '/it'\''s'`
 	if got != want {
 		t.Fatalf("got %s", got)
+	}
+}
+
+func TestWriteSettingsConcurrent(t *testing.T) {
+	home := t.TempDir()
+	var wg sync.WaitGroup
+	errs := make(chan error, 20)
+	for range 20 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, err := WriteSettings(home, "/bin/cv")
+			errs <- err
+		}()
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 }
