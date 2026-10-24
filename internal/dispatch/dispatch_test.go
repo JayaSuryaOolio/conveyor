@@ -293,6 +293,39 @@ func TestReapVanished(t *testing.T) {
 	}
 }
 
+func TestReapLaunchingNoBg(t *testing.T) {
+	e := setup(t)
+	tk := e.task(t, "t", 0)
+	// Simulate a crash between CreateRun and saving the bg id.
+	run, err := store.CreateRun(e.db, store.Run{TaskID: tk.ID, Kind: "auto", Mode: "fresh", Status: "launching"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.UpdateTaskStatus(e.db, tk.ID, store.StatusRunning, store.ActorSystem); err != nil {
+		t.Fatal(err)
+	}
+	e.now = time.Now().Add(5 * time.Second) // inside the grace period
+	e.d.reap(t.Context())
+	if got, _ := store.GetRun(e.db, run.ID); got.Status != "launching" {
+		t.Fatal("reaped inside the grace period")
+	}
+
+	e.now = time.Now().Add(time.Minute)
+	if err := e.d.reap(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := store.GetRun(e.db, run.ID)
+	if got.Status != "failed" || got.Error == nil || *got.Error != "launch interrupted" {
+		t.Fatalf("run %+v", got)
+	}
+	if e.get(t, tk.ID).Status != store.StatusNeedsYou {
+		t.Fatalf("task %s", e.get(t, tk.ID).Status)
+	}
+	if cs, _ := store.ListComments(e.db, tk.ID); len(cs) != 1 || cs[0].Author != store.AuthorSystem {
+		t.Fatalf("comments %+v", cs)
+	}
+}
+
 func TestLockExclusive(t *testing.T) {
 	home := t.TempDir()
 	rel, err := Lock(home)
