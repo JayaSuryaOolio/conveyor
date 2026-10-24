@@ -28,7 +28,7 @@ criteria:
 - [x] AC1 - evidence
 - [ ] AC2 - why not
 learning: a lesson (repeatable line)
-spawn: child task title (repeatable line)
+spawn: child task title | description with everything its agent needs (repeatable line)
 </conveyor>
 ` + "```" + `
 `

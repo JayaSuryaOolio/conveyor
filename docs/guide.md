@@ -68,9 +68,11 @@ next: what remains
 criteria:
 - [x] AC1 - evidence
 learning: a lesson
-spawn: title of a follow-up task
+spawn: title of a follow-up task | its description
 </conveyor>
 ```
+
+Each `spawn:` line becomes a backlog sub-task with the parent's repos and the text after `|` as its description. A line without a description creates nothing and records a `spawn_failed` event, so no sub-task starts without context; `conveyor task new --parent` likewise requires `--desc`.
 
 Without a block the agent is treated as asking you a question. `BRIEF.md` explains this protocol to the agent, along with the task, repos, latest runs and your comments. The `brief_extra_rules` setting adds your own rules to it.
 

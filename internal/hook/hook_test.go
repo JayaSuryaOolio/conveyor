@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/JayaSuryaOolio/conveyor/internal/core"
@@ -69,7 +70,7 @@ func (e env) status(t *testing.T) store.Task {
 	return tk
 }
 
-const doneMsg = "All good.\n<conveyor>\nstatus: done\nsummary: s\ncriteria:\n- [x] AC1 — ok\nlearning: l1\nspawn: child\n</conveyor>"
+const doneMsg = "All good.\n<conveyor>\nstatus: done\nsummary: s\ncriteria:\n- [x] AC1 — ok\nlearning: l1\nspawn: child | do the thing\nspawn: nodesc\n</conveyor>"
 const failMsg = "<conveyor>\nstatus: failed\nsummary: nope\n</conveyor>"
 
 func TestPromptSetsSessionAndNeedsYouResumes(t *testing.T) {
@@ -117,7 +118,7 @@ func TestStopDoneToReview(t *testing.T) {
 	evs, _ := store.ListEvents(e.db, e.task.ID)
 	spawn := 0
 	for _, ev := range evs {
-		if ev.Kind == "spawn" && ev.Detail == "child" {
+		if ev.Kind == "spawn" && ev.Detail == "child | do the thing" {
 			spawn++
 		}
 	}
@@ -128,6 +129,16 @@ func TestStopDoneToReview(t *testing.T) {
 	if len(all) != 1 || all[0].Title != "child" || all[0].ParentID == nil || *all[0].ParentID != e.task.ID ||
 		len(all[0].Repos) != 1 || all[0].Repos[0].RepoName != "a" || !all[0].Repos[0].IsPrimary {
 		t.Fatalf("spawned child: %+v", all)
+	}
+	if d := all[0].Description; d != "do the thing" {
+		t.Fatalf("spawned child description: %q", d)
+	}
+	failed := false
+	for _, ev := range evs {
+		failed = failed || ev.Kind == "spawn_failed" && strings.Contains(ev.Detail, "nodesc")
+	}
+	if !failed {
+		t.Fatal("want spawn_failed for the line without a description")
 	}
 }
 
