@@ -14,6 +14,7 @@ import (
 
 	"github.com/JayaSuryaOolio/conveyor/internal/brief"
 	"github.com/JayaSuryaOolio/conveyor/internal/claude"
+	"github.com/JayaSuryaOolio/conveyor/internal/core"
 	"github.com/JayaSuryaOolio/conveyor/internal/gh"
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 	"github.com/JayaSuryaOolio/conveyor/internal/workspace"
@@ -153,6 +154,9 @@ func (d *Dispatcher) pollPRs(ctx context.Context) {
 	for _, t := range tasks {
 		if err := gh.SyncTask(ctx, d.DB, t); err != nil {
 			d.logf("pr poll %s: %v", t.Key, err)
+		}
+		if got, err := store.GetTask(d.DB, t.ID); err == nil && got.Status == store.StatusDone {
+			(&core.Service{DB: d.DB}).CleanupSessions(t.ID)
 		}
 	}
 }
