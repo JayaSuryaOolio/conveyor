@@ -1,6 +1,6 @@
 import {lazy, Suspense, useEffect, useRef, useState} from 'react'
-import {Anchor, Box, Breadcrumbs, Button, Code, Group, Paper, Stack, Text, Timeline, Title} from '@mantine/core'
-import {IconMessage, IconPlayerPlay} from '@tabler/icons-react'
+import {ActionIcon, Anchor, Box, Breadcrumbs, Button, Code, Group, Paper, Stack, Text, Timeline, Title} from '@mantine/core'
+import {IconArrowDown, IconArrowUp, IconMessage, IconPlayerPlay} from '@tabler/icons-react'
 import {GetTask, ListTasks, RunLog} from '../wailsjs/go/ui/App'
 import {core, store, ui} from '../wailsjs/go/models'
 import {Card, CommentBox, Message, Nav, StatusBadge, Time, errMsg} from './components'
@@ -153,41 +153,73 @@ export function TaskPage({k, nav}: {k: string; nav: Nav}) {
     const runNo = new Map(d.runs.map((r, i) => [r.id, i + 1]))
     const latest = d.runs[d.runs.length - 1]
     return (
-        <Box style={{display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 2 * var(--mantine-spacing-md))'}}>
-        <Box style={{flex: 1, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 300px', gap: 'var(--mantine-spacing-xl)', alignItems: 'start'}}>
-            <Stack>
-                <Breadcrumbs>
-                    <Anchor size="sm" component="button" onClick={() => nav({name: 'board'})}>Board</Anchor>
-                    <Text size="sm">{t.key}</Text>
-                </Breadcrumbs>
-                <Title order={3}>{t.title}</Title>
-                <Paper withBorder p="md" radius="md">
-                    <Markdown c={t.description ? undefined : 'dimmed'}>{t.description || '(no description)'}</Markdown>
-                </Paper>
-                {latest?.criteria && <><Title order={5}>Acceptance criteria</Title><Criteria text={latest.criteria}/></>}
-                <Title order={5}>Thread</Title>
-                <Timeline bulletSize={24} lineWidth={2}>
-                    {items.map(it => it.run ? (
-                        <Timeline.Item key={'r' + it.run.id} bullet={<IconPlayerPlay size={12}/>}
-                                       title={`Run ${runNo.get(it.run.id)} · ${it.run.mode}`}>
-                            <Text size="xs" c="dimmed">
-                                {it.run.api_calls} calls · {fmtK(it.run.ctx_peak)} peak · {fmtDuration(it.run.started_at, it.run.ended_at)} · <Time iso={it.run.started_at}/>
-                            </Text>
-                            <SessionLog run={it.run}/>
-                        </Timeline.Item>
-                    ) : (
-                        <Timeline.Item key={'c' + it.comment!.id} bullet={<IconMessage size={12}/>}>
-                            <Message m={it.comment!}/>
-                        </Timeline.Item>
-                    ))}
-                </Timeline>
-                <CommentBox k={t.key} onDone={reload}/>
+        // Only the thread scrolls: the comment box, sidebar and terminal dock stay put.
+        <Box style={{display: 'flex', flexDirection: 'column', height: 'calc(100vh - 2 * var(--mantine-spacing-md))'}}>
+        <Box style={{flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 300px', gap: 'var(--mantine-spacing-xl)'}}>
+            <Stack gap="sm" mih={0}>
+                <ScrollBox>
+                    <Stack>
+                        <Breadcrumbs>
+                            <Anchor size="sm" component="button" onClick={() => nav({name: 'board'})}>Board</Anchor>
+                            <Text size="sm">{t.key}</Text>
+                        </Breadcrumbs>
+                        <Title order={3}>{t.title}</Title>
+                        <Paper withBorder p="md" radius="md">
+                            <Markdown c={t.description ? undefined : 'dimmed'}>{t.description || '(no description)'}</Markdown>
+                        </Paper>
+                        {latest?.criteria && <><Title order={5}>Acceptance criteria</Title><Criteria text={latest.criteria}/></>}
+                        <Title order={5}>Thread</Title>
+                        <Timeline bulletSize={24} lineWidth={2}>
+                            {items.map(it => it.run ? (
+                                <Timeline.Item key={'r' + it.run.id} bullet={<IconPlayerPlay size={12}/>}
+                                               title={`Run ${runNo.get(it.run.id)} · ${it.run.mode}`}>
+                                    <Text size="xs" c="dimmed">
+                                        {it.run.api_calls} calls · {fmtK(it.run.ctx_peak)} peak · {fmtDuration(it.run.started_at, it.run.ended_at)} · <Time iso={it.run.started_at}/>
+                                    </Text>
+                                    <SessionLog run={it.run}/>
+                                </Timeline.Item>
+                            ) : (
+                                <Timeline.Item key={'c' + it.comment!.id} bullet={<IconMessage size={12}/>}>
+                                    <Message m={it.comment!}/>
+                                </Timeline.Item>
+                            ))}
+                        </Timeline>
+                    </Stack>
+                </ScrollBox>
+                <Box style={{flex: 'none'}}><CommentBox k={t.key} onDone={reload}/></Box>
             </Stack>
-            <TaskSidebar t={t} runs={d.runs} reload={reload} onTerm={setAdded}/>
+            <Box mih={0} style={{overflowY: 'auto'}}>
+                <TaskSidebar t={t} runs={d.runs} reload={reload} onTerm={setAdded}/>
+            </Box>
         </Box>
-        <Box mx="calc(-1 * var(--mantine-spacing-md))" mb="calc(-1 * var(--mantine-spacing-md))" mt="md">
+        <Box mx="calc(-1 * var(--mantine-spacing-md))" mb="calc(-1 * var(--mantine-spacing-md))" mt="md" style={{flex: 'none'}}>
             <Suspense fallback={null}><TermDock k={t.key} added={added}/></Suspense>
         </Box>
+        </Box>
+    )
+}
+
+/** Scrolling column with floating jump-to-top / jump-to-bottom buttons, shown only when there is somewhere to go. */
+function ScrollBox({children}: {children: React.ReactNode}) {
+    const el = useRef<HTMLDivElement>(null)
+    const [pos, setPos] = useState({top: true, bottom: true})
+    const update = () => {
+        const e = el.current
+        if (e) setPos({top: e.scrollTop < 40, bottom: e.scrollHeight - e.scrollTop - e.clientHeight < 40})
+    }
+    useEffect(() => {
+        const ro = new ResizeObserver(update)
+        if (el.current) { ro.observe(el.current); if (el.current.firstElementChild) ro.observe(el.current.firstElementChild) }
+        return () => ro.disconnect()
+    }, [])
+    const go = (top: number) => el.current?.scrollTo({top, behavior: 'smooth'})
+    return (
+        <Box pos="relative" style={{flex: 1, minHeight: 0}}>
+            <Box ref={el} onScroll={update} h="100%" pr="xs" style={{overflowY: 'auto'}}>{children}</Box>
+            <Stack gap={4} pos="absolute" right={16} bottom={8}>
+                {!pos.top && <ActionIcon variant="default" radius="xl" size="lg" aria-label="Scroll to top" onClick={() => go(0)}><IconArrowUp size={16}/></ActionIcon>}
+                {!pos.bottom && <ActionIcon variant="default" radius="xl" size="lg" aria-label="Scroll to bottom" onClick={() => go(el.current!.scrollHeight)}><IconArrowDown size={16}/></ActionIcon>}
+            </Stack>
         </Box>
     )
 }
