@@ -46,17 +46,17 @@ export default function App() {
     }, [])
 
     return (
-        <>
-            <header>
+        <div className="app">
+            <nav className="sidebar">
                 <b>Conveyor</b>
+                <button onClick={() => setShowNew(true)}>New task (n)</button>
+                <input ref={search} className="search" placeholder="Search (/)" value={q} onChange={e => setQ(e.target.value)}/>
                 {['board', 'focus', 'learnings', 'automations', 'repos', 'settings'].map(n => (
                     <a key={n} href="#" className={view.name === n ? 'active' : ''}
                        onClick={e => { e.preventDefault(); setView({name: n}) }}>{n}{n === 'learnings' && proposed > 0 && <span className="chip">{proposed}</span>}</a>
                 ))}
                 <span className="muted badge" title="Whether this app is running the dispatcher">{dispatcher}</span>
-                <input ref={search} className="search" placeholder="Search (/)" value={q} onChange={e => setQ(e.target.value)}/>
-                <button onClick={() => setShowNew(true)}>New task (n)</button>
-            </header>
+            </nav>
             <main>
                 {view.name === 'board' && <Board nav={nav} q={q}/>}
                 {view.name === 'focus' && <Focus nav={nav} q={q}/>}
@@ -67,6 +67,6 @@ export default function App() {
                 {view.name === 'settings' && <Settings/>}
             </main>
             {showNew && <NewTask nav={nav} close={() => setShowNew(false)}/>}
-        </>
+        </div>
     )
 }
