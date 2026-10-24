@@ -1,0 +1,348 @@
+// Package dispatch turns todo tasks into background Claude runs (tech-spec §2, §7).
+package dispatch
+
+import (
+	"context"
+	"database/sql"
+	"errors"
+	"fmt"
+	"log"
+	"os"
+	"path/filepath"
+	"strconv"
+	"time"
+
+	"github.com/JayaSuryaOolio/conveyor/internal/brief"
+	"github.com/JayaSuryaOolio/conveyor/internal/claude"
+	"github.com/JayaSuryaOolio/conveyor/internal/gh"
+	"github.com/JayaSuryaOolio/conveyor/internal/store"
+	"github.com/JayaSuryaOolio/conveyor/internal/workspace"
+)
+
+const (
+	tickEvery  = 2 * time.Second
+	reapGrace  = 30 * time.Second
+	prPollEach = 60 * time.Second
+)
+
+// Dispatcher launches and supervises auto runs. Run it from one process at a time (see Lock).
+type Dispatcher struct {
+	DB          *sql.DB
+	Home        string
+	ConveyorBin string
+	Now         func() time.Time // injectable; defaults to time.Now
+	Log         *log.Logger      // defaults to log.Default()
+
+	lastPoll time.Time
+}
+
+func (d *Dispatcher) now() time.Time {
+	if d.Now != nil {
+		return d.Now()
+	}
+	return time.Now()
+}
+
+func (d *Dispatcher) logf(format string, a ...any) {
+	l := d.Log
+	if l == nil {
+		l = log.Default()
+	}
+	l.Printf(format, a...)
+}
+
+func (d *Dispatcher) intSetting(key string) int {
+	n, err := strconv.Atoi(store.GetSetting(d.DB, key))
+	if err != nil {
+		n, _ = strconv.Atoi(store.Defaults[key])
+	}
+	return n
+}
+
+// Run ticks every 2s until ctx is done.
+func (d *Dispatcher) Run(ctx context.Context) error {
+	t := time.NewTicker(tickEvery)
+	defer t.Stop()
+	for {
+		if err := d.Tick(ctx); err != nil && ctx.Err() == nil {
+			d.logf("tick: %v", err)
+		}
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-t.C:
+		}
+	}
+}
+
+// Tick does one pass: reap, PR poll, launch.
+func (d *Dispatcher) Tick(ctx context.Context) error {
+	if err := d.reap(ctx); err != nil {
+		d.logf("reap: %v", err)
+	}
+	d.pollPRs(ctx)
+	return d.launchTodo(ctx)
+}
+
+func parseTime(s string) time.Time {
+	t, _ := time.Parse(time.RFC3339, s)
+	return t
+}
+
+func ptr(s string) *string { return &s }
+
+// reap fails active runs whose background session no longer exists.
+func (d *Dispatcher) reap(ctx context.Context) error {
+	runs, err := store.ActiveRuns(d.DB)
+	if err != nil {
+		return err
+	}
+	var withBg []store.Run
+	for _, r := range runs {
+		if r.BgID != nil {
+			withBg = append(withBg, r)
+		}
+	}
+	if len(withBg) == 0 {
+		return nil
+	}
+	agents, err := claude.Agents(ctx)
+	if err != nil {
+		return err
+	}
+	alive := map[string]bool{}
+	for _, a := range agents {
+		alive[a.ID] = true
+	}
+	for _, r := range withBg {
+		if alive[*r.BgID] || d.now().Sub(parseTime(r.StartedAt)) <= reapGrace {
+			continue
+		}
+		ended := d.now().UTC().Format(time.RFC3339)
+		r.Status, r.Error, r.EndedAt = "failed", ptr("session vanished"), &ended
+		if err := store.UpdateRun(d.DB, r); err != nil {
+			return err
+		}
+		task, err := store.GetTask(d.DB, r.TaskID)
+		if err != nil {
+			return err
+		}
+		if task.Status != store.StatusRunning {
+			continue
+		}
+		if _, err := store.AddComment(d.DB, store.Comment{TaskID: task.ID, Author: store.AuthorSystem, Body: "The Claude session vanished before finishing."}); err != nil {
+			return err
+		}
+		if _, err := store.UpdateTaskStatus(d.DB, task.ID, store.StatusNeedsYou, store.ActorSystem); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (d *Dispatcher) pollPRs(ctx context.Context) {
+	if !d.lastPoll.IsZero() && d.now().Sub(d.lastPoll) < prPollEach {
+		return
+	}
+	d.lastPoll = d.now()
+	tasks, err := store.ListTasks(d.DB, store.StatusReview)
+	if err != nil {
+		d.logf("pr poll: %v", err)
+		return
+	}
+	for _, t := range tasks {
+		if err := gh.SyncTask(ctx, d.DB, t); err != nil {
+			d.logf("pr poll %s: %v", t.Key, err)
+		}
+	}
+}
+
+func (d *Dispatcher) launchTodo(ctx context.Context) error {
+	runs, err := store.ActiveRuns(d.DB)
+	if err != nil {
+		return err
+	}
+	busy, auto := map[int64]bool{}, 0
+	for _, r := range runs {
+		busy[r.TaskID] = true
+		if r.Kind == "auto" {
+			auto++
+		}
+	}
+	tasks, err := store.ListTasks(d.DB, store.StatusTodo) // priority desc
+	if err != nil {
+		return err
+	}
+	max := d.intSetting("max_parallel")
+	debounce := time.Duration(d.intSetting("comment_debounce_secs")) * time.Second
+	for _, t := range tasks {
+		if auto >= max || ctx.Err() != nil {
+			break
+		}
+		if busy[t.ID] {
+			continue
+		}
+		pending, err := store.UnconsumedComments(d.DB, t.ID)
+		if err != nil {
+			return err
+		}
+		if n := len(pending); n > 0 && d.now().Sub(parseTime(pending[n-1].CreatedAt)) < debounce {
+			continue
+		}
+		run, err := d.start(ctx, t, pending)
+		if err != nil {
+			d.logf("launch %s: %v", t.Key, err)
+			if ferr := d.fail(t, run, err); ferr != nil {
+				d.logf("record failure %s: %v", t.Key, ferr)
+			}
+			continue
+		}
+		auto++
+	}
+	return nil
+}
+
+// start launches one run. On error the returned run is the launching row if one was created.
+func (d *Dispatcher) start(ctx context.Context, task store.Task, delta []store.Comment) (store.Run, error) {
+	task, err := workspace.Ensure(d.DB, d.Home, task)
+	if err != nil {
+		return store.Run{}, err
+	}
+	settings, err := claude.WriteSettings(d.Home, d.ConveyorBin)
+	if err != nil {
+		return store.Run{}, err
+	}
+	briefPath, err := brief.Render(d.DB, d.Home, task)
+	if err != nil {
+		return store.Run{}, err
+	}
+	prev, err := d.resumable(task)
+	if err != nil {
+		return store.Run{}, err
+	}
+	cwd := workspace.PrimaryPath(task)
+	run := store.Run{TaskID: task.ID, Kind: "auto", Mode: "fresh", Status: "launching"}
+	if prev != nil {
+		run.Mode, run.SessionID = "resume", prev.SessionID // the hook matches resumed sessions by id
+		run.Prompt = brief.ResumePrompt(task, briefPath, delta)
+	} else {
+		run.Prompt = brief.FreshPrompt(task, briefPath, delta)
+	}
+	if run, err = store.CreateRun(d.DB, run); err != nil {
+		return store.Run{}, err
+	}
+	ids := make([]int64, len(delta))
+	for i, c := range delta {
+		ids[i] = c.ID
+	}
+	if err := store.ConsumeComments(d.DB, ids, run.ID); err != nil {
+		return run, err
+	}
+	if _, err := store.UpdateTaskStatus(d.DB, task.ID, store.StatusRunning, store.ActorSystem); err != nil {
+		return run, err
+	}
+	var bg string
+	if prev != nil {
+		bg, err = claude.Resume(ctx, cwd, *prev.BgID, *prev.SessionID, run.Prompt)
+	} else {
+		bg, err = claude.Launch(ctx, d.spec(task, cwd, settings, run.Prompt))
+	}
+	if err != nil {
+		return run, err
+	}
+	// Re-read: a hook may have adopted the run (session id) while we launched.
+	if run, err = store.GetRun(d.DB, run.ID); err != nil {
+		return run, err
+	}
+	run.BgID = &bg
+	if err := store.UpdateRun(d.DB, run); err != nil {
+		return run, err
+	}
+	store.RecordEvent(d.DB, task.ID, "run_started", fmt.Sprintf("run %d (%s) bg %s", run.ID, run.Mode, bg))
+	return run, nil
+}
+
+func (d *Dispatcher) spec(task store.Task, cwd, settings, prompt string) claude.LaunchSpec {
+	s := claude.LaunchSpec{Cwd: cwd, AddDirs: workspace.OtherPaths(task), Prompt: prompt, Name: task.Key, SettingsPath: settings, Bypass: true}
+	if task.Model != nil {
+		s.Model = *task.Model
+	} else {
+		s.Model = store.GetSetting(d.DB, "default_model")
+	}
+	if task.Agent != nil {
+		s.Agent = *task.Agent
+	}
+	if mcp := filepath.Join(cwd, ".mcp.json"); fileExists(mcp) {
+		s.MCPConfig = mcp
+	}
+	return s
+}
+
+func fileExists(p string) bool { _, err := os.Stat(p); return err == nil }
+
+// resumable returns the latest auto run if it can be resumed: finished, with session and bg ids, and a small context.
+func (d *Dispatcher) resumable(task store.Task) (*store.Run, error) {
+	runs, err := store.ListRuns(d.DB, task.ID)
+	if err != nil {
+		return nil, err
+	}
+	for i := len(runs) - 1; i >= 0; i-- {
+		r := runs[i]
+		if r.Kind != "auto" {
+			continue
+		}
+		if r.Status == "finished" && r.SessionID != nil && r.BgID != nil && r.CtxPeak < int64(d.intSetting("resume_threshold")) {
+			return &r, nil
+		}
+		break
+	}
+	return nil, nil
+}
+
+// fail records a failed launch: the run fails, the task returns to todo, and at the
+// failure cap the task fails with a system comment.
+func (d *Dispatcher) fail(task store.Task, run store.Run, cause error) error {
+	if run.ID != 0 {
+		ended := d.now().UTC().Format(time.RFC3339)
+		run.Status, run.Error, run.EndedAt = "failed", ptr(cause.Error()), &ended
+		if err := store.UpdateRun(d.DB, run); err != nil {
+			return err
+		}
+	} else if err := store.RecordEvent(d.DB, task.ID, "error", "launch: "+cause.Error()); err != nil {
+		return err
+	}
+	t, err := store.GetTask(d.DB, task.ID)
+	if err != nil {
+		return err
+	}
+	t.ConsecutiveFailures++
+	if err := store.UpdateTask(d.DB, t); err != nil {
+		return err
+	}
+	if t.ConsecutiveFailures < d.intSetting("max_consecutive_failures") {
+		if t.Status == store.StatusRunning {
+			_, err = store.UpdateTaskStatus(d.DB, t.ID, store.StatusTodo, store.ActorSystem)
+		}
+		return err
+	}
+	body := fmt.Sprintf("Launch failed %d times in a row: %v", t.ConsecutiveFailures, cause)
+	if errors.Is(cause, claude.ErrUntrusted) {
+		for _, r := range t.Repos {
+			if r.IsPrimary {
+				if repo, e := store.GetRepoByName(d.DB, r.RepoName); e == nil {
+					body += fmt.Sprintf("\nHint: open %s in Claude once to trust it.", repo.Path)
+				}
+			}
+		}
+	}
+	if _, err := store.AddComment(d.DB, store.Comment{TaskID: t.ID, Author: store.AuthorSystem, Body: body}); err != nil {
+		return err
+	}
+	if t.Status == store.StatusTodo { // todo -> failed is not an edge; go through running
+		if _, err := store.UpdateTaskStatus(d.DB, t.ID, store.StatusRunning, store.ActorSystem); err != nil {
+			return err
+		}
+	}
+	_, err = store.UpdateTaskStatus(d.DB, t.ID, store.StatusFailed, store.ActorSystem)
+	return err
+}

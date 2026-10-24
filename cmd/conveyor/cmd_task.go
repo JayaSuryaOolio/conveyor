@@ -9,14 +9,17 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"github.com/JayaSuryaOolio/conveyor/internal/brief"
 	"github.com/JayaSuryaOolio/conveyor/internal/core"
 	"github.com/JayaSuryaOolio/conveyor/internal/gh"
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 )
 
-func init() { register("task", runTask, "manage tasks (new|list|show|comment|move|cancel|done|sync)") }
+func init() {
+	register("task", runTask, "manage tasks (new|list|show|comment|move|cancel|done|sync|brief)")
+}
 
-const taskUsage = "usage: conveyor task new|list|show|comment|move|cancel|done|sync ..."
+const taskUsage = "usage: conveyor task new|list|show|comment|move|cancel|done|sync|brief ..."
 
 func runTask(home string, args []string) error {
 	if len(args) == 0 {
@@ -42,6 +45,11 @@ func runTask(home string, args []string) error {
 				return fmt.Errorf("unknown status %q", rest[1])
 			}
 			return s.Move(rest[0], to)
+		case "brief":
+			if len(rest) != 1 {
+				return fmt.Errorf("usage: conveyor task brief KEY")
+			}
+			return taskBrief(s, rest[0])
 		case "sync":
 			if len(rest) != 1 {
 				return fmt.Errorf("usage: conveyor task sync KEY")
@@ -235,4 +243,22 @@ func taskSync(s *core.Service, key string) error {
 		fmt.Fprintf(out, "%s  %s  %s\n", r.RepoName, deref(r.PRState), deref(r.PRURL))
 	}
 	return nil
+}
+
+// taskBrief renders the task's brief and prints its content.
+func taskBrief(s *core.Service, key string) error {
+	t, err := store.GetTaskByKey(s.DB, key)
+	if err != nil {
+		return err
+	}
+	path, err := brief.Render(s.DB, s.Home, t)
+	if err != nil {
+		return err
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	_, err = out.Write(b)
+	return err
 }

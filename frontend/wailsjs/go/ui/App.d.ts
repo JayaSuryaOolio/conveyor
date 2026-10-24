@@ -12,6 +12,8 @@ export function Cancel(arg1:string):Promise<void>;
 
 export function CreateTask(arg1:core.NewTaskInput):Promise<string>;
 
+export function DispatcherState():Promise<string>;
+
 export function GetSettings():Promise<Record<string, string>>;
 
 export function GetTask(arg1:string):Promise<ui.TaskDetail>;

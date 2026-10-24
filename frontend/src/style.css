@@ -10,7 +10,8 @@ a { color: var(--accent); }
 header { display: flex; gap: 14px; align-items: center; padding: 8px 16px; border-bottom: 1px solid var(--border); }
 header a { text-decoration: none; text-transform: capitalize; color: var(--muted); }
 header a.active { color: var(--fg); font-weight: 600; }
-.search { margin-left: auto; width: 200px; }
+.badge { margin-left: auto; }
+.search { width: 200px; }
 main { padding: 16px; }
 input, textarea, select, button { font: inherit; color: inherit; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; }
 button { cursor: pointer; }
