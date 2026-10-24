@@ -1,3 +1,5 @@
+> **Superseded** by `docs/tech-spec.md` and `docs/research/conveyor-design.md` (2026-10-24). Kept for history.
+
 # Implementation plan: Conveyor
 
 Conveyor is the standalone kanban/auto-dispatch product from `docs/kanban-board-prd.md` — a separate repository, own binary, own DB, own frontend. This plan sequences its build so that **phase 1 is fully provable with zero worktree-studio involvement** (per the PRD's Section 3 "optional provider" design), and phase 2 is additive on top of that, built against a stubbed contract so it doesn't block on the worktree-studio-side integration plan landing first (see `worktree-studio-conveyor-integration-plan.md` in the worktree-studio repo's `docs/`).
