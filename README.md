@@ -5,10 +5,21 @@
 <h1 align="center">Conveyor</h1>
 
 <p align="center">
-  <b>A local kanban that runs tasks through Claude Code.</b>
+  <b>A local kanban that orchestrates agentic tasks.</b>
 </p>
 
 <!-- Screenshots: drop PNGs in docs/screenshots/ (board.png, task-page.png) -->
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/images/image.webp" alt="Task Page"></td>
+    <td width="50%"><img src="docs/images/image-1.webp" alt="Jump in to interact with claude session"></td>
+  </tr>
+  <tr>
+    <td width="50%" align="center"><img src="docs/images/image-2.webp" alt="Apps & Integrations" height="240"></td>
+    <td width="50%" align="center"><img src="docs/images/image-3.webp" alt="Introspect and improve prompt setup" height="240"></td>
+  </tr>
+</table>
 
 ---
 
