@@ -2,6 +2,7 @@ package core
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -29,6 +30,40 @@ func TestAppPresets(t *testing.T) {
 		if p.Name == "Cursor" {
 			t.Fatal("uninstalled preset offered")
 		}
+	}
+}
+
+func TestSpotlightRoot(t *testing.T) {
+	list := "/r/a  <-  /w/one two  (pid 12)\n/r/b  <-  /w/three  (pid 3)\n"
+	if got := spotlightRoot(list, "/w/one two"); got != "/r/a" {
+		t.Fatal(got)
+	}
+	if spotlightRoot(list, "/w/other") != "" || spotlightRoot("no spotlight instances running\n", "/w/three") != "" {
+		t.Fatal("matched inactive worktree")
+	}
+}
+
+func TestAppBundleIcns(t *testing.T) {
+	if _, err := exec.LookPath("plutil"); err != nil {
+		t.Skip("no plutil")
+	}
+	dir := t.TempDir()
+	res := filepath.Join(dir, "Zed Preview.app", "Contents", "Resources")
+	os.MkdirAll(res, 0o755)
+	os.WriteFile(filepath.Join(res, "Z.icns"), nil, 0o644)
+	os.WriteFile(filepath.Join(dir, "Zed Preview.app", "Contents", "Info.plist"), []byte(`<?xml version="1.0"?><plist version="1.0"><dict><key>CFBundleIconFile</key><string>Z</string></dict></plist>`), 0o644)
+	old := appDirs
+	appDirs = func() []string { return []string{dir} }
+	t.Cleanup(func() { appDirs = old })
+	app := appBundle("open -a 'Zed Preview' {cwd}")
+	if app == "" || appBundle("echo hi") != "" || appBundle("open -a Nope {cwd}") != "" {
+		t.Fatal(app)
+	}
+	if got := bundleIcns(app); filepath.Base(got) != "Z.icns" {
+		t.Fatal(got)
+	}
+	if exists("/System/Library/CoreServices/Finder.app") && appBundle("open {cwd}") == "" {
+		t.Fatal("finder not found")
 	}
 }
 

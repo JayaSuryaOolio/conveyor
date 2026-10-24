@@ -57,5 +57,20 @@ func (a *App) TestApp(command string) error {
 // OpenApp opens the named app in the task repo's worktree ("" repo = primary).
 func (a *App) OpenApp(name, key, repo string) error { return a.svc.OpenApp(name, key, repo) }
 
+// AppIcons maps configured app names to PNG data: URLs of their macOS icons.
+func (a *App) AppIcons() (map[string]string, error) {
+	apps, err := store.ListApps(a.svc.DB)
+	if err != nil {
+		return nil, err
+	}
+	return core.AppIcons(a.svc.Home, apps), nil
+}
+
+// SpotlightRoot returns the root checkout spotlight mirrors worktree into, "" when inactive for it.
+func (a *App) SpotlightRoot(worktree string) string { return core.SpotlightRoot(worktree) }
+
+// SpotlightStop stops the spotlight instance mirroring into root.
+func (a *App) SpotlightStop(root string) error { return core.SpotlightStop(root) }
+
 // UserHooks reports or changes Conveyor's hooks in ~/.claude/settings.json ("status", "install", "uninstall").
 func (a *App) UserHooks(action string) (string, error) { return a.svc.UserHooks(action) }
