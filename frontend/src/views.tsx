@@ -189,12 +189,12 @@ export function TaskPage({k, nav}: {k: string; nav: Nav}) {
         <Box style={{display: 'flex', flexDirection: 'column', height: 'calc(100vh - 2 * var(--mantine-spacing-md))'}}>
         <Box style={{flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: `minmax(0, 1fr) ${side ? '300px' : 'auto'}`, gap: side ? 'var(--mantine-spacing-xl)' : 'var(--mantine-spacing-xs)'}}>
             <Stack gap="sm" mih={0}>
+                <Breadcrumbs style={{flex: 'none'}}>
+                    <Anchor size="sm" component="button" onClick={() => nav({name: 'board'})}>Board</Anchor>
+                    <Text size="sm">{t.key}</Text>
+                </Breadcrumbs>
                 <ScrollBox>
                     <Stack>
-                        <Breadcrumbs>
-                            <Anchor size="sm" component="button" onClick={() => nav({name: 'board'})}>Board</Anchor>
-                            <Text size="sm">{t.key}</Text>
-                        </Breadcrumbs>
                         <Title order={3}>{t.title}</Title>
                         <Description t={t} reload={reload}/>
                         <Relations k={t.key} status={t.status} rel={d.relations} nav={nav} reload={reload}/>
