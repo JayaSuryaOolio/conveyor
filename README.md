@@ -80,8 +80,8 @@ conveyor repo add ~/work/my-repo
 conveyor task new "Fix the thing" --repo my-repo --desc "..." --todo
 conveyor daemon                          # or just open the app
 conveyor task comment CV-1 "also do X"   # send it back for another pass
-conveyor state export ~/cv.json          # settings/apps/automations/agents as JSON, no repos; `state import` on a fresh install
-conveyor --home /tmp/mock mock seed      # empty home -> mock repos + one task per board scenario (scenarios live in internal/core/mock.go)
+conveyor state export ~/cv.json          # settings/apps/automations/agents/tasks+runs as JSON, no repos; `state import` on a fresh install
+conveyor --home /tmp/mock mock seed      # empty home -> mock repos + one task per board scenario (scenarios live in internal/core/mock.go, imported through the same path as `state import`)
 ```
 
 `claude --bg` refuses untrusted folders, so do the trust step once per repo. A "workspace not trusted" launch failure means it was skipped. `CONVEYOR_HOME` (default `~/.conveyor`) holds the DB, logs and workspaces.

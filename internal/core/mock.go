@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
+	"time"
 
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 )
@@ -60,64 +62,54 @@ func (s *Service) SeedMock(home string) error {
 	if n > 0 {
 		return fmt.Errorf("refusing to seed: %s already has repos or tasks (use an empty --home or CONVEYOR_HOME)", DBPath(home))
 	}
-	ids := map[string]int64{}
 	for _, r := range mockRepos {
 		p := filepath.Join(home, "mock-repos", r)
 		if err := os.MkdirAll(p, 0o755); err != nil {
 			return err
 		}
-		repo, err := store.AddRepo(s.DB, store.Repo{Name: r, Path: p, DefaultBranch: "main"})
-		if err != nil {
+		if _, err := store.AddRepo(s.DB, store.Repo{Name: r, Path: p, DefaultBranch: "main"}); err != nil {
 			return err
 		}
-		ids[r] = repo.ID
 	}
-	created := make([]store.Task, len(mockTasks))
+	repoMap := map[string]string{}
+	for _, r := range mockRepos {
+		repoMap[r] = r // the state's placeholders are the repo names
+	}
+	_, err := s.ImportState(mockState(), repoMap)
+	return err
+}
+
+// mockState turns mockTasks into the state a real export would hold, so seeding
+// goes through the one import path.
+func mockState() State {
+	st := State{Version: stateVersion}
+	ts := time.Now().UTC().Format(time.RFC3339)
+	key := func(i int) string { return strconv.Itoa(i) } // mock indexes are 1-based
 	for i, m := range mockTasks {
-		t := store.Task{Title: m.Title, Description: "Mock scenario: " + m.Title, Priority: m.Priority, ConsecutiveFailures: m.Failures}
+		t := StateTask{Key: key(i + 1), Title: m.Title, Description: "Mock scenario: " + m.Title, Status: m.Status, Priority: m.Priority, Failures: m.Failures}
 		if m.Parent > 0 {
-			t.ParentID = &created[m.Parent-1].ID
+			t.Parent = key(m.Parent)
 		}
-		var repos []store.TaskRepo
+		if m.Blocks > 0 {
+			t.Blocks = []string{key(m.Blocks)}
+		}
 		for j, r := range m.Repos {
-			repos = append(repos, store.TaskRepo{RepoID: ids[r], IsPrimary: j == 0, Branch: "mock", PRURL: sp(m.PRURL), PRState: sp(m.PRState)})
-		}
-		c, err := store.CreateTask(s.DB, t, repos)
-		if err != nil {
-			return err
-		}
-		created[i] = c
-		if _, err := s.DB.Exec(`UPDATE tasks SET status=? WHERE id=?`, m.Status, c.ID); err != nil {
-			return err
+			t.Repos = append(t.Repos, StateTaskRepo{Repo: r, Primary: j == 0, Branch: "mock", PRURL: m.PRURL, PRState: m.PRState})
 		}
 		if r := m.Run; r != nil {
-			run, err := store.CreateRun(s.DB, store.Run{TaskID: c.ID, Kind: "task", Mode: "new", Status: r.Status, Prompt: "mock prompt"})
-			if err != nil {
-				return err
-			}
-			run.Summary, run.Next, run.Error = sp(r.Summary), sp(r.Next), sp(r.Error)
-			run.TokensIn, run.TokensOut, run.CtxPeak, run.APICalls = 1200, 800, 30000, 12
+			run := StateRun{Kind: "task", Mode: "new", Status: r.Status, Prompt: "mock prompt", Summary: r.Summary, Next: r.Next, Error: r.Error,
+				TokensIn: 1200, TokensOut: 800, CtxPeak: 30000, APICalls: 12, StartedAt: ts}
 			if r.Status != "running" {
-				run.EndedAt = sp(run.StartedAt)
+				run.EndedAt = ts
 			}
-			if err := store.UpdateRun(s.DB, run); err != nil {
-				return err
-			}
+			t.Runs = []StateRun{run}
 		}
-		for _, cm := range m.Comments {
-			if _, err := store.AddComment(s.DB, store.Comment{TaskID: c.ID, Author: cm[0], Body: cm[1]}); err != nil {
-				return err
-			}
+		for _, c := range m.Comments {
+			t.Comments = append(t.Comments, StateComment{Author: c[0], Body: c[1]})
 		}
+		st.Tasks = append(st.Tasks, t)
 	}
-	for i, m := range mockTasks {
-		if m.Blocks > 0 {
-			if err := store.AddLink(s.DB, created[i].ID, created[m.Blocks-1].ID, "blocks"); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
+	return st
 }
 
 // sp returns &v, or nil for "".

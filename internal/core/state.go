@@ -12,9 +12,13 @@ import (
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 )
 
-// State is the portable, repo-free configuration: settings, apps, automations and
-// user-level agents. Repos are not exported; the names automations use become
-// placeholders A, B, C... that import maps back to registered repos.
+// stateVersion is 2: v1 files (no tasks) still import.
+const stateVersion = 2
+
+// State is the portable, repo-free configuration: settings, apps, automations,
+// user-level agents and tasks with their runs and comments. Repos are not exported;
+// the names automations and tasks use become placeholders A, B, C... that import
+// maps back to registered repos.
 type State struct {
 	Version     int               `json:"version"`
 	Repos       []string          `json:"repos"`
@@ -22,6 +26,7 @@ type State struct {
 	Apps        []StateApp        `json:"apps"`
 	Automations []StateAutomation `json:"automations"`
 	Agents      []StateAgent      `json:"agents"`
+	Tasks       []StateTask       `json:"tasks"`
 }
 
 type StateApp struct {
@@ -76,9 +81,9 @@ func mapRepos(arg string, f func(string) string) (string, error) {
 	return string(b), err
 }
 
-// ExportState collects the stored settings, apps, automations (repos replaced by placeholders) and user agents.
+// ExportState collects the stored settings, apps, automations and tasks (repos replaced by placeholders) and user agents.
 func (s *Service) ExportState() (State, error) {
-	st := State{Version: 1, Repos: []string{}, Settings: map[string]string{}, Apps: []StateApp{}, Automations: []StateAutomation{}, Agents: []StateAgent{}}
+	st := State{Version: stateVersion, Tasks: []StateTask{}, Repos: []string{}, Settings: map[string]string{}, Apps: []StateApp{}, Automations: []StateAutomation{}, Agents: []StateAgent{}}
 	rows, err := s.DB.Query(`SELECT key, value FROM settings`)
 	if err != nil {
 		return st, err
@@ -104,18 +109,22 @@ func (s *Service) ExportState() (State, error) {
 		return st, err
 	}
 	ph := map[string]string{}
+	repo := func(r string) string {
+		if ph[r] == "" {
+			ph[r] = placeholder(len(ph))
+			st.Repos = append(st.Repos, ph[r])
+		}
+		return ph[r]
+	}
 	for _, a := range autos {
-		arg, err := mapRepos(a.ActionArg, func(r string) string {
-			if ph[r] == "" {
-				ph[r] = placeholder(len(ph))
-				st.Repos = append(st.Repos, ph[r])
-			}
-			return ph[r]
-		})
+		arg, err := mapRepos(a.ActionArg, repo)
 		if err != nil {
 			return st, fmt.Errorf("automation %q: %w", a.Name, err)
 		}
 		st.Automations = append(st.Automations, StateAutomation{a.Name, a.Schedule, a.Precheck, a.ActionKind, arg, a.Enabled})
+	}
+	if st.Tasks, err = s.exportTasks(repo); err != nil {
+		return st, err
 	}
 	files, _ := filepath.Glob(filepath.Join(userAgentsDir(), "*.md"))
 	for _, f := range files {
@@ -132,9 +141,13 @@ func (s *Service) ExportState() (State, error) {
 
 // ImportState adds what the state has and this install lacks; it never overwrites.
 // repoMap maps placeholders to registered repo names; an automation with an
-// unmapped placeholder is added disabled. It returns one line per change or skip.
+// unmapped placeholder is added disabled and a task with one is skipped. Tasks get
+// new keys; their links are remapped. It returns one line per change or skip.
 func (s *Service) ImportState(st State, repoMap map[string]string) ([]string, error) {
 	var out []string
+	if st.Version > stateVersion {
+		return nil, fmt.Errorf("state file is version %d; this build reads up to %d", st.Version, stateVersion)
+	}
 	for p, r := range repoMap {
 		if _, err := store.GetRepoByName(s.DB, r); err != nil {
 			return nil, fmt.Errorf("%s=%s: repo %q is not registered", p, r, r)
@@ -218,5 +231,6 @@ func (s *Service) ImportState(st State, repoMap map[string]string) ([]string, er
 		}
 		out = append(out, "added agent "+a.Name)
 	}
-	return out, nil
+	lines, err := s.importTasks(st.Tasks, repoMap)
+	return append(out, lines...), err
 }
