@@ -85,7 +85,7 @@ func Import(ctx context.Context, svc *core.Service, jql, repo string) ([]string,
 		}
 		t, err := svc.CreateTask(core.NewTaskInput{
 			Title: is.Fields.Summary, Description: strings.TrimSpace(adfText(is.Fields.Description)), Repos: []string{repo},
-			Source: "jira", ExternalKey: is.Key, ExternalURL: url,
+			Source: "jira", CreatedBy: "jira", ExternalKey: is.Key, ExternalURL: url,
 		})
 		if err != nil {
 			return created, fmt.Errorf("import %s: %w", is.Key, err)

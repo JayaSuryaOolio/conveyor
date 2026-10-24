@@ -130,14 +130,14 @@ func RunOne(ctx context.Context, svc *core.Service, a store.Automation) (string,
 	if !ok {
 		return "skipped: precheck failed", nil
 	}
-	return act.run(ctx, svc, a.ActionKind, out, act.TaskKey)
+	return act.run(ctx, svc, a.Name, a.ActionKind, out, act.TaskKey)
 }
 
-func (act action) run(ctx context.Context, svc *core.Service, kind, out, key string) (string, error) {
+func (act action) run(ctx context.Context, svc *core.Service, name, kind, out, key string) (string, error) {
 	sub := func(s string) string { return strings.ReplaceAll(s, "{output}", out) }
 	switch kind {
 	case "create_task":
-		t, err := svc.CreateTask(core.NewTaskInput{Title: sub(act.Title), Description: sub(act.Description), Repos: act.Repos, Agent: act.Agent, Start: act.Start})
+		t, err := svc.CreateTask(core.NewTaskInput{Title: sub(act.Title), Description: sub(act.Description), Repos: act.Repos, Agent: act.Agent, Start: act.Start, CreatedBy: "automation:" + name})
 		if err != nil {
 			return "", err
 		}
@@ -147,7 +147,9 @@ func (act action) run(ctx context.Context, svc *core.Service, kind, out, key str
 		if err != nil {
 			return "", fmt.Errorf("find conveyor binary: %w", err)
 		}
-		o, err := exec.CommandContext(ctx, b, append([]string{"--home", svc.Home}, act.Args...)...).CombinedOutput()
+		cmd := exec.CommandContext(ctx, b, append([]string{"--home", svc.Home}, act.Args...)...)
+		cmd.Env = append(os.Environ(), "CONVEYOR_CREATED_BY=automation:"+name) // read by `task new`
+		o, err := cmd.CombinedOutput()
 		res := strings.TrimSpace(string(o))
 		if len(res) > maxOutput {
 			res = res[:maxOutput]
@@ -191,7 +193,7 @@ func commentByStatus(ctx context.Context, svc *core.Service, a store.Automation,
 		if !ok {
 			continue
 		}
-		if _, err := act.run(ctx, svc, a.ActionKind, out, t.Key); err != nil {
+		if _, err := act.run(ctx, svc, a.Name, a.ActionKind, out, t.Key); err != nil {
 			errs = append(errs, fmt.Errorf("%s: %w", t.Key, err))
 			continue
 		}

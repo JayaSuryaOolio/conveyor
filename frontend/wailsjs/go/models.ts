@@ -447,6 +447,7 @@ export namespace store {
 	    consecutive_failures: number;
 	    created_at: string;
 	    updated_at: string;
+	    created_by?: string;
 	    repos?: TaskRepo[];
 	
 	    static createFrom(source: any = {}) {
@@ -470,6 +471,7 @@ export namespace store {
 	        this.consecutive_failures = source["consecutive_failures"];
 	        this.created_at = source["created_at"];
 	        this.updated_at = source["updated_at"];
+	        this.created_by = source["created_by"];
 	        this.repos = this.convertValues(source["repos"], TaskRepo);
 	    }
 	

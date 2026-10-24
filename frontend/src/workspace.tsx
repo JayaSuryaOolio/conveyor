@@ -2,7 +2,7 @@ import {useEffect, useState} from 'react'
 import {ActionIcon, Anchor, Badge, Button, Code, Divider, Group, Indicator, Paper, Stack, Text, TextInput, Title, Tooltip} from '@mantine/core'
 import {useClipboard} from '@mantine/hooks'
 import {IconCheck, IconCopy, IconPencil, IconStar, IconTerminal, IconTerminal2, IconX} from '@tabler/icons-react'
-import {Actions, AppIcons, EnsureWorkspace, ListApps, OpenApp, RunAction, Sessions, SetTaskRepo, SpotlightRoot, SpotlightStop, TermStart} from '../wailsjs/go/ui/App'
+import {Actions, AppIcons, EnsureWorkspace, GetSettings, ListApps, OpenApp, RunAction, Sessions, SetTaskRepo, SpotlightRoot, SpotlightStop, TermStart} from '../wailsjs/go/ui/App'
 import {core, store, ui} from '../wailsjs/go/models'
 import {BrowserOpenURL} from '../wailsjs/runtime/runtime'
 import {AppIcon, StatusSelect, Time, errMsg, runApp} from './components'
@@ -139,12 +139,30 @@ function RepoFields({k, r, reload, children}: {k: string; r: store.TaskRepo; rel
     )
 }
 
+/** Who made the task: the exact created_by, else (rows from before it existed) inferred from the lettered key (CV-14A is a child of CV-14). */
+function creator(key: string, source: string, user: string | undefined, createdBy?: string | null) {
+    if (createdBy) {
+        const [kind, ...rest] = createdBy.split(':'), arg = rest.join(':')
+        if (kind === 'human') return user || 'human'
+        if (kind === 'agent') return `agent · ${arg}`
+        if (kind === 'followup') return `follow-up of ${arg}`
+        if (kind === 'automation') return `automation · ${arg}`
+        return createdBy
+    }
+    const parent = key.match(/^(.+-\d+)[A-Z]+$/)?.[1]
+    if (parent) return source === 'followup' ? `follow-up of ${parent}` : `agent · ${parent}`
+    if (source === 'jira' || source === 'learning') return source
+    return user || 'human'
+}
+
 export function TaskSidebar({t, runs, reload, onTerm}: {t: store.Task; runs: store.Run[]; reload: () => void; onTerm: (t: ui.TermInfo) => void}) {
     const k = t.key
     const repos = t.repos ?? []
     const {data: actions, error: actionsError, reload: reloadActions} = useData(() => Actions(k), [k])
     const {data: sessions, error: sessionsError, reload: reloadSessions} = useData(() => Sessions(k), [k])
     const {data: apps} = useData(ListApps, [])
+    const {data: settings} = useData(GetSettings, [])
+    const by = creator(k, t.source, settings?.user_name, t.created_by)
     const {data: icons} = useData(AppIcons, [])
     const [busy, setBusy] = useState(false)
     const taskActions = (actions ?? []).filter(a => ['attach', 'resume', 'fresh', 'shell'].includes(a.kind))
@@ -159,7 +177,7 @@ export function TaskSidebar({t, runs, reload, onTerm}: {t: store.Task; runs: sto
                 <Text size="sm" fw={600}>Status</Text>
                 <StatusSelect k={k} status={t.status}/>
             </Group>
-            <Group justify="space-between"><Text size="xs" c="dimmed">Created</Text><Time iso={t.created_at}/></Group>
+            <Group justify="space-between"><Text size="xs" c="dimmed">Created</Text><Group gap={4} wrap="nowrap"><Text size="xs">{by} ·</Text><Time iso={t.created_at}/></Group></Group>
             <Group justify="space-between"><Text size="xs" c="dimmed">Updated</Text><Time iso={t.updated_at}/></Group>
             <Divider/>
             <Title order={6}>Repos</Title>

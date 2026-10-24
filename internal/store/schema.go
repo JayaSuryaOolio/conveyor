@@ -139,7 +139,24 @@ func Migrate(db *sql.DB) error {
 	if _, err := db.Exec(`DELETE FROM task_links WHERE kind='duplicates'`); err != nil {
 		return fmt.Errorf("drop duplicates links: %w", err)
 	}
-	return migrateAddAppGlobal(db)
+	if err := migrateAddAppGlobal(db); err != nil {
+		return err
+	}
+	return migrateAddTaskCreatedBy(db)
+}
+
+// migrateAddTaskCreatedBy adds tasks.created_by; existing rows stay NULL.
+func migrateAddTaskCreatedBy(db *sql.DB) error {
+	var n int
+	if err := db.QueryRow(`SELECT count(*) FROM pragma_table_info('tasks') WHERE name='created_by'`).Scan(&n); err != nil {
+		return fmt.Errorf("check tasks.created_by: %w", err)
+	}
+	if n == 0 {
+		if _, err := db.Exec(`ALTER TABLE tasks ADD COLUMN created_by TEXT`); err != nil {
+			return fmt.Errorf("add tasks.created_by: %w", err)
+		}
+	}
+	return nil
 }
 
 // migrateAddAppGlobal adds apps.global and apps.output to databases created before they existed.

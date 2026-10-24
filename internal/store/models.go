@@ -35,6 +35,8 @@ type Task struct {
 	ConsecutiveFailures int        `json:"consecutive_failures"`
 	CreatedAt           string     `json:"created_at"`
 	UpdatedAt           string     `json:"updated_at"`
+	// CreatedBy is "human", "agent:<KEY>", "automation:<name>", "jira", "learning" or "followup:<KEY>"; nil on rows from before the column.
+	CreatedBy           *string    `json:"created_by"`
 	Repos               []TaskRepo `json:"repos,omitempty"`
 }
 
