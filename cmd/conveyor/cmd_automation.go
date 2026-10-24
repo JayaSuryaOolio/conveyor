@@ -97,10 +97,7 @@ func automationAdd(s *core.Service, args []string) error {
 	} else if len(pos) > 1 || a.Name == "" {
 		return errors.New(automationUsage)
 	}
-	if a.ActionKind != "create_task" && a.ActionKind != "comment" && a.ActionKind != "cli" {
-		return fmt.Errorf("--kind must be create_task, comment or cli")
-	}
-	if err := automation.ValidSchedule(a.Schedule); err != nil {
+	if err := automation.Validate(a); err != nil {
 		return err
 	}
 	if _, err := store.GetAutomation(s.DB, a.Name); err == nil {
