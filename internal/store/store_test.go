@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"path/filepath"
+	"sync"
 	"testing"
 )
 
@@ -209,5 +210,47 @@ func TestSettingsDefaults(t *testing.T) {
 	SetSetting(db, "max_parallel", "5")
 	if GetSetting(db, "max_parallel") != "5" || ListSettings(db)["max_parallel"] != "5" || ListSettings(db)["key_prefix"] != "CV" {
 		t.Fatal("override")
+	}
+}
+
+// Two processes creating tasks at once must not fail with SQLITE_BUSY when
+// the deferred read->write upgrade loses the race.
+func TestCreateTaskConcurrentHandles(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "c.db")
+	var dbs [2]*sql.DB
+	for i := range dbs {
+		db, err := Open(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { db.Close() })
+		dbs[i] = db
+	}
+	r := mkRepo(t, dbs[0], "a")
+	const per = 20
+	var (
+		wg   sync.WaitGroup
+		mu   sync.Mutex
+		keys = map[string]bool{}
+	)
+	for _, db := range dbs {
+		for i := 0; i < per; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				tk, err := CreateTask(db, Task{Title: "t"}, []TaskRepo{{RepoID: r.ID, IsPrimary: true, Branch: "t"}})
+				if err != nil {
+					t.Error(err)
+					return
+				}
+				mu.Lock()
+				keys[tk.Key] = true
+				mu.Unlock()
+			}()
+		}
+	}
+	wg.Wait()
+	if len(keys) != 2*per {
+		t.Fatalf("got %d unique keys, want %d", len(keys), 2*per)
 	}
 }
