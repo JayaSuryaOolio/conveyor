@@ -3,7 +3,7 @@ import {ActionIcon, Badge, Button, Code, Group, Modal, Paper, Stack, Switch, Tab
 import {IconPencil, IconPlayerPlay, IconPlus, IconTrash} from '@tabler/icons-react'
 import {AddApp, AppIcons, AppPresets, Confirm, DeleteApp, Home, ListApps, RenderApp, TestApp, UpdateApp, UserHooks} from '../wailsjs/go/ui/App'
 import {store} from '../wailsjs/go/models'
-import {AppIcon, errMsg} from './components'
+import {AppIcon, errMsg, runApp} from './components'
 import {useData} from './util'
 
 function AppForm({initial, onClose}: {initial: store.App; onClose: (saved: boolean) => void}) {
@@ -11,22 +11,24 @@ function AppForm({initial, onClose}: {initial: store.App; onClose: (saved: boole
     const [preview, setPreview] = useState('')
     const {data: home} = useData(Home, [])
     const sample = (home ?? '~/.conveyor') + '/workspaces/CV-1/my repo'
-    useEffect(() => { RenderApp(f.command, sample).then(setPreview, errMsg) }, [f.command, sample])
+    useEffect(() => { RenderApp(f.command, sample, 'CV-1').then(setPreview, errMsg) }, [f.command, sample])
     const ready = f.name.trim() && f.command.trim()
     const save = () => (f.id ? UpdateApp(f) : AddApp(f)).then(() => onClose(true), errMsg)
     return (
         <Stack gap="sm">
             <TextInput data-autofocus label="Name" value={f.name} onChange={e => setF({...f, name: e.target.value})}/>
-            <TextInput label="Command" description="Run with sh -c. {cwd} becomes the quoted worktree path, e.g. open -a Zed {cwd}" ff="monospace"
+            <TextInput label="Command" description="Run with sh -c. {cwd} becomes the quoted worktree path and {key} the task key, e.g. open -a Zed {cwd}" ff="monospace"
                        value={f.command} onChange={e => setF({...f, command: e.target.value})}/>
             <Switch label="Global" description="Not tied to a worktree: shown in the left menu, not on task pages" checked={f.global}
                     onChange={e => setF({...f, global: e.currentTarget.checked})}/>
+            <Switch label="Quick action" checked={f.output} onChange={e => setF({...f, output: e.currentTarget.checked})}
+                    description={<>Runs to completion in the task's primary worktree and shows its output as a toast; a button in the task sidebar. Scripts can call <Code>conveyor task sessions {'{key}'}</Code> for the task's Claude session ids.</>}/>
             <div>
                 <Text size="sm" fw={500}>Preview</Text>
                 <Code block style={{whiteSpace: 'pre-wrap', wordBreak: 'break-all'}}>{preview}</Code>
             </div>
             <Group justify="space-between">
-                <Button variant="default" leftSection={<IconPlayerPlay size={16}/>} disabled={!f.command.trim()} onClick={() => TestApp(f.command).catch(errMsg)}>Test on home folder</Button>
+                <Button variant="default" leftSection={<IconPlayerPlay size={16}/>} disabled={!f.command.trim()} onClick={() => runApp(f, TestApp(f))}>Test on home folder</Button>
                 <Group>
                     <Button variant="default" onClick={() => onClose(false)}>Cancel</Button>
                     <Button onClick={save} disabled={!ready}>{f.id ? 'Save' : 'Create'}</Button>
@@ -73,7 +75,7 @@ export function Apps() {
         <Stack maw={900}>
             <Group justify="space-between">
                 <Title order={3}>Apps</Title>
-                <Button leftSection={<IconPlus size={16}/>} onClick={() => setForm(store.App.createFrom({id: 0, name: '', command: '', global: false}))}>New app</Button>
+                <Button leftSection={<IconPlus size={16}/>} onClick={() => setForm(store.App.createFrom({id: 0, name: '', command: '', global: false, output: false}))}>New app</Button>
             </Group>
             <Text size="sm" c="dimmed">Apps a task worktree can be opened in, from the icons under each repo on the task page or <Code>conveyor app open NAME KEY</Code>.
                 Global apps (Slack, a dashboard, ...) are not tied to a worktree: they show as icons at the bottom of the left menu instead, and <Code>{'{cwd}'}</Code> is your home folder.</Text>
@@ -85,7 +87,7 @@ export function Apps() {
                     <Table.Tbody>
                         {data.map(a => (
                             <Table.Tr key={a.id}>
-                                <Table.Td fw={600}><Group gap="xs" wrap="nowrap"><AppIcon name={a.name} icons={icons}/>{a.name}</Group></Table.Td>
+                                <Table.Td fw={600}><Group gap="xs" wrap="nowrap"><AppIcon name={a.name} icons={icons}/>{a.name}{a.output && <Badge size="xs" variant="light">quick action</Badge>}</Group></Table.Td>
                                 <Table.Td><Code>{a.command}</Code></Table.Td>
                                 <Table.Td>
                                     <Switch aria-label={`${a.name} is global`} checked={a.global}
@@ -93,7 +95,7 @@ export function Apps() {
                                 </Table.Td>
                                 <Table.Td>
                                     <Group gap="xs" wrap="nowrap" justify="flex-end">
-                                        <ActionIcon variant="subtle" color="gray" aria-label="Test" title="Test on home folder" onClick={() => TestApp(a.command).catch(errMsg)}><IconPlayerPlay size={16}/></ActionIcon>
+                                        <ActionIcon variant="subtle" color="gray" aria-label="Test" title="Test on home folder" onClick={() => runApp(a, TestApp(a))}><IconPlayerPlay size={16}/></ActionIcon>
                                         <ActionIcon variant="subtle" color="gray" aria-label="Edit" onClick={() => setForm(a)}><IconPencil size={16}/></ActionIcon>
                                         <ActionIcon variant="subtle" color="red" aria-label="Delete" onClick={() => Confirm(`Delete app ${a.name}?`).then(ok => { if (ok) return DeleteApp(a.name).then(reload) }).catch(errMsg)}><IconTrash size={16}/></ActionIcon>
                                     </Group>

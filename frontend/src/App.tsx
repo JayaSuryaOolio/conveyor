@@ -6,7 +6,7 @@ import {AppIcons, DispatcherState, Learnings, ListApps, OpenApp} from '../wailsj
 import {Agents} from './agents'
 import {Apps} from './apps'
 import {Automations} from './automations'
-import {AppIcon, errMsg, Nav} from './components'
+import {AppIcon, Nav, Toasts, runApp} from './components'
 import {NewTask, Repos, Settings} from './forms'
 import {LearningsPage} from './learnings'
 import {Logs} from './logs'
@@ -98,7 +98,7 @@ export default function App() {
                     <Group mt="auto" gap={4} justify={mini ? 'center' : 'flex-start'}>
                         {globalApps.map(a => (
                             <Tooltip key={a.id} label={a.name} position="right">
-                                <ActionIcon variant="subtle" color="gray" aria-label={a.name} onClick={() => OpenApp(a.name, '', '').catch(errMsg)}>
+                                <ActionIcon variant="subtle" color="gray" aria-label={a.name} onClick={() => runApp(a, OpenApp(a.name, '', ''))}>
                                     <AppIcon name={a.name} icons={icons}/>
                                 </ActionIcon>
                             </Tooltip>
@@ -122,6 +122,7 @@ export default function App() {
                 {view.name === 'settings' && <Settings/>}
             </AppShell.Main>
             {showNew && <NewTask nav={nav} close={() => setShowNew(false)}/>}
+            <Toasts/>
         </AppShell>
     )
 }

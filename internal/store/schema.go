@@ -122,7 +122,8 @@ CREATE TABLE IF NOT EXISTS apps (
   id INTEGER PRIMARY KEY,
   name TEXT NOT NULL UNIQUE,
   command TEXT NOT NULL,
-  global INTEGER NOT NULL DEFAULT 0
+  global INTEGER NOT NULL DEFAULT 0,
+  output INTEGER NOT NULL DEFAULT 0
 );
 `
 
@@ -141,15 +142,17 @@ func Migrate(db *sql.DB) error {
 	return migrateAddAppGlobal(db)
 }
 
-// migrateAddAppGlobal adds apps.global to databases created before it existed.
+// migrateAddAppGlobal adds apps.global and apps.output to databases created before they existed.
 func migrateAddAppGlobal(db *sql.DB) error {
-	var n int
-	if err := db.QueryRow(`SELECT count(*) FROM pragma_table_info('apps') WHERE name='global'`).Scan(&n); err != nil {
-		return fmt.Errorf("check apps.global: %w", err)
-	}
-	if n == 0 {
-		if _, err := db.Exec(`ALTER TABLE apps ADD COLUMN global INTEGER NOT NULL DEFAULT 0`); err != nil {
-			return fmt.Errorf("add apps.global: %w", err)
+	for _, col := range []string{"global", "output"} {
+		var n int
+		if err := db.QueryRow(`SELECT count(*) FROM pragma_table_info('apps') WHERE name=?`, col).Scan(&n); err != nil {
+			return fmt.Errorf("check apps.%s: %w", col, err)
+		}
+		if n == 0 {
+			if _, err := db.Exec(`ALTER TABLE apps ADD COLUMN ` + col + ` INTEGER NOT NULL DEFAULT 0`); err != nil {
+				return fmt.Errorf("add apps.%s: %w", col, err)
+			}
 		}
 	}
 	return nil

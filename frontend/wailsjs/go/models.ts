@@ -60,6 +60,7 @@ export namespace core {
 	    Start: boolean;
 	    Model: string;
 	    Agent: string;
+	    AgentSet: boolean;
 	    ParentKey: string;
 	    Priority: number;
 	    Source: string;
@@ -79,6 +80,7 @@ export namespace core {
 	        this.Start = source["Start"];
 	        this.Model = source["Model"];
 	        this.Agent = source["Agent"];
+	        this.AgentSet = source["AgentSet"];
 	        this.ParentKey = source["ParentKey"];
 	        this.Priority = source["Priority"];
 	        this.Source = source["Source"];
@@ -166,6 +168,7 @@ export namespace store {
 	    name: string;
 	    command: string;
 	    global: boolean;
+	    output: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new App(source);
@@ -177,6 +180,7 @@ export namespace store {
 	        this.name = source["name"];
 	        this.command = source["command"];
 	        this.global = source["global"];
+	        this.output = source["output"];
 	    }
 	}
 	export class Automation {

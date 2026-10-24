@@ -11,7 +11,7 @@ import (
 )
 
 func TestRenderApp(t *testing.T) {
-	if got := RenderApp("open -a Zed {cwd} && echo {cwd}", "/a b/it's"); got != `open -a Zed '/a b/it'\''s' && echo '/a b/it'\''s'` {
+	if got := RenderApp("open -a Zed {cwd} && echo {cwd} {key}", "/a b/it's", "CV-1"); got != `open -a Zed '/a b/it'\''s' && echo '/a b/it'\''s' 'CV-1'` {
 		t.Fatal(got)
 	}
 }
@@ -74,13 +74,13 @@ func TestOpenGlobalApp(t *testing.T) {
 	out := filepath.Join(t.TempDir(), "out")
 	store.CreateApp(s.DB, store.App{Name: "g", Command: "echo {cwd} > " + shq(out), Global: true})
 	store.CreateApp(s.DB, store.App{Name: "n", Command: "true"})
-	if err := s.OpenApp("g", "", ""); err != nil {
+	if _, err := s.OpenApp("g", "", ""); err != nil {
 		t.Fatal(err)
 	}
 	if b, _ := os.ReadFile(out); strings.TrimSpace(string(b)) != home {
 		t.Fatal(string(b))
 	}
-	if err := s.OpenApp("n", "", ""); err == nil {
+	if _, err := s.OpenApp("n", "", ""); err == nil {
 		t.Fatal("non-global app opened without a task")
 	}
 }
@@ -96,10 +96,45 @@ func TestOpenApp(t *testing.T) {
 	}
 	out := filepath.Join(t.TempDir(), "out")
 	store.CreateApp(s.DB, store.App{Name: "t", Command: "echo {cwd} > " + shq(out)})
-	if err := s.OpenApp("t", tk.Key, "b"); err != nil {
+	if _, err := s.OpenApp("t", tk.Key, "b"); err != nil {
 		t.Fatal(err)
 	}
 	if b, _ := os.ReadFile(out); filepath.Base(strings.TrimSpace(string(b))) != "b" {
 		t.Fatal(string(b))
+	}
+}
+
+func TestOutputApp(t *testing.T) {
+	s := newSvc(t)
+	tk := actionTask(t, s)
+	wt, _ := s.WorktreePath(tk.Key, "")
+	os.MkdirAll(wt, 0o755)
+	store.CreateApp(s.DB, store.App{Name: "o", Command: "echo {key}; basename \"$PWD\"", Output: true})
+	if got, err := s.OpenApp("o", tk.Key, ""); err != nil || got != tk.Key+"\na" {
+		t.Fatalf("%q %v", got, err)
+	}
+	store.CreateApp(s.DB, store.App{Name: "f", Command: "echo nope; exit 3", Output: true})
+	if _, err := s.OpenApp("f", tk.Key, ""); err == nil || !strings.Contains(err.Error(), "nope") {
+		t.Fatal(err)
+	}
+}
+
+func TestSessionIDs(t *testing.T) {
+	s := newSvc(t)
+	tk := actionTask(t, s)
+	for _, id := range []string{"s1", "s1", "", "s2"} {
+		r := store.Run{TaskID: tk.ID, Kind: "bg", Status: "finished"}
+		if id != "" {
+			r.SessionID = &id
+		}
+		if _, err := store.CreateRun(s.DB, r); err != nil {
+			t.Fatal(err)
+		}
+	}
+	dir := filepath.Join(s.ProjectsDir, nonAlnumPath.ReplaceAllString(*tk.Repos[0].WorktreePath, "-"))
+	os.MkdirAll(dir, 0o755)
+	os.WriteFile(filepath.Join(dir, "m1.jsonl"), []byte("{}\n"), 0o644)
+	if ids, err := s.SessionIDs(tk.Key); err != nil || strings.Join(ids, ",") != "s1,s2,m1" {
+		t.Fatal(ids, err)
 	}
 }
