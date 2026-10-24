@@ -1,6 +1,7 @@
 package core
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -8,6 +9,19 @@ import (
 
 // LogPath is the desktop app's log file under home.
 func LogPath(home string) string { return filepath.Join(home, "conveyor.log") }
+
+// logSources maps the fixed source names the UI may ask for to files under home.
+var logSources = map[string]string{
+	"app":        "conveyor.log",
+	"dispatcher": "logs/dispatcher.log",
+	"hooks":      "logs/hook.log",
+}
+
+// SourcePath is the log file for a source name; ok is false for an unknown name.
+func SourcePath(home, source string) (string, bool) {
+	rel, ok := logSources[source]
+	return filepath.Join(home, rel), ok
+}
 
 // AppLog is a chunk of the app log and the offset to read from next.
 type AppLog struct {
@@ -17,10 +31,14 @@ type AppLog struct {
 
 const logTail = 64 << 10
 
-// ReadAppLog returns the log from offset after. A negative after, or one past the end
+// ReadAppLog returns the source's log from offset after. A negative after, or one past the end
 // (the log was rotated), starts from the last 64 KB.
-func ReadAppLog(home string, after int64) (AppLog, error) {
-	f, err := os.Open(LogPath(home))
+func ReadAppLog(home, source string, after int64) (AppLog, error) {
+	path, ok := SourcePath(home, source)
+	if !ok {
+		return AppLog{}, fmt.Errorf("unknown log source %q", source)
+	}
+	f, err := os.Open(path)
 	if os.IsNotExist(err) {
 		return AppLog{}, nil
 	}
