@@ -143,7 +143,7 @@ func (s *Service) Move(key string, to store.Status) error {
 		return err
 	}
 	if to == store.StatusDone || to == store.StatusCancelled {
-		s.cleanup(t.ID)
+		s.CleanupSessions(t.ID)
 	}
 	return nil
 }
@@ -162,7 +162,8 @@ func (s *Service) bgIDs(taskID int64) []string {
 	return ids
 }
 
-func (s *Service) cleanup(taskID int64) {
+// CleanupSessions stops and removes the task's background sessions (best effort).
+func (s *Service) CleanupSessions(taskID int64) {
 	for _, id := range s.bgIDs(taskID) {
 		claude.Stop(context.Background(), id)
 		claude.Remove(context.Background(), id)
