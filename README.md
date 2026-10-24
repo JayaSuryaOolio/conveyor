@@ -51,6 +51,10 @@ Run `conveyor <command>` with no arguments for per-command usage. Listing and sh
 
 `scripts/e2e.sh` drives the full loop against the real `claude` (haiku) on two throwaway repos. The repos must already be trusted: by default they live in `~/work/conveyor-e2e/repo-a` and `repo-b` (override with `E2E_ROOT`); create them, run `claude` in each once by hand, then run the script.
 
+## TODO
+
+- Command palette (⌘K): jump to any task, view or action, and run commands (new task, move, comment, open terminal), more robust than the sidebar search.
+
 ## Development
 
 `gofmt -l .`, `go vet ./...`, `go test ./...`; frontend: `cd frontend && npm ci && npm run build`.
