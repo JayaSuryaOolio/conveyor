@@ -10,6 +10,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sync/atomic"
 	"time"
 
@@ -49,7 +50,8 @@ func (a *App) Startup(ctx context.Context) {
 	if f, err := openLog(core.LogPath(home)); err == nil {
 		log.SetOutput(io.MultiWriter(os.Stderr, f))
 	}
-	log.Printf("app start: home=%s cli=%s PATH=%s", home, conveyorBin(), os.Getenv("PATH"))
+	pe := filepath.SplitList(os.Getenv("PATH"))
+	log.Printf("app start: home=%s cli=%s PATH entries=%d first=%v", home, conveyorBin(), len(pe), pe[:min(len(pe), 5)])
 	db, err := store.Open(core.DBPath(home))
 	if err != nil {
 		runtime.LogFatalf(ctx, "open db: %v", err)
