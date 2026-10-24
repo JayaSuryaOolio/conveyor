@@ -77,11 +77,19 @@ func (s *Service) WorktreePath(key, repo string) (string, error) {
 	return "", fmt.Errorf("%s: no worktree for repo %q", key, repo)
 }
 
-// OpenApp opens the named app in the task repo's worktree.
+// OpenApp opens the named app in the task repo's worktree. A global app with an
+// empty key runs with {cwd} = the user's home directory.
 func (s *Service) OpenApp(name, key, repo string) error {
 	a, err := store.GetApp(s.DB, name)
 	if err != nil {
 		return err
+	}
+	if a.Global && key == "" {
+		h, err := os.UserHomeDir()
+		if err != nil {
+			return err
+		}
+		return LaunchApp(a.Command, h)
 	}
 	cwd, err := s.WorktreePath(key, repo)
 	if err != nil {

@@ -67,6 +67,24 @@ func TestAppBundleIcns(t *testing.T) {
 	}
 }
 
+func TestOpenGlobalApp(t *testing.T) {
+	s := newSvc(t)
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	out := filepath.Join(t.TempDir(), "out")
+	store.CreateApp(s.DB, store.App{Name: "g", Command: "echo {cwd} > " + shq(out), Global: true})
+	store.CreateApp(s.DB, store.App{Name: "n", Command: "true"})
+	if err := s.OpenApp("g", "", ""); err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := os.ReadFile(out); strings.TrimSpace(string(b)) != home {
+		t.Fatal(string(b))
+	}
+	if err := s.OpenApp("n", "", ""); err == nil {
+		t.Fatal("non-global app opened without a task")
+	}
+}
+
 func TestOpenApp(t *testing.T) {
 	s := newSvc(t)
 	tk := actionTask(t, s)

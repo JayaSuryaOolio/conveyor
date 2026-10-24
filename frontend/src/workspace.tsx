@@ -153,7 +153,7 @@ export function TaskSidebar({t, runs, reload, onTerm}: {t: store.Task; runs: sto
             {repos.map(r => (
                 <RepoFields key={r.repo_id + '|' + r.branch + '|' + (r.pr_url ?? '')} k={k} r={r} reload={reload}>
                     {(actions ?? []).filter(a => a.repo === r.repo_name && a.kind === 'shell').map(a => <ActionRow key={a.kind} k={k} a={a} onTerm={onTerm}/>)}
-                    {r.worktree_path && <OpenIn k={k} repo={r.repo_name} wt={r.worktree_path} apps={apps ?? []} icons={icons}/>}
+                    {r.worktree_path && <OpenIn k={k} repo={r.repo_name} wt={r.worktree_path} apps={(apps ?? []).filter(a => !a.global)} icons={icons}/>}
                 </RepoFields>
             ))}
             {!hasWorktree && (
