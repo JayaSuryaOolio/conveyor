@@ -30,3 +30,19 @@ func Apply(svc *core.Service, repo string) ([]string, error)
 - The state transitions.
 - `Apply` groups by repo and creates the task with the right description.
 - Spawn creates child tasks with inherited repos.
+
+## Outcome
+Built:
+- `store/learnings.go` queries; `internal/learning` (List, Accept, Reject, Edit, Apply, plus Personal for the paste-into-~/.claude/CLAUDE.md list).
+- `core.SpawnChildren(db, parent, titles)`; `hook.Handle` now creates backlog children (same repos/primary, `parent_id` set) besides recording the `spawn` event.
+- `conveyor learning list|accept|reject|edit|apply`; Learnings page and nav count badge (proposed items); bound methods `Learnings`, `AcceptLearning`, `RejectLearning`, `EditLearning`, `ApplyLearnings`.
+
+Deviations:
+- `SpawnChildren` takes `db` as its first argument (the hook has a DB, not a Service).
+- Added `Source` to `core.NewTaskInput` so Apply can set `source=learning`.
+- `Apply(svc, "")` applies every repo; a repo name limits it to that repo. Applied learnings are immutable.
+- The "Apply to <repo>" button shows only when the repo has accepted learnings.
+
+Manual checks: not done in the running app (no GUI session); `wails build` succeeds.
+
+Follow-ups: personal learnings stay `accepted` forever (no "mark pasted" action).

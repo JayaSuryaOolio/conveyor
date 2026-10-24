@@ -1,0 +1,131 @@
+// Package learning curates proposed learnings and turns accepted ones into "apply learnings" tasks.
+package learning
+
+import (
+	"database/sql"
+	"fmt"
+	"strings"
+
+	"github.com/JayaSuryaOolio/conveyor/internal/core"
+	"github.com/JayaSuryaOolio/conveyor/internal/store"
+)
+
+// DefaultTarget is the file an accepted learning goes to unless the human picks another.
+const DefaultTarget = "CLAUDE.md"
+
+// List returns learnings, optionally filtered by status.
+func List(db *sql.DB, status ...string) ([]store.Learning, error) {
+	return store.ListLearnings(db, status...)
+}
+
+// Accept marks a learning accepted for target (default CLAUDE.md).
+func Accept(db *sql.DB, id int64, target string) error {
+	if target = strings.TrimSpace(target); target == "" {
+		target = DefaultTarget
+	}
+	l, err := store.GetLearning(db, id)
+	if err != nil {
+		return err
+	}
+	l.Status, l.Target = store.LearningAccepted, &target
+	return store.UpdateLearning(db, l)
+}
+
+// Reject marks a learning rejected.
+func Reject(db *sql.DB, id int64) error {
+	l, err := store.GetLearning(db, id)
+	if err != nil {
+		return err
+	}
+	l.Status = store.LearningRejected
+	return store.UpdateLearning(db, l)
+}
+
+// Edit replaces a learning's body.
+func Edit(db *sql.DB, id int64, body string) error {
+	if strings.TrimSpace(body) == "" {
+		return fmt.Errorf("learning body is empty")
+	}
+	l, err := store.GetLearning(db, id)
+	if err != nil {
+		return err
+	}
+	l.Body = strings.TrimSpace(body)
+	return store.UpdateLearning(db, l)
+}
+
+// Personal returns accepted learnings with no repo, for the human to paste into ~/.claude/CLAUDE.md.
+func Personal(db *sql.DB) ([]store.Learning, error) {
+	all, err := store.ListLearnings(db, store.LearningAccepted)
+	var out []store.Learning
+	for _, l := range all {
+		if l.RepoID == nil {
+			out = append(out, l)
+		}
+	}
+	return out, err
+}
+
+const instruction = "Edit the target files so each lesson is captured concisely and isn't duplicated; open one PR."
+
+// Apply creates one todo task "Apply learnings to <repo>" per repo that has accepted learnings (repo "" means every
+// repo, otherwise just that one) and marks those learnings applied. Personal learnings are skipped (see Personal).
+// It returns the created task keys.
+func Apply(svc *core.Service, repo string) ([]string, error) {
+	repos, err := store.ListRepos(svc.DB)
+	if err != nil {
+		return nil, err
+	}
+	if repo != "" {
+		if _, err := store.GetRepoByName(svc.DB, repo); err != nil {
+			return nil, err
+		}
+	}
+	accepted, err := store.ListLearnings(svc.DB, store.LearningAccepted)
+	if err != nil {
+		return nil, err
+	}
+	byRepo := map[int64][]store.Learning{}
+	for _, l := range accepted {
+		if l.RepoID != nil {
+			byRepo[*l.RepoID] = append(byRepo[*l.RepoID], l)
+		}
+	}
+	var keys []string
+	for _, r := range repos {
+		ls := byRepo[r.ID]
+		if len(ls) == 0 || (repo != "" && r.Name != repo) {
+			continue
+		}
+		var sb strings.Builder
+		sb.WriteString("Accepted learnings for " + r.Name + ":\n\n")
+		for _, l := range ls {
+			src := "unknown task"
+			if l.TaskID != nil {
+				if t, err := store.GetTask(svc.DB, *l.TaskID); err == nil {
+					src = t.Key
+				}
+			}
+			target := DefaultTarget
+			if l.Target != nil {
+				target = *l.Target
+			}
+			fmt.Fprintf(&sb, "- %s (target: %s, from %s)\n", l.Body, target, src)
+		}
+		sb.WriteString("\n" + instruction + "\n")
+		t, err := svc.CreateTask(core.NewTaskInput{
+			Title: "Apply learnings to " + r.Name, Description: sb.String(), Repos: []string{r.Name}, Start: true, Source: "learning",
+		})
+		if err != nil {
+			return keys, err
+		}
+		for _, l := range ls {
+			l.Status, l.AppliedTaskID = store.LearningApplied, &t.ID
+			if err := store.UpdateLearning(svc.DB, l); err != nil {
+				return keys, err
+			}
+		}
+		keys = append(keys, t.Key)
+	}
+	return keys, nil
+}
