@@ -171,7 +171,7 @@ export function TaskPage({k, nav}: {k: string; nav: Nav}) {
                         <Title order={5}>Thread</Title>
                         <Timeline bulletSize={24} lineWidth={2}>
                             {items.map(it => it.run ? (
-                                <Timeline.Item key={'r' + it.run.id} bullet={<IconPlayerPlay size={12}/>}
+                                <Timeline.Item key={'r' + it.run.id} id={'run-' + it.run.id} bullet={<IconPlayerPlay size={12}/>}
                                                title={`Run ${runNo.get(it.run.id)} · ${it.run.mode}`}>
                                     <Text size="xs" c="dimmed">
                                         {it.run.api_calls} calls · {fmtK(it.run.ctx_peak)} peak · {fmtDuration(it.run.started_at, it.run.ended_at)} · <Time iso={it.run.started_at}/>

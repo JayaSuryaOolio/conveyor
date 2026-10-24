@@ -165,7 +165,10 @@ export function TaskSidebar({t, runs, reload, onTerm}: {t: store.Task; runs: sto
             {sessionsError && <Text size="xs" c="red">Failed to load sessions: {sessionsError}</Text>}
             {runs.length + (sessions?.length ?? 0) === 0 && <Text size="xs" c="dimmed">None yet.</Text>}
             {runs.map((r, i) => (
-                <Text key={r.id} size="xs" c="dimmed">#{i + 1} {r.kind} · {r.status}{r.block_status ? ' · ' + r.block_status : ''}</Text>
+                <Anchor key={r.id} size="xs" c="dimmed" component="button" ta="left" title="Show in thread"
+                        onClick={() => document.getElementById('run-' + r.id)?.scrollIntoView({behavior: 'smooth', block: 'start'})}>
+                    #{i + 1} {r.kind} · {r.status}{r.block_status ? ' · ' + r.block_status : ''}
+                </Anchor>
             ))}
             {sessions?.map(s => (
                 <Stack key={s.id} gap={2}>
