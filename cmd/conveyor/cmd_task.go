@@ -16,10 +16,10 @@ import (
 )
 
 func init() {
-	register("task", runTask, "manage tasks (new|list|show|comment|move|cancel|done|sync|brief|attach|open)")
+	register("task", runTask, "manage tasks (new|list|show|comment|move|set|cancel|done|sync|brief|attach|open)")
 }
 
-const taskUsage = "usage: conveyor task new|list|show|comment|move|cancel|done|sync|brief|attach|open ..."
+const taskUsage = "usage: conveyor task new|list|show|comment|move|set|cancel|done|sync|brief|attach|open ..."
 
 func runTask(home string, args []string) error {
 	if len(args) == 0 {
@@ -45,6 +45,8 @@ func runTask(home string, args []string) error {
 				return fmt.Errorf("unknown status %q", rest[1])
 			}
 			return s.Move(rest[0], to)
+		case "set":
+			return taskSet(s, rest)
 		case "attach":
 			return taskAttach(s, rest)
 		case "open":
@@ -228,6 +230,51 @@ func taskComment(s *core.Service, args []string) error {
 	}
 	_, err := s.AddComment(args[0], store.AuthorHuman, body)
 	return err
+}
+
+// taskSet changes the branch and/or PR URL of one of the task's repos.
+// Omitted flags keep the current value; --pr "" clears the PR.
+func taskSet(s *core.Service, args []string) error {
+	fs := flag.NewFlagSet("task set", flag.ContinueOnError)
+	repo := fs.String("repo", "", "repo name (default: the only repo)")
+	branch := fs.String("branch", "", "worktree branch (only before the worktree exists)")
+	pr := fs.String("pr", "", "PR URL (empty clears it)")
+	pos, err := parseArgs(fs, args)
+	if err != nil {
+		return err
+	}
+	if len(pos) != 1 {
+		return fmt.Errorf("usage: conveyor task set KEY [--repo r] [--branch b] [--pr url]")
+	}
+	given := map[string]bool{}
+	fs.Visit(func(f *flag.Flag) { given[f.Name] = true })
+	if !given["branch"] && !given["pr"] {
+		return fmt.Errorf("nothing to set: pass --branch and/or --pr")
+	}
+	t, err := store.GetTaskByKey(s.DB, pos[0])
+	if err != nil {
+		return err
+	}
+	name := *repo
+	if name == "" {
+		if len(t.Repos) != 1 {
+			return fmt.Errorf("task has %d repos: pass --repo", len(t.Repos))
+		}
+		name = t.Repos[0].RepoName
+	}
+	var cur store.TaskRepo
+	for _, r := range t.Repos {
+		if r.RepoName == name {
+			cur = r
+		}
+	}
+	if !given["branch"] {
+		*branch = cur.Branch
+	}
+	if !given["pr"] {
+		*pr = deref(cur.PRURL)
+	}
+	return s.SetTaskRepo(t.Key, name, *branch, *pr)
 }
 
 // taskSync refreshes PR state from gh and prints it.

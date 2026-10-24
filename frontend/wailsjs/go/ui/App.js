@@ -110,6 +110,10 @@ export function SetTaskAgent(arg1, arg2) {
   return window['go']['ui']['App']['SetTaskAgent'](arg1, arg2);
 }
 
+export function SetTaskRepo(arg1, arg2, arg3, arg4) {
+  return window['go']['ui']['App']['SetTaskRepo'](arg1, arg2, arg3, arg4);
+}
+
 export function ShowError(arg1) {
   return window['go']['ui']['App']['ShowError'](arg1);
 }

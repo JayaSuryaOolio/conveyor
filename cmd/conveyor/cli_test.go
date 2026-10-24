@@ -63,6 +63,14 @@ func TestCLIFlow(t *testing.T) {
 	if out := cv(t, home, "config", "get", "max_parallel"); strings.TrimSpace(out) != "7" {
 		t.Fatal(out)
 	}
+	cv(t, home, "task", "set", "CV-1", "--branch", "feat/x", "--pr", "https://gh/pr/1")
+	if out := cv(t, home, "task", "show", "CV-1"); !strings.Contains(out, "branch feat/x") || !strings.Contains(out, "https://gh/pr/1") {
+		t.Fatal(out)
+	}
+	cv(t, home, "task", "set", "CV-1", "--pr", "")
+	if out := cv(t, home, "task", "show", "CV-1"); !strings.Contains(out, "branch feat/x") || strings.Contains(out, "gh/pr") {
+		t.Fatal(out)
+	}
 	cv(t, home, "task", "cancel", "CV-1")
 	if out := cv(t, home, "task", "list", "--status", "cancelled"); !strings.Contains(out, "CV-1") {
 		t.Fatal(out)
