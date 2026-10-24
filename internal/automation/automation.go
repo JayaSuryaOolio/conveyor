@@ -62,6 +62,7 @@ type action struct {
 	Title       string   `json:"title"`
 	Description string   `json:"description"`
 	Repos       []string `json:"repos"`
+	Agent       string   `json:"agent"`
 	Start       bool     `json:"start"`
 	TaskStatus  string   `json:"task_status"`
 	TaskKey     string   `json:"task_key"`
@@ -136,7 +137,7 @@ func (act action) run(ctx context.Context, svc *core.Service, kind, out, key str
 	sub := func(s string) string { return strings.ReplaceAll(s, "{output}", out) }
 	switch kind {
 	case "create_task":
-		t, err := svc.CreateTask(core.NewTaskInput{Title: sub(act.Title), Description: sub(act.Description), Repos: act.Repos, Start: act.Start})
+		t, err := svc.CreateTask(core.NewTaskInput{Title: sub(act.Title), Description: sub(act.Description), Repos: act.Repos, Agent: act.Agent, Start: act.Start})
 		if err != nil {
 			return "", err
 		}
