@@ -72,3 +72,15 @@ func TestCLIFlow(t *testing.T) {
 		t.Fatalf("expected failure: %s", b)
 	}
 }
+
+func TestHookAlwaysExitsZero(t *testing.T) {
+	home := t.TempDir()
+	cmd := exec.Command(bin, "--home", home, "hook", "Stop")
+	cmd.Stdin = strings.NewReader("{garbage")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("hook failed: %v %s", err, out)
+	}
+	if b, err := os.ReadFile(filepath.Join(home, "logs", "hook.log")); err != nil || len(b) == 0 {
+		t.Fatalf("log: %v %q", err, b)
+	}
+}
