@@ -53,10 +53,15 @@ func entry(file, kind, fallbackName string) (string, bool) {
 	return line, true
 }
 
-// workflows indexes each task repo's .claude commands and skills (names and one-liners, no bodies).
+// workflows indexes the non-primary task repos' CLAUDE.md, .claude commands, skills and agents
+// (names and one-liners, no bodies). Claude Code loads the primary repo's natively (it is the cwd),
+// but not these: --add-dir directories get neither their CLAUDE.md nor their commands and agents.
 func workflows(db *sql.DB, task store.Task) string {
 	var b strings.Builder
 	for _, r := range task.Repos {
+		if r.IsPrimary {
+			continue
+		}
 		root := deref(r.WorktreePath)
 		if st, err := os.Stat(root); root == "" || err != nil || !st.IsDir() {
 			repo, err := store.GetRepoByName(db, r.RepoName)
@@ -66,6 +71,9 @@ func workflows(db *sql.DB, task store.Task) string {
 			root = repo.Path
 		}
 		var lines []string
+		if _, err := os.Stat(filepath.Join(root, "CLAUDE.md")); err == nil {
+			lines = append(lines, fmt.Sprintf("- Read `%s` before changing this repo", filepath.Join(root, "CLAUDE.md")))
+		}
 		cmds, _ := filepath.Glob(filepath.Join(root, ".claude", "commands", "*.md"))
 		for _, f := range cmds {
 			if l, ok := entry(f, "command", "/"+strings.TrimSuffix(filepath.Base(f), ".md")); ok {
@@ -75,6 +83,12 @@ func workflows(db *sql.DB, task store.Task) string {
 		skills, _ := filepath.Glob(filepath.Join(root, ".claude", "skills", "*", "SKILL.md"))
 		for _, f := range skills {
 			if l, ok := entry(f, "skill", filepath.Base(filepath.Dir(f))); ok {
+				lines = append(lines, l)
+			}
+		}
+		agents, _ := filepath.Glob(filepath.Join(root, ".claude", "agents", "*.md"))
+		for _, f := range agents {
+			if l, ok := entry(f, "agent", strings.TrimSuffix(filepath.Base(f), ".md")); ok {
 				lines = append(lines, l)
 			}
 		}
