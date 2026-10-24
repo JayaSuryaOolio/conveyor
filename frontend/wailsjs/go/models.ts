@@ -36,6 +36,20 @@ export namespace core {
 	        this.scope = source["scope"];
 	    }
 	}
+	export class AppLog {
+	    text: string;
+	    next: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new AppLog(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.text = source["text"];
+	        this.next = source["next"];
+	    }
+	}
 	export class NewTaskInput {
 	    Title: string;
 	    Description: string;
