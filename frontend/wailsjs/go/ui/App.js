@@ -30,6 +30,10 @@ export function AddRepo(arg1, arg2) {
   return window['go']['ui']['App']['AddRepo'](arg1, arg2);
 }
 
+export function AppIcons() {
+  return window['go']['ui']['App']['AppIcons']();
+}
+
 export function AppLog(arg1) {
   return window['go']['ui']['App']['AppLog'](arg1);
 }
@@ -172,6 +176,14 @@ export function SetTaskRepo(arg1, arg2, arg3, arg4) {
 
 export function ShowError(arg1) {
   return window['go']['ui']['App']['ShowError'](arg1);
+}
+
+export function SpotlightRoot(arg1) {
+  return window['go']['ui']['App']['SpotlightRoot'](arg1);
+}
+
+export function SpotlightStop(arg1) {
+  return window['go']['ui']['App']['SpotlightStop'](arg1);
 }
 
 export function TermBuffer(arg1) {

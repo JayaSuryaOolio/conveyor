@@ -18,6 +18,8 @@ export function AddComment(arg1:string,arg2:string):Promise<void>;
 
 export function AddRepo(arg1:string,arg2:string):Promise<void>;
 
+export function AppIcons():Promise<Record<string, string>>;
+
 export function AppLog(arg1:number):Promise<core.AppLog>;
 
 export function AppPresets():Promise<Array<store.App>>;
@@ -89,6 +91,10 @@ export function SetTaskAgent(arg1:string,arg2:string):Promise<void>;
 export function SetTaskRepo(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
 
 export function ShowError(arg1:string):Promise<void>;
+
+export function SpotlightRoot(arg1:string):Promise<string>;
+
+export function SpotlightStop(arg1:string):Promise<void>;
 
 export function TermBuffer(arg1:string):Promise<ui.TermBuf>;
 
