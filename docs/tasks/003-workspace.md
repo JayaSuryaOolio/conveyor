@@ -45,3 +45,15 @@ var ErrDirty = errors.New("workspace has uncommitted changes")
 - Adopting existing paths works.
 - `KeyFromCwd` handles nested dirs, a non-workspace path and a symlinked home.
 - `Remove` on a dirty tree returns `ErrDirty`; with `force` it succeeds.
+
+## Outcome
+Built `internal/workspace` (`workspace.go`, `workspace_test.go`) with the exact API from the spec. Tests use real git with temp repos and a bare origin.
+
+Deviations / choices:
+- `Remove` checks every worktree with `git status --porcelain` first (when not forced), so a dirty repo returns `ErrDirty` before any worktree is removed. It also clears `worktree_path` in the DB for each removed worktree, so a later `Ensure` recreates it.
+- Adoption requires the path to share the repo's git common dir and be on the task branch; otherwise `Ensure` errors.
+- The workspace folder is removed with `os.Remove`, so stray files in it leave it in place silently.
+
+Manual checks: none.
+
+Follow-ups: none.
