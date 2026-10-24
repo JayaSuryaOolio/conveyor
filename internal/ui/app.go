@@ -13,6 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/JayaSuryaOolio/conveyor/internal/automation"
 	"github.com/JayaSuryaOolio/conveyor/internal/core"
 	"github.com/JayaSuryaOolio/conveyor/internal/dispatch"
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
@@ -47,6 +48,7 @@ func (a *App) Startup(ctx context.Context) {
 		return
 	}
 	a.svc = &core.Service{DB: db, Home: home}
+	automation.Bin = conveyorBin() // the cli automation kind runs the CLI, not the app binary
 	ctx, a.cancel = context.WithCancel(ctx)
 	go pollDataVersion(ctx, core.DBPath(home), pollEvery, func() { runtime.EventsEmit(ctx, "db:changed") })
 	go a.startDispatcher(ctx)

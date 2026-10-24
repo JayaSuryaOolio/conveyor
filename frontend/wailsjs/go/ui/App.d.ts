@@ -22,6 +22,8 @@ export function GetSettings():Promise<Record<string, string>>;
 
 export function GetTask(arg1:string):Promise<ui.TaskDetail>;
 
+export function ListAutomations():Promise<Array<store.Automation>>;
+
 export function ListRepos():Promise<Array<store.Repo>>;
 
 export function ListTasks():Promise<Array<ui.TaskCard>>;
@@ -30,6 +32,10 @@ export function Move(arg1:string,arg2:string):Promise<void>;
 
 export function RunAction(arg1:string,arg2:string,arg3:string):Promise<void>;
 
+export function RunAutomation(arg1:string):Promise<string>;
+
 export function Sessions(arg1:string):Promise<Array<core.Session>>;
+
+export function SetAutomationEnabled(arg1:string,arg2:boolean):Promise<void>;
 
 export function SetSetting(arg1:string,arg2:string):Promise<void>;

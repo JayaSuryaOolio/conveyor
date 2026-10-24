@@ -10,10 +10,13 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"sync/atomic"
 	"time"
 
+	"github.com/JayaSuryaOolio/conveyor/internal/automation"
 	"github.com/JayaSuryaOolio/conveyor/internal/brief"
 	"github.com/JayaSuryaOolio/conveyor/internal/claude"
+	"github.com/JayaSuryaOolio/conveyor/internal/core"
 	"github.com/JayaSuryaOolio/conveyor/internal/gh"
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 	"github.com/JayaSuryaOolio/conveyor/internal/workspace"
@@ -23,6 +26,7 @@ const (
 	tickEvery  = 2 * time.Second
 	reapGrace  = 30 * time.Second
 	prPollEach = 60 * time.Second
+	autoEach   = 30 * time.Second
 )
 
 // Dispatcher launches and supervises auto runs. Run it from one process at a time (see Lock).
@@ -34,6 +38,8 @@ type Dispatcher struct {
 	Log         *log.Logger      // defaults to log.Default()
 
 	lastPoll time.Time
+	lastAuto time.Time
+	autoBusy atomic.Bool // an automation pass is in flight (prechecks can take a minute)
 }
 
 func (d *Dispatcher) now() time.Time {
@@ -81,7 +87,26 @@ func (d *Dispatcher) Tick(ctx context.Context) error {
 		d.logf("reap: %v", err)
 	}
 	d.pollPRs(ctx)
+	d.tickAutomations(ctx)
 	return d.launchTodo(ctx)
+}
+
+// tickAutomations runs due automations every autoEach, off the main loop so a slow precheck never stalls launches.
+func (d *Dispatcher) tickAutomations(ctx context.Context) {
+	if !d.lastAuto.IsZero() && d.now().Sub(d.lastAuto) < autoEach || !d.autoBusy.CompareAndSwap(false, true) {
+		return
+	}
+	d.lastAuto = d.now()
+	if d.ConveyorBin != "" {
+		automation.Bin = d.ConveyorBin
+	}
+	now := d.now()
+	go func() {
+		defer d.autoBusy.Store(false)
+		if err := automation.Tick(ctx, &core.Service{DB: d.DB, Home: d.Home}, now); err != nil {
+			d.logf("automations: %v", err)
+		}
+	}()
 }
 
 func parseTime(s string) time.Time {
