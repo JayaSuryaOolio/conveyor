@@ -12,7 +12,7 @@ import {useData} from './util'
 const SPOTLIGHT = 'Spotlight'
 const copy = (s: string) => navigator.clipboard.writeText(s).catch(errMsg)
 const sq = (s: string) => "'" + s.replace(/'/g, "'\\''") + "'"
-const cdCmd = (a: core.Action) => 'cd ' + sq(a.cwd) + (a.cmd && a.kind !== 'editor' ? ' && ' + a.cmd : '')
+const cdCmd = (a: core.Action) => 'cd ' + sq(a.cwd) + (a.cmd ? ' && ' + a.cmd : '')
 
 /** One full-width row: label left, copy / external terminal / internal terminal icons right. */
 function ActionRow({k, a, kind, onTerm}: {k: string; a: core.Action; kind?: string; onTerm: (t: ui.TermInfo) => void}) {
@@ -21,14 +21,14 @@ function ActionRow({k, a, kind, onTerm}: {k: string; a: core.Action; kind?: stri
             <Text size="sm" style={{wordBreak: 'break-word'}}>{a.label}</Text>
             <Group gap={2} wrap="nowrap">
                 <Tooltip label="Copy command">
-                    <ActionIcon variant="default" size="sm" aria-label="Copy command" onClick={() => copy(a.kind === 'editor' ? a.cmd : cdCmd(a))}><IconCopy size={14}/></ActionIcon>
+                    <ActionIcon variant="default" size="sm" aria-label="Copy command" onClick={() => copy(cdCmd(a))}><IconCopy size={14}/></ActionIcon>
                 </Tooltip>
-                <Tooltip label={a.kind === 'editor' ? 'Open editor' : 'Open in external terminal'}>
+                <Tooltip label="Open in external terminal">
                     <ActionIcon variant="default" size="sm" aria-label="Open in external terminal" onClick={() => RunAction(k, kind ?? a.kind, a.repo).catch(errMsg)}><IconTerminal2 size={14}/></ActionIcon>
                 </Tooltip>
-                <Tooltip label={a.kind === 'editor' ? 'The editor opens externally' : 'Open in internal terminal'}>
-                    <span><ActionIcon variant="default" size="sm" aria-label="Open in internal terminal" disabled={a.kind === 'editor'}
-                                      onClick={() => TermStart(k, kind ?? a.kind, a.repo).then(onTerm).catch(errMsg)}><IconTerminal size={14}/></ActionIcon></span>
+                <Tooltip label="Open in internal terminal">
+                    <ActionIcon variant="default" size="sm" aria-label="Open in internal terminal"
+                                onClick={() => TermStart(k, kind ?? a.kind, a.repo).then(onTerm).catch(errMsg)}><IconTerminal size={14}/></ActionIcon>
                 </Tooltip>
             </Group>
         </Group>
@@ -152,7 +152,7 @@ export function TaskSidebar({t, runs, reload, onTerm}: {t: store.Task; runs: sto
             {actionsError && <Text size="xs" c="red">Failed to load actions: {actionsError}</Text>}
             {repos.map(r => (
                 <RepoFields key={r.repo_id + '|' + r.branch + '|' + (r.pr_url ?? '')} k={k} r={r} reload={reload}>
-                    {(actions ?? []).filter(a => a.repo === r.repo_name && ['shell', 'editor'].includes(a.kind)).map(a => <ActionRow key={a.kind} k={k} a={a} onTerm={onTerm}/>)}
+                    {(actions ?? []).filter(a => a.repo === r.repo_name && a.kind === 'shell').map(a => <ActionRow key={a.kind} k={k} a={a} onTerm={onTerm}/>)}
                     {r.worktree_path && <OpenIn k={k} repo={r.repo_name} wt={r.worktree_path} apps={apps ?? []} icons={icons}/>}
                 </RepoFields>
             ))}

@@ -2,7 +2,6 @@ package ui
 
 import (
 	"encoding/base64"
-	"fmt"
 	"strconv"
 	"strings"
 	"sync"
@@ -39,9 +38,6 @@ func (a *App) startTerms() {
 
 // TermStart opens an embedded terminal for the same cwd/command RunAction would use.
 func (a *App) TermStart(key, kind, repo string) (TermInfo, error) {
-	if kind == "editor" {
-		return TermInfo{}, fmt.Errorf("the editor opens externally")
-	}
 	act, err := a.svc.FindAction(key, kind, repo)
 	if err != nil {
 		return TermInfo{}, err

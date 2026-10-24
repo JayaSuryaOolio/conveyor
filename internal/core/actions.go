@@ -22,7 +22,7 @@ import (
 )
 
 // Action is one thing the operator can open from the Workspace panel.
-// Kind is attach, resume, fresh, shell or editor.
+// Kind is attach, resume, fresh or shell.
 type Action struct {
 	Label string `json:"label"`
 	Repo  string `json:"repo"`
@@ -125,14 +125,11 @@ func (s *Service) Actions(key string) ([]Action, error) {
 		return nil, err
 	}
 	out = append(out, Action{"New session from brief", primary, cwd, claude.FreshCommand(settings, briefPath, workspace.OtherPaths(t)), "fresh"})
-	editor := store.GetSetting(s.DB, "editor_command")
 	for _, r := range t.Repos {
 		if r.WorktreePath == nil {
 			continue
 		}
-		out = append(out,
-			Action{"Shell in " + r.RepoName, r.RepoName, *r.WorktreePath, "", "shell"},
-			Action{"Editor: " + r.RepoName, r.RepoName, *r.WorktreePath, strings.ReplaceAll(editor, "{cwd}", shq(*r.WorktreePath)), "editor"})
+		out = append(out, Action{"Shell in " + r.RepoName, r.RepoName, *r.WorktreePath, "", "shell"})
 	}
 	return out, nil
 }
@@ -257,7 +254,7 @@ func (s *Service) RunLog(runID, after int64) (RunLog, error) {
 	return RunLog{es, next}, nil
 }
 
-// FindAction picks an action by kind and repo ("" means the primary repo for shell and editor).
+// FindAction picks an action by kind and repo ("" means the primary repo for shell).
 // Kind "resume:<id>" selects a manual session's resume action.
 func (s *Service) FindAction(key, kind, repo string) (Action, error) {
 	if id, ok := strings.CutPrefix(kind, "resume:"); ok {
@@ -283,7 +280,7 @@ func (s *Service) FindAction(key, kind, repo string) (Action, error) {
 		if a.Kind != kind {
 			continue
 		}
-		if repo == "" && (kind == "shell" || kind == "editor") {
+		if repo == "" && kind == "shell" {
 			repo = as[0].Repo // the primary
 		}
 		if repo == "" || a.Repo == repo {
@@ -295,17 +292,11 @@ func (s *Service) FindAction(key, kind, repo string) (Action, error) {
 
 // Render is the command line that Launch would run, for --print.
 func (s *Service) Render(a Action) string {
-	if a.Kind == "editor" {
-		return a.Cmd
-	}
 	return terminal.Render(store.GetSetting(s.DB, "terminal_template"), a.Cwd, a.Cmd)
 }
 
-// Launch runs the action: the editor directly, everything else in a terminal.
+// Launch runs the action in a terminal.
 func (s *Service) Launch(a Action) error {
-	if a.Kind == "editor" {
-		return runShell("editor", a.Cmd)
-	}
 	return terminal.Open(store.GetSetting(s.DB, "terminal_template"), a.Cwd, a.Cmd)
 }
 

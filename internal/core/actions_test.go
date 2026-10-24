@@ -47,7 +47,7 @@ func TestActionsByState(t *testing.T) {
 			t.Fatalf("got %s want %s", got, want)
 		}
 	}
-	base := "fresh:a,shell:a,editor:a,shell:b,editor:b"
+	base := "fresh:a,shell:a,shell:b"
 	check(base) // no runs
 	bg, sess := "bg1", "sess1"
 	r, _ := store.CreateRun(s.DB, store.Run{TaskID: tk.ID, Kind: "auto", Mode: "fresh", Status: "running", BgID: &bg})
