@@ -196,3 +196,4 @@ func onStop(db *sql.DB, task store.Task, run store.Run, p payload) error {
 	_, err = store.UpdateTaskStatus(db, task.ID, to, store.ActorSystem)
 	return err
 }
+
