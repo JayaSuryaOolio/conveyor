@@ -42,20 +42,20 @@ func (a *App) UpdateApp(x store.App) error {
 // DeleteApp removes an app.
 func (a *App) DeleteApp(name string) error { return store.DeleteApp(a.svc.DB, name) }
 
-// RenderApp previews command for cwd.
-func (a *App) RenderApp(command, cwd string) string { return core.RenderApp(command, cwd) }
+// RenderApp previews command for cwd and task key.
+func (a *App) RenderApp(command, cwd, key string) string { return core.RenderApp(command, cwd, key) }
 
-// TestApp runs command (saved or not) on the user's home directory.
-func (a *App) TestApp(command string) error {
+// TestApp runs app x (saved or not) on the user's home directory with no task key.
+func (a *App) TestApp(x store.App) (string, error) {
 	h, err := os.UserHomeDir()
 	if err != nil {
-		return err
+		return "", err
 	}
-	return core.LaunchApp(command, h)
+	return core.RunApp(x, h, "")
 }
 
-// OpenApp opens the named app in the task repo's worktree ("" repo = primary).
-func (a *App) OpenApp(name, key, repo string) error { return a.svc.OpenApp(name, key, repo) }
+// OpenApp runs the named app in the task repo's worktree ("" repo = primary); an output app returns its output.
+func (a *App) OpenApp(name, key, repo string) (string, error) { return a.svc.OpenApp(name, key, repo) }
 
 // AppIcons maps configured app names to PNG data: URLs of their macOS icons.
 func (a *App) AppIcons() (map[string]string, error) {

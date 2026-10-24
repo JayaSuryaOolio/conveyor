@@ -17,10 +17,10 @@ import (
 )
 
 func init() {
-	register("task", runTask, "manage tasks (new|list|show|comment|move|set|link|unlink|parent|cancel|done|sync|brief|log|attach|open)")
+	register("task", runTask, "manage tasks (new|list|show|comment|move|set|link|unlink|parent|sessions|cancel|done|sync|brief|log|attach|open)")
 }
 
-const taskUsage = "usage: conveyor task new|list|show|comment|move|set|link|unlink|parent|cancel|done|sync|brief|log|attach|open ..."
+const taskUsage = "usage: conveyor task new|list|show|comment|move|set|link|unlink|parent|sessions|cancel|done|sync|brief|log|attach|open ..."
 
 func runTask(home string, args []string) error {
 	if len(args) == 0 {
@@ -83,6 +83,21 @@ func runTask(home string, args []string) error {
 				return fmt.Errorf("usage: conveyor task sync KEY")
 			}
 			return taskSync(s, rest[0])
+		case "sessions":
+			if len(rest) < 1 || len(rest) > 2 || len(rest) == 2 && rest[1] != "--json" {
+				return fmt.Errorf("usage: conveyor task sessions KEY [--json]")
+			}
+			ids, err := s.SessionIDs(rest[0])
+			if err != nil {
+				return err
+			}
+			if len(rest) == 2 {
+				return printJSON(ids)
+			}
+			for _, id := range ids {
+				fmt.Fprintln(out, id)
+			}
+			return nil
 		case "cancel", "done":
 			if len(rest) != 1 {
 				return fmt.Errorf("usage: conveyor task %s KEY", cmd)

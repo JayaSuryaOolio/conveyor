@@ -166,7 +166,7 @@ conveyor automation list | enable NAME | disable NAME | run NAME | rm NAME
 
 ## Apps
 
-An app is a name plus a shell command in which `{cwd}` is replaced by the quoted worktree path. The Apps page offers presets detected on your Mac (editors, terminals, git clients, Finder). Apps show up as a row of icons on each repo of the task page; hover for the name. A launched icon flashes a check or a cross, and Spotlight shows a green dot while it runs for that worktree (click again to stop it).
+An app is a name plus a shell command in which `{cwd}` is replaced by the quoted worktree path and `{key}` by the task key. The Apps page offers presets detected on your Mac (editors, terminals, git clients, Finder). Apps show up as a row of icons on each repo of the task page; hover for the name. A launched icon flashes a check or a cross, and Spotlight shows a green dot while it runs for that worktree (click again to stop it).
 
 ```
 conveyor app presets
@@ -179,6 +179,12 @@ conveyor app open Slack                        # global apps need no task or dir
 ```
 
 A global app (Slack, a dashboard, anything not tied to a worktree) is switched on in the Apps page or with `--global`. It is left off the task page and shown instead as an icon at the bottom of the left menu. `{cwd}` in a global app's command is your home folder, so `conveyor app open NAME` with no KEY or DIR works for global apps only.
+
+**Quick actions.** An app with the Quick action switch on (`--output`, or `conveyor app output NAME on|off`) is not an opener: it runs to completion in the task's primary worktree, and its output shows as a toast (or is printed by `conveyor app open`). It appears as a button in the task sidebar. There are no special variables beyond `{cwd}` and `{key}`; scripts get anything else from the CLI, for example `conveyor task sessions KEY [--json]`, which lists the task's Claude session ids (Conveyor runs plus sessions you started in its worktrees). A task's Claude cost through [ccusage](https://github.com/ryoppippi/ccusage) (needs `npx` and `jq`, takes a few seconds):
+
+```
+conveyor app add Usage --output --command 'ids=$(conveyor task sessions {key} --json) && npx -y ccusage session --json --offline | jq -r --argjson ids "$ids" '"'"'[.session[] | select(.period as $p | $ids | index($p))] | "Claude usage: $\((map(.totalCost) | add // 0) * 100 | round / 100) across \(length) of \($ids | length) sessions"'"'"
+```
 
 ## Pull requests
 

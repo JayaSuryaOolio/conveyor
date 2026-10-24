@@ -13,15 +13,19 @@ import (
 )
 
 func init() {
-	register("app", runApp, "open worktrees in external apps (list|presets|add|global|rm|open)")
+	register("app", runApp, "open worktrees in external apps, run quick actions (list|presets|add|global|output|rm|open)")
 	register("hooks", runHooks, "Claude Code hooks in ~/.claude/settings.json (status|install|uninstall)")
 }
 
-const appUsage = `usage: conveyor app list [--json] | presets [--json] | add NAME [--command CMD] [--global] | global NAME on|off | rm NAME
+const appUsage = `usage: conveyor app list [--json] | presets [--json] | add NAME [--command CMD] [--global] [--output]
+       conveyor app global|output NAME on|off | rm NAME
        conveyor app open NAME [KEY|DIR] [--repo r] [--print]
-CMD is a shell command; {cwd} becomes the quoted worktree path. add without --command uses the preset of that name.
+CMD is a shell command; {cwd} becomes the quoted worktree path and {key} the task key ('' without one).
+add without --command uses the preset of that name.
 A global app is not tied to a worktree: it shows in the UI nav bar instead of on task pages, and open NAME
-(no KEY|DIR) runs it with {cwd} = your home directory.`
+(no KEY|DIR) runs it with {cwd} = your home directory.
+An output app is a quick action: it runs to completion in {cwd} and its output is shown (a toast in the app).
+Scripts can use conveyor task sessions KEY [--json] for the task's Claude session ids.`
 
 func runApp(home string, args []string) error {
 	if len(args) == 0 {
@@ -32,6 +36,7 @@ func runApp(home string, args []string) error {
 	asJSON := fs.Bool("json", false, "print JSON")
 	command := fs.String("command", "", "shell command; {cwd} is the worktree path")
 	global := fs.Bool("global", false, "app is not tied to a worktree")
+	output := fs.Bool("output", false, "run to completion and show the output (a quick action)")
 	repo := fs.String("repo", "", "repo of the task (default primary)")
 	print := fs.Bool("print", false, "print the command instead of running it")
 	pos, err := parseArgs(fs, rest)
@@ -60,7 +65,7 @@ func runApp(home string, args []string) error {
 			if len(pos) != 1 {
 				return errors.New(appUsage)
 			}
-			a := store.App{Name: pos[0], Command: *command, Global: *global}
+			a := store.App{Name: pos[0], Command: *command, Global: *global, Output: *output}
 			if a.Command == "" {
 				for _, p := range core.AppPresets() {
 					if p.Name == a.Name {
@@ -76,7 +81,7 @@ func runApp(home string, args []string) error {
 			}
 			fmt.Fprintf(out, "added %s: %s\n", a.Name, a.Command)
 			return nil
-		case "global":
+		case "global", "output":
 			if len(pos) != 2 || pos[1] != "on" && pos[1] != "off" {
 				return errors.New(appUsage)
 			}
@@ -84,7 +89,11 @@ func runApp(home string, args []string) error {
 			if err != nil {
 				return err
 			}
-			a.Global = pos[1] == "on"
+			if cmd == "global" {
+				a.Global = pos[1] == "on"
+			} else {
+				a.Output = pos[1] == "on"
+			}
 			return store.UpdateApp(s.DB, a)
 		case "rm":
 			if len(pos) != 1 {
@@ -99,39 +108,47 @@ func runApp(home string, args []string) error {
 			if err != nil {
 				return err
 			}
-			cwd, err := appCwd(s, a, pos[1:], *repo)
+			cwd, key, err := appCwd(s, a, pos[1:], *repo)
 			if err != nil {
 				return err
 			}
 			if *print {
-				fmt.Fprintln(out, core.RenderApp(a.Command, cwd))
+				fmt.Fprintln(out, core.RenderApp(a.Command, cwd, key))
 				return nil
 			}
-			return core.LaunchApp(a.Command, cwd)
+			res, err := core.RunApp(a, cwd, key)
+			if res != "" {
+				fmt.Fprintln(out, res)
+			}
+			return err
 		}
 		return fmt.Errorf("unknown app command %q\n%s", cmd, appUsage)
 	})
 }
 
 // appCwd resolves where an app opens: a directory, a task key's worktree, or (global apps, no arg) home.
-func appCwd(s *core.Service, a store.App, arg []string, repo string) (string, error) {
+// key is the task key when one was given.
+func appCwd(s *core.Service, a store.App, arg []string, repo string) (cwd, key string, err error) {
 	if len(arg) == 0 {
 		if !a.Global {
-			return "", fmt.Errorf("%s is not a global app; pass a task KEY or DIR", a.Name)
+			return "", "", fmt.Errorf("%s is not a global app; pass a task KEY or DIR", a.Name)
 		}
-		return os.UserHomeDir()
+		cwd, err = os.UserHomeDir()
+		return cwd, "", err
 	}
 	if fi, err := os.Stat(arg[0]); err == nil && fi.IsDir() {
-		return filepath.Abs(arg[0])
+		cwd, err = filepath.Abs(arg[0])
+		return cwd, "", err
 	}
-	return s.WorktreePath(arg[0], repo)
+	cwd, err = s.WorktreePath(arg[0], repo)
+	return cwd, arg[0], err
 }
 
 func printApps(as []store.App) error {
 	tw := tabwriter.NewWriter(out, 0, 4, 2, ' ', 0)
-	fmt.Fprintln(tw, "NAME\tGLOBAL\tCOMMAND")
+	fmt.Fprintln(tw, "NAME\tGLOBAL\tOUTPUT\tCOMMAND")
 	for _, a := range as {
-		fmt.Fprintf(tw, "%s\t%v\t%s\n", a.Name, a.Global, a.Command)
+		fmt.Fprintf(tw, "%s\t%v\t%v\t%s\n", a.Name, a.Global, a.Output, a.Command)
 	}
 	return tw.Flush()
 }

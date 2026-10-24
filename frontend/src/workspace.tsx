@@ -5,7 +5,7 @@ import {IconCheck, IconCopy, IconPencil, IconStar, IconTerminal, IconTerminal2, 
 import {Actions, AppIcons, EnsureWorkspace, ListApps, OpenApp, RunAction, Sessions, SetTaskRepo, SpotlightRoot, SpotlightStop, TermStart} from '../wailsjs/go/ui/App'
 import {core, store, ui} from '../wailsjs/go/models'
 import {BrowserOpenURL} from '../wailsjs/runtime/runtime'
-import {AppIcon, StatusSelect, Time, errMsg} from './components'
+import {AppIcon, StatusSelect, Time, errMsg, runApp} from './components'
 import {TaskAgent, TaskSettings} from './forms'
 import {useData} from './util'
 
@@ -46,7 +46,7 @@ function OpenIn({k, repo, wt, apps, icons}: {k: string; repo: string; wt: string
         setRes(r => ({...r, [n]: ok}))
         setTimeout(() => setRes(({[n]: _, ...r}) => r), 1500)
     }
-    const click = (a: store.App) => (a.name === SPOTLIGHT && root ? SpotlightStop(root) : OpenApp(a.name, k, repo))
+    const click = (a: store.App) => (a.name === SPOTLIGHT && root ? SpotlightStop(root) : OpenApp(a.name, k, repo).then(() => {}))
         .then(() => flash(a.name, true), e => { flash(a.name, false); errMsg(e) }).finally(check)
     if (apps.length === 0) return <Text size="xs" c="dimmed">No apps yet. Add them on the Apps page.</Text>
     return (
@@ -63,6 +63,20 @@ function OpenIn({k, repo, wt, apps, icons}: {k: string; repo: string; wt: string
                     </Tooltip>
                 )
             })}
+        </Group>
+    )
+}
+
+/** Output apps run on the task's primary worktree; their output shows as a toast. */
+function QuickActions({k, apps, icons}: {k: string; apps: store.App[]; icons?: Record<string, string>}) {
+    const [busy, setBusy] = useState('')
+    if (apps.length === 0) return null
+    return (
+        <Group gap={4}>
+            {apps.map(a => (
+                <Button key={a.id} size="xs" variant="default" loading={busy === a.name} leftSection={<AppIcon name={a.name} icons={icons} size={14}/>}
+                        onClick={() => { setBusy(a.name); runApp(a, OpenApp(a.name, k, '')).finally(() => setBusy('')) }}>{a.name}</Button>
+            ))}
         </Group>
     )
 }
@@ -153,13 +167,14 @@ export function TaskSidebar({t, runs, reload, onTerm}: {t: store.Task; runs: sto
             {repos.map(r => (
                 <RepoFields key={r.repo_id + '|' + r.branch + '|' + (r.pr_url ?? '')} k={k} r={r} reload={reload}>
                     {(actions ?? []).filter(a => a.repo === r.repo_name && a.kind === 'shell').map(a => <ActionRow key={a.kind} k={k} a={a} onTerm={onTerm}/>)}
-                    {r.worktree_path && <OpenIn k={k} repo={r.repo_name} wt={r.worktree_path} apps={(apps ?? []).filter(a => !a.global)} icons={icons}/>}
+                    {r.worktree_path && <OpenIn k={k} repo={r.repo_name} wt={r.worktree_path} apps={(apps ?? []).filter(a => !a.global && !a.output)} icons={icons}/>}
                 </RepoFields>
             ))}
             {!hasWorktree && (
                 <Button loading={busy} onClick={() => { setBusy(true); EnsureWorkspace(k).then(() => { reload(); reloadActions(); reloadSessions() }).catch(errMsg).finally(() => setBusy(false)) }}>Create workspace</Button>
             )}
             {taskActions.map(a => <ActionRow key={a.kind} k={k} a={a} onTerm={onTerm}/>)}
+            {hasWorktree && <QuickActions k={k} apps={(apps ?? []).filter(a => !a.global && a.output)} icons={icons}/>}
             <Divider/>
             <Title order={6}>Sessions</Title>
             {sessionsError && <Text size="xs" c="red">Failed to load sessions: {sessionsError}</Text>}

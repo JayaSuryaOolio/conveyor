@@ -68,13 +68,13 @@ export function ListTasks():Promise<Array<ui.TaskCard>>;
 
 export function Move(arg1:string,arg2:string):Promise<void>;
 
-export function OpenApp(arg1:string,arg2:string,arg3:string):Promise<void>;
+export function OpenApp(arg1:string,arg2:string,arg3:string):Promise<string>;
 
 export function PreviewBrief(arg1:string):Promise<ui.BriefPreview>;
 
 export function RejectLearning(arg1:number):Promise<void>;
 
-export function RenderApp(arg1:string,arg2:string):Promise<string>;
+export function RenderApp(arg1:string,arg2:string,arg3:string):Promise<string>;
 
 export function RunAction(arg1:string,arg2:string,arg3:string):Promise<void>;
 
@@ -120,7 +120,7 @@ export function TermStart(arg1:string,arg2:string,arg3:string):Promise<ui.TermIn
 
 export function TermWrite(arg1:string,arg2:string):Promise<void>;
 
-export function TestApp(arg1:string):Promise<void>;
+export function TestApp(arg1:store.App):Promise<string>;
 
 export function Unlink(arg1:string,arg2:string,arg3:string):Promise<void>;
 
