@@ -121,7 +121,8 @@ CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS apps (
   id INTEGER PRIMARY KEY,
   name TEXT NOT NULL UNIQUE,
-  command TEXT NOT NULL
+  command TEXT NOT NULL,
+  global INTEGER NOT NULL DEFAULT 0
 );
 `
 
@@ -136,6 +137,20 @@ func Migrate(db *sql.DB) error {
 	}
 	if _, err := db.Exec(`DELETE FROM task_links WHERE kind='duplicates'`); err != nil {
 		return fmt.Errorf("drop duplicates links: %w", err)
+	}
+	return migrateAddAppGlobal(db)
+}
+
+// migrateAddAppGlobal adds apps.global to databases created before it existed.
+func migrateAddAppGlobal(db *sql.DB) error {
+	var n int
+	if err := db.QueryRow(`SELECT count(*) FROM pragma_table_info('apps') WHERE name='global'`).Scan(&n); err != nil {
+		return fmt.Errorf("check apps.global: %w", err)
+	}
+	if n == 0 {
+		if _, err := db.Exec(`ALTER TABLE apps ADD COLUMN global INTEGER NOT NULL DEFAULT 0`); err != nil {
+			return fmt.Errorf("add apps.global: %w", err)
+		}
 	}
 	return nil
 }

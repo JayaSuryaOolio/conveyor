@@ -43,7 +43,7 @@ usage: conveyor [--home dir] <command> [args]
 
 commands:
   agent      Claude subagents from repos and ~/.claude (list|add|model)
-  app        open worktrees in external apps (list|presets|add|rm|open)
+  app        open worktrees in external apps (list|presets|add|global|rm|open)
   automation manage automations (list|add|enable|disable|run|rm)
   config     list, get or set settings
   daemon     run the dispatcher in the foreground

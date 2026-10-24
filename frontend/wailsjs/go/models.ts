@@ -165,6 +165,7 @@ export namespace store {
 	    id: number;
 	    name: string;
 	    command: string;
+	    global: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new App(source);
@@ -175,6 +176,7 @@ export namespace store {
 	        this.id = source["id"];
 	        this.name = source["name"];
 	        this.command = source["command"];
+	        this.global = source["global"];
 	    }
 	}
 	export class Automation {
