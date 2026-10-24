@@ -429,6 +429,24 @@ export namespace ui {
 	        this.repo = source["repo"];
 	    }
 	}
+	export class ScheduleInfo {
+	    valid: boolean;
+	    error: string;
+	    description: string;
+	    next: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ScheduleInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.valid = source["valid"];
+	        this.error = source["error"];
+	        this.description = source["description"];
+	        this.next = source["next"];
+	    }
+	}
 	export class TaskCard {
 	    key: string;
 	    title: string;
