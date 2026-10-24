@@ -205,6 +205,12 @@ Settings are in the app (Settings page) or `conveyor config list|get|set`.
 - **External terminal**: `terminal_template`, the command for external terminals (`{cwd}` and `{cmd}` are substituted; default uses macOS Terminal).
 - **Prompts**: `pr_comment_prefix`, `brief_extra_rules`, and `prompt_fresh` / `prompt_resume` to replace the launch prompts (placeholders `{key}`, `{title}`, `{brief}`, `{comments}`). Empty means the built-in prompt. The page also shows the status block protocol the agent is given.
 
+## Moving to a fresh install
+
+`conveyor state export [file]` writes stored settings, apps, automations and user-level agents (`~/.claude/agents`) as JSON. Repos are never exported: the repo names automations use become placeholders `A`, `B`, ... `conveyor state import file --repo A=<name>` adds whatever is missing (it never overwrites) and maps each placeholder to a registered repo; an automation with an unmapped placeholder is added disabled.
+
+`scripts/uninstall.sh` exports to `~/conveyor-state.json` and `<home>/state.json`, then removes the CLI, app, skills and hooks, keeping the data folder. `scripts/install.sh` imports `<home>/state.json` if it finds one, says so, and renames it to `state.json.imported`.
+
 ## CLI cheat-sheet
 
 Global flag: `conveyor [--home dir] <command>`. Running a command with no arguments prints its usage. List and show commands take `--json`.
@@ -231,6 +237,7 @@ conveyor automation list|add|enable|disable|run|rm
 conveyor app list|presets|add|global|rm|open
 conveyor hooks status|install|uninstall
 conveyor config list | get <key> | set <key> <value>
+conveyor state export [file] | import <file> [--repo A=name ...]
 conveyor import jira --jql "..." --repo a      # needs acli
 conveyor daemon                                # run the dispatcher in the foreground
 ```
