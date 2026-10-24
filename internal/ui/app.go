@@ -4,6 +4,7 @@ package ui
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -318,6 +319,43 @@ func (a *App) GetSettings() (map[string]string, error) { return store.ListSettin
 
 // SetSetting stores one setting.
 func (a *App) SetSetting(k, v string) error { return store.SetSetting(a.svc.DB, k, v) }
+
+// ExportState saves the portable state (no repos) to a file the user picks and returns its path ("" if cancelled).
+func (a *App) ExportState() (string, error) {
+	st, err := a.svc.ExportState()
+	if err != nil {
+		return "", err
+	}
+	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{Title: "Export state", DefaultFilename: "conveyor-state.json"})
+	if err != nil || path == "" {
+		return "", err
+	}
+	b, err := json.MarshalIndent(st, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	return path, os.WriteFile(path, append(b, '\n'), 0o600)
+}
+
+// ImportState adds what is missing from a state file the user picks and returns the report lines.
+// ponytail: no repo mapping, so automations with repo placeholders import disabled; add a picker if that bites.
+func (a *App) ImportState() ([]string, error) {
+	path, err := runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
+		Title: "Import state", Filters: []runtime.FileFilter{{DisplayName: "JSON", Pattern: "*.json"}},
+	})
+	if err != nil || path == "" {
+		return nil, err
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var st core.State
+	if err := json.Unmarshal(b, &st); err != nil {
+		return nil, fmt.Errorf("%s: %w", path, err)
+	}
+	return a.svc.ImportState(st, nil)
+}
 
 // Actions lists the terminal actions for a task's workspace.
 func (a *App) Actions(key string) ([]core.Action, error) {

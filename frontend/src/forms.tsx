@@ -1,7 +1,7 @@
 import {useState} from 'react'
 import {ActionIcon, Button, Checkbox, Code, Group, Modal, MultiSelect, ScrollArea, SegmentedControl, Select, SelectProps, Stack, Table, Tabs, Text, TextInput, Textarea, Title, Tooltip} from '@mantine/core'
 import {IconAdjustments} from '@tabler/icons-react'
-import {AddRepo, CreateTask, GetPromptDefaults, GetTask, GetSettings, ListAgents, ListRepos, ListTasks, PreviewBrief, SetSetting, SetTaskAgent, SetTaskModel} from '../wailsjs/go/ui/App'
+import {AddRepo, CreateTask, ExportState, GetPromptDefaults, GetTask, GetSettings, ImportState, ListAgents, ListRepos, ListTasks, PreviewBrief, SetSetting, SetTaskAgent, SetTaskModel} from '../wailsjs/go/ui/App'
 import {core} from '../wailsjs/go/models'
 import {Nav, errMsg} from './components'
 import {Markdown, MarkdownEditor} from './markdown'
@@ -152,12 +152,29 @@ export function Settings() {
                         <Tabs.Panel key={t.name} value={t.name}>
                             <Stack>
                                 {(t.name === "General" ? [...t.fields, ...extra] : t.fields).map(f => <SettingRow key={f.k} f={f} v={data[f.k] ?? ""} reload={reload} ph={f.k === "prompt_fresh" ? defs?.fresh : f.k === "prompt_resume" ? defs?.resume : undefined}/>)}
+                                {t.name === "General" && <StateButtons reload={reload}/>}
                                 {t.name === "Prompts" && <PromptsInfo settings={data} protocol={defs?.protocol ?? ""}/>}
                             </Stack>
                         </Tabs.Panel>
                     ))}
                 </Tabs>
             )}
+        </Stack>
+    )
+}
+
+/** Export or import the portable state (settings, apps, automations, user agents) as a JSON file. */
+function StateButtons({reload}: {reload: () => void}) {
+    const [msg, setMsg] = useState<string[]>([])
+    return (
+        <Stack gap={4}>
+            <Text size="sm" fw={500}>State</Text>
+            <Text size="xs" c="dimmed">Move settings, apps, automations and user agents to another install. Repos are not exported: automations get placeholders and import disabled. Import only adds what is missing.</Text>
+            <Group>
+                <Button variant="default" onClick={() => ExportState().then(p => setMsg(p ? [`Exported to ${p}`] : []), errMsg)}>Export state</Button>
+                <Button variant="default" onClick={() => ImportState().then(l => { setMsg(l ?? []); reload() }, errMsg)}>Import state</Button>
+            </Group>
+            {msg.map((l, i) => <Text key={i} size="sm">{l}</Text>)}
         </Stack>
     )
 }
