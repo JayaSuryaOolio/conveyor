@@ -61,6 +61,7 @@ var transitions = map[edge]actors{
 	{StatusNeedsYou, StatusTodo}:    byAny,
 	{StatusNeedsYou, StatusDone}:    byHuman,
 	{StatusReview, StatusTodo}:      byAny,
+	{StatusReview, StatusNeedsYou}:  bySystem, // all PRs closed without merge
 	{StatusReview, StatusDone}:      byAny,
 	{StatusFailed, StatusTodo}:      byAny,
 	{StatusDone, StatusTodo}:        byAny,
