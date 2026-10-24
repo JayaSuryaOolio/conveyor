@@ -1,6 +1,7 @@
 package core
 
 import (
+	"cmp"
 	"context"
 	"database/sql"
 	"fmt"
@@ -39,6 +40,8 @@ type NewTaskInput struct {
 	Source      string
 	ExternalKey string
 	ExternalURL string
+	// CreatedBy is stored as tasks.created_by; empty means "human".
+	CreatedBy string
 }
 
 var nonAlnum = regexp.MustCompile(`[^a-z0-9]+`)
@@ -117,7 +120,7 @@ func (s *Service) CreateTask(in NewTaskInput) (store.Task, error) {
 	t := store.Task{
 		Title: in.Title, Description: in.Description, Priority: in.Priority,
 		Model: optional(in.Model), Agent: optional(in.Agent), Status: store.StatusBacklog,
-		Source: in.Source, ExternalKey: optional(in.ExternalKey), ExternalURL: optional(in.ExternalURL),
+		Source: in.Source, CreatedBy: optional(cmp.Or(in.CreatedBy, "human")), ExternalKey: optional(in.ExternalKey), ExternalURL: optional(in.ExternalURL),
 	}
 	if in.Start {
 		t.Status = store.StatusTodo
@@ -214,7 +217,7 @@ func (s *Service) followUp(t store.Task, pr, body string, actor store.Actor) err
 	if len(title) > 60 {
 		title = append(title[:57], '…')
 	}
-	child, err := s.CreateTask(NewTaskInput{Title: string(title), Description: body, ParentKey: t.Key, Source: "followup", Start: true})
+	child, err := s.CreateTask(NewTaskInput{Title: string(title), Description: body, ParentKey: t.Key, Source: "followup", CreatedBy: "followup:" + t.Key, Start: true})
 	if err != nil {
 		return fmt.Errorf("follow-up task: %w", err)
 	}
