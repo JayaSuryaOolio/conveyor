@@ -80,7 +80,7 @@ func taskNew(s *core.Service, args []string) error {
 	descFile := fs.String("desc-file", "", "read description from file")
 	todo := fs.Bool("todo", false, "start in todo instead of backlog")
 	model := fs.String("model", "", "model override")
-	agent := fs.String("agent", "", "agent override")
+	agent := fs.String("agent", "", "Claude subagent name (see conveyor agent list)")
 	parent := fs.String("parent", "", "parent task key")
 	prio := fs.Int("priority", 0, "priority (higher first)")
 	pos, err := parseArgs(fs, args)

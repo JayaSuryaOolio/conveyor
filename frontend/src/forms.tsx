@@ -1,5 +1,5 @@
 import {useState} from 'react'
-import {AddRepo, CreateTask, GetSettings, ListRepos, SetSetting} from '../wailsjs/go/ui/App'
+import {AddAgent, AddRepo, CreateTask, GetSettings, ListAgents, ListRepos, SetSetting, SetTaskAgent} from '../wailsjs/go/ui/App'
 import {core} from '../wailsjs/go/models'
 import {Nav, errMsg} from './components'
 import {useData} from './util'
@@ -36,9 +36,60 @@ export function NewTask({nav, close}: {nav: Nav; close: () => void}) {
                     </label>
                 ))}
                 <input placeholder="Model (optional)" value={model} onChange={e => setModel(e.target.value)}/>
-                <input placeholder="Agent (optional)" value={agent} onChange={e => setAgent(e.target.value)}/>
+                <AgentSelect repos={sel} value={agent} onChange={setAgent}/>
                 <label><input type="checkbox" checked={start} onChange={e => setStart(e.target.checked)}/> Start now (todo)</label>
                 <div className="row"><button onClick={submit} disabled={!title.trim() || sel.length === 0}>Create</button><button onClick={close}>Cancel</button></div>
+            </div>
+        </div>
+    )
+}
+
+/** Select of the Claude agents available to the given repos; "" means none. */
+export function AgentSelect({repos, value, onChange}: {repos: string[]; value: string; onChange: (a: string) => void}) {
+    const {data} = useData(() => ListAgents(repos), [repos.join(',')])
+    const names = [...new Set((data ?? []).map(a => a.name))]
+    if (value && !names.includes(value)) names.push(value)
+    return (
+        <select value={value} onChange={e => onChange(e.target.value)} title="Claude agent">
+            <option value="">Agent: none</option>
+            {names.map(n => <option key={n} value={n}>{n}</option>)}
+        </select>
+    )
+}
+
+export function TaskAgent({k, repos, agent}: {k: string; repos: string[]; agent: string}) {
+    return <AgentSelect repos={repos} value={agent} onChange={a => SetTaskAgent(k, a).catch(errMsg)}/>
+}
+
+function Agents({repos}: {repos: string[]}) {
+    const {data, error, reload} = useData(() => ListAgents(repos), [repos.join(',')])
+    const [name, setName] = useState('')
+    const [desc, setDesc] = useState('')
+    const [prompt, setPrompt] = useState('')
+    const [scope, setScope] = useState('user')
+    const [hint, setHint] = useState('')
+    const add = () => AddAgent(name, desc, prompt, scope).then(() => {
+        setHint(scope === 'user' ? '' : `Commit .claude/agents/${name}.md in ${scope}, or task worktrees will not see it.`)
+        setName(''); setDesc(''); setPrompt(''); reload()
+    }, errMsg)
+    return (
+        <div>
+            <h2>Agents</h2>
+            <p className="muted">Claude Code subagents from each repo's .claude/agents and ~/.claude/agents.</p>
+            {error && <p className="err">{error}</p>}
+            <table><tbody>
+                {data?.map(a => <tr key={a.scope + a.name}><td><b>{a.name}</b></td><td>{a.scope}</td><td className="muted">{a.description}</td></tr>)}
+            </tbody></table>
+            {hint && <p className="muted">{hint}</p>}
+            <input placeholder="name (a-z, 0-9, -)" value={name} onChange={e => setName(e.target.value)}/>
+            <input placeholder="description" value={desc} onChange={e => setDesc(e.target.value)}/>
+            <textarea placeholder="Prompt" rows={4} value={prompt} onChange={e => setPrompt(e.target.value)}/>
+            <div className="row">
+                <select value={scope} onChange={e => setScope(e.target.value)}>
+                    <option value="user">user (~/.claude/agents)</option>
+                    {repos.map(r => <option key={r} value={r}>{r}</option>)}
+                </select>
+                <button onClick={add} disabled={!name || !desc.trim()}>Add agent</button>
             </div>
         </div>
     )
@@ -60,6 +111,7 @@ export function Repos() {
                 <input placeholder="name (optional)" value={name} onChange={e => setName(e.target.value)}/>
                 <button onClick={() => AddRepo(path, name).then(() => { setPath(''); setName(''); reload() }, errMsg)}>Add</button>
             </div>
+            <Agents repos={data?.map(r => r.name) ?? []}/>
         </div>
     )
 }

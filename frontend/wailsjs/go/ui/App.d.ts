@@ -8,6 +8,8 @@ export function AcceptLearning(arg1:number,arg2:string):Promise<void>;
 
 export function Actions(arg1:string):Promise<Array<core.Action>>;
 
+export function AddAgent(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
+
 export function AddComment(arg1:string,arg2:string):Promise<void>;
 
 export function AddRepo(arg1:string,arg2:string):Promise<void>;
@@ -32,6 +34,8 @@ export function GetTask(arg1:string):Promise<ui.TaskDetail>;
 
 export function Learnings():Promise<Array<ui.LearningRow>>;
 
+export function ListAgents(arg1:Array<string>):Promise<Array<core.Agent>>;
+
 export function ListAutomations():Promise<Array<store.Automation>>;
 
 export function ListRepos():Promise<Array<store.Repo>>;
@@ -51,5 +55,7 @@ export function Sessions(arg1:string):Promise<Array<core.Session>>;
 export function SetAutomationEnabled(arg1:string,arg2:boolean):Promise<void>;
 
 export function SetSetting(arg1:string,arg2:string):Promise<void>;
+
+export function SetTaskAgent(arg1:string,arg2:string):Promise<void>;
 
 export function ShowError(arg1:string):Promise<void>;
