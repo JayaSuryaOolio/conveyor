@@ -47,6 +47,16 @@ else
 		--arg "{\"title\":\"Conveyor doctor: weekly run review\",\"description\":\"Use the conveyor-doctor skill to review last week's runs and propose prompt and context fixes.\",\"repos\":[\"$repo\"],\"start\":true}"
 fi
 
+echo "==> Saved state"
+# Left by scripts/uninstall.sh (or copied from another machine); renamed once imported so it is not re-applied.
+state="${CONVEYOR_HOME:-$HOME/.conveyor}/state.json"
+if [ -f "$state" ]; then
+	echo "found $state from a previous install; importing settings, apps, automations and agents (existing ones are kept):"
+	"$BIN_DIR/conveyor" state import "$state" && mv "$state" "$state.imported"
+else
+	echo "none"
+fi
+
 echo "installed: $BIN_DIR/conveyor"
 echo "installed: $APP_DIR/Conveyor.app"
 case ":$user_path:" in
