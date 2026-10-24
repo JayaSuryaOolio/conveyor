@@ -176,3 +176,22 @@ func TestSubtaskDefaultsToParentRepos(t *testing.T) {
 		t.Fatalf("%+v %v", e.Repos, err)
 	}
 }
+
+func TestSetTaskDescriptionBacklogOnly(t *testing.T) {
+	s := newSvc(t)
+	if _, err := s.CreateTask(NewTaskInput{Title: "t", Repos: []string{"a"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetTaskDescription("CV-1", "new"); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := store.GetTaskByKey(s.DB, "CV-1"); got.Description != "new" {
+		t.Fatalf("%q", got.Description)
+	}
+	if _, err := s.CreateTask(NewTaskInput{Title: "u", Repos: []string{"a"}, Start: true}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetTaskDescription("CV-2", "x"); err == nil {
+		t.Fatal("edited a todo task")
+	}
+}

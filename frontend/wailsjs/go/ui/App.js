@@ -182,6 +182,10 @@ export function SetTaskAgent(arg1, arg2) {
   return window['go']['ui']['App']['SetTaskAgent'](arg1, arg2);
 }
 
+export function SetTaskDescription(arg1, arg2) {
+  return window['go']['ui']['App']['SetTaskDescription'](arg1, arg2);
+}
+
 export function SetTaskModel(arg1, arg2) {
   return window['go']['ui']['App']['SetTaskModel'](arg1, arg2);
 }
