@@ -66,6 +66,7 @@ export namespace core {
 	    Source: string;
 	    ExternalKey: string;
 	    ExternalURL: string;
+	    CreatedBy: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new NewTaskInput(source);
@@ -86,6 +87,7 @@ export namespace core {
 	        this.Source = source["Source"];
 	        this.ExternalKey = source["ExternalKey"];
 	        this.ExternalURL = source["ExternalURL"];
+	        this.CreatedBy = source["CreatedBy"];
 	    }
 	}
 	export class RunLog {
@@ -157,6 +159,22 @@ export namespace core {
 		    }
 		    return a;
 		}
+	}
+	export class Suggestion {
+	    insert: string;
+	    label: string;
+	    hint: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Suggestion(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.insert = source["insert"];
+	        this.label = source["label"];
+	        this.hint = source["hint"];
+	    }
 	}
 
 }

@@ -5,7 +5,7 @@ import {IconArrowDown, IconArrowUp, IconPencil, IconLayoutSidebarRightCollapse, 
 import {GetTask, ListTasks, RunLog, SetTaskDescription} from '../wailsjs/go/ui/App'
 import {core, store, ui} from '../wailsjs/go/models'
 import {Card, CommentBox, Message, Nav, StatusBadge, Time, errMsg} from './components'
-import {Markdown, MarkdownEditor} from './markdown'
+import {Markdown, MarkdownEditor, TaskKey} from './markdown'
 import {Relations} from './relations'
 import {TaskSidebar} from './workspace'
 import {fmtDuration, fmtK, useData} from './util'
@@ -186,6 +186,7 @@ export function TaskPage({k, nav}: {k: string; nav: Nav}) {
     const latest = d.runs[d.runs.length - 1]
     return (
         // Only the thread scrolls: the comment box, sidebar and terminal dock stay put.
+        <TaskKey.Provider value={t.key}>
         <Box style={{display: 'flex', flexDirection: 'column', height: 'calc(100vh - 2 * var(--mantine-spacing-md))'}}>
         <Box style={{flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: `minmax(0, 1fr) ${side ? '300px' : 'auto'}`, gap: side ? 'var(--mantine-spacing-xl)' : 'var(--mantine-spacing-xs)'}}>
             <Stack gap="sm" mih={0}>
@@ -232,6 +233,7 @@ export function TaskPage({k, nav}: {k: string; nav: Nav}) {
             <Suspense fallback={null}><TermDock k={t.key} added={added}/></Suspense>
         </Box>
         </Box>
+        </TaskKey.Provider>
     )
 }
 
