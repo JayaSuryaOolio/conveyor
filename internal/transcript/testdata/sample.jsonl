@@ -1,0 +1,8 @@
+{"type":"user","message":{"role":"user","content":"first prompt"}}
+{"type":"assistant","message":{"id":"m0","usage":{"input_tokens":1,"output_tokens":1,"cache_read_input_tokens":1000,"cache_creation_input_tokens":0},"content":[{"type":"text","text":"old"}]}}
+{"type":"user","message":{"role":"user","content":[{"type":"text","text":"second prompt"}]}}
+{"type":"assistant","message":{"id":"m1","usage":{"input_tokens":10,"output_tokens":5,"cache_read_input_tokens":100,"cache_creation_input_tokens":20},"content":[{"type":"thinking"}]}}
+{"type":"assistant","message":{"id":"m1","usage":{"input_tokens":10,"output_tokens":5,"cache_read_input_tokens":100,"cache_creation_input_tokens":20},"content":[{"type":"text","text":"hi"}]}}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","content":"ok"}]}}
+{"type":"assistant","message":{"id":"m2","usage":{"input_tokens":2,"output_tokens":7,"cache_read_input_tokens":300,"cache_creation_input_tokens":0},"content":[{"type":"text","text":"done"}]}}
+not json
