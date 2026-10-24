@@ -85,7 +85,7 @@ func oneRun(db *sql.DB, what string, where string, args ...any) (Run, error) {
 
 // RunBySession finds a run by Claude session UUID.
 func RunBySession(db *sql.DB, sessionID string) (Run, error) {
-	return oneRun(db, "run for session "+sessionID, `session_id=?`, sessionID)
+	return oneRun(db, "run for session "+sessionID, `session_id=? ORDER BY id DESC`, sessionID)
 }
 
 // LatestRun returns the task's newest run.
