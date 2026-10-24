@@ -202,6 +202,17 @@ func TestRuns(t *testing.T) {
 	}
 }
 
+func TestRunBySessionNewest(t *testing.T) {
+	db := openTest(t)
+	tk := mkTask(t, db, StatusTodo)
+	sid := "shared"
+	CreateRun(db, Run{TaskID: tk.ID, Kind: "auto", Mode: "fresh", Status: "finished", SessionID: &sid})
+	r2, _ := CreateRun(db, Run{TaskID: tk.ID, Kind: "auto", Mode: "resume", Status: "running", SessionID: &sid})
+	if g, err := RunBySession(db, sid); err != nil || g.ID != r2.ID {
+		t.Fatalf("got %+v, %v; want newest run %d", g, err, r2.ID)
+	}
+}
+
 func TestSettingsDefaults(t *testing.T) {
 	db := openTest(t)
 	if GetSetting(db, "key_prefix") != "CV" || GetSetting(db, "max_parallel") != "3" {
