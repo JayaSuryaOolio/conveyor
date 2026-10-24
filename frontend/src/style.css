@@ -7,12 +7,14 @@
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.4 -apple-system, system-ui, sans-serif; }
 a { color: var(--accent); }
-header { display: flex; gap: 14px; align-items: center; padding: 8px 16px; border-bottom: 1px solid var(--border); }
-header a { text-decoration: none; text-transform: capitalize; color: var(--muted); }
-header a.active { color: var(--fg); font-weight: 600; }
-.badge { margin-left: auto; }
-.search { width: 200px; }
-main { padding: 16px; }
+.app { display: flex; height: 100vh; overflow: hidden; }
+.sidebar { flex: 0 0 168px; display: flex; flex-direction: column; gap: 6px; padding: 12px; border-right: 1px solid var(--border); background: var(--panel); overflow-y: auto; }
+.sidebar b { margin-bottom: 4px; }
+.sidebar a { display: flex; justify-content: space-between; align-items: center; padding: 4px 8px; border-radius: 6px; text-decoration: none; text-transform: capitalize; color: var(--muted); }
+.sidebar a.active { color: var(--fg); font-weight: 600; background: var(--bg); }
+.sidebar .badge { margin: auto auto 0 0; }
+.sidebar input, .sidebar button { width: 100%; }
+main { flex: 1; min-width: 0; overflow: auto; padding: 16px; }
 input, textarea, select, button { font: inherit; color: inherit; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; }
 button { cursor: pointer; }
 textarea { width: 100%; resize: vertical; }
