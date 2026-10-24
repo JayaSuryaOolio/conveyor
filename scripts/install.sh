@@ -26,6 +26,27 @@ git checkout -- frontend/dist/.gitkeep 2>/dev/null || true
 rm -rf "$APP_DIR/Conveyor.app"
 cp -R build/bin/Conveyor.app "$APP_DIR/"
 
+echo "==> Skills"
+# Conveyor's user-level skills; overwritten on every install, so edit them in this repo.
+mkdir -p "$HOME/.claude/skills"
+for d in skills/*/; do
+	rm -rf "$HOME/.claude/skills/$(basename "$d")"
+	cp -R "$d" "$HOME/.claude/skills/"
+	echo "installed: ~/.claude/skills/$(basename "$d")"
+done
+
+echo "==> Weekly doctor"
+# A weekly task, on the repo registered for this checkout, that runs the conveyor-doctor skill.
+repo=$("$BIN_DIR/conveyor" repo list --json | python3 -c 'import json,os,sys; p=os.path.realpath(sys.argv[1]); print(next((r["name"] for r in json.load(sys.stdin) or [] if os.path.realpath(r["path"])==p), ""))' "$PWD")
+if [ -z "$repo" ]; then
+	echo "skipped: register this checkout first (conveyor repo add $PWD), then re-run"
+elif "$BIN_DIR/conveyor" automation list | grep -q '^conveyor-doctor '; then
+	echo "exists: automation conveyor-doctor"
+else
+	"$BIN_DIR/conveyor" automation add conveyor-doctor --schedule "0 9 * * 1" --kind create_task \
+		--arg "{\"title\":\"Conveyor doctor: weekly run review\",\"description\":\"Use the conveyor-doctor skill to review last week's runs and propose prompt and context fixes.\",\"repos\":[\"$repo\"],\"start\":true}"
+fi
+
 echo "installed: $BIN_DIR/conveyor"
 echo "installed: $APP_DIR/Conveyor.app"
 case ":$user_path:" in
