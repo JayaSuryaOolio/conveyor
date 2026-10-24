@@ -49,8 +49,37 @@ var mockTasks = []mockTask{
 	{Title: "Child of epic", Status: "todo", Repos: []string{"mock-api"}, Parent: 10},
 }
 
+// mockState is the non-task fixtures, loaded through ImportState: settings, apps
+// (global/per-repo, with/without output) and automations (enabled/disabled, every
+// action kind). Repos are the mockRepos names. Agents are left out on purpose:
+// import writes them to the real ~/.claude/agents. Add a fixture here whenever a
+// bug needs a particular settings/apps/automations state to reproduce.
+var mockState = State{
+	Version: 1,
+	Settings: map[string]string{
+		"user_name":         "Mock User",
+		"max_parallel":      "2",
+		"brief_extra_rules": "Mock rule: keep changes small.",
+	},
+	Apps: []StateApp{
+		{Name: "Mock Editor", Command: "mock-editor {cwd}", Global: true},
+		{Name: "Mock Tests", Command: "mock-test --watch", Output: true},
+		{Name: "Mock Global Logs", Command: "mock-logs -f", Global: true, Output: true},
+		{Name: "Mock Repo Shell", Command: "mock-shell {cwd}"},
+	},
+	Automations: []StateAutomation{
+		{Name: "mock-weekly-task", Schedule: "0 9 * * 1", ActionKind: "create_task", Enabled: true,
+			ActionArg: `{"title":"Mock weekly review","description":"Fake recurring task","repos":["mock-api","mock-web"],"start":false}`},
+		{Name: "mock-nudge", Schedule: "*/30 * * * *", ActionKind: "comment", Enabled: true, Precheck: "true",
+			ActionArg: `{"body":"Mock nudge: status?","task_status":"needs_you"}`},
+		{Name: "mock-cli-disabled", Schedule: "0 0 * * *", ActionKind: "cli", Enabled: false,
+			ActionArg: `{"args":["task","list"]}`},
+	},
+}
+
 // SeedMock fills an empty install with fake repos (empty dirs under home/mock-repos)
-// and one task per scenario in mockTasks. It refuses a database that has repos or
+// and one task per scenario in mockTasks, plus the settings, apps and
+// automations in mockState. It refuses a database that has repos or
 // tasks, so real data is never mixed with mocks.
 func (s *Service) SeedMock(home string) error {
 	var n int
@@ -117,7 +146,13 @@ func (s *Service) SeedMock(home string) error {
 			}
 		}
 	}
-	return nil
+	// identity map: the fixtures already name the mock repos
+	repoMap := map[string]string{}
+	for _, r := range mockRepos {
+		repoMap[r] = r
+	}
+	_, err := s.ImportState(mockState, repoMap)
+	return err
 }
 
 // sp returns &v, or nil for "".
