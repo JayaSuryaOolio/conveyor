@@ -177,6 +177,21 @@ func TestSubtaskDefaultsToParentRepos(t *testing.T) {
 	}
 }
 
+func TestSubtaskDefaultsToParentAgent(t *testing.T) {
+	s := newSvc(t)
+	if _, err := s.CreateTask(NewTaskInput{Title: "p", Repos: []string{"a"}, Agent: "reviewer"}); err != nil {
+		t.Fatal(err)
+	}
+	c, err := s.CreateTask(NewTaskInput{Title: "c", ParentKey: "CV-1"})
+	if err != nil || c.Agent == nil || *c.Agent != "reviewer" {
+		t.Fatalf("%+v %v", c.Agent, err)
+	}
+	e, err := s.CreateTask(NewTaskInput{Title: "e", ParentKey: "CV-1", Agent: "other"})
+	if err != nil || e.Agent == nil || *e.Agent != "other" {
+		t.Fatalf("%+v %v", e.Agent, err)
+	}
+}
+
 func TestSetTaskDescriptionBacklogOnly(t *testing.T) {
 	s := newSvc(t)
 	if _, err := s.CreateTask(NewTaskInput{Title: "t", Repos: []string{"a"}}); err != nil {

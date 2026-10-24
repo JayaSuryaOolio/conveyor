@@ -1,7 +1,7 @@
 import {useState} from 'react'
 import {ActionIcon, Button, Checkbox, Code, Group, Modal, MultiSelect, ScrollArea, SegmentedControl, Select, SelectProps, Stack, Table, Tabs, Text, TextInput, Textarea, Title, Tooltip} from '@mantine/core'
 import {IconAdjustments} from '@tabler/icons-react'
-import {AddRepo, CreateTask, GetPromptDefaults, GetSettings, ListAgents, ListRepos, ListTasks, PreviewBrief, SetSetting, SetTaskAgent, SetTaskModel} from '../wailsjs/go/ui/App'
+import {AddRepo, CreateTask, GetPromptDefaults, GetTask, GetSettings, ListAgents, ListRepos, ListTasks, PreviewBrief, SetSetting, SetTaskAgent, SetTaskModel} from '../wailsjs/go/ui/App'
 import {core} from '../wailsjs/go/models'
 import {Nav, errMsg} from './components'
 import {Markdown, MarkdownEditor} from './markdown'
@@ -9,6 +9,8 @@ import {useData} from './util'
 
 export function NewTask({nav, close}: {nav: Nav; close: () => void}) {
     const {data: repos} = useData(ListRepos, [])
+    const {data: tasks} = useData(ListTasks, [])
+    const [parent, setParent] = useState('')
     const [title, setTitle] = useState('')
     const [desc, setDesc] = useState('')
     const [sel, setSel] = useState<string[]>([])
@@ -20,13 +22,24 @@ export function NewTask({nav, close}: {nav: Nav; close: () => void}) {
     const submit = () =>
         CreateTask(core.NewTaskInput.createFrom({
             Title: title, Description: desc, Repos: sel, Primary: prim,
-            Start: start, Model: model, Agent: agent,
+            Start: start, Model: model, Agent: agent, ParentKey: parent,
         })).then(key => { close(); nav({name: 'task', key}) }, errMsg)
+    // Picking a parent prefills repos, primary and agent from it; they stay editable. Clearing leaves them.
+    const pickParent = (key: string | null) => {
+        setParent(key ?? '')
+        if (key) GetTask(key).then(d => {
+            setSel(d.task.repos?.map(r => r.repo_name) ?? [])
+            setPrimary(d.task.repos?.find(r => r.is_primary)?.repo_name ?? '')
+            setAgent(d.task.agent ?? '')
+        }, errMsg)
+    }
     return (
         <Modal opened onClose={close} title="New task" size="md">
             <Stack gap="sm">
                 <TextInput data-autofocus placeholder="Title" value={title} onChange={e => setTitle(e.target.value)}/>
                 <MarkdownEditor minRows={4} placeholder="Description" value={desc} onChange={setDesc}/>
+                <Select label="Parent" placeholder="None" searchable clearable value={parent || null} onChange={pickParent}
+                        data={(tasks ?? []).filter(t => t.status !== 'done' && t.status !== 'cancelled').map(t => ({value: t.key, label: `${t.key} ${t.title}`}))}/>
                 <MultiSelect label="Repos" placeholder="Pick repos" description={repos?.length === 0 ? 'Add one on the Repos page first' : undefined}
                              data={repos?.map(r => r.name) ?? []} value={sel} onChange={setSel}/>
                 {sel.length > 1 && <Select label="Primary repo" allowDeselect={false} data={sel} value={prim} onChange={v => setPrimary(v ?? '')}/>}
