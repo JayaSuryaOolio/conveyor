@@ -26,6 +26,10 @@ export function Cancel(arg1) {
   return window['go']['ui']['App']['Cancel'](arg1);
 }
 
+export function Confirm(arg1) {
+  return window['go']['ui']['App']['Confirm'](arg1);
+}
+
 export function CreateTask(arg1) {
   return window['go']['ui']['App']['CreateTask'](arg1);
 }
@@ -92,4 +96,8 @@ export function SetAutomationEnabled(arg1, arg2) {
 
 export function SetSetting(arg1, arg2) {
   return window['go']['ui']['App']['SetSetting'](arg1, arg2);
+}
+
+export function ShowError(arg1) {
+  return window['go']['ui']['App']['ShowError'](arg1);
 }

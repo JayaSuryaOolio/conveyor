@@ -16,6 +16,8 @@ export function ApplyLearnings(arg1:string):Promise<string>;
 
 export function Cancel(arg1:string):Promise<void>;
 
+export function Confirm(arg1:string):Promise<boolean>;
+
 export function CreateTask(arg1:core.NewTaskInput):Promise<string>;
 
 export function DispatcherState():Promise<string>;
@@ -49,3 +51,5 @@ export function Sessions(arg1:string):Promise<Array<core.Session>>;
 export function SetAutomationEnabled(arg1:string,arg2:boolean):Promise<void>;
 
 export function SetSetting(arg1:string,arg2:string):Promise<void>;
+
+export function ShowError(arg1:string):Promise<void>;
