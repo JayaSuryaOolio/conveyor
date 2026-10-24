@@ -29,3 +29,15 @@ A fake `gh` script returns canned JSON per branch. Cover:
 - two repos, one merged and one open → stays review
 - all closed → needs_you
 - `gh` missing → `ErrNotFound`
+
+## Outcome
+Built `internal/gh` (`FindPR`, `SyncTask`, `ErrNotFound`) and `conveyor task sync KEY` (prints status and per-repo PR state). Tests use a fake `gh` shell script on a temp PATH; they cover no PR, open, merged, merged plus open, all closed, and `gh` missing.
+
+Deviations:
+- Added the `review -> needs_you` edge (system only) to `internal/store/status.go` and its table test; the spec requires that move but the transition table lacked it.
+- A repo with no PR keeps its stored `pr_url`/`pr_state` untouched.
+- Merged event kind is `pr_merged`.
+
+Manual checks: none against real GitHub.
+
+Follow-ups: nothing polls `SyncTask` yet (a poller is out of scope here); tech-spec §6 should list `review -> needs_you`.
