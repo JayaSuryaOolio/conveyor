@@ -1,11 +1,10 @@
 import {useEffect, useRef, useState} from 'react'
 import {Anchor, Box, Breadcrumbs, Button, Code, Group, Paper, Stack, Text, Timeline, Title} from '@mantine/core'
 import {IconMessage, IconPlayerPlay} from '@tabler/icons-react'
-import {Cancel, Confirm, GetTask, ListTasks, RunLog} from '../wailsjs/go/ui/App'
+import {GetTask, ListTasks, RunLog} from '../wailsjs/go/ui/App'
 import {core, store} from '../wailsjs/go/models'
 import {Card, CommentBox, Message, Nav, StatusBadge, Time, errMsg} from './components'
 import {Markdown} from './markdown'
-import {TaskAgent} from './forms'
 import {TaskSidebar} from './workspace'
 import {fmtDuration, fmtK, useData} from './util'
 
@@ -146,10 +145,6 @@ export function TaskPage({k, nav}: {k: string; nav: Nav}) {
                     <Text size="sm">{t.key}</Text>
                 </Breadcrumbs>
                 <Title order={3}>{t.title}</Title>
-                <Group>
-                    <TaskAgent k={t.key} repos={t.repos?.map(r => r.repo_name) ?? []} agent={t.agent ?? ''}/>
-                    <Button variant="default" color="red" size="xs" onClick={() => Confirm('Cancel this task?').then(ok => { if (ok) return Cancel(t.key) }).catch(errMsg)}>Cancel task</Button>
-                </Group>
                 <Paper withBorder p="md" radius="md">
                     <Markdown c={t.description ? undefined : 'dimmed'}>{t.description || '(no description)'}</Markdown>
                 </Paper>

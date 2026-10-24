@@ -1,52 +1,56 @@
 import {useState} from 'react'
-import {ActionIcon, Anchor, Badge, Button, Code, CopyButton, Divider, Group, Paper, Stack, Text, TextInput, Title, Tooltip} from '@mantine/core'
-import {IconCheck, IconCopy, IconStar} from '@tabler/icons-react'
+import {ActionIcon, Anchor, Badge, Button, Code, Divider, Group, Paper, Stack, Text, TextInput, Title, Tooltip} from '@mantine/core'
+import {useClipboard} from '@mantine/hooks'
+import {IconCopy, IconPencil, IconStar, IconTerminal, IconTerminal2} from '@tabler/icons-react'
 import {Actions, EnsureWorkspace, RunAction, Sessions, SetTaskRepo} from '../wailsjs/go/ui/App'
 import {core, store} from '../wailsjs/go/models'
 import {BrowserOpenURL} from '../wailsjs/runtime/runtime'
 import {StatusSelect, Time, errMsg} from './components'
+import {TaskAgent} from './forms'
 import {useData} from './util'
 
 const copy = (s: string) => navigator.clipboard.writeText(s).catch(errMsg)
 const sq = (s: string) => "'" + s.replace(/'/g, "'\\''") + "'"
 const cdCmd = (a: core.Action) => 'cd ' + sq(a.cwd) + (a.cmd && a.kind !== 'editor' ? ' && ' + a.cmd : '')
 
-function ActionButton({k, a, kind}: {k: string; a: core.Action; kind?: string}) {
+/** One full-width row: label left, copy / external terminal / internal terminal icons right. */
+function ActionRow({k, a, kind}: {k: string; a: core.Action; kind?: string}) {
     return (
-        <Group gap={2} wrap="nowrap">
-            <Button variant="default" size="compact-sm" onClick={() => RunAction(k, kind ?? a.kind, a.repo).catch(errMsg)}>{a.label}</Button>
-            <Tooltip label="Copy command">
-                <ActionIcon variant="default" size="sm" aria-label="Copy command" onClick={() => copy(a.kind === 'editor' ? a.cmd : cdCmd(a))}><IconCopy size={14}/></ActionIcon>
-            </Tooltip>
+        <Group justify="space-between" wrap="nowrap" gap="xs">
+            <Text size="sm" style={{wordBreak: 'break-word'}}>{a.label}</Text>
+            <Group gap={2} wrap="nowrap">
+                <Tooltip label="Copy command">
+                    <ActionIcon variant="default" size="sm" aria-label="Copy command" onClick={() => copy(a.kind === 'editor' ? a.cmd : cdCmd(a))}><IconCopy size={14}/></ActionIcon>
+                </Tooltip>
+                <Tooltip label={a.kind === 'editor' ? 'Open editor' : 'Open in external terminal'}>
+                    <ActionIcon variant="default" size="sm" aria-label="Open in external terminal" onClick={() => RunAction(k, kind ?? a.kind, a.repo).catch(errMsg)}><IconTerminal2 size={14}/></ActionIcon>
+                </Tooltip>
+                <Tooltip label="coming next">
+                    <span><ActionIcon variant="default" size="sm" aria-label="Open in internal terminal" disabled><IconTerminal size={14}/></ActionIcon></span>
+                </Tooltip>
+            </Group>
         </Group>
     )
 }
 
 const PR_COLOR: Record<string, string> = {open: 'green', merged: 'violet', closed: 'red', draft: 'gray'}
 
-/** Single-line value that truncates with ellipsis, full text on hover, with an inline copy button. */
+/** Full value, wrapped anywhere; click copies it and flashes "Copied". */
 function Mono({text}: {text: string}) {
+    const cb = useClipboard({timeout: 1200})
     return (
-        <Group gap={4} wrap="nowrap">
-            <Tooltip label={text} multiline maw={300} openDelay={300}>
-                <Code style={{flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>{text}</Code>
-            </Tooltip>
-            <CopyButton value={text}>
-                {({copied, copy}) => (
-                    <ActionIcon variant="subtle" color={copied ? 'teal' : 'gray'} size="sm" aria-label="Copy" onClick={copy}>
-                        {copied ? <IconCheck size={14}/> : <IconCopy size={14}/>}
-                    </ActionIcon>
-                )}
-            </CopyButton>
-        </Group>
+        <Tooltip label="Copied" opened={cb.copied} position="top-start">
+            <Code style={{display: 'block', cursor: 'pointer', whiteSpace: 'pre-wrap', wordBreak: 'break-all'}} title="Click to copy" onClick={() => cb.copy(text)}>{text}</Code>
+        </Tooltip>
     )
 }
 
 // RepoFields shows one repo's branch, worktree and PR. The branch is editable
-// until the worktree exists; the PR URL always is.
+// until the worktree exists; the PR URL via the pencil.
 function RepoFields({k, r, reload, children}: {k: string; r: store.TaskRepo; reload: () => void; children?: React.ReactNode}) {
     const [branch, setBranch] = useState(r.branch)
     const [pr, setPr] = useState(r.pr_url ?? '')
+    const [editPr, setEditPr] = useState(false)
     const dirty = branch !== r.branch || pr !== (r.pr_url ?? '')
     const save = () => SetTaskRepo(k, r.repo_name, branch, pr).then(reload).catch(errMsg)
     const onKey = (e: React.KeyboardEvent) => { if (e.key === 'Enter' && dirty) save() }
@@ -72,11 +76,16 @@ function RepoFields({k, r, reload, children}: {k: string; r: store.TaskRepo; rel
                         <Text size="xs" c="dimmed">PR</Text>
                         {r.pr_url && r.pr_state && <Badge size="xs" variant="light" color={PR_COLOR[r.pr_state.toLowerCase()] ?? 'gray'}>{r.pr_state}</Badge>}
                         {r.pr_url && <Anchor size="xs" href={r.pr_url} onClick={e => { e.preventDefault(); BrowserOpenURL(r.pr_url!) }}>Open PR</Anchor>}
+                        <Tooltip label="Edit PR URL">
+                            <ActionIcon variant="subtle" color="gray" size="xs" aria-label="Edit PR URL" onClick={() => setEditPr(!editPr)}><IconPencil size={12}/></ActionIcon>
+                        </Tooltip>
                     </Group>
-                    <TextInput size="xs" value={pr} placeholder="https://github.com/…/pull/1" onChange={e => setPr(e.target.value)} onKeyDown={onKey}/>
+                    {editPr || !r.pr_url
+                        ? <TextInput size="xs" value={pr} placeholder="https://github.com/…/pull/1" onChange={e => setPr(e.target.value)} onKeyDown={onKey}/>
+                        : <Mono text={r.pr_url}/>}
                 </div>
                 {dirty && <Button size="compact-sm" onClick={save}>Save</Button>}
-                <Group gap="xs">{children}</Group>
+                {children}
             </Stack>
         </Paper>
     )
@@ -92,6 +101,10 @@ export function TaskSidebar({t, runs, reload}: {t: store.Task; runs: store.Run[]
     const hasWorktree = repos.some(r => r.worktree_path)
     return (
         <Stack gap="sm" component="aside" miw={0}>
+            <Group justify="space-between" wrap="nowrap">
+                <Text size="sm" fw={600}>Agent</Text>
+                <TaskAgent k={k} repos={repos.map(r => r.repo_name)} agent={t.agent ?? ''}/>
+            </Group>
             <Group justify="space-between">
                 <Text size="sm" fw={600}>Status</Text>
                 <StatusSelect k={k} status={t.status}/>
@@ -102,13 +115,13 @@ export function TaskSidebar({t, runs, reload}: {t: store.Task; runs: store.Run[]
             <Title order={6}>Repos</Title>
             {repos.map(r => (
                 <RepoFields key={r.repo_id + '|' + r.branch + '|' + (r.pr_url ?? '')} k={k} r={r} reload={reload}>
-                    {(actions ?? []).filter(a => a.repo === r.repo_name && ['shell', 'editor'].includes(a.kind)).map(a => <ActionButton key={a.kind} k={k} a={a}/>)}
+                    {(actions ?? []).filter(a => a.repo === r.repo_name && ['shell', 'editor'].includes(a.kind)).map(a => <ActionRow key={a.kind} k={k} a={a}/>)}
                 </RepoFields>
             ))}
             {!hasWorktree && (
                 <Button loading={busy} onClick={() => { setBusy(true); EnsureWorkspace(k).then(() => { reload(); reloadActions(); reloadSessions() }).catch(errMsg).finally(() => setBusy(false)) }}>Create workspace</Button>
             )}
-            {taskActions.length > 0 && <Group gap="xs">{taskActions.map(a => <ActionButton key={a.kind} k={k} a={a}/>)}</Group>}
+            {taskActions.map(a => <ActionRow key={a.kind} k={k} a={a}/>)}
             <Divider/>
             <Title order={6}>Sessions</Title>
             {runs.length + (sessions?.length ?? 0) === 0 && <Text size="xs" c="dimmed">None yet.</Text>}
@@ -117,7 +130,7 @@ export function TaskSidebar({t, runs, reload}: {t: store.Task; runs: store.Run[]
             ))}
             {sessions?.map(s => (
                 <Stack key={s.id} gap={2}>
-                    <ActionButton k={k} a={s.action} kind={'resume:' + s.id}/>
+                    <ActionRow k={k} a={s.action} kind={'resume:' + s.id}/>
                     <Text size="xs" c="dimmed" lineClamp={1} title={s.prompt}>{s.prompt || s.id}</Text>
                 </Stack>
             ))}
