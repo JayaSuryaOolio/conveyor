@@ -62,3 +62,17 @@ func Handle(db *sql.DB, home, event string, payload []byte) error
   - an interactive Stop that doesn't change the task
   - a cwd outside the workspaces → ignored
   - malformed JSON → error but no panic
+
+## Outcome
+Built `internal/statusblock` (Parse), `internal/transcript` (Sum, last copy per message.id wins, prompt split), `internal/hook` (Handle per tech-spec §8) and `conveyor hook <Event>` (`cmd/conveyor/cmd_hook.go`, 1 MB stdin cap, errors to `<home>/logs/hook.log`, always exit 0). Tests per the spec list pass, plus an exec test that a malformed payload still exits 0 and logs.
+
+Deviations and notes:
+- Task 003 has not merged, so `hook.keyFromCwd` is an unexported copy marked `// TODO(003)`.
+- `Parse` returns the last *valid* block (an invalid later block does not hide an earlier valid one); on no valid block `rest` is the message unchanged.
+- Run criteria are stored as `- [x] text` lines.
+- On auto `Stop` the task only transitions if it is currently `running` (a human-moved task is left alone); the run and agent comment are still recorded.
+- If several runs share a session_id (resumes), the newest run is used.
+- `main.run` returns 0 for `hook` even if home resolution fails.
+- Learnings are inserted with raw SQL (no store helper exists until task 011).
+
+Manual checks: none (no real `claude` involved).
