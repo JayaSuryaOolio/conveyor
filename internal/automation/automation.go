@@ -5,6 +5,7 @@ package automation
 import (
 	"bytes"
 	"context"
+	_ "embed"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -253,4 +254,22 @@ var Templates = map[string]store.Automation{
 		ActionArg:  `{"task_status":"review","body":"New PR review comments since the last sweep. Address them, push, and reply on the PR threads."}`,
 		Enabled:    true,
 	},
+	"open-pr-review-sweep": {
+		Name:       "open-pr-review-sweep",
+		Schedule:   "0 9,13 * * 1-5",
+		Precheck:   `gh search prs --author=@me --state=open --limit 1 --json url --jq '.[].url' | grep -q .`,
+		ActionKind: "create_task",
+		ActionArg:  sweepArg(),
+		Enabled:    true,
+	},
+}
+
+//go:embed open_pr_review_sweep.md
+var sweepPrompt string
+
+// sweepArg is the create_task argument of the open-pr-review-sweep template;
+// `automation add --repo` fills in repos.
+func sweepArg() string {
+	b, _ := json.Marshal(action{Title: "Open PR review sweep", Description: sweepPrompt, Start: true})
+	return string(b)
 }

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -20,7 +21,7 @@ func init() {
 	register("import", runImport, "import tasks (jira --jql ... --repo a)")
 }
 
-const automationUsage = "usage: conveyor automation list | add NAME --schedule S --kind K --arg JSON [--precheck CMD] | add --template pr-sweep | enable|disable|run|rm NAME"
+const automationUsage = "usage: conveyor automation list | add NAME --schedule S --kind K --arg JSON [--precheck CMD] | add --template pr-sweep|open-pr-review-sweep [--repo R] | enable|disable|run|rm NAME"
 
 func runAutomation(home string, args []string) error {
 	if len(args) == 0 {
@@ -73,11 +74,12 @@ func runAutomation(home string, args []string) error {
 
 func automationAdd(s *core.Service, args []string) error {
 	fs := flag.NewFlagSet("automation add", flag.ContinueOnError)
-	tmpl := fs.String("template", "", "built-in template (pr-sweep)")
+	tmpl := fs.String("template", "", "built-in template (pr-sweep, open-pr-review-sweep)")
 	schedule := fs.String("schedule", "", "cron schedule (5 fields)")
 	precheck := fs.String("precheck", "", "shell precheck; exit 0 runs the action")
 	kind := fs.String("kind", "", "create_task, comment or cli")
 	arg := fs.String("arg", "", "action_arg JSON")
+	repo := fs.String("repo", "", "repo the task runs in (create_task templates)")
 	pos, err := parseArgs(fs, args)
 	if err != nil {
 		return err
@@ -89,6 +91,18 @@ func automationAdd(s *core.Service, args []string) error {
 			return fmt.Errorf("unknown template %q", *tmpl)
 		}
 		a = t
+		if a.ActionKind == "create_task" {
+			if *repo == "" {
+				return fmt.Errorf("template %q creates a task: pass --repo", *tmpl)
+			}
+			var m map[string]any
+			if err := json.Unmarshal([]byte(a.ActionArg), &m); err != nil {
+				return err
+			}
+			m["repos"] = []string{*repo}
+			b, _ := json.Marshal(m)
+			a.ActionArg = string(b)
+		}
 	} else {
 		a = store.Automation{Schedule: *schedule, Precheck: *precheck, ActionKind: *kind, ActionArg: *arg, Enabled: true}
 	}

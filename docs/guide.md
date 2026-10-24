@@ -152,10 +152,11 @@ Kinds:
 - `comment`: `{task_key | task_status, body}`. With `task_status` it comments on every task in that status, running the precheck once per task with `CONVEYOR_TASK_KEY`, `CONVEYOR_TASK_BRANCH` and `CONVEYOR_TASK_PR` set.
 - `cli`: `{args}`, run as a `conveyor` command.
 
-There is one built-in template, `pr-sweep` (every 15 minutes, comments on tasks in review that have new PR reviews):
+There are two built-in templates. `pr-sweep` (every 15 minutes) comments on tasks in review that have new PR reviews. `open-pr-review-sweep` (weekdays 09:00 and 13:00, only when you have open PRs) creates a triage-only task in `--repo` that reads the unresolved review threads of all your open PRs, matches each to its Conveyor task and reports in its final output (ported from the Multica autopilot of the same name; the prompt is `internal/automation/open_pr_review_sweep.md`):
 
 ```
 conveyor automation add --template pr-sweep
+conveyor automation add --template open-pr-review-sweep --repo Conveyor
 conveyor automation add NAME --schedule "0 9 * * 1-5" --kind create_task --arg '{"title":"Daily check","repos":["my-repo"],"start":true}' [--precheck CMD]
 conveyor automation list | enable NAME | disable NAME | run NAME | rm NAME
 ```

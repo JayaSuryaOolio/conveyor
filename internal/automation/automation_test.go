@@ -2,6 +2,7 @@ package automation
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -170,5 +171,16 @@ func TestTickRecordsRun(t *testing.T) {
 	Tick(context.Background(), svc, now.Add(time.Second)) // not due again
 	if ts, _ := store.ListTasks(svc.DB); len(ts) != 1 {
 		t.Fatalf("%d tasks", len(ts))
+	}
+}
+
+func TestOpenPRReviewSweepTemplate(t *testing.T) {
+	a := Templates["open-pr-review-sweep"]
+	if err := Validate(a); err != nil {
+		t.Fatal(err)
+	}
+	var act action
+	if err := json.Unmarshal([]byte(a.ActionArg), &act); err != nil || !act.Start || !strings.Contains(act.Description, "reviewThreads") {
+		t.Fatalf("bad arg %v %+v", err, act)
 	}
 }
