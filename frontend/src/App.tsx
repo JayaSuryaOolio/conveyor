@@ -1,4 +1,5 @@
 import {useEffect, useRef, useState} from 'react'
+import {DispatcherState} from '../wailsjs/go/ui/App'
 import {Nav} from './components'
 import {NewTask, Repos, Settings} from './forms'
 import {Board, Focus, TaskPage} from './views'
@@ -10,7 +11,15 @@ export default function App() {
     const [showNew, setShowNew] = useState(false)
     const [q, setQ] = useState('')
     const search = useRef<HTMLInputElement>(null)
+    const [dispatcher, setDispatcher] = useState('')
     const nav: Nav = v => setView(v)
+
+    useEffect(() => {
+        const poll = () => DispatcherState().then(setDispatcher, () => {})
+        poll()
+        const t = setInterval(poll, 5000)
+        return () => clearInterval(t)
+    }, [])
 
     useEffect(() => {
         let g = false
@@ -39,6 +48,7 @@ export default function App() {
                     <a key={n} href="#" className={view.name === n ? 'active' : ''}
                        onClick={e => { e.preventDefault(); setView({name: n}) }}>{n}</a>
                 ))}
+                <span className="muted badge" title="Whether this app is running the dispatcher">{dispatcher}</span>
                 <input ref={search} className="search" placeholder="Search (/)" value={q} onChange={e => setQ(e.target.value)}/>
                 <button onClick={() => setShowNew(true)}>New task (n)</button>
             </header>

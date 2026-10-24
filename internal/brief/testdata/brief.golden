@@ -1,0 +1,60 @@
+# Add login
+
+Key: CV-1
+
+## Repos
+
+- api: /ws/CV-1/api (branch `cv/CV-1-login`, PR: https://example.com/pr/1)
+
+## Description
+
+Users can log in.
+
+## Acceptance criteria
+
+- [x] AC1 - done
+- [ ] AC2 - todo
+
+## Latest run
+
+State: branch cv/CV-1-login, tests: pass
+Next: wire up UI
+
+## Recent runs
+
+- run 2: second line two
+- run 3: third
+- run 4: fourth
+
+## Human comments
+
+- please add tests
+- thanks
+
+## Status block
+
+End every final reply with this block. Omit it to ask the human a question instead.
+
+```
+<conveyor>
+status: done | failed
+summary: one paragraph
+state: branch ..., PR #N, tests: pass|fail|not run
+next: what remains
+criteria:
+- [x] AC1 - evidence
+- [ ] AC2 - why not
+learning: a lesson (repeatable line)
+spawn: child task title (repeatable line)
+</conveyor>
+```
+
+## Rules
+
+- Work only inside the worktrees listed above.
+- Open at most one PR per repo.
+- Never push to the default branch.
+
+## Older history
+
+Full thread: `conveyor task show CV-1 --thread --json`
