@@ -147,7 +147,7 @@ export function TaskSidebar({t, runs, reload, onTerm}: {t: store.Task; runs: sto
     const {data: apps} = useData(ListApps, [])
     const {data: icons} = useData(AppIcons, [])
     const [busy, setBusy] = useState(false)
-    const taskActions = (actions ?? []).filter(a => ['attach', 'resume', 'fresh'].includes(a.kind))
+    const taskActions = (actions ?? []).filter(a => ['attach', 'resume', 'fresh', 'shell'].includes(a.kind))
     const hasWorktree = repos.some(r => r.worktree_path)
     return (
         <Stack gap="sm" component="aside" miw={0}>
@@ -165,15 +165,19 @@ export function TaskSidebar({t, runs, reload, onTerm}: {t: store.Task; runs: sto
             <Title order={6}>Repos</Title>
             {actionsError && <Text size="xs" c="red">Failed to load actions: {actionsError}</Text>}
             {repos.map(r => (
-                <RepoFields key={r.repo_id + '|' + r.branch + '|' + (r.pr_url ?? '')} k={k} r={r} reload={reload}>
-                    {(actions ?? []).filter(a => a.repo === r.repo_name && a.kind === 'shell').map(a => <ActionRow key={a.kind} k={k} a={a} onTerm={onTerm}/>)}
-                    {r.worktree_path && <OpenIn k={k} repo={r.repo_name} wt={r.worktree_path} apps={(apps ?? []).filter(a => !a.global && !a.output)} icons={icons}/>}
-                </RepoFields>
+                <RepoFields key={r.repo_id + '|' + r.branch + '|' + (r.pr_url ?? '')} k={k} r={r} reload={reload}/>
             ))}
             {!hasWorktree && (
                 <Button loading={busy} onClick={() => { setBusy(true); EnsureWorkspace(k).then(() => { reload(); reloadActions(); reloadSessions() }).catch(errMsg).finally(() => setBusy(false)) }}>Create workspace</Button>
             )}
-            {taskActions.map(a => <ActionRow key={a.kind} k={k} a={a} onTerm={onTerm}/>)}
+            {taskActions.map(a => <ActionRow key={a.kind + a.repo} k={k} a={a} onTerm={onTerm}/>)}
+            {/* refactor: OpenIn is per worktree, so one labelled row per repo; a task-level app launcher would drop the labels */}
+            {repos.filter(r => r.worktree_path).map(r => (
+                <Stack key={r.repo_id} gap={2}>
+                    {repos.length > 1 && <Text size="xs" c="dimmed">{r.repo_name}</Text>}
+                    <OpenIn k={k} repo={r.repo_name} wt={r.worktree_path!} apps={(apps ?? []).filter(a => !a.global && !a.output)} icons={icons}/>
+                </Stack>
+            ))}
             {hasWorktree && <QuickActions k={k} apps={(apps ?? []).filter(a => !a.global && a.output)} icons={icons}/>}
             <Divider/>
             <Title order={6}>Sessions</Title>
