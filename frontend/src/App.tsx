@@ -1,4 +1,6 @@
 import {useEffect, useRef, useState} from 'react'
+import {AppShell, Badge, Button, Kbd, NavLink, Stack, Text, TextInput, Title} from '@mantine/core'
+import {IconBolt, IconBook2, IconClock, IconFolders, IconLayoutKanban, IconPlus, IconSearch, IconSettings} from '@tabler/icons-react'
 import {DispatcherState, Learnings} from '../wailsjs/go/ui/App'
 import {Automations} from './automations'
 import {Nav} from './components'
@@ -6,6 +8,15 @@ import {NewTask, Repos, Settings} from './forms'
 import {LearningsPage} from './learnings'
 import {useData} from './util'
 import {Board, Focus, TaskPage} from './views'
+
+const NAV = [
+    {name: 'board', label: 'Board', icon: IconLayoutKanban},
+    {name: 'focus', label: 'Focus', icon: IconBolt},
+    {name: 'learnings', label: 'Learnings', icon: IconBook2},
+    {name: 'automations', label: 'Automations', icon: IconClock},
+    {name: 'repos', label: 'Repos', icon: IconFolders},
+    {name: 'settings', label: 'Settings', icon: IconSettings},
+]
 
 type View = {name: string; key?: string}
 
@@ -46,18 +57,24 @@ export default function App() {
     }, [])
 
     return (
-        <div className="app">
-            <nav className="sidebar">
-                <b>Conveyor</b>
-                <button onClick={() => setShowNew(true)}>New task (n)</button>
-                <input ref={search} className="search" placeholder="Search (/)" value={q} onChange={e => setQ(e.target.value)}/>
-                {['board', 'focus', 'learnings', 'automations', 'repos', 'settings'].map(n => (
-                    <a key={n} href="#" className={view.name === n ? 'active' : ''}
-                       onClick={e => { e.preventDefault(); setView({name: n}) }}>{n}{n === 'learnings' && proposed > 0 && <span className="chip">{proposed}</span>}</a>
-                ))}
-                <span className="muted badge" title="Whether this app is running the dispatcher">{dispatcher}</span>
-            </nav>
-            <main>
+        <AppShell navbar={{width: 220, breakpoint: 0}} padding="md">
+            <AppShell.Navbar p="sm">
+                <Stack gap="xs" h="100%">
+                    <Title order={4}>Conveyor</Title>
+                    <Button leftSection={<IconPlus size={16}/>} rightSection={<Kbd size="xs">n</Kbd>} onClick={() => setShowNew(true)}>New task</Button>
+                    <TextInput ref={search} placeholder="Search" leftSection={<IconSearch size={16}/>} rightSection={<Kbd size="xs">/</Kbd>}
+                               value={q} onChange={e => setQ(e.target.value)}/>
+                    <Stack gap={2} mt="xs">
+                        {NAV.map(({name, label, icon: Icon}) => (
+                            <NavLink key={name} label={label} active={view.name === name} leftSection={<Icon size={18}/>}
+                                     rightSection={name === 'learnings' && proposed > 0 ? <Badge size="sm" circle>{proposed}</Badge> : undefined}
+                                     onClick={() => setView({name})}/>
+                        ))}
+                    </Stack>
+                    <Text mt="auto" size="xs" c="dimmed" title="Whether this app is running the dispatcher">{dispatcher}</Text>
+                </Stack>
+            </AppShell.Navbar>
+            <AppShell.Main h="100vh" style={{overflow: 'auto'}}>
                 {view.name === 'board' && <Board nav={nav} q={q}/>}
                 {view.name === 'focus' && <Focus nav={nav} q={q}/>}
                 {view.name === 'task' && <TaskPage k={view.key!} nav={nav}/>}
@@ -65,8 +82,8 @@ export default function App() {
                 {view.name === 'automations' && <Automations/>}
                 {view.name === 'repos' && <Repos/>}
                 {view.name === 'settings' && <Settings/>}
-            </main>
+            </AppShell.Main>
             {showNew && <NewTask nav={nav} close={() => setShowNew(false)}/>}
-        </div>
+        </AppShell>
     )
 }

@@ -26,3 +26,19 @@ export const STATUS_LABEL: Record<string, string> = {
     review: 'Review', done: 'Done', failed: 'Failed', cancelled: 'Cancelled',
 }
 export const ALL_STATUSES = Object.keys(STATUS_LABEL)
+
+export const STATUS_COLOR: Record<string, string> = {
+    backlog: 'gray', todo: 'blue', running: 'cyan', needs_you: 'orange',
+    review: 'violet', done: 'green', failed: 'red', cancelled: 'gray',
+}
+
+/** "5m ago" style relative time; pair with fmtTime for the absolute one. */
+export function ago(iso: string): string {
+    const s = Math.round((Date.now() - Date.parse(iso)) / 1000)
+    if (!(s >= 60)) return 'just now'
+    if (s < 3600) return Math.floor(s / 60) + 'm ago'
+    if (s < 86400) return Math.floor(s / 3600) + 'h ago'
+    return Math.floor(s / 86400) + 'd ago'
+}
+
+export const fmtTime = (iso: string) => new Date(iso).toLocaleString()
