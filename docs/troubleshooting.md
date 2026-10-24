@@ -40,7 +40,7 @@ EOF
 conveyor task show KEY --runs                  # run finished with its summary
 ```
 
-Conveyor does not detect this on its own: it is a Claude Code resume bug, and checking every session each tick costs more than the rare case is worth. The `conveyor-doctor` skill finds and fixes it on demand (see below).
+Conveyor does not detect this on its own: it is a Claude Code resume bug, and checking every session each tick costs more than the rare case is worth. The `conveyor-doctor` skill finds and fixes it on demand (see the top of this page).
 
 ## A task has a second PR that Conveyor doesn't track
 
