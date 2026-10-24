@@ -1,6 +1,7 @@
 import {lazy, Suspense, useEffect, useRef, useState} from 'react'
 import {ActionIcon, Anchor, Box, Breadcrumbs, Button, Code, Group, Paper, Stack, Text, Timeline, Title} from '@mantine/core'
-import {IconArrowDown, IconArrowUp, IconMessage, IconPlayerPlay} from '@tabler/icons-react'
+import {useLocalStorage} from '@mantine/hooks'
+import {IconArrowDown, IconArrowUp, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconMessage, IconPlayerPlay} from '@tabler/icons-react'
 import {GetTask, ListTasks, RunLog} from '../wailsjs/go/ui/App'
 import {core, store, ui} from '../wailsjs/go/models'
 import {Card, CommentBox, Message, Nav, StatusBadge, Time, errMsg} from './components'
@@ -143,6 +144,7 @@ function SessionLog({run}: {run: store.Run}) {
 export function TaskPage({k, nav}: {k: string; nav: Nav}) {
     const {data: d, error, reload} = useData(() => GetTask(k), [k])
     const [added, setAdded] = useState<ui.TermInfo>()
+    const [side, setSide] = useLocalStorage({key: 'task-sidebar', defaultValue: true})
     if (error) return <Text c="red">{error}</Text>
     if (!d) return <Text c="dimmed">Loading…</Text>
     const t = d.task
@@ -155,7 +157,7 @@ export function TaskPage({k, nav}: {k: string; nav: Nav}) {
     return (
         // Only the thread scrolls: the comment box, sidebar and terminal dock stay put.
         <Box style={{display: 'flex', flexDirection: 'column', height: 'calc(100vh - 2 * var(--mantine-spacing-md))'}}>
-        <Box style={{flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 300px', gap: 'var(--mantine-spacing-xl)'}}>
+        <Box style={{flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: `minmax(0, 1fr) ${side ? '300px' : 'auto'}`, gap: side ? 'var(--mantine-spacing-xl)' : 'var(--mantine-spacing-xs)'}}>
             <Stack gap="sm" mih={0}>
                 <ScrollBox>
                     <Stack>
@@ -189,7 +191,12 @@ export function TaskPage({k, nav}: {k: string; nav: Nav}) {
                 <Box style={{flex: 'none'}}><CommentBox k={t.key} onDone={reload}/></Box>
             </Stack>
             <Box mih={0} style={{overflowY: 'auto'}}>
-                <TaskSidebar t={t} rel={d.relations} runs={d.runs} nav={nav} reload={reload} onTerm={setAdded}/>
+                <Group justify="flex-end" mb={4}>
+                    <ActionIcon variant="subtle" color="gray" aria-label={side ? 'Hide details' : 'Show details'} title={side ? 'Hide details' : 'Show details'} onClick={() => setSide(!side)}>
+                        {side ? <IconLayoutSidebarRightCollapse size={18}/> : <IconLayoutSidebarRightExpand size={18}/>}
+                    </ActionIcon>
+                </Group>
+                {side && <TaskSidebar t={t} rel={d.relations} runs={d.runs} nav={nav} reload={reload} onTerm={setAdded}/>}
             </Box>
         </Box>
         <Box mx="calc(-1 * var(--mantine-spacing-md))" mb="calc(-1 * var(--mantine-spacing-md))" mt="md" style={{flex: 'none'}}>
