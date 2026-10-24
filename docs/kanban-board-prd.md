@@ -1,3 +1,5 @@
+> **Superseded** by `docs/tech-spec.md` and `docs/research/conveyor-design.md` (2026-10-24). Kept for history.
+
 # PRD: Kanban Board with AI Task Dispatch
 
 ## 0. Recommendation up front
