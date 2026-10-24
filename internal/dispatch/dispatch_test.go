@@ -363,3 +363,30 @@ func TestLockExclusive(t *testing.T) {
 	}
 	rel2()
 }
+
+func TestPRMergeRemovesSessions(t *testing.T) {
+	e := setup(t)
+	ghDir := t.TempDir()
+	gh := "#!/bin/sh\necho '[{\"url\":\"https://x/pr/1\",\"state\":\"MERGED\",\"number\":1,\"reviewDecision\":\"\",\"updatedAt\":\"2026-01-01T00:00:00Z\"}]'\n"
+	if err := os.WriteFile(filepath.Join(ghDir, "gh"), []byte(gh), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", ghDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	tk, err := store.CreateTask(e.db, store.Task{Title: "Merged", Status: store.StatusReview},
+		[]store.TaskRepo{{RepoID: e.repo.ID, IsPrimary: true, Branch: "x"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	bg := "abcd0001"
+	if _, err := store.CreateRun(e.db, store.Run{TaskID: tk.ID, Kind: "auto", Mode: "fresh", Status: "finished", BgID: &bg}); err != nil {
+		t.Fatal(err)
+	}
+	e.d.pollPRs(t.Context())
+	if got := e.get(t, tk.ID); got.Status != store.StatusDone {
+		t.Fatalf("status %s", got.Status)
+	}
+	b, _ := os.ReadFile(filepath.Join(e.fake, "log"))
+	if !strings.Contains(string(b), "|rm\x1fabcd0001\x1f\n") {
+		t.Fatalf("no rm call in log: %q", b)
+	}
+}
