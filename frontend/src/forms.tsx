@@ -89,8 +89,8 @@ const TABS: {name: string; fields: Field[]}[] = [
         {k: "comment_debounce_secs", label: "Comment debounce (s)", desc: "Wait this long after a comment before starting a run, so you can batch comments."},
         {k: "max_consecutive_failures", label: "Max consecutive failures", desc: "After this many failed runs in a row the task is marked failed."},
     ]},
-    {name: "Terminal", fields: [
-        {k: "terminal_template", label: "Terminal command", desc: "Opens a terminal in a workspace. {cwd} is the directory and {cmd} the command to run.", kind: "area"},
+    {name: "External terminal", fields: [
+        {k: "terminal_template", label: "External terminal command", desc: `Run by the external terminal button (terminal icon) on the Shell, Resume and New session rows of a task. {cwd} is the folder and {cmd} the command to run. The default opens macOS Terminal. iTerm: osascript -e 'tell application "iTerm" to create window with default profile command "cd {cwd} && {cmd}"'. Ghostty: open -na Ghostty --args --working-directory={cwd} -e sh -c "{cmd}". (The internal terminal icon runs inside Conveyor and ignores this.)`, kind: "area"},
     ]},
     {name: "Prompts", fields: [
         {k: "pr_comment_prefix", label: "PR comment prefix", desc: "Every PR or issue comment the agent posts must start with this. Added to the brief and enforced by a hook. Empty disables both."},

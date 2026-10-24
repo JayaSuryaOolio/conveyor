@@ -1,9 +1,9 @@
 import {useEffect, useState} from 'react'
 import {ActionIcon, Badge, Button, Code, Group, Modal, Paper, Stack, Table, Text, TextInput, Title} from '@mantine/core'
 import {IconPencil, IconPlayerPlay, IconPlus, IconTrash} from '@tabler/icons-react'
-import {AddApp, AppPresets, Confirm, DeleteApp, Home, ListApps, RenderApp, TestApp, UpdateApp, UserHooks} from '../wailsjs/go/ui/App'
+import {AddApp, AppIcons, AppPresets, Confirm, DeleteApp, Home, ListApps, RenderApp, TestApp, UpdateApp, UserHooks} from '../wailsjs/go/ui/App'
 import {store} from '../wailsjs/go/models'
-import {errMsg} from './components'
+import {AppIcon, errMsg} from './components'
 import {useData} from './util'
 
 function AppForm({initial, onClose}: {initial: store.App; onClose: (saved: boolean) => void}) {
@@ -63,6 +63,7 @@ function AgentHooks() {
 export function Apps() {
     const {data, error, reload} = useData(ListApps, [])
     const {data: presets} = useData(AppPresets, [])
+    const {data: icons} = useData(AppIcons, [])
     const [form, setForm] = useState<store.App>()
     const have = new Set((data ?? []).map(a => a.name))
     const missing = (presets ?? []).filter(p => !have.has(p.name))
@@ -72,7 +73,7 @@ export function Apps() {
                 <Title order={3}>Apps</Title>
                 <Button leftSection={<IconPlus size={16}/>} onClick={() => setForm(store.App.createFrom({id: 0, name: '', command: ''}))}>New app</Button>
             </Group>
-            <Text size="sm" c="dimmed">Apps a task worktree can be opened in, from "Open in…" on the task page or <Code>conveyor app open NAME KEY</Code>.</Text>
+            <Text size="sm" c="dimmed">Apps a task worktree can be opened in, from the icons under each repo on the task page or <Code>conveyor app open NAME KEY</Code>.</Text>
             {error && <Text c="red">{error}</Text>}
             {data && data.length === 0 && <Text c="dimmed">None yet. Add one below or create your own.</Text>}
             {data && data.length > 0 && (
@@ -81,7 +82,7 @@ export function Apps() {
                     <Table.Tbody>
                         {data.map(a => (
                             <Table.Tr key={a.id}>
-                                <Table.Td fw={600}>{a.name}</Table.Td>
+                                <Table.Td fw={600}><Group gap="xs" wrap="nowrap"><AppIcon name={a.name} icons={icons}/>{a.name}</Group></Table.Td>
                                 <Table.Td><Code>{a.command}</Code></Table.Td>
                                 <Table.Td>
                                     <Group gap="xs" wrap="nowrap" justify="flex-end">

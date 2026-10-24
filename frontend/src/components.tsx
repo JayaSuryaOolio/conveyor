@@ -1,6 +1,6 @@
 import {useState} from 'react'
 import {ActionIcon, Badge, Box, Button, Card as MCard, Group, Menu, Paper, Select, Stack, Text, Tooltip} from '@mantine/core'
-import {IconDots} from '@tabler/icons-react'
+import {IconAppWindow, IconDots} from '@tabler/icons-react'
 import {AddComment, Move, ShowError} from '../wailsjs/go/ui/App'
 import {store, ui} from '../wailsjs/go/models'
 import {Markdown, MarkdownEditor} from './markdown'
@@ -9,6 +9,10 @@ import {ALL_STATUSES, STATUS_COLOR, STATUS_LABEL, ago, fmtK, fmtTime} from './ut
 export type Nav = (v: {name: string; key?: string}) => void
 
 export const errMsg = (e: unknown) => ShowError(String(e))
+
+/** The app's macOS icon (from AppIcons), else a generic window glyph. */
+export const AppIcon = ({name, icons, size = 18}: {name: string; icons?: Record<string, string>; size?: number}) =>
+    icons?.[name] ? <img src={icons[name]} alt="" width={size} height={size}/> : <IconAppWindow size={size}/>
 
 /** Relative time with the absolute one on hover. */
 export const Time = ({iso}: {iso: string}) => (
