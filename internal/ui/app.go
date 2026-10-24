@@ -290,7 +290,7 @@ func (a *App) GetSettings() (map[string]string, error) { return store.ListSettin
 // SetSetting stores one setting.
 func (a *App) SetSetting(k, v string) error { return store.SetSetting(a.svc.DB, k, v) }
 
-// Actions lists the terminal/editor actions for a task's workspace.
+// Actions lists the terminal actions for a task's workspace.
 func (a *App) Actions(key string) ([]core.Action, error) {
 	r, err := a.svc.Actions(key)
 	if err != nil {

@@ -81,7 +81,6 @@ const TABS: {name: string; fields: Field[]}[] = [
     {name: "General", fields: [
         {k: "key_prefix", label: "Task key prefix", desc: "Prefix for new task keys, e.g. CV gives CV-12."},
         {k: "default_model", label: "Default model", desc: "Model for runs that do not set one. Empty uses the Claude Code default."},
-        {k: "editor_command", label: "Editor command", desc: "Opens a workspace in your editor. {cwd} is the workspace path."},
     ]},
     {name: "Dispatch", fields: [
         {k: "max_parallel", label: "Max parallel runs", desc: "How many tasks run at once."},
