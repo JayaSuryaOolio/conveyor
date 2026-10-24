@@ -208,7 +208,6 @@ CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 | `max_consecutive_failures` | `3` |
 | `default_model` | empty |
 | `terminal_template` | see §10 |
-| `editor_command` | `code {cwd}` |
 
 The store reads them with `GetSetting(db, key)`, which falls back to the default.
 
