@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/JayaSuryaOolio/conveyor/internal/claude"
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 )
 
@@ -20,29 +21,6 @@ type Agent struct {
 
 var agentName = regexp.MustCompile(`^[a-z0-9-]+$`)
 
-// frontmatter returns the top-level scalar keys of a leading ---/--- block.
-// ponytail: single-line values only (no YAML folding); add a parser if descriptions need it.
-func frontmatter(b []byte) map[string]string {
-	lines := strings.Split(strings.ReplaceAll(string(b), "\r\n", "\n"), "\n")
-	m := map[string]string{}
-	if strings.TrimSpace(lines[0]) != "---" {
-		return m
-	}
-	for _, l := range lines[1:] {
-		if strings.TrimSpace(l) == "---" {
-			break
-		}
-		if k, v, ok := strings.Cut(l, ":"); ok && !strings.HasPrefix(l, " ") {
-			v = strings.TrimSpace(v)
-			if len(v) >= 2 && (v[0] == '"' || v[0] == '\'') && v[len(v)-1] == v[0] {
-				v = v[1 : len(v)-1]
-			}
-			m[strings.TrimSpace(k)] = v
-		}
-	}
-	return m
-}
-
 func scanAgents(dir, scope string) []Agent {
 	files, _ := filepath.Glob(filepath.Join(dir, "*.md"))
 	var out []Agent
@@ -51,7 +29,7 @@ func scanAgents(dir, scope string) []Agent {
 		if err != nil {
 			continue
 		}
-		fm := frontmatter(b)
+		fm, _ := claude.Frontmatter(b)
 		if fm["name"] == "" {
 			continue
 		}
