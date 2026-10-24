@@ -82,6 +82,10 @@ export function EnsureWorkspace(arg1) {
   return window['go']['ui']['App']['EnsureWorkspace'](arg1);
 }
 
+export function ExportState() {
+  return window['go']['ui']['App']['ExportState']();
+}
+
 export function GetPromptDefaults() {
   return window['go']['ui']['App']['GetPromptDefaults']();
 }
@@ -96,6 +100,10 @@ export function GetTask(arg1) {
 
 export function Home() {
   return window['go']['ui']['App']['Home']();
+}
+
+export function ImportState() {
+  return window['go']['ui']['App']['ImportState']();
 }
 
 export function Learnings() {

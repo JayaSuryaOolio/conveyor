@@ -44,6 +44,8 @@ export function EditLearning(arg1:number,arg2:string):Promise<void>;
 
 export function EnsureWorkspace(arg1:string):Promise<void>;
 
+export function ExportState():Promise<string>;
+
 export function GetPromptDefaults():Promise<ui.PromptDefaults>;
 
 export function GetSettings():Promise<Record<string, string>>;
@@ -51,6 +53,8 @@ export function GetSettings():Promise<Record<string, string>>;
 export function GetTask(arg1:string):Promise<ui.TaskDetail>;
 
 export function Home():Promise<string>;
+
+export function ImportState():Promise<Array<string>>;
 
 export function Learnings():Promise<Array<ui.LearningRow>>;
 
