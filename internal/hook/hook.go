@@ -161,7 +161,7 @@ func onStop(db *sql.DB, task store.Task, run store.Run, p payload) error {
 			return err
 		}
 	}
-	if _, err := core.SpawnChildren(db, task, block.Spawn); err != nil {
+	if _, err := core.SpawnChildren(db, task, block.Spawn, spawnDesc(task, block)); err != nil {
 		// A failed spawn must not leave the task stuck in running; record it and transition anyway.
 		store.RecordEvent(db, task.ID, "spawn_failed", err.Error())
 	}
@@ -195,4 +195,16 @@ func onStop(db *sql.DB, task store.Task, run store.Run, p payload) error {
 	}
 	_, err = store.UpdateTaskStatus(db, task.ID, to, store.ActorSystem)
 	return err
+}
+
+// spawnDesc is the description of a child spawned from a status block: the parent and what its run reported.
+func spawnDesc(parent store.Task, b statusblock.Block) string {
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "Spawned by %s (%s) at the end of its run. See `conveyor task show %s --thread` for full context.\n", parent.Key, parent.Title, parent.Key)
+	for _, f := range []struct{ name, v string }{{"Parent summary", b.Summary}, {"Parent state", b.State}, {"Parent next", b.Next}} {
+		if f.v != "" {
+			fmt.Fprintf(&sb, "\n## %s\n\n%s\n", f.name, f.v)
+		}
+	}
+	return sb.String()
 }
