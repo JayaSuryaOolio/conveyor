@@ -8,6 +8,7 @@ import (
 // Defaults are the setting values used when a key is unset (tech-spec §5).
 var Defaults = map[string]string{
 	"key_prefix":               "CV",
+	"user_name":                "",
 	"max_parallel":             "3",
 	"resume_threshold":         "60000",
 	"comment_debounce_secs":    "20",
