@@ -31,6 +31,7 @@ type NewTaskInput struct {
 	Agent       string
 	ParentKey   string
 	Priority    int
+	Source      string // default "manual"
 }
 
 var nonAlnum = regexp.MustCompile(`[^a-z0-9]+`)
@@ -88,7 +89,7 @@ func (s *Service) CreateTask(in NewTaskInput) (store.Task, error) {
 	}
 	t := store.Task{
 		Title: in.Title, Description: in.Description, Priority: in.Priority,
-		Model: optional(in.Model), Agent: optional(in.Agent), Status: store.StatusBacklog,
+		Model: optional(in.Model), Agent: optional(in.Agent), Status: store.StatusBacklog, Source: in.Source,
 	}
 	if in.Start {
 		t.Status = store.StatusTodo

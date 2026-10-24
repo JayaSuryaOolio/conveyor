@@ -99,7 +99,7 @@ type Event struct {
 	CreatedAt string `json:"created_at"`
 }
 
-// Learning is a proposed lesson (queries arrive with task 011).
+// Learning is a proposed lesson.
 type Learning struct {
 	ID            int64   `json:"id"`
 	TaskID        *int64  `json:"task_id"`

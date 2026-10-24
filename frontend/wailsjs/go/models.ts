@@ -30,6 +30,7 @@ export namespace core {
 	    Agent: string;
 	    ParentKey: string;
 	    Priority: number;
+	    Source: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new NewTaskInput(source);
@@ -46,6 +47,7 @@ export namespace core {
 	        this.Agent = source["Agent"];
 	        this.ParentKey = source["ParentKey"];
 	        this.Priority = source["Priority"];
+	        this.Source = source["Source"];
 	    }
 	}
 	export class Session {
@@ -282,6 +284,36 @@ export namespace store {
 
 export namespace ui {
 	
+	export class LearningRow {
+	    id: number;
+	    task_id?: number;
+	    run_id?: number;
+	    repo_id?: number;
+	    body: string;
+	    status: string;
+	    target?: string;
+	    applied_task_id?: number;
+	    created_at: string;
+	    repo: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new LearningRow(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.task_id = source["task_id"];
+	        this.run_id = source["run_id"];
+	        this.repo_id = source["repo_id"];
+	        this.body = source["body"];
+	        this.status = source["status"];
+	        this.target = source["target"];
+	        this.applied_task_id = source["applied_task_id"];
+	        this.created_at = source["created_at"];
+	        this.repo = source["repo"];
+	    }
+	}
 	export class TaskCard {
 	    key: string;
 	    title: string;
