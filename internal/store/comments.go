@@ -60,3 +60,11 @@ func ConsumeComments(db *sql.DB, ids []int64, runID int64) error {
 	}
 	return nil
 }
+
+// UnconsumeComments releases comments a run consumed, so the next run receives them.
+func UnconsumeComments(db *sql.DB, runID int64) error {
+	if _, err := db.Exec(`UPDATE comments SET consumed_by_run_id=NULL WHERE consumed_by_run_id=?`, runID); err != nil {
+		return fmt.Errorf("unconsume comments: %w", err)
+	}
+	return nil
+}

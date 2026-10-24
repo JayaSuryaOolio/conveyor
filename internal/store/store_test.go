@@ -159,6 +159,24 @@ func TestCommentsConsume(t *testing.T) {
 	}
 }
 
+func TestUnconsumeComments(t *testing.T) {
+	db := openTest(t)
+	tk := mkTask(t, db, StatusBacklog)
+	c, _ := AddComment(db, Comment{TaskID: tk.ID, Author: AuthorHuman, Body: "h"})
+	r1, _ := CreateRun(db, Run{TaskID: tk.ID, Kind: "auto", Mode: "fresh", Status: "launching"})
+	r2, _ := CreateRun(db, Run{TaskID: tk.ID, Kind: "auto", Mode: "fresh", Status: "launching"})
+	other, _ := AddComment(db, Comment{TaskID: tk.ID, Author: AuthorHuman, Body: "o"})
+	ConsumeComments(db, []int64{c.ID}, r1.ID)
+	ConsumeComments(db, []int64{other.ID}, r2.ID)
+	if err := UnconsumeComments(db, r1.ID); err != nil {
+		t.Fatal(err)
+	}
+	u, _ := UnconsumedComments(db, tk.ID)
+	if len(u) != 1 || u[0].ID != c.ID {
+		t.Fatalf("unconsumed %+v, want only comment %d", u, c.ID)
+	}
+}
+
 func TestRuns(t *testing.T) {
 	db := openTest(t)
 	tk := mkTask(t, db, StatusTodo)

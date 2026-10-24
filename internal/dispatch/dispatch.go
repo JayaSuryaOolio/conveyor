@@ -248,6 +248,10 @@ func (d *Dispatcher) start(ctx context.Context, task store.Task, delta []store.C
 		bg, err = claude.Launch(ctx, d.spec(task, cwd, settings, run.Prompt))
 	}
 	if err != nil {
+		// The run never started: give its comments back so the retry's prompt carries them.
+		if uerr := store.UnconsumeComments(d.DB, run.ID); uerr != nil {
+			d.logf("unconsume comments for run %d: %v", run.ID, uerr)
+		}
 		return run, err
 	}
 	// Re-read: a hook may have adopted the run (session id) while we launched.
