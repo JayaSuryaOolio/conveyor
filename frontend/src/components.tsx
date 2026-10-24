@@ -1,5 +1,5 @@
-import {useState} from 'react'
-import {ActionIcon, Badge, Box, Button, Card as MCard, Group, Menu, Paper, Select, Stack, Text, Tooltip} from '@mantine/core'
+import {useEffect, useState} from 'react'
+import {ActionIcon, Badge, Box, Button, Card as MCard, Group, Menu, Notification, Paper, Select, Stack, Text, Tooltip} from '@mantine/core'
 import {IconAppWindow, IconDots} from '@tabler/icons-react'
 import {AddComment, Move, ShowError} from '../wailsjs/go/ui/App'
 import {store, ui} from '../wailsjs/go/models'
@@ -9,6 +9,33 @@ import {ALL_STATUSES, STATUS_COLOR, STATUS_LABEL, ago, fmtK, fmtTime} from './ut
 export type Nav = (v: {name: string; key?: string}) => void
 
 export const errMsg = (e: unknown) => ShowError(String(e))
+
+let pushToast: (m: string) => void = () => {}
+/** Shows a message bottom-right for 10 seconds (needs <Toasts/> mounted once). */
+export const toast = (m: string) => pushToast(m)
+
+export function Toasts() {
+    const [list, setList] = useState<{id: number; m: string}[]>([])
+    useEffect(() => {
+        let n = 0
+        const drop = (id: number) => setList(l => l.filter(x => x.id !== id))
+        pushToast = m => { const id = ++n; setList(l => [...l, {id, m}]); setTimeout(() => drop(id), 10000) }
+        return () => { pushToast = () => {} }
+    }, [])
+    return (
+        <Stack pos="fixed" bottom={16} right={16} gap="xs" maw={480} style={{zIndex: 1000}}>
+            {list.map(x => (
+                <Notification key={x.id} withBorder onClose={() => setList(l => l.filter(y => y.id !== x.id))}>
+                    <Text size="sm" ff="monospace" style={{whiteSpace: 'pre-wrap', wordBreak: 'break-word'}}>{x.m}</Text>
+                </Notification>
+            ))}
+        </Stack>
+    )
+}
+
+/** Runs an app; an output app's result (or "done") is toasted. */
+export const runApp = (a: store.App, p: Promise<string>) =>
+    p.then(out => { if (a.output) toast(out || `${a.name}: done`) }, errMsg)
 
 /** The app's macOS icon (from AppIcons), else a generic window glyph. */
 export const AppIcon = ({name, icons, size = 18}: {name: string; icons?: Record<string, string>; size?: number}) =>

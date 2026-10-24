@@ -142,8 +142,8 @@ export function RejectLearning(arg1) {
   return window['go']['ui']['App']['RejectLearning'](arg1);
 }
 
-export function RenderApp(arg1, arg2) {
-  return window['go']['ui']['App']['RenderApp'](arg1, arg2);
+export function RenderApp(arg1, arg2, arg3) {
+  return window['go']['ui']['App']['RenderApp'](arg1, arg2, arg3);
 }
 
 export function RunAction(arg1, arg2, arg3) {

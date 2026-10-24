@@ -45,7 +45,7 @@ usage: conveyor [--home dir] <command> [args]
 
 commands:
   agent      Claude subagents from repos and ~/.claude (list|add|model)
-  app        open worktrees in external apps (list|presets|add|global|rm|open)
+  app        open worktrees in external apps, run quick actions (list|presets|add|global|output|rm|open)
   automation manage automations (list|add|enable|disable|run|rm)
   config     list, get or set settings
   daemon     run the dispatcher in the foreground
@@ -54,7 +54,7 @@ commands:
   import     import tasks (jira --jql ... --repo a)
   learning   curate learnings (list|accept|reject|edit|apply)
   repo       manage registered repos (add|list|rm)
-  task       manage tasks (new|list|show|comment|move|set|link|unlink|parent|cancel|done|sync|brief|log|attach|open)
+  task       manage tasks (new|list|show|comment|move|set|link|unlink|parent|cancel|done|sync|brief|log|attach|open|sessions)
 ```
 
 Tasks can have sub-tasks (`task new --parent CV-1` gives CV-1A, CV-1B ...) and links (`task link CV-1A blocks CV-1B`; kinds `blocks|relates`), and `task parent KEY PARENT|--none` re-parents without changing keys. A blocked todo task is not launched until its blockers are done or cancelled.
@@ -64,7 +64,7 @@ Run `conveyor <command>` with no arguments for per-command usage. Listing and sh
 ## Integrations
 
 - **Terminal template.** `conveyor task open KEY --shell|--resume|--fresh` opens a terminal via the `terminal_template` setting (default: macOS Terminal through `osascript`; `{cwd}` and `{cmd}` are substituted). Set an iTerm, Ghostty or tmux template with `conveyor config set terminal_template '...'`. `--print` shows the command instead.
-- **Apps.** Open a task's worktree in any app: an app is a name plus a shell command where `{cwd}` becomes the quoted worktree path. Installed editors, terminals, git clients, Finder and the `spotlight` CLI are offered as presets. Manage them on the Apps page or with `conveyor app presets`, `conveyor app add Cursor` (preset), `conveyor app add Zed --command 'zed {cwd}'`, `conveyor app open Zed CV-12 [--repo r] [--print]` (or a directory instead of a key), `conveyor app rm Zed`. The task page shows them as icons on each repo.
+- **Apps.** Open a task's worktree in any app: an app is a name plus a shell command where `{cwd}` becomes the quoted worktree path and `{key}` the task key. Installed editors, terminals, git clients, Finder and the `spotlight` CLI are offered as presets. Manage them on the Apps page or with `conveyor app presets`, `conveyor app add Cursor` (preset), `conveyor app add Zed --command 'zed {cwd}'`, `conveyor app open Zed CV-12 [--repo r] [--print]` (or a directory instead of a key), `conveyor app rm Zed`. The task page shows them as icons on each repo. Quick actions (`--output`) run to completion instead and show their output; scripts can use `conveyor task sessions KEY --json` (e.g. to price a task's sessions with `ccusage`, see the guide).
 - **Agent hooks.** Conveyor-launched sessions always report through `--settings`. `conveyor hooks install` also adds the same hook commands (UserPromptSubmit, Stop, Notification) to `~/.claude/settings.json`, so a `claude` you start yourself in a task worktree (from an app or any terminal) shows up as an interactive run. Sessions outside Conveyor workspaces are ignored, and identical commands run once per event. `conveyor hooks status|uninstall`; the old file is kept as `settings.json.conveyor.bak`.
 - **Automations.** Cron-scheduled actions with an optional shell precheck: `conveyor automation add NAME --schedule "0 9 * * 1-5" --precheck "..." --kind create_task --arg '{...}'`. Actions: `create_task`, `comment`, `cli`.
 - **Jira.** `conveyor import jira --jql "..." --repo a` (needs `acli`).
