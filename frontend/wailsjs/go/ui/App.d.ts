@@ -20,8 +20,6 @@ export function AppLog(arg1:number):Promise<core.AppLog>;
 
 export function ApplyLearnings(arg1:string):Promise<string>;
 
-export function Cancel(arg1:string):Promise<void>;
-
 export function Confirm(arg1:string):Promise<boolean>;
 
 export function CreateTask(arg1:core.NewTaskInput):Promise<string>;

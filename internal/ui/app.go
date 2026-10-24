@@ -264,9 +264,6 @@ func (a *App) AddComment(key, body string) error {
 // Move changes a task's status as a human.
 func (a *App) Move(key, status string) error { return a.svc.Move(key, store.Status(status)) }
 
-// Cancel cancels a task.
-func (a *App) Cancel(key string) error { return a.svc.Cancel(key) }
-
 // SetTaskRepo sets a task repo's branch (before the worktree exists) and PR URL.
 func (a *App) SetTaskRepo(key, repo, branch, prURL string) error {
 	return a.svc.SetTaskRepo(key, repo, branch, prURL)
