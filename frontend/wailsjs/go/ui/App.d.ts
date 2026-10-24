@@ -18,6 +18,8 @@ export function AddComment(arg1:string,arg2:string):Promise<void>;
 
 export function AddRepo(arg1:string,arg2:string):Promise<void>;
 
+export function AdoptChild(arg1:string,arg2:string):Promise<void>;
+
 export function AppIcons():Promise<Record<string, string>>;
 
 export function AppLog(arg1:string,arg2:number):Promise<core.AppLog>;

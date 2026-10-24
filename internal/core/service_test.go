@@ -195,3 +195,24 @@ func TestSetTaskDescriptionBacklogOnly(t *testing.T) {
 		t.Fatal("edited a todo task")
 	}
 }
+
+func TestAdoptChildRefusesReparent(t *testing.T) {
+	s := newSvc(t)
+	for _, n := range []string{"p", "q", "c"} {
+		if _, err := s.CreateTask(NewTaskInput{Title: n, Repos: []string{"a"}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := s.AdoptChild("CV-1", "CV-3"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.AdoptChild("CV-1", "CV-3"); err != nil {
+		t.Fatalf("same parent is a no-op: %v", err)
+	}
+	if err := s.AdoptChild("CV-2", "CV-3"); err == nil {
+		t.Fatal("silently re-parented")
+	}
+	if err := s.SetParent("CV-3", "CV-2"); err != nil {
+		t.Fatalf("explicit re-parent must work: %v", err)
+	}
+}
