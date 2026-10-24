@@ -113,11 +113,17 @@ func Apply(svc *core.Service, repo string) ([]string, error) {
 			fmt.Fprintf(&sb, "- %s (target: %s, from %s)\n", l.Body, target, src)
 		}
 		sb.WriteString("\n" + instruction + "\n")
-		t, err := svc.CreateTask(core.NewTaskInput{
-			Title: "Apply learnings to " + r.Name, Description: sb.String(), Repos: []string{r.Name}, Start: true, Source: "learning",
-		})
+		title := "Apply learnings to " + r.Name
+		t, found, err := findPending(svc.DB, title, sb.String())
 		if err != nil {
 			return keys, err
+		}
+		if !found {
+			if t, err = svc.CreateTask(core.NewTaskInput{
+				Title: title, Description: sb.String(), Repos: []string{r.Name}, Start: true, Source: "learning",
+			}); err != nil {
+				return keys, err
+			}
 		}
 		for _, l := range ls {
 			l.Status, l.AppliedTaskID = store.LearningApplied, &t.ID
@@ -128,4 +134,20 @@ func Apply(svc *core.Service, repo string) ([]string, error) {
 		keys = append(keys, t.Key)
 	}
 	return keys, nil
+}
+
+// findPending returns a live learning task with exactly this title and description: one a previous Apply created
+// before failing to mark its learnings applied. Reusing it keeps a retry from creating a duplicate.
+func findPending(db *sql.DB, title, desc string) (store.Task, bool, error) {
+	tasks, err := store.ListTasks(db)
+	if err != nil {
+		return store.Task{}, false, err
+	}
+	for _, t := range tasks {
+		if t.Source == "learning" && t.Title == title && t.Description == desc &&
+			t.Status != store.StatusDone && t.Status != store.StatusCancelled {
+			return t, true, nil
+		}
+	}
+	return store.Task{}, false, nil
 }
