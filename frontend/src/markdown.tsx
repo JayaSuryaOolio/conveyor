@@ -1,8 +1,16 @@
 import {lazy, Suspense, useRef, useState} from 'react'
-import {ActionIcon, Group, Stack, Tabs, Text, Textarea, Tooltip, Typography} from '@mantine/core'
+import {ActionIcon, Box, Button, Group, SegmentedControl, Stack, Text, Textarea, Tooltip, Typography} from '@mantine/core'
 import {IconBold, IconCode, IconItalic, IconLink, IconList, IconListCheck} from '@tabler/icons-react'
+import {SaveAttachment, ShowError} from '../wailsjs/go/ui/App'
 
 const MdRender = lazy(() => import('./md-render'))
+
+const toBase64 = (f: File) => new Promise<string>((ok, no) => {
+    const r = new FileReader()
+    r.onload = () => ok(String(r.result).split(',')[1] ?? '')
+    r.onerror = () => no(r.error)
+    r.readAsDataURL(f)
+})
 
 /** Renders GitHub-flavoured markdown; raw HTML stays escaped (react-markdown default). */
 export function Markdown({children, c}: {children: string; c?: string}) {
@@ -16,12 +24,42 @@ export function Markdown({children, c}: {children: string; c?: string}) {
 type Edit = {value: string; start: number; end: number}
 const LIST_LINE = /^\s*([-*+]|\d+\.)\s/
 
-/** Write/Preview markdown editor with a small toolbar; Cmd+Enter calls onSubmit. */
-export function MarkdownEditor({value, onChange, onSubmit, placeholder, minRows = 3}: {
-    value: string; onChange: (v: string) => void; onSubmit?: () => void; placeholder?: string; minRows?: number
+let uploads = 0
+
+/**
+ * GitHub-style comment box: Write/Preview + toolbar header, textarea, hint/submit footer.
+ * Cmd+Enter calls onSubmit; pasted or dropped images are saved via SaveAttachment
+ * (attachKey = task key, empty = shared folder) and inserted as markdown.
+ */
+export function MarkdownEditor({value, onChange, onSubmit, submitLabel = 'Send', submitting, canSubmit = true, attachKey = '', placeholder, minRows = 3}: {
+    value: string; onChange: (v: string) => void; onSubmit?: () => void; submitLabel?: string; submitting?: boolean
+    canSubmit?: boolean; attachKey?: string; placeholder?: string; minRows?: number
 }) {
     const ref = useRef<HTMLTextAreaElement>(null)
-    const [tab, setTab] = useState<string | null>('write')
+    const cur = useRef(value)
+    cur.current = value
+    const [tab, setTab] = useState('write')
+    const [focus, setFocus] = useState(false)
+    const [over, setOver] = useState(false)
+    const upload = (files: File[]) => files.filter(f => f.type.startsWith('image/')).forEach(f => {
+        const tok = `![Uploading…](#${++uploads})`
+        const t = ref.current
+        const at = t ? t.selectionStart : cur.current.length
+        onChange(cur.current.slice(0, at) + tok + cur.current.slice(at))
+        const done = (s: string) => onChange(cur.current.replace(tok, s))
+        toBase64(f).then(b => SaveAttachment(attachKey, f.name || 'image.' + f.type.split('/')[1], b))
+            .then(p => done(`![image](${p})`), e => { done(''); ShowError(String(e)) })
+    })
+    const onPaste = (e: React.ClipboardEvent) => {
+        const files = [...e.clipboardData.items].filter(i => i.type.startsWith('image/')).flatMap(i => i.getAsFile() ?? [])
+        if (files.length) { e.preventDefault(); upload(files) }
+    }
+    const onDrop = (e: React.DragEvent) => {
+        setOver(false)
+        if (!e.dataTransfer.files.length) return
+        e.preventDefault()
+        upload([...e.dataTransfer.files])
+    }
     const apply = (fn: (v: string, s: number, e: number) => Edit) => {
         const t = ref.current
         if (!t) return
@@ -61,14 +99,22 @@ export function MarkdownEditor({value, onChange, onSubmit, placeholder, minRows 
         ['Bulleted list', <IconList size={14}/>, prefix('- ')], ['Task list', <IconListCheck size={14}/>, prefix('- [ ] ')],
     ]
     return (
-        <Tabs value={tab} onChange={setTab} variant="outline" keepMounted={false}>
-            <Group justify="space-between" align="flex-end" wrap="nowrap">
-                <Tabs.List>
-                    <Tabs.Tab value="write">Write</Tabs.Tab>
-                    <Tabs.Tab value="preview">Preview</Tabs.Tab>
-                </Tabs.List>
+        <Box
+            onFocus={() => setFocus(true)} onBlur={() => setFocus(false)}
+            onDragOver={e => { if (tab === 'write' && e.dataTransfer.types.includes('Files')) { e.preventDefault(); setOver(true) } }}
+            onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setOver(false) }}
+            onDrop={tab === 'write' ? onDrop : undefined}
+            style={{
+                border: '1px solid ' + (over || focus ? 'var(--mantine-primary-color-filled)' : 'var(--mantine-color-default-border)'),
+                borderRadius: 'var(--mantine-radius-md)', overflow: 'hidden', width: '100%',
+                boxShadow: focus ? '0 0 0 2px var(--mantine-primary-color-light)' : undefined,
+                background: over ? 'var(--mantine-primary-color-light)' : undefined,
+            }}>
+            <Group justify="space-between" wrap="nowrap" px="xs" py={6} bg="var(--mantine-color-default-hover)"
+                   style={{borderBottom: '1px solid var(--mantine-color-default-border)'}}>
+                <SegmentedControl size="xs" value={tab} onChange={setTab} data={[{value: 'write', label: 'Write'}, {value: 'preview', label: 'Preview'}]}/>
                 {tab === 'write' && (
-                    <Group gap={2}>
+                    <Group gap={2} wrap="nowrap">
                         {tools.map(([label, icon, fn]) => (
                             <Tooltip key={label} label={label}>
                                 <ActionIcon variant="subtle" color="gray" size="sm" aria-label={label} onMouseDown={e => e.preventDefault()} onClick={fn}>{icon}</ActionIcon>
@@ -77,15 +123,16 @@ export function MarkdownEditor({value, onChange, onSubmit, placeholder, minRows 
                     </Group>
                 )}
             </Group>
-            <Tabs.Panel value="write" pt="xs">
-                <Textarea ref={ref} autosize minRows={minRows} maxRows={14} value={value} placeholder={placeholder}
-                          onChange={e => onChange(e.target.value)} onKeyDown={onKeyDown}/>
-            </Tabs.Panel>
-            <Tabs.Panel value="preview" pt="xs">
-                <Stack mih={minRows * 24} px="sm">
+            {tab === 'write'
+                ? <Textarea ref={ref} variant="unstyled" px="sm" py={4} autosize minRows={minRows} maxRows={14} value={value} placeholder={placeholder}
+                            onChange={e => onChange(e.target.value)} onKeyDown={onKeyDown} onPaste={onPaste}/>
+                : <Stack mih={minRows * 24} p="sm">
                     {value.trim() ? <Markdown>{value}</Markdown> : <Text size="sm" c="dimmed">Nothing to preview</Text>}
-                </Stack>
-            </Tabs.Panel>
-        </Tabs>
+                </Stack>}
+            <Group justify="space-between" wrap="nowrap" px="xs" py={6} style={{borderTop: '1px solid var(--mantine-color-default-border)'}}>
+                <Text size="xs" c="dimmed">Markdown supported · paste or drop images{onSubmit && ' · ⌘↵ to send'}</Text>
+                {onSubmit && <Button size="compact-sm" onClick={onSubmit} loading={submitting} disabled={!canSubmit}>{submitLabel}</Button>}
+            </Group>
+        </Box>
     )
 }

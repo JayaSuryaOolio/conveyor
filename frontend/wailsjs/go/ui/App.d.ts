@@ -34,6 +34,8 @@ export function GetSettings():Promise<Record<string, string>>;
 
 export function GetTask(arg1:string):Promise<ui.TaskDetail>;
 
+export function Home():Promise<string>;
+
 export function Learnings():Promise<Array<ui.LearningRow>>;
 
 export function ListAgents(arg1:Array<string>):Promise<Array<core.Agent>>;
@@ -53,6 +55,8 @@ export function RunAction(arg1:string,arg2:string,arg3:string):Promise<void>;
 export function RunAutomation(arg1:string):Promise<string>;
 
 export function RunLog(arg1:number,arg2:number):Promise<core.RunLog>;
+
+export function SaveAttachment(arg1:string,arg2:string,arg3:string):Promise<string>;
 
 export function Sessions(arg1:string):Promise<Array<core.Session>>;
 

@@ -63,16 +63,13 @@ export function Card({c, nav}: {c: ui.TaskCard; nav: Nav}) {
 
 export function CommentBox({k, placeholder = 'Comment…', onDone}: {k: string; placeholder?: string; onDone?: () => void}) {
     const [text, setText] = useState('')
+    const [busy, setBusy] = useState(false)
     const send = () => {
-        if (!text.trim()) return
-        AddComment(k, text).then(() => { setText(''); onDone?.() }, errMsg)
+        if (!text.trim() || busy) return
+        setBusy(true)
+        AddComment(k, text).then(() => { setText(''); onDone?.() }, errMsg).finally(() => setBusy(false))
     }
-    return (
-        <Stack gap="xs" align="flex-end">
-            <div style={{width: '100%'}}><MarkdownEditor value={text} onChange={setText} onSubmit={send} placeholder={placeholder}/></div>
-            <Button size="xs" onClick={send} disabled={!text.trim()}>Send</Button>
-        </Stack>
-    )
+    return <MarkdownEditor value={text} onChange={setText} onSubmit={send} submitting={busy} canSubmit={!!text.trim()} attachKey={k} placeholder={placeholder}/>
 }
 
 /** One comment in the thread. */
