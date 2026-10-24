@@ -88,7 +88,7 @@ export function Apps() {
                         {data.map(a => (
                             <Table.Tr key={a.id}>
                                 <Table.Td fw={600}><Group gap="xs" wrap="nowrap"><AppIcon name={a.name} icons={icons}/>{a.name}{a.output && <Badge size="xs" variant="light">quick action</Badge>}</Group></Table.Td>
-                                <Table.Td><Code>{a.command}</Code></Table.Td>
+                                <Table.Td><Code title={a.command} style={{display: 'block', maxWidth: 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>{a.command}</Code></Table.Td>
                                 <Table.Td>
                                     <Switch aria-label={`${a.name} is global`} checked={a.global}
                                             onChange={e => UpdateApp({...a, global: e.currentTarget.checked}).then(reload, errMsg)}/>
