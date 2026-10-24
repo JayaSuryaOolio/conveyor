@@ -277,7 +277,6 @@ func (d *Dispatcher) start(ctx context.Context, task store.Task, delta []store.C
 		return run, err
 	}
 	if _, err := store.UpdateTaskStatus(d.DB, task.ID, store.StatusRunning, store.ActorSystem); err != nil {
-		d.unconsume(run) // the run never started
 		return run, err
 	}
 	var bg string
@@ -287,7 +286,10 @@ func (d *Dispatcher) start(ctx context.Context, task store.Task, delta []store.C
 		bg, err = claude.Launch(ctx, d.spec(task, cwd, settings, run.Prompt))
 	}
 	if err != nil {
-		d.unconsume(run) // the run never started
+		// The run never started: give its comments back so the retry's prompt carries them.
+		if uerr := store.UnconsumeComments(d.DB, run.ID); uerr != nil {
+			d.logf("unconsume comments for run %d: %v", run.ID, uerr)
+		}
 		return run, err
 	}
 	// Re-read: a hook may have adopted the run (session id) while we launched.
@@ -300,13 +302,6 @@ func (d *Dispatcher) start(ctx context.Context, task store.Task, delta []store.C
 	}
 	store.RecordEvent(d.DB, task.ID, "run_started", fmt.Sprintf("run %d (%s) bg %s", run.ID, run.Mode, bg))
 	return run, nil
-}
-
-// unconsume gives a never-started run's comments back so the retry's prompt carries them.
-func (d *Dispatcher) unconsume(run store.Run) {
-	if err := store.UnconsumeComments(d.DB, run.ID); err != nil {
-		d.logf("unconsume comments for run %d: %v", run.ID, err)
-	}
 }
 
 func (d *Dispatcher) spec(task store.Task, cwd, settings, prompt string) claude.LaunchSpec {
