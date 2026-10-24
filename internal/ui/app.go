@@ -56,7 +56,7 @@ func (a *App) Startup(ctx context.Context) {
 		runtime.LogFatalf(ctx, "open db: %v", err)
 		return
 	}
-	a.svc = &core.Service{DB: db, Home: home}
+	a.svc = &core.Service{DB: db, Home: home, Bin: conveyorBin()}
 	automation.Bin = conveyorBin() // the cli automation kind runs the CLI, not the app binary
 	ctx, a.cancel = context.WithCancel(ctx)
 	go pollDataVersion(ctx, core.DBPath(home), pollEvery, func() { runtime.EventsEmit(ctx, "db:changed") })
@@ -102,7 +102,7 @@ func (a *App) runDispatcher(ctx context.Context) {
 	defer db.Close()
 	a.dispatcher.Store(true)
 	defer a.dispatcher.Store(false)
-	d := &dispatch.Dispatcher{DB: db, Home: a.svc.Home, ConveyorBin: conveyorBin(), Log: log.New(log.Writer(), "dispatcher: ", log.LstdFlags)}
+	d := &dispatch.Dispatcher{DB: db, Home: a.svc.Home, ConveyorBin: a.svc.Bin, Log: log.New(log.Writer(), "dispatcher: ", log.LstdFlags)}
 	d.Run(ctx)
 }
 

@@ -103,7 +103,7 @@ func (d *Dispatcher) tickAutomations(ctx context.Context) {
 	now := d.now()
 	go func() {
 		defer d.autoBusy.Store(false)
-		if err := automation.Tick(ctx, &core.Service{DB: d.DB, Home: d.Home}, now); err != nil {
+		if err := automation.Tick(ctx, &core.Service{DB: d.DB, Home: d.Home, Bin: d.ConveyorBin}, now); err != nil {
 			d.logf("automations: %v", err)
 		}
 	}()

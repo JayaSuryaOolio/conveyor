@@ -17,6 +17,9 @@ type Service struct {
 	Home string
 	// ProjectsDir overrides ~/.claude/projects (tests).
 	ProjectsDir string
+	// Bin is the conveyor CLI the hooks call; empty means this executable.
+	// The desktop app must set it: its own executable is the GUI, not the CLI.
+	Bin string
 }
 
 // NewTaskInput describes a task to create. Repos are registered repo names;

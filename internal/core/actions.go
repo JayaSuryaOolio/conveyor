@@ -46,6 +46,9 @@ func isActive(r store.Run) bool { return r.Status == "launching" || r.Status == 
 
 // settingsPath makes sure claude-settings.json exists and returns its path.
 func (s *Service) settingsPath() (string, error) {
+	if s.Bin != "" {
+		return claude.WriteSettings(s.Home, s.Bin)
+	}
 	exe, err := os.Executable()
 	if err != nil {
 		return "", fmt.Errorf("find conveyor binary: %w", err)
