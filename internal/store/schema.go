@@ -1,45 +1,125 @@
 package store
 
-import "database/sql"
+import (
+	"database/sql"
+	"fmt"
+)
 
-const schemaSQL = `
-CREATE TABLE IF NOT EXISTS kanban_tasks (
-  id TEXT PRIMARY KEY,
+const schema = `
+CREATE TABLE IF NOT EXISTS repos (
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  path TEXT NOT NULL UNIQUE,
+  default_branch TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS tasks (
+  id INTEGER PRIMARY KEY,
+  key TEXT NOT NULL UNIQUE,
   title TEXT NOT NULL,
-  description TEXT,
-  status TEXT NOT NULL DEFAULT 'draft',
-  mode TEXT NOT NULL DEFAULT 'headless',
-  remote_control_enabled INTEGER NOT NULL DEFAULT 0,
-  source TEXT NOT NULL,
-  external_key TEXT,
+  description TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'backlog',
+  priority INTEGER NOT NULL DEFAULT 0,
+  model TEXT,
+  agent TEXT,
+  source TEXT NOT NULL DEFAULT 'manual',
+  external_key TEXT UNIQUE,
   external_url TEXT,
-  worktree_path TEXT,
-  wts_worktree_id TEXT,
-  wts_terminal_id TEXT,
-  claude_session_id TEXT,
-  claim_lock TEXT,
-  claimed_at TEXT,
+  parent_id INTEGER REFERENCES tasks(id),
   consecutive_failures INTEGER NOT NULL DEFAULT 0,
-  latest_message TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
-CREATE UNIQUE INDEX IF NOT EXISTS idx_kanban_tasks_external_key ON kanban_tasks(external_key) WHERE external_key IS NOT NULL;
 
-CREATE TABLE IF NOT EXISTS kanban_task_events (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  task_id TEXT NOT NULL REFERENCES kanban_tasks(id) ON DELETE CASCADE,
-  event TEXT NOT NULL,
-  detail TEXT,
+CREATE TABLE IF NOT EXISTS task_repos (
+  task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  repo_id INTEGER NOT NULL REFERENCES repos(id),
+  is_primary INTEGER NOT NULL DEFAULT 0,
+  branch TEXT NOT NULL,
+  worktree_path TEXT,
+  pr_url TEXT,
+  pr_state TEXT,
+  PRIMARY KEY (task_id, repo_id)
+);
+
+CREATE TABLE IF NOT EXISTS runs (
+  id INTEGER PRIMARY KEY,
+  task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL,
+  mode TEXT NOT NULL,
+  bg_id TEXT,
+  session_id TEXT,
+  status TEXT NOT NULL,
+  prompt TEXT NOT NULL DEFAULT '',
+  block_status TEXT,
+  summary TEXT, state TEXT, next TEXT, criteria TEXT,
+  final_message TEXT,
+  tokens_in INTEGER NOT NULL DEFAULT 0, tokens_out INTEGER NOT NULL DEFAULT 0,
+  cache_read INTEGER NOT NULL DEFAULT 0, cache_write INTEGER NOT NULL DEFAULT 0,
+  ctx_peak INTEGER NOT NULL DEFAULT 0,
+  api_calls INTEGER NOT NULL DEFAULT 0,
+  error TEXT,
+  started_at TEXT NOT NULL,
+  ended_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_runs_task ON runs(task_id);
+CREATE INDEX IF NOT EXISTS idx_runs_session ON runs(session_id);
+
+CREATE TABLE IF NOT EXISTS comments (
+  id INTEGER PRIMARY KEY,
+  task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  author TEXT NOT NULL,
+  body TEXT NOT NULL,
+  run_id INTEGER REFERENCES runs(id),
+  consumed_by_run_id INTEGER REFERENCES runs(id),
   created_at TEXT NOT NULL
 );
+CREATE INDEX IF NOT EXISTS idx_comments_task ON comments(task_id);
+
+CREATE TABLE IF NOT EXISTS events (
+  id INTEGER PRIMARY KEY,
+  task_id INTEGER REFERENCES tasks(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL,
+  detail TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS learnings (
+  id INTEGER PRIMARY KEY,
+  task_id INTEGER REFERENCES tasks(id) ON DELETE SET NULL,
+  run_id INTEGER REFERENCES runs(id) ON DELETE SET NULL,
+  repo_id INTEGER REFERENCES repos(id),
+  body TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'proposed',
+  target TEXT,
+  applied_task_id INTEGER REFERENCES tasks(id),
+  created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS automations (
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  schedule TEXT NOT NULL,
+  precheck TEXT NOT NULL DEFAULT '',
+  action_kind TEXT NOT NULL,
+  action_arg TEXT NOT NULL,
+  enabled INTEGER NOT NULL DEFAULT 1,
+  last_run_at TEXT,
+  last_result TEXT
+);
+
+CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 `
 
-// Migrate creates kanban_tasks and kanban_task_events if they don't already
-// exist. Future schema changes get their own migrateAddX(db) step, called
-// from here after the base CREATE TABLEs, each idempotent via PRAGMA
-// table_info before ALTER TABLE.
+// Migrate drops the v1 tables and creates the v2 schema if missing. Later
+// column additions go here as idempotent migrateAddX steps.
 func Migrate(db *sql.DB) error {
-	_, err := db.Exec(schemaSQL)
-	return err
+	if _, err := db.Exec(`DROP TABLE IF EXISTS kanban_task_events; DROP TABLE IF EXISTS kanban_tasks;`); err != nil {
+		return fmt.Errorf("drop v1 tables: %w", err)
+	}
+	if _, err := db.Exec(schema); err != nil {
+		return fmt.Errorf("migrate: %w", err)
+	}
+	return nil
 }

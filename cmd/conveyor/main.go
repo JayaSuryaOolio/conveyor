@@ -1,57 +1,135 @@
-// Command conveyor is Conveyor's entrypoint: own chi router, own port, own SQLite DB.
+// Command conveyor is Conveyor's CLI. Command groups live in cmd_<group>.go
+// and register themselves with register().
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
-	"log"
-	"net/http"
+	"io"
 	"os"
-	"path/filepath"
+	"sort"
+	"strings"
 
-	"github.com/go-chi/chi/v5"
-
+	"github.com/JayaSuryaOolio/conveyor/internal/core"
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 )
 
+// cmdFunc runs a command group with the resolved home and the args after its name.
+type cmdFunc func(home string, args []string) error
+
+type command struct {
+	fn   cmdFunc
+	help string
+}
+
+var commands = map[string]command{}
+
+// register adds a command group; call it from an init() in cmd_<group>.go.
+func register(name string, fn cmdFunc, help string) { commands[name] = command{fn, help} }
+
 func main() {
-	if len(os.Args) < 2 || os.Args[1] != "serve" {
-		fmt.Fprintln(os.Stderr, "usage: conveyor serve [--port N] [--db path]")
-		os.Exit(1)
+	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
+}
+
+func run(args []string, stdout, stderr io.Writer) int {
+	out = stdout
+	fs := flag.NewFlagSet("conveyor", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	homeFlag := fs.String("home", "", "conveyor home (default $CONVEYOR_HOME or ~/.conveyor)")
+	if err := fs.Parse(args); err != nil {
+		return 2
 	}
-
-	fs := flag.NewFlagSet("serve", flag.ExitOnError)
-	port := fs.Int("port", 8420, "port to listen on")
-	dbPath := fs.String("db", defaultDBPath(), "path to the SQLite database file")
-	fs.Parse(os.Args[2:])
-
-	if err := os.MkdirAll(filepath.Dir(*dbPath), 0o755); err != nil {
-		log.Fatalf("create db dir: %v", err)
+	rest := fs.Args()
+	if len(rest) == 0 {
+		usage(stderr)
+		return 1
 	}
-
-	db, err := store.Open(*dbPath)
+	c, ok := commands[rest[0]]
+	if !ok {
+		fmt.Fprintf(stderr, "unknown command %q\n", rest[0])
+		usage(stderr)
+		return 1
+	}
+	home, err := core.Home(*homeFlag)
+	if err == nil {
+		err = c.fn(home, rest[1:])
+	}
 	if err != nil {
-		log.Fatalf("open db: %v", err)
+		fmt.Fprintln(stderr, "error:", err)
+		return 1
 	}
-	defer db.Close()
+	return 0
+}
 
-	r := chi.NewRouter()
-	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("ok"))
-	})
-
-	addr := fmt.Sprintf(":%d", *port)
-	log.Printf("conveyor listening on %s (db=%s)", addr, *dbPath)
-	if err := http.ListenAndServe(addr, r); err != nil {
-		log.Fatalf("serve: %v", err)
+func usage(w io.Writer) {
+	fmt.Fprintln(w, "usage: conveyor [--home dir] <command> [args]\n\ncommands:")
+	names := make([]string, 0, len(commands))
+	for n := range commands {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	for _, n := range names {
+		fmt.Fprintf(w, "  %-10s %s\n", n, commands[n].help)
 	}
 }
 
-func defaultDBPath() string {
-	home, err := os.UserHomeDir()
+// out is where commands print results (stdout, swappable in tests).
+var out io.Writer = os.Stdout
+
+// openService opens the DB under home.
+func openService(home string) (*core.Service, error) {
+	db, err := store.Open(core.DBPath(home))
 	if err != nil {
-		return "conveyor.db"
+		return nil, err
 	}
-	return filepath.Join(home, ".conveyor", "conveyor.db")
+	return &core.Service{DB: db, Home: home}, nil
+}
+
+// withService opens the service, runs fn and closes the DB.
+func withService(home string, fn func(s *core.Service) error) error {
+	s, err := openService(home)
+	if err != nil {
+		return err
+	}
+	defer s.DB.Close()
+	return fn(s)
+}
+
+// parseArgs parses flags interspersed with positionals ("task new <title> --repo a").
+func parseArgs(fs *flag.FlagSet, args []string) ([]string, error) {
+	var pos []string
+	for {
+		if err := fs.Parse(args); err != nil {
+			return nil, err
+		}
+		if fs.NArg() == 0 {
+			return pos, nil
+		}
+		pos = append(pos, fs.Arg(0))
+		args = fs.Args()[1:]
+	}
+}
+
+func printJSON(v any) error {
+	enc := json.NewEncoder(out)
+	enc.SetIndent("", "  ")
+	return enc.Encode(v)
+}
+
+func deref(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
+func splitCSV(s string) []string {
+	var r []string
+	for _, p := range strings.Split(s, ",") {
+		if p = strings.TrimSpace(p); p != "" {
+			r = append(r, p)
+		}
+	}
+	return r
 }
