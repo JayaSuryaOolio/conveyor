@@ -50,6 +50,8 @@ export function RunAction(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function RunAutomation(arg1:string):Promise<string>;
 
+export function RunLog(arg1:number,arg2:number):Promise<core.RunLog>;
+
 export function Sessions(arg1:string):Promise<Array<core.Session>>;
 
 export function SetAutomationEnabled(arg1:string,arg2:boolean):Promise<void>;

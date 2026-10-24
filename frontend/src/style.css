@@ -40,6 +40,14 @@ pre { white-space: pre-wrap; word-break: break-word; font: inherit; margin: 4px 
 .desc { background: var(--panel); padding: 8px; border-radius: 6px; }
 .criteria { list-style: none; padding: 0; }
 .runsep { text-align: center; color: var(--muted); font-size: 12px; margin: 14px 0; border-top: 1px dashed var(--border); padding-top: 6px; }
+.working { display: flex; gap: 8px; align-items: center; font-size: 13px; }
+.working .clamp { min-width: 0; }
+.pulse { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: pulse 1.2s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .25; transform: scale(.7); } }
+.chatlog { max-height: 320px; overflow-y: auto; margin-top: 6px; padding: 6px 8px; background: var(--panel); border-radius: 6px; font-size: 13px; }
+.chatlog > div { white-space: pre-wrap; word-break: break-word; margin: 2px 0; }
+.log-tool { color: var(--muted); font: 12px ui-monospace, monospace; }
+.log-user { font-weight: 600; }
 .comment { border: 1px solid var(--border); border-radius: 6px; padding: 8px; margin: 6px 0; }
 .comment.by-human { background: var(--panel); }
 .workspace { border: 1px dashed var(--border); border-radius: 6px; padding: 12px; margin-bottom: 12px; }

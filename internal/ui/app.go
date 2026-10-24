@@ -290,6 +290,9 @@ func (a *App) RunAction(key, kind, repo string) error { return a.svc.RunAction(k
 // Sessions lists manual Claude sessions in the task's worktrees.
 func (a *App) Sessions(key string) ([]core.Session, error) { return a.svc.Sessions(key) }
 
+// RunLog returns the run's session chat entries after byte offset after.
+func (a *App) RunLog(runID, after int64) (core.RunLog, error) { return a.svc.RunLog(runID, after) }
+
 // EnsureWorkspace creates the task's worktrees (workspace.Ensure).
 func (a *App) EnsureWorkspace(key string) error {
 	t, err := store.GetTaskByKey(a.svc.DB, key)
