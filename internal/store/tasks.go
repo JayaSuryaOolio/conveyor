@@ -166,6 +166,17 @@ func UpdateTaskStatus(db *sql.DB, id int64, to Status, actor Actor) (Task, error
 		if err := ValidateTransition(from, to, actor); err != nil {
 			return err
 		}
+		// A run ending (needs_you/review) with human comments still queued goes back to todo
+		// so the next run gets them. Failed is excluded: a launch-failure cap must still stop.
+		if from == StatusRunning && actor == ActorSystem && (to == StatusNeedsYou || to == StatusReview) {
+			var n int
+			if err := tx.QueryRow(`SELECT COUNT(*) FROM comments WHERE task_id=? AND author='human' AND consumed_by_run_id IS NULL`, id).Scan(&n); err != nil {
+				return fmt.Errorf("queued comments: %w", err)
+			}
+			if n > 0 {
+				to = StatusTodo
+			}
+		}
 		// A human leaving failed (requeue) gets a fresh failure budget.
 		reset := from == StatusFailed && actor == ActorHuman
 		res, err := tx.Exec(`UPDATE tasks SET status=?, consecutive_failures=CASE WHEN ? THEN 0 ELSE consecutive_failures END, updated_at=? WHERE id=? AND status=?`, to, reset, now(), id, from)

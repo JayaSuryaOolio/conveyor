@@ -77,12 +77,13 @@ export function CommentBox({k, placeholder = 'Comment…', onDone}: {k: string; 
 }
 
 /** One comment in the thread. */
-export function Message({m}: {m: store.Comment}) {
+export function Message({m, queued}: {m: store.Comment; queued?: boolean}) {
     return (
         <Paper withBorder p="sm" radius="md" bg={m.author === 'human' ? 'var(--mantine-color-default-hover)' : undefined}>
             <Group gap="xs" mb={4}>
                 <Text size="xs" fw={600}>{m.author}</Text>
                 <Time iso={m.created_at}/>
+                {queued && <Tooltip label="Sent to the agent when the current run stops"><Badge size="xs" variant="light" color="gray">queued</Badge></Tooltip>}
             </Group>
             <Markdown>{m.body}</Markdown>
         </Paper>

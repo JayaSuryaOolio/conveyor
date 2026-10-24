@@ -361,6 +361,21 @@ func TestReapVanished(t *testing.T) {
 	}
 }
 
+func TestReapVanishedWithQueuedCommentRequeues(t *testing.T) {
+	e := setup(t)
+	tk := e.task(t, "t", 0)
+	e.tick(t)
+	if _, err := store.AddComment(e.db, store.Comment{TaskID: tk.ID, Author: store.AuthorHuman, Body: "while running"}); err != nil {
+		t.Fatal(err)
+	}
+	os.WriteFile(filepath.Join(e.fake, "agents.json"), []byte(`[]`), 0o644)
+	e.now = time.Now().Add(time.Minute)
+	e.tick(t) // reaps, requeues, and relaunches with the queued comment
+	if left, _ := store.UnconsumedComments(e.db, tk.ID); len(left) != 0 {
+		t.Fatalf("%d comments still queued; task %s", len(left), e.get(t, tk.ID).Status)
+	}
+}
+
 func TestAdoptSessionWithoutHooks(t *testing.T) {
 	e := setup(t)
 	tk := e.task(t, "t", 0)

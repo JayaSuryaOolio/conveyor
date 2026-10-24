@@ -180,7 +180,7 @@ export function TaskPage({k, nav}: {k: string; nav: Nav}) {
                                 </Timeline.Item>
                             ) : (
                                 <Timeline.Item key={'c' + it.comment!.id} bullet={<IconMessage size={12}/>}>
-                                    <Message m={it.comment!}/>
+                                    <Message m={it.comment!} queued={t.status === 'running' && it.comment!.author === 'human' && !it.comment!.consumed_by_run_id}/>
                                 </Timeline.Item>
                             ))}
                         </Timeline>
