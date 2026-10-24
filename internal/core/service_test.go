@@ -90,3 +90,21 @@ func TestMoveCancelDone(t *testing.T) {
 		t.Fatal("cancel twice must fail")
 	}
 }
+
+func TestHumanRequeueResetsFailures(t *testing.T) {
+	s := newSvc(t)
+	for name, requeue := range map[string]func(key string) error{
+		"move":    func(k string) error { return s.Move(k, store.StatusTodo) },
+		"comment": func(k string) error { _, err := s.AddComment(k, store.AuthorHuman, "retry"); return err },
+	} {
+		tk, _ := s.CreateTask(NewTaskInput{Title: "t", Repos: []string{"a"}})
+		s.DB.Exec(`UPDATE tasks SET status='failed', consecutive_failures=3 WHERE id=?`, tk.ID)
+		if err := requeue(tk.Key); err != nil {
+			t.Fatal(err)
+		}
+		got, _ := store.GetTask(s.DB, tk.ID)
+		if got.Status != store.StatusTodo || got.ConsecutiveFailures != 0 {
+			t.Errorf("%s: %s/%d, want todo/0", name, got.Status, got.ConsecutiveFailures)
+		}
+	}
+}
