@@ -40,7 +40,8 @@ To split work or hand a part off, create a sub-task (` + "`--parent`" + `, key C
 ` + "```" + `
 conveyor task new "title" --repo <repo> --parent <KEY> --desc "..." [--todo] [--agent <name>]
 conveyor task link <KEY> blocks <OTHER>      # OTHER waits until KEY is done or cancelled
-conveyor task link <KEY> relates|duplicates <OTHER>
+conveyor task link <KEY> relates <OTHER>
+conveyor task parent <KEY> <PARENT>|--none   # re-parent; keys do not change
 conveyor task unlink <KEY> blocks <OTHER>
 ` + "```" + `
 

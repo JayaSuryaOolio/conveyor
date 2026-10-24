@@ -90,3 +90,58 @@ func TestLinks(t *testing.T) {
 		t.Fatalf("relates is symmetric: %v", err)
 	}
 }
+
+func TestBlockLoops(t *testing.T) {
+	db := openTest(t)
+	a, b, c := mkTask(t, db, StatusTodo), mkTask(t, db, StatusTodo), mkTask(t, db, StatusTodo)
+	for _, p := range [][2]int64{{a.ID, b.ID}, {b.ID, c.ID}} {
+		if err := AddLink(db, p[0], p[1], LinkBlocks); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := AddLink(db, c.ID, a.ID, LinkBlocks); err == nil {
+		t.Error("loop a->b->c->a accepted")
+	}
+	if err := AddLink(db, b.ID, a.ID, LinkBlocks); err == nil {
+		t.Error("loop a->b->a accepted")
+	}
+	if err := AddLink(db, a.ID, a.ID, LinkBlocks); err == nil {
+		t.Error("a blocks a accepted")
+	}
+	if err := AddLink(db, c.ID, a.ID, LinkRelates); err != nil {
+		t.Errorf("relates may point back: %v", err)
+	}
+	rel, err := ListRelations(db, b)
+	if err != nil || len(rel.BlockedByAll) != 1 || rel.BlockedByAll[0] != a.Key || len(rel.BlocksAll) != 1 || rel.BlocksAll[0] != c.Key {
+		t.Fatalf("reach = %+v, %v", rel, err)
+	}
+	if rel, _ = ListRelations(db, c); len(rel.BlockedByAll) != 2 || len(rel.BlocksAll) != 0 {
+		t.Fatalf("c reach = %+v", rel)
+	}
+}
+
+func TestSetParent(t *testing.T) {
+	db := openTest(t)
+	a, b, c := mkTask(t, db, StatusTodo), mkTask(t, db, StatusTodo), mkTask(t, db, StatusTodo)
+	if err := SetParent(db, b.ID, &a.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := SetParent(db, c.ID, &b.ID); err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range [][2]int64{{a.ID, a.ID}, {a.ID, b.ID}, {a.ID, c.ID}} {
+		if err := SetParent(db, p[0], &p[1]); err == nil {
+			t.Errorf("parent loop %d under %d accepted", p[0], p[1])
+		}
+	}
+	rel, err := ListRelations(db, b)
+	if err != nil || len(rel.Ancestors) != 1 || rel.Ancestors[0] != a.Key || len(rel.Descendants) != 1 || rel.Descendants[0] != c.Key {
+		t.Fatalf("tree = %+v, %v", rel, err)
+	}
+	if err := SetParent(db, c.ID, nil); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := GetTaskByKey(db, c.Key); got.ParentID != nil {
+		t.Fatalf("after clear: %+v", got)
+	}
+}

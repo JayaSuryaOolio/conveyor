@@ -170,6 +170,10 @@ export function SetAutomationEnabled(arg1, arg2) {
   return window['go']['ui']['App']['SetAutomationEnabled'](arg1, arg2);
 }
 
+export function SetParent(arg1, arg2) {
+  return window['go']['ui']['App']['SetParent'](arg1, arg2);
+}
+
 export function SetSetting(arg1, arg2) {
   return window['go']['ui']['App']['SetSetting'](arg1, arg2);
 }
