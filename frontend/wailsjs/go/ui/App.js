@@ -22,6 +22,10 @@ export function AddRepo(arg1, arg2) {
   return window['go']['ui']['App']['AddRepo'](arg1, arg2);
 }
 
+export function AppLog(arg1) {
+  return window['go']['ui']['App']['AppLog'](arg1);
+}
+
 export function ApplyLearnings(arg1) {
   return window['go']['ui']['App']['ApplyLearnings'](arg1);
 }
