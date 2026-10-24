@@ -16,15 +16,15 @@ function ActionButton({k, a, kind}: {k: string; a: core.Action; kind?: string}) 
     )
 }
 
-export function WorkspacePanel({k, repos, runs}: {k: string; repos: store.TaskRepo[]; runs: store.Run[]}) {
-    const {data: actions} = useData(() => Actions(k), [k])
-    const {data: sessions} = useData(() => Sessions(k), [k])
+export function WorkspacePanel({k, repos, runs, reload}: {k: string; repos: store.TaskRepo[]; runs: store.Run[]; reload: () => void}) {
+    const {data: actions, reload: reloadActions} = useData(() => Actions(k), [k])
+    const {data: sessions, reload: reloadSessions} = useData(() => Sessions(k), [k])
     if (!repos.some(r => r.worktree_path)) {
         return (
             <aside className="workspace">
                 <h4>Workspace</h4>
                 <p className="muted">Workspace not created yet.</p>
-                <button onClick={() => EnsureWorkspace(k).catch(errMsg)}>Create workspace</button>
+                <button onClick={() => EnsureWorkspace(k).then(() => { reload(); reloadActions(); reloadSessions() }).catch(errMsg)}>Create workspace</button>
             </aside>
         )
     }
