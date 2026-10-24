@@ -5,8 +5,7 @@
 <h1 align="center">Conveyor</h1>
 
 <p align="center">
-  <b>A kanban board that runs Claude Code for you.</b><br>
-  Write a task, move it to Todo, and review the pull request when it's ready.
+  <b>A local kanban that runs tasks through Claude Code.</b>
 </p>
 
 <!-- Screenshots: drop PNGs in docs/screenshots/ (board.png, task-page.png) -->
@@ -15,7 +14,7 @@
 
 ## What it is
 
-Conveyor is a desktop app and a CLI that share one SQLite file on your machine. Each task runs as a regular Claude Code session in its own git worktree of your repo. We aim to keep it simple, predictable and intuitive.
+Conveyor is a local kanban that runs tasks through Claude Code background sessions. Each task has a Jira-like page with a comment thread; a comment triggers the next run; every run is a real Claude session you can attach to; each task works in its own workspace folder holding one git worktree per repo. It tries to stay simple, predictable and intuitive.
 
 - **Your repo's setup is used as is.** Runs load the repo's own `CLAUDE.md`, skills, commands and agents.
 - **You can step in at any time.** Attach to a running session, resume it in your terminal, or open a fresh one with the task's context.
