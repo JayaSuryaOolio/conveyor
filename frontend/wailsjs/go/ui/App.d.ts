@@ -4,6 +4,8 @@ import {core} from '../models';
 import {ui} from '../models';
 import {store} from '../models';
 
+export function Actions(arg1:string):Promise<Array<core.Action>>;
+
 export function AddComment(arg1:string,arg2:string):Promise<void>;
 
 export function AddRepo(arg1:string,arg2:string):Promise<void>;
@@ -11,6 +13,8 @@ export function AddRepo(arg1:string,arg2:string):Promise<void>;
 export function Cancel(arg1:string):Promise<void>;
 
 export function CreateTask(arg1:core.NewTaskInput):Promise<string>;
+
+export function EnsureWorkspace(arg1:string):Promise<void>;
 
 export function GetSettings():Promise<Record<string, string>>;
 
@@ -21,5 +25,9 @@ export function ListRepos():Promise<Array<store.Repo>>;
 export function ListTasks():Promise<Array<ui.TaskCard>>;
 
 export function Move(arg1:string,arg2:string):Promise<void>;
+
+export function RunAction(arg1:string,arg2:string,arg3:string):Promise<void>;
+
+export function Sessions(arg1:string):Promise<Array<core.Session>>;
 
 export function SetSetting(arg1:string,arg2:string):Promise<void>;

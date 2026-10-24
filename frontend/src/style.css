@@ -44,3 +44,9 @@ pre { white-space: pre-wrap; word-break: break-word; font: inherit; margin: 4px 
 .dialog { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px; width: 440px; display: grid; gap: 8px; }
 table { border-collapse: collapse; margin-bottom: 12px; } td { padding: 4px 12px 4px 0; }
 .setting label { width: 220px; } .setting input { flex: 1; }
+.workspace { border-style: solid; }
+.wsrepo { margin-bottom: 10px; }
+.path { cursor: pointer; word-break: break-all; font-size: 11px; }
+.actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.actionbtn { display: inline-flex; gap: 2px; }
+.session { margin: 6px 0; }
