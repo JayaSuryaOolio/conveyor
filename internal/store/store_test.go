@@ -56,6 +56,7 @@ func TestTransitionTable(t *testing.T) {
 		{StatusNeedsYou, StatusTodo, []Actor{H, S}},
 		{StatusNeedsYou, StatusDone, []Actor{H}},
 		{StatusReview, StatusTodo, []Actor{H, S}},
+		{StatusReview, StatusNeedsYou, []Actor{S}},
 		{StatusReview, StatusDone, []Actor{H, S}},
 		{StatusFailed, StatusTodo, []Actor{H, S}},
 		{StatusDone, StatusTodo, []Actor{H, S}},
