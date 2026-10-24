@@ -110,6 +110,12 @@ CREATE TABLE IF NOT EXISTS automations (
 );
 
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+
+CREATE TABLE IF NOT EXISTS apps (
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  command TEXT NOT NULL
+);
 `
 
 // Migrate drops the v1 tables and creates the v2 schema if missing. Later
