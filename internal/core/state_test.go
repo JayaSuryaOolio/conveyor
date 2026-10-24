@@ -2,6 +2,7 @@ package core
 
 import (
 	"encoding/json"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -53,5 +54,30 @@ func TestStateRoundTrip(t *testing.T) {
 		if !strings.HasPrefix(l, "skipped") {
 			t.Fatalf("second import changed something: %v", again)
 		}
+	}
+}
+
+func TestSeedMock(t *testing.T) {
+	db, err := store.Open(filepath.Join(t.TempDir(), "c.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	s := &Service{DB: db}
+	if err := s.SeedMock(t.TempDir()); err != nil {
+		t.Fatal(err)
+	}
+	ts, _ := store.ListTasks(db)
+	seen := map[store.Status]bool{}
+	for _, x := range ts {
+		seen[x.Status] = true
+	}
+	for _, st := range store.AllStatuses {
+		if !seen[st] {
+			t.Errorf("no mock task in %s", st)
+		}
+	}
+	if len(ts) != len(mockTasks) || s.SeedMock(t.TempDir()) == nil {
+		t.Fatal("want every scenario seeded once and a second seed refused")
 	}
 }

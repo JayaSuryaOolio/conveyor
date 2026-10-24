@@ -139,9 +139,16 @@ function RepoFields({k, r, reload, children}: {k: string; r: store.TaskRepo; rel
     )
 }
 
-/** Who made the task. Sub-tasks get a lettered key (CV-14A is a child of CV-14), so the key alone names the creating task. */
-// refactor: keys never change on re-parent, so this can go stale; a created_by column set at insert would be exact (and cover automations).
-function creator(key: string, source: string, user: string | undefined) {
+/** Who made the task: the exact created_by, else (rows from before it existed) inferred from the lettered key (CV-14A is a child of CV-14). */
+function creator(key: string, source: string, user: string | undefined, createdBy?: string | null) {
+    if (createdBy) {
+        const [kind, ...rest] = createdBy.split(':'), arg = rest.join(':')
+        if (kind === 'human') return user || 'human'
+        if (kind === 'agent') return `agent · ${arg}`
+        if (kind === 'followup') return `follow-up of ${arg}`
+        if (kind === 'automation') return `automation · ${arg}`
+        return createdBy
+    }
     const parent = key.match(/^(.+-\d+)[A-Z]+$/)?.[1]
     if (parent) return source === 'followup' ? `follow-up of ${parent}` : `agent · ${parent}`
     if (source === 'jira' || source === 'learning') return source
@@ -155,7 +162,7 @@ export function TaskSidebar({t, runs, reload, onTerm}: {t: store.Task; runs: sto
     const {data: sessions, error: sessionsError, reload: reloadSessions} = useData(() => Sessions(k), [k])
     const {data: apps} = useData(ListApps, [])
     const {data: settings} = useData(GetSettings, [])
-    const by = creator(k, t.source, settings?.user_name)
+    const by = creator(k, t.source, settings?.user_name, t.created_by)
     const {data: icons} = useData(AppIcons, [])
     const [busy, setBusy] = useState(false)
     const taskActions = (actions ?? []).filter(a => ['attach', 'resume', 'fresh', 'shell'].includes(a.kind))
