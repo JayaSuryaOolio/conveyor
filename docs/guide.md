@@ -26,7 +26,7 @@ The task page shows the description, the comment thread (yours, the agent's fina
 
 ![Task lifecycle](diagrams/task-lifecycle.svg)
 
-- **backlog**: parked. Nothing runs.
+- **backlog**: parked. Nothing runs. The description can be edited only here (pencil on the task page, or `conveyor task set KEY --desc ...`); after that, changes go in comments.
 - **todo**: waiting for the dispatcher.
 - **running**: a session is working on it.
 - **needs_you**: the agent stopped without a final status block (it asked you something), or its session disappeared.
@@ -196,7 +196,7 @@ conveyor task new "<title>" --repo a[,b] [--primary r] [--desc t | --desc-file f
 conveyor task list [--status a,b]         conveyor task show KEY [--thread] [--runs]
 conveyor task comment KEY <text|->        conveyor task move KEY <status>
 conveyor task done KEY                    conveyor task cancel KEY
-conveyor task set KEY [--repo r] [--branch b] [--pr url] [--model m]
+conveyor task set KEY [--repo r] [--branch b] [--pr url] [--model m] [--desc d | --desc-file f]
 conveyor task link KEY blocks|relates OTHER    conveyor task unlink KEY kind OTHER
 conveyor task parent KEY PARENT|--none
 conveyor task sync KEY                    conveyor task brief KEY [--preview]
