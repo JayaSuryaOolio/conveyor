@@ -31,8 +31,8 @@ export function Board({nav, q}: {nav: Nav; q: string}) {
                 let list = cards.filter(c => c.status === s)
                 if (ARCHIVE.includes(s)) list = list.filter(c => Date.now() - Date.parse(c.updatedAt) < WEEK)
                 if (shut(s)) return (
-                    <Paper key={s} bg="var(--mantine-color-default-hover)" py="xs" radius="md" mih={120} title={'Show ' + label}
-                           style={{cursor: 'pointer', writingMode: 'vertical-rl', display: 'flex', alignItems: 'center', gap: 6}} onClick={() => toggle(s)}>
+                    <Paper key={s} bg="var(--mantine-color-default-hover)" radius="md" mih={120} title={'Show ' + label}
+                           style={{cursor: 'pointer', writingMode: 'vertical-rl', padding: '12px 0', display: 'flex', alignItems: 'center', gap: 6}} onClick={() => toggle(s)}>
                         <Text size="sm" fw={600}>{label}</Text>
                         <Text size="xs" c="dimmed">{list.length}</Text>
                     </Paper>
