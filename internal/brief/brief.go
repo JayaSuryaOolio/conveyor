@@ -14,7 +14,7 @@ import (
 
 const maxComments = 20
 
-const protocol = `## Status block
+const statusBlock = `## Status block
 
 End every final reply with this block. Omit it to ask the human a question instead.
 
@@ -31,18 +31,34 @@ learning: a lesson (repeatable line)
 spawn: child task title (repeatable line)
 </conveyor>
 ` + "```" + `
+`
 
-## Rules
-
-- Work only inside the worktrees listed above.
+const defaultRules = `- Work only inside the worktrees listed above.
 - Open at most one PR per repo.
 - Never push to the default branch.
 - Prefer the repo's own commands and skills over ad-hoc steps. When one matches what you are doing (e.g. creating a PR, adding tests, writing a changeset), use it: run the slash command via the Skill tool, or Read the command file and follow it.
-
-## Older history
-
-Full thread: ` + "`conveyor task show %s --thread --json`" + `
 `
+
+// Built-in prompt templates; empty prompt_fresh / prompt_resume settings use these.
+const (
+	DefaultFresh  = "You are working on Conveyor task {key}: {title}. Read {brief} first and follow it.\n{comments}"
+	DefaultResume = "New comments on {key}:\n{comments}\n(The brief at {brief} is up to date.)"
+)
+
+// rules is the Rules section body: the defaults, the PR comment prefix rule, then (if extra) the user's extra rules.
+func rules(db *sql.DB, extra bool) string {
+	r := defaultRules
+	if p := store.GetSetting(db, "pr_comment_prefix"); p != "" {
+		r += fmt.Sprintf("- Start every comment or reply you post on a PR or issue with `%s`.\n", p)
+	}
+	if x := strings.TrimSpace(store.GetSetting(db, "brief_extra_rules")); extra && x != "" {
+		r += x + "\n"
+	}
+	return r
+}
+
+// Protocol is the status-block protocol and the built-in rules (extra rules excluded), for display.
+func Protocol(db *sql.DB) string { return statusBlock + "\n## Rules\n\n" + rules(db, false) }
 
 func firstLine(s string) string {
 	s = strings.TrimSpace(s)
@@ -63,6 +79,28 @@ func deref(s *string) string {
 
 // Render writes <ws>/BRIEF.md and returns its path.
 func Render(db *sql.DB, home string, task store.Task) (string, error) {
+	text, err := Build(db, task)
+	if err != nil {
+		return "", err
+	}
+	dir := workspace.Dir(home, task.Key)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "", fmt.Errorf("create workspace dir: %w", err)
+	}
+	path := filepath.Join(dir, "BRIEF.md")
+	if err := os.WriteFile(path, []byte(text), 0o644); err != nil {
+		return "", fmt.Errorf("write brief: %w", err)
+	}
+	return path, nil
+}
+
+// Path is where Render writes the task's brief.
+func Path(home string, task store.Task) string {
+	return filepath.Join(workspace.Dir(home, task.Key), "BRIEF.md")
+}
+
+// Build renders the brief text without writing anything.
+func Build(db *sql.DB, task store.Task) (string, error) {
 	runs, err := store.ListRuns(db, task.ID)
 	if err != nil {
 		return "", err
@@ -124,17 +162,8 @@ func Render(db *sql.DB, home string, task store.Task) (string, error) {
 	if len(human) > 0 {
 		fmt.Fprintf(&b, "\n## Human comments\n\n%s\n", strings.Join(human, "\n"))
 	}
-	fmt.Fprintf(&b, "\n"+protocol, task.Key)
-
-	dir := workspace.Dir(home, task.Key)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return "", fmt.Errorf("create workspace dir: %w", err)
-	}
-	path := filepath.Join(dir, "BRIEF.md")
-	if err := os.WriteFile(path, []byte(b.String()), 0o644); err != nil {
-		return "", fmt.Errorf("write brief: %w", err)
-	}
-	return path, nil
+	fmt.Fprintf(&b, "\n%s\n## Rules\n\n%s\n## Older history\n\nFull thread: `conveyor task show %s --thread --json`\n", statusBlock, rules(db, true), task.Key)
+	return b.String(), nil
 }
 
 func deltaText(delta []store.Comment) string {
@@ -145,16 +174,31 @@ func deltaText(delta []store.Comment) string {
 	return strings.Join(lines, "\n")
 }
 
-// FreshPrompt is the first prompt of a fresh session.
-func FreshPrompt(task store.Task, briefPath string, delta []store.Comment) string {
-	p := fmt.Sprintf("You are working on Conveyor task %s: %s. Read %s first and follow it.", task.Key, task.Title, briefPath)
-	if len(delta) > 0 {
-		p += "\n" + deltaText(delta)
+func fill(tmpl, def string, task store.Task, briefPath string, delta []store.Comment) string {
+	if strings.TrimSpace(tmpl) == "" {
+		tmpl = def
 	}
-	return p
+	return strings.TrimSpace(strings.NewReplacer("{key}", task.Key, "{title}", task.Title, "{brief}", briefPath, "{comments}", deltaText(delta)).Replace(tmpl))
 }
 
-// ResumePrompt is the prompt that resumes a hot session with new comments.
-func ResumePrompt(task store.Task, briefPath string, delta []store.Comment) string {
-	return fmt.Sprintf("New comments on %s:\n%s\n(The brief at %s is up to date.)", task.Key, deltaText(delta), briefPath)
+// FreshPrompt is the first prompt of a fresh session; tmpl is the prompt_fresh setting.
+func FreshPrompt(task store.Task, briefPath string, delta []store.Comment, tmpl string) string {
+	return fill(tmpl, DefaultFresh, task, briefPath, delta)
+}
+
+// ResumePrompt is the prompt that resumes a hot session with new comments; tmpl is the prompt_resume setting.
+func ResumePrompt(task store.Task, briefPath string, delta []store.Comment, tmpl string) string {
+	return fill(tmpl, DefaultResume, task, briefPath, delta)
+}
+
+// Preview renders the brief and the fresh prompt as a launch would, writing nothing.
+func Preview(db *sql.DB, home string, task store.Task) (text, prompt string, err error) {
+	if text, err = Build(db, task); err != nil {
+		return "", "", err
+	}
+	delta, err := store.UnconsumedComments(db, task.ID)
+	if err != nil {
+		return "", "", err
+	}
+	return text, FreshPrompt(task, Path(home, task), delta, store.GetSetting(db, "prompt_fresh")), nil
 }

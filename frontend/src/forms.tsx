@@ -1,9 +1,9 @@
 import {useState} from 'react'
-import {Button, Checkbox, Group, Modal, MultiSelect, Select, Stack, Table, Text, TextInput, Textarea, Title} from '@mantine/core'
-import {AddRepo, CreateTask, GetSettings, ListAgents, ListRepos, SetSetting, SetTaskAgent} from '../wailsjs/go/ui/App'
+import {Button, Checkbox, Code, Group, Modal, MultiSelect, ScrollArea, SegmentedControl, Select, Stack, Table, Tabs, Text, TextInput, Textarea, Title} from '@mantine/core'
+import {AddRepo, CreateTask, GetPromptDefaults, GetSettings, ListAgents, ListRepos, ListTasks, PreviewBrief, SetSetting, SetTaskAgent} from '../wailsjs/go/ui/App'
 import {core} from '../wailsjs/go/models'
 import {Nav, errMsg} from './components'
-import {MarkdownEditor} from './markdown'
+import {Markdown, MarkdownEditor} from './markdown'
 import {useData} from './util'
 
 export function NewTask({nav, close}: {nav: Nav; close: () => void}) {
@@ -75,23 +75,99 @@ export function Repos() {
     )
 }
 
+type Field = {k: string; label: string; desc: string; kind?: "area" | "md"}
+
+const TABS: {name: string; fields: Field[]}[] = [
+    {name: "General", fields: [
+        {k: "key_prefix", label: "Task key prefix", desc: "Prefix for new task keys, e.g. CV gives CV-12."},
+        {k: "default_model", label: "Default model", desc: "Model for runs that do not set one. Empty uses the Claude Code default."},
+        {k: "editor_command", label: "Editor command", desc: "Opens a workspace in your editor. {cwd} is the workspace path."},
+    ]},
+    {name: "Dispatch", fields: [
+        {k: "max_parallel", label: "Max parallel runs", desc: "How many tasks run at once."},
+        {k: "resume_threshold", label: "Resume threshold (tokens)", desc: "A hot session resumes while its context peak is below this; above it a fresh session starts."},
+        {k: "comment_debounce_secs", label: "Comment debounce (s)", desc: "Wait this long after a comment before starting a run, so you can batch comments."},
+        {k: "max_consecutive_failures", label: "Max consecutive failures", desc: "After this many failed runs in a row the task is marked failed."},
+    ]},
+    {name: "Terminal", fields: [
+        {k: "terminal_template", label: "Terminal command", desc: "Opens a terminal in a workspace. {cwd} is the directory and {cmd} the command to run.", kind: "area"},
+    ]},
+    {name: "Prompts", fields: [
+        {k: "pr_comment_prefix", label: "PR comment prefix", desc: "Every PR or issue comment the agent posts must start with this. Added to the brief and enforced by a hook. Empty disables both."},
+        {k: "brief_extra_rules", label: "Extra rules", desc: "Markdown appended to the Rules section of every brief.", kind: "md"},
+        {k: "prompt_fresh", label: "Fresh prompt", desc: "First prompt of a new session. Placeholders: {key} {title} {brief} {comments}. Empty uses the built-in.", kind: "area"},
+        {k: "prompt_resume", label: "Resume prompt", desc: "Prompt that resumes a session with new comments. Same placeholders. Empty uses the built-in.", kind: "area"},
+    ]},
+]
+
 export function Settings() {
     const {data, error, reload} = useData(GetSettings, [])
+    const {data: defs} = useData(GetPromptDefaults, [])
+    const known = new Set(TABS.flatMap(t => t.fields.map(f => f.k)))
+    const extra = Object.keys(data ?? {}).filter(k => !known.has(k)).sort().map((k): Field => ({k, label: k, desc: ""}))
     return (
-        <Stack maw={700}>
+        <Stack maw={800}>
             <Title order={3}>Settings</Title>
             {error && <Text c="red">{error}</Text>}
-            {data && Object.keys(data).sort().map(k => <SettingRow key={k} k={k} v={data[k]} reload={reload}/>)}
+            {data && (
+                <Tabs defaultValue="General" keepMounted={false}>
+                    <Tabs.List mb="md">{TABS.map(t => <Tabs.Tab key={t.name} value={t.name}>{t.name}</Tabs.Tab>)}</Tabs.List>
+                    {TABS.map(t => (
+                        <Tabs.Panel key={t.name} value={t.name}>
+                            <Stack>
+                                {(t.name === "General" ? [...t.fields, ...extra] : t.fields).map(f => <SettingRow key={f.k} f={f} v={data[f.k] ?? ""} reload={reload} ph={f.k === "prompt_fresh" ? defs?.fresh : f.k === "prompt_resume" ? defs?.resume : undefined}/>)}
+                                {t.name === "Prompts" && <PromptsInfo settings={data} protocol={defs?.protocol ?? ""}/>}
+                            </Stack>
+                        </Tabs.Panel>
+                    ))}
+                </Tabs>
+            )}
         </Stack>
     )
 }
 
-function SettingRow({k, v, reload}: {k: string; v: string; reload: () => void}) {
+function SettingRow({f, v, ph, reload}: {f: Field; v: string; ph?: string; reload: () => void}) {
     const [val, setVal] = useState(v)
+    const props = {style: {flex: 1}, label: f.label, description: f.desc, placeholder: ph}
     return (
         <Group wrap="nowrap" align="flex-end">
-            <TextInput style={{flex: 1}} label={k} value={val} onChange={e => setVal(e.target.value)}/>
-            <Button disabled={val === v} onClick={() => SetSetting(k, val).then(reload, errMsg)}>Save</Button>
+            {f.kind === "md" ? <Stack gap={4} style={{flex: 1}}>
+                <Text size="sm" fw={500}>{f.label}</Text><Text size="xs" c="dimmed">{f.desc}</Text>
+                <MarkdownEditor minRows={4} value={val} onChange={setVal}/>
+            </Stack>
+                : f.kind === "area" ? <Textarea {...props} autosize minRows={2} maxRows={10} value={val} onChange={e => setVal(e.target.value)}/>
+                : <TextInput {...props} value={val} onChange={e => setVal(e.target.value)}/>}
+            <Button disabled={val === v} onClick={() => SetSetting(f.k, val).then(reload, errMsg)}>Save</Button>
         </Group>
+    )
+}
+
+/** What the agent receives: the built-in protocol (read-only) and a live preview of a task brief. */
+function PromptsInfo({settings, protocol}: {settings: Record<string, string>; protocol: string}) {
+    const {data: tasks} = useData(ListTasks, [])
+    const [key, setKey] = useState<string | null>(null)
+    const [raw, setRaw] = useState("rendered")
+    const sig = JSON.stringify(settings) // refetch when any setting is saved
+    const {data: pv, error} = useData(() => key ? PreviewBrief(key) : Promise.resolve(undefined), [key, sig])
+    return (
+        <Stack mt="md">
+            <Title order={5}>Built-in protocol and rules</Title>
+            <Text size="xs" c="dimmed">Always in the brief. Read-only; add to the rules with Extra rules above.</Text>
+            <ScrollArea.Autosize mah={360}><Code block>{protocol}</Code></ScrollArea.Autosize>
+            <Title order={5}>Preview</Title>
+            <Text size="xs" c="dimmed">The brief and first prompt for a task as they would be sent now. Nothing is written.</Text>
+            <Group>
+                <Select style={{flex: 1}} searchable placeholder="Pick a task" value={key} onChange={setKey}
+                        data={(tasks ?? []).map(t => ({value: t.key, label: `${t.key}  ${t.title}`}))}/>
+                <SegmentedControl value={raw} onChange={setRaw} data={[{value: "rendered", label: "Rendered"}, {value: "raw", label: "Raw"}]}/>
+            </Group>
+            {error && <Text c="red">{error}</Text>}
+            {pv && <>
+                <Text size="sm" fw={600}>BRIEF.md</Text>
+                {raw === "raw" ? <Code block>{pv.brief}</Code> : <Markdown>{pv.brief}</Markdown>}
+                <Text size="sm" fw={600}>Fresh prompt</Text>
+                <Code block>{pv.prompt}</Code>
+            </>}
+        </Stack>
     )
 }

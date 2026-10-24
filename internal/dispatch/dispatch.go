@@ -282,9 +282,9 @@ func (d *Dispatcher) start(ctx context.Context, task store.Task, delta []store.C
 	run := store.Run{TaskID: task.ID, Kind: "auto", Mode: "fresh", Status: "launching"}
 	if prev != nil {
 		run.Mode, run.SessionID = "resume", prev.SessionID // the hook matches resumed sessions by id
-		run.Prompt = brief.ResumePrompt(task, briefPath, delta)
+		run.Prompt = brief.ResumePrompt(task, briefPath, delta, store.GetSetting(d.DB, "prompt_resume"))
 	} else {
-		run.Prompt = brief.FreshPrompt(task, briefPath, delta)
+		run.Prompt = brief.FreshPrompt(task, briefPath, delta, store.GetSetting(d.DB, "prompt_fresh"))
 	}
 	if run, err = store.CreateRun(d.DB, run); err != nil {
 		return store.Run{}, err
