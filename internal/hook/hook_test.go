@@ -131,6 +131,28 @@ func TestStopDoneToReview(t *testing.T) {
 	}
 }
 
+func TestStopSpawnFailureStillTransitions(t *testing.T) {
+	e := setup(t, store.StatusRunning)
+	e.run(t, "auto", "running", "S1", "do it")
+	// No repo link on the parent makes SpawnChildren fail ("needs exactly one primary repo").
+	if _, err := e.db.Exec(`DELETE FROM task_repos WHERE task_id=?`, e.task.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.fire(t, "Stop", map[string]any{"session_id": "S1", "last_assistant_message": doneMsg}); err != nil {
+		t.Fatal(err)
+	}
+	if e.status(t).Status != store.StatusReview {
+		t.Fatal("want review despite spawn failure")
+	}
+	evs, _ := store.ListEvents(e.db, e.task.ID)
+	for _, ev := range evs {
+		if ev.Kind == "spawn_failed" {
+			return
+		}
+	}
+	t.Fatal("want spawn_failed event")
+}
+
 func TestStopNoBlockNeedsYou(t *testing.T) {
 	e := setup(t, store.StatusRunning)
 	e.run(t, "auto", "running", "S1", "")

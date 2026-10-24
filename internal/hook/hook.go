@@ -162,7 +162,8 @@ func onStop(db *sql.DB, task store.Task, run store.Run, p payload) error {
 		}
 	}
 	if _, err := core.SpawnChildren(db, task, block.Spawn); err != nil {
-		return err
+		// A failed spawn must not leave the task stuck in running; record it and transition anyway.
+		store.RecordEvent(db, task.ID, "spawn_failed", err.Error())
 	}
 
 	if task.Status != store.StatusRunning {
