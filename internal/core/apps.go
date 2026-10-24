@@ -14,11 +14,15 @@ import (
 
 // presetApps are macOS apps offered as one-click presets when installed. Each opens
 // with `open -a NAME {cwd}`, so supporting another app is one more name here.
-var presetApps = []string{
-	"Visual Studio Code", "Cursor", "Zed", "Windsurf", "Antigravity", "Sublime Text", "Xcode",
-	"GoLand", "IntelliJ IDEA", "WebStorm", "PyCharm",
+var presetApps = append(editorApps,
 	"Terminal", "iTerm", "Ghostty", "Warp", "WezTerm", "kitty",
 	"GitHub Desktop", "Fork", "Tower", "Sourcetree",
+)
+
+// editorApps are the presets that can also open one file (`open -a NAME file`); used by @file links.
+var editorApps = []string{
+	"Visual Studio Code", "Cursor", "Zed", "Windsurf", "Antigravity", "Sublime Text", "Xcode",
+	"GoLand", "IntelliJ IDEA", "WebStorm", "PyCharm",
 }
 
 // appDirs is where presets are looked for (swapped in tests).
