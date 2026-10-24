@@ -31,3 +31,5 @@ Built `scripts/e2e.sh` (temp `CONVEYOR_HOME`, two repos with bare origins under 
 **Deviations:** no bug fixes or regression tests, since the real run could not get past the trust check. `progress/progress.md` left to the orchestrator as instructed.
 
 **Manual checks:** ran `scripts/e2e.sh` here. It builds, adds both repos, creates the task, starts the daemon, and the launch fails with `workspace not trusted` because the repos under `~/work/conveyor-e2e/` have never been trusted in Claude (that needs an interactive prompt). The script then fails fast and cleans up. Steps 5 and 6 (real Claude, resume) are therefore **unverified**. To finish: `cd ~/work/conveyor-e2e/repo-a && claude` (same for repo-b), accept trust, re-run `scripts/e2e.sh`.
+
+**Update (review follow-up):** `wails build` passes. The real-Claude run of `scripts/e2e.sh` is still unverified: it needs an operator to trust `~/work/conveyor-e2e/repo-a` and `repo-b` interactively (`claude` in each dir), then re-run the script and fix what breaks. `progress/progress.md` now carries the final state.
