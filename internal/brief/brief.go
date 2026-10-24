@@ -37,6 +37,7 @@ spawn: child task title (repeatable line)
 - Work only inside the worktrees listed above.
 - Open at most one PR per repo.
 - Never push to the default branch.
+- Prefer the repo's own commands and skills over ad-hoc steps. When one matches what you are doing (e.g. creating a PR, adding tests, writing a changeset), use it: run the slash command via the Skill tool, or Read the command file and follow it.
 
 ## Older history
 
@@ -92,6 +93,9 @@ func Render(db *sql.DB, home string, task store.Task) (string, error) {
 		}
 	}
 	fmt.Fprintf(&b, "%s\n", criteria)
+	if w := workflows(db, task); w != "" {
+		fmt.Fprintf(&b, "\n## Repo workflows\n\n%s", w)
+	}
 	if len(runs) > 0 {
 		last := runs[len(runs)-1]
 		fmt.Fprintf(&b, "\n## Latest run\n\nState: %s\nNext: %s\n", oneLine(deref(last.State)), oneLine(deref(last.Next)))
