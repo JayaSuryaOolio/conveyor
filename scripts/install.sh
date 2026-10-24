@@ -31,7 +31,7 @@ echo "==> Skills"
 mkdir -p "$HOME/.claude/skills"
 for d in skills/*/; do
 	rm -rf "$HOME/.claude/skills/$(basename "$d")"
-	cp -R "$d" "$HOME/.claude/skills/"
+	cp -R "${d%/}" "$HOME/.claude/skills/" # no trailing slash: BSD cp would copy the contents only
 	echo "installed: ~/.claude/skills/$(basename "$d")"
 done
 
