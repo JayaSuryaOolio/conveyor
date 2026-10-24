@@ -1,0 +1,212 @@
+package main
+
+import (
+	"flag"
+	"fmt"
+	"io"
+	"os"
+	"strings"
+	"text/tabwriter"
+
+	"github.com/JayaSuryaOolio/conveyor/internal/core"
+	"github.com/JayaSuryaOolio/conveyor/internal/store"
+)
+
+func init() { register("task", runTask, "manage tasks (new|list|show|comment|move|cancel|done)") }
+
+const taskUsage = "usage: conveyor task new|list|show|comment|move|cancel|done ..."
+
+func runTask(home string, args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("%s", taskUsage)
+	}
+	cmd, rest := args[0], args[1:]
+	return withService(home, func(s *core.Service) error {
+		switch cmd {
+		case "new":
+			return taskNew(s, rest)
+		case "list":
+			return taskList(s, rest)
+		case "show":
+			return taskShow(s, rest)
+		case "comment":
+			return taskComment(s, rest)
+		case "move":
+			if len(rest) != 2 {
+				return fmt.Errorf("usage: conveyor task move KEY <status>")
+			}
+			to := store.Status(rest[1])
+			if !to.Valid() {
+				return fmt.Errorf("unknown status %q", rest[1])
+			}
+			return s.Move(rest[0], to)
+		case "cancel", "done":
+			if len(rest) != 1 {
+				return fmt.Errorf("usage: conveyor task %s KEY", cmd)
+			}
+			if cmd == "done" {
+				return s.MarkDone(rest[0])
+			}
+			return s.Cancel(rest[0])
+		}
+		return fmt.Errorf("unknown task command %q\n%s", cmd, taskUsage)
+	})
+}
+
+func taskNew(s *core.Service, args []string) error {
+	fs := flag.NewFlagSet("task new", flag.ContinueOnError)
+	repos := fs.String("repo", "", "repo name(s), comma separated")
+	primary := fs.String("primary", "", "primary repo (default: first)")
+	desc := fs.String("desc", "", "description")
+	descFile := fs.String("desc-file", "", "read description from file")
+	todo := fs.Bool("todo", false, "start in todo instead of backlog")
+	model := fs.String("model", "", "model override")
+	agent := fs.String("agent", "", "agent override")
+	parent := fs.String("parent", "", "parent task key")
+	prio := fs.Int("priority", 0, "priority (higher first)")
+	pos, err := parseArgs(fs, args)
+	if err != nil {
+		return err
+	}
+	if len(pos) != 1 {
+		return fmt.Errorf("usage: conveyor task new <title> --repo a[,b] [flags]")
+	}
+	d := *desc
+	if *descFile != "" {
+		b, err := os.ReadFile(*descFile)
+		if err != nil {
+			return fmt.Errorf("read desc file: %w", err)
+		}
+		d = string(b)
+	}
+	t, err := s.CreateTask(core.NewTaskInput{
+		Title: pos[0], Description: d, Repos: splitCSV(*repos), Primary: *primary, Start: *todo,
+		Model: *model, Agent: *agent, ParentKey: *parent, Priority: *prio,
+	})
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(out, "%s %s (%s)\n", t.Key, t.Title, t.Status)
+	return nil
+}
+
+func taskList(s *core.Service, args []string) error {
+	fs := flag.NewFlagSet("task list", flag.ContinueOnError)
+	status := fs.String("status", "", "status filter, comma separated")
+	asJSON := fs.Bool("json", false, "JSON output")
+	if _, err := parseArgs(fs, args); err != nil {
+		return err
+	}
+	var sts []store.Status
+	for _, v := range splitCSV(*status) {
+		st := store.Status(v)
+		if !st.Valid() {
+			return fmt.Errorf("unknown status %q", v)
+		}
+		sts = append(sts, st)
+	}
+	tasks, err := store.ListTasks(s.DB, sts...)
+	if err != nil {
+		return err
+	}
+	if *asJSON {
+		if tasks == nil {
+			tasks = []store.Task{}
+		}
+		return printJSON(tasks)
+	}
+	tw := tabwriter.NewWriter(out, 0, 4, 2, ' ', 0)
+	fmt.Fprintln(tw, "KEY\tSTATUS\tPRI\tREPOS\tTITLE")
+	for _, t := range tasks {
+		fmt.Fprintf(tw, "%s\t%s\t%d\t%s\t%s\n", t.Key, t.Status, t.Priority, repoNames(t), t.Title)
+	}
+	return tw.Flush()
+}
+
+func repoNames(t store.Task) string {
+	var n []string
+	for _, r := range t.Repos {
+		n = append(n, r.RepoName)
+	}
+	return strings.Join(n, ",")
+}
+
+func taskShow(s *core.Service, args []string) error {
+	fs := flag.NewFlagSet("task show", flag.ContinueOnError)
+	thread := fs.Bool("thread", false, "include comments")
+	runs := fs.Bool("runs", false, "include runs")
+	asJSON := fs.Bool("json", false, "JSON output")
+	pos, err := parseArgs(fs, args)
+	if err != nil {
+		return err
+	}
+	if len(pos) != 1 {
+		return fmt.Errorf("usage: conveyor task show KEY [--thread] [--runs] [--json]")
+	}
+	t, err := store.GetTaskByKey(s.DB, pos[0])
+	if err != nil {
+		return err
+	}
+	var comments []store.Comment
+	var rs []store.Run
+	if *thread {
+		if comments, err = store.ListComments(s.DB, t.ID); err != nil {
+			return err
+		}
+	}
+	if *runs {
+		if rs, err = store.ListRuns(s.DB, t.ID); err != nil {
+			return err
+		}
+	}
+	if *asJSON {
+		return printJSON(struct {
+			store.Task
+			Comments []store.Comment `json:"comments,omitempty"`
+			Runs     []store.Run     `json:"runs,omitempty"`
+		}{t, comments, rs})
+	}
+	fmt.Fprintf(out, "%s  %s\nstatus: %s  priority: %d\n", t.Key, t.Title, t.Status, t.Priority)
+	for _, r := range t.Repos {
+		p := ""
+		if r.IsPrimary {
+			p = " (primary)"
+		}
+		fmt.Fprintf(out, "repo: %s%s  branch %s  worktree %s  pr %s %s\n", r.RepoName, p, r.Branch, deref(r.WorktreePath), deref(r.PRURL), deref(r.PRState))
+	}
+	if t.Description != "" {
+		fmt.Fprintf(out, "\n%s\n", t.Description)
+	}
+	if *thread {
+		fmt.Fprintln(out, "\nthread:")
+		for _, c := range comments {
+			fmt.Fprintf(out, "[%s] %s: %s\n", c.CreatedAt, c.Author, c.Body)
+		}
+	}
+	if *runs {
+		fmt.Fprintln(out, "\nruns:")
+		for _, r := range rs {
+			fmt.Fprintf(out, "#%d %s/%s %s peak=%d calls=%d %s\n", r.ID, r.Kind, r.Mode, r.Status, r.CtxPeak, r.APICalls, deref(r.Summary))
+		}
+	}
+	return nil
+}
+
+func taskComment(s *core.Service, args []string) error {
+	if len(args) != 2 {
+		return fmt.Errorf("usage: conveyor task comment KEY <text|->")
+	}
+	body := args[1]
+	if body == "-" {
+		b, err := io.ReadAll(os.Stdin)
+		if err != nil {
+			return fmt.Errorf("read stdin: %w", err)
+		}
+		body = strings.TrimSpace(string(b))
+	}
+	if body == "" {
+		return fmt.Errorf("comment is empty")
+	}
+	_, err := s.AddComment(args[0], store.AuthorHuman, body)
+	return err
+}

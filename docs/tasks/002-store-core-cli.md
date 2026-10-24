@@ -68,3 +68,22 @@ Replace the v1 schema with the tech-spec §5 schema. Add the domain operations t
 
 ## Out of scope
 Worktrees, runs launching, the app.
+
+## Outcome
+
+**Built:** the v2 schema (`Migrate` drops the v1 tables), `Open` with WAL, busy_timeout and foreign_keys, the status machine from tech-spec §6, the models and per-table queries with the exact names from this spec, `core.Service` (`CreateTask`, `AddComment`, `Move`, `MarkDone`, `Cancel`, `Home`, `DBPath`, `WorkspacesDir`), and the CLI (`repo`, `task`, `config`) behind the `register(name, fn, help)` registry. The chi server and dependency are gone, along with the unused `google/uuid`.
+
+**Conventions later tasks should know:**
+- A command function has the signature `func(home string, args []string) error`. `withService(home, fn)` opens and closes the DB. `parseArgs` allows flags after positionals.
+- Timestamps are RFC3339 strings on the models, and nullable columns are pointers.
+- `store.CreateTask` takes the slug in each `TaskRepo.Branch` and stores `cv/<KEY>-<slug>`. `TaskRepo.RepoName` is joined on load and ignored on write.
+- Comment authors are the constants `store.AuthorHuman`, `AuthorAgent` and `AuthorSystem`.
+
+**Deviations:**
+- `progress/progress.md` is not edited, because the workflow's merge step does that.
+- `Service.Cancel` only moves the status. The `Stop` field arrives with task 007, as the spec says.
+- `running -> review` is allowed for both actors, because §6 lists it as a hook transition and as a human override.
+
+**Tests:** `go test ./...` covers every transition edge for both actors, the human-only cancel, sequential keys, the primary-repo rule, the comment rules, settings defaults, and a CLI test that builds the binary. No manual checks.
+
+**Follow-ups:** Key allocation uses a deferred transaction, so two processes creating tasks at the same instant may get `SQLITE_BUSY` rather than a duplicate. The `UNIQUE` constraint prevents duplicates, but a retry could be added.
