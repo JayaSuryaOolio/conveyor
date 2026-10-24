@@ -31,6 +31,8 @@ export namespace core {
 	    ParentKey: string;
 	    Priority: number;
 	    Source: string;
+	    ExternalKey: string;
+	    ExternalURL: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new NewTaskInput(source);
@@ -48,6 +50,8 @@ export namespace core {
 	        this.ParentKey = source["ParentKey"];
 	        this.Priority = source["Priority"];
 	        this.Source = source["Source"];
+	        this.ExternalKey = source["ExternalKey"];
+	        this.ExternalURL = source["ExternalURL"];
 	    }
 	}
 	export class Session {
@@ -93,6 +97,34 @@ export namespace core {
 
 export namespace store {
 	
+	export class Automation {
+	    id: number;
+	    name: string;
+	    schedule: string;
+	    precheck: string;
+	    action_kind: string;
+	    action_arg: string;
+	    enabled: boolean;
+	    last_run_at?: string;
+	    last_result?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Automation(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.schedule = source["schedule"];
+	        this.precheck = source["precheck"];
+	        this.action_kind = source["action_kind"];
+	        this.action_arg = source["action_arg"];
+	        this.enabled = source["enabled"];
+	        this.last_run_at = source["last_run_at"];
+	        this.last_result = source["last_result"];
+	    }
+	}
 	export class Comment {
 	    id: number;
 	    task_id: number;

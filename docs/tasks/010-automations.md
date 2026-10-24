@@ -37,3 +37,23 @@ func Tick(ctx context.Context, svc *core.Service, now time.Time) error  // calle
 - `Due` cases: every 15 min, a missed window and a disabled automation.
 - `RunOne` for each kind, using fake `conveyor`, `gh` and `acli`.
 - Jira import de-dupes on external_key.
+
+## Outcome
+Built:
+- `internal/store/automations.go`: Create/List/Get/Update/DeleteAutomation. `CreateAutomation` stamps a nil `last_run_at` with the creation time, so a schedule counts from creation instead of firing at once.
+- `internal/automation`: `Due`, `RunOne`, `Tick`, plus `Record` (stores last_run_at/last_result), `ValidSchedule` and the `Templates` map (`pr-sweep`). Parsing uses `github.com/robfig/cron/v3` (`ParseStandard`, 5 fields).
+- `dispatch.Tick` calls `automation.Tick` every 30 s in a goroutine (guarded so passes never overlap), so a 60 s precheck never stalls launches.
+- `internal/jira` and `conveyor import jira --jql "…" --repo a`. `core.NewTaskInput` gained `Source`, `ExternalKey` and `ExternalURL`.
+- CLI `conveyor automation list|add|enable|disable|run|rm` (`add --template pr-sweep`, or `add NAME --schedule --kind --arg [--precheck]`).
+- App: bound `ListAutomations`, `SetAutomationEnabled`, `RunAutomation`, and an Automations page (toggle, last run, result, Run now). Bindings regenerated with `wails generate module`.
+
+`acli jira workitem search --help` flags used: `--jql`, `--fields key,summary,description`, `--paginate`, `--json`. Others: `--limit`, `--count`, `--csv`, `--filter`, `--web`. With `--json` the output is an array of issues: `key`, `self` (an API URL, not a browse URL) and `fields.{summary,description}`. The description is Atlassian Document Format, or null, and is flattened to text.
+
+Deviations and decisions:
+- `external_url`: `self` is not a browse URL, so the URL is `<jira_base_url>/browse/KEY` when the new setting `jira_base_url` is set (`conveyor config set jira_base_url https://x.atlassian.net`), else `self`.
+- The cli kind runs `automation.Bin` (set by the dispatcher from `ConveyorBin` and by the app from `conveyorBin()`), else the current executable. It passes `--home <svc.Home>`.
+- Precheck gets `SINCE=<last_run_at>` in its env (epoch if never run), as the pr-sweep template needs. A failing precheck yields result "skipped: precheck failed", not an error. A manual "Run now" also updates last_run_at.
+
+Manual checks: not run against a live Jira or GitHub (fakes only). `wails build` run result is noted in the PR.
+
+Follow-ups: no UI to create or edit automations (CLI only); the pr-sweep precheck needs `gh` authenticated in the daemon's environment.
