@@ -2,6 +2,7 @@ import {Fragment} from 'react'
 import {Cancel, Confirm, GetTask, ListTasks} from '../wailsjs/go/ui/App'
 import {store} from '../wailsjs/go/models'
 import {Card, CommentBox, Nav, StatusSelect, errMsg} from './components'
+import {TaskAgent} from './forms'
 import {WorkspacePanel} from './workspace'
 import {fmtDuration, fmtK, useData} from './util'
 
@@ -90,6 +91,7 @@ export function TaskPage({k, nav}: {k: string; nav: Nav}) {
                 <h2>{t.key} · {t.title}</h2>
                 <div className="row">
                     <StatusSelect k={t.key} status={t.status}/>
+                    <TaskAgent k={t.key} repos={t.repos?.map(r => r.repo_name) ?? []} agent={t.agent ?? ''}/>
                     <button onClick={() => Confirm('Cancel this task?').then(ok => { if (ok) return Cancel(t.key) }).catch(errMsg)}>Cancel task</button>
                     {t.repos?.map(r => <span key={r.repo_id} className="chip">{r.repo_name}{r.is_primary ? ' ★' : ''}</span>)}
                 </div>
