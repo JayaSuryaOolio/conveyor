@@ -12,6 +12,7 @@ import (
 var assets embed.FS
 
 func main() {
+	useLoginShellPath()
 	app := newApp()
 	err := wails.Run(&options.App{
 		Title:            "Conveyor",
