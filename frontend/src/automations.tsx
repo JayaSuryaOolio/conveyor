@@ -4,16 +4,17 @@ import {IconCheck, IconCopy, IconPencil, IconPlus, IconTrash} from '@tabler/icon
 import {AddAutomation, Confirm, DeleteAutomation, DescribeSchedule, ListAutomations, ListRepos, RunAutomation, SetAutomationEnabled, UpdateAutomation} from '../wailsjs/go/ui/App'
 import {store, ui} from '../wailsjs/go/models'
 import {Time, errMsg} from './components'
+import {AgentSelect} from './forms'
 import {ALL_STATUSES, STATUS_LABEL, useData} from './util'
 
 const PRESETS = [['hourly', '0 * * * *'], ['weekdays 9am', '0 9 * * 1-5'], ['daily', '0 9 * * *'], ['Mondays', '0 9 * * 1']]
 
 type Form = {
     name: string; schedule: string; precheck: string; kind: string
-    title: string; repos: string[]; description: string; start: boolean
+    title: string; repos: string[]; agent: string; description: string; start: boolean
     taskKey: string; status: string; body: string; args: string
 }
-const EMPTY: Form = {name: '', schedule: '0 9 * * 1-5', precheck: '', kind: 'create_task', title: '', repos: [], description: '', start: false, taskKey: '', status: '', body: '', args: ''}
+const EMPTY: Form = {name: '', schedule: '0 9 * * 1-5', precheck: '', kind: 'create_task', title: '', repos: [], agent: '', description: '', start: false, taskKey: '', status: '', body: '', args: ''}
 
 /** POSIX single-quote a string unless it is plainly safe. */
 const shq = (s: string) => (/^[\w@%+=:,./-]+$/.test(s) ? s : "'" + s.replace(/'/g, "'\\''") + "'")
@@ -24,7 +25,7 @@ function splitArgs(s: string): string[] {
 }
 
 function actionArg(f: Form): object {
-    if (f.kind === 'create_task') return {title: f.title, description: f.description, repos: f.repos, start: f.start}
+    if (f.kind === 'create_task') return {title: f.title, description: f.description, repos: f.repos, ...(f.agent && {agent: f.agent}), start: f.start}
     if (f.kind === 'comment') return f.status ? {task_status: f.status, body: f.body} : {task_key: f.taskKey, body: f.body}
     return {args: splitArgs(f.args)}
 }
@@ -34,7 +35,7 @@ function toForm(a: store.Automation): Form {
     try { x = JSON.parse(a.action_arg) } catch { /* edit the rest, leave action fields blank */ }
     return {
         ...EMPTY, name: a.name, schedule: a.schedule, precheck: a.precheck, kind: a.action_kind,
-        title: x.title ?? '', repos: x.repos ?? [], description: x.description ?? '', start: !!x.start,
+        title: x.title ?? '', repos: x.repos ?? [], agent: x.agent ?? '', description: x.description ?? '', start: !!x.start,
         taskKey: x.task_key ?? '', status: x.task_status ?? '', body: x.body ?? '', args: (x.args ?? []).map(shq).join(' '),
     }
 }
@@ -78,6 +79,7 @@ function AutomationForm({initial, edit, onClose}: {initial: Form; edit: boolean;
             {f.kind === 'create_task' && <>
                 <TextInput label="Title" value={f.title} onChange={e => set({title: e.target.value})}/>
                 <MultiSelect label="Repos" data={repos?.map(r => r.name) ?? []} value={f.repos} onChange={repos => set({repos})}/>
+                <AgentSelect label="Agent" repos={f.repos} value={f.agent} onChange={agent => set({agent})}/>
                 <Textarea label="Description" autosize minRows={3} maxRows={10} value={f.description} onChange={e => set({description: e.target.value})}/>
                 <Switch label="Start the agent right away" checked={f.start} onChange={e => set({start: e.currentTarget.checked})}/>
             </>}
