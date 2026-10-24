@@ -201,12 +201,32 @@ func WriteSettings(home, conveyorBin string) (string, error) {
 		return "", fmt.Errorf("marshal settings: %w", err)
 	}
 	path := filepath.Join(home, "claude-settings.json")
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, append(b, '\n'), 0o644); err != nil {
+	if err := writeAtomic(path, append(b, '\n'), 0o644); err != nil {
 		return "", fmt.Errorf("write settings: %w", err)
 	}
-	if err := os.Rename(tmp, path); err != nil {
-		return "", fmt.Errorf("rename settings: %w", err)
-	}
 	return path, nil
+}
+
+// writeAtomic replaces path via a uniquely named temp file in the same directory,
+// so concurrent writers (the sidebar loads actions and sessions at once) never
+// rename each other's temp file away.
+func writeAtomic(path string, b []byte, mode os.FileMode) error {
+	f, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".*.tmp")
+	if err != nil {
+		return err
+	}
+	_, err = f.Write(b)
+	if cerr := f.Close(); err == nil {
+		err = cerr
+	}
+	if err == nil {
+		err = os.Chmod(f.Name(), mode)
+	}
+	if err == nil {
+		err = os.Rename(f.Name(), path)
+	}
+	if err != nil {
+		os.Remove(f.Name())
+	}
+	return err
 }
