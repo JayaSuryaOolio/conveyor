@@ -22,8 +22,8 @@ export function AddAutomation(arg1) {
   return window['go']['ui']['App']['AddAutomation'](arg1);
 }
 
-export function AddComment(arg1, arg2) {
-  return window['go']['ui']['App']['AddComment'](arg1, arg2);
+export function AddComment(arg1, arg2, arg3) {
+  return window['go']['ui']['App']['AddComment'](arg1, arg2, arg3);
 }
 
 export function AddRepo(arg1, arg2) {
@@ -124,6 +124,10 @@ export function ListRepos() {
 
 export function ListTasks() {
   return window['go']['ui']['App']['ListTasks']();
+}
+
+export function MergedPR(arg1) {
+  return window['go']['ui']['App']['MergedPR'](arg1);
 }
 
 export function Move(arg1, arg2) {

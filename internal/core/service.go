@@ -128,10 +128,19 @@ func (s *Service) CreateTask(in NewTaskInput) (store.Task, error) {
 	return store.CreateTask(s.DB, t, links)
 }
 
+// AfterMerge is what a comment does to a task with a merged PR.
+type AfterMerge string
+
+const (
+	FollowUp AfterMerge = ""     // start a follow-up sub-task (the default)
+	Ask      AfterMerge = "ask"  // requeue the task to answer, without changing code
+	Note     AfterMerge = "note" // only add the comment
+)
+
 // AddComment appends a comment. A human or system comment on a task in
-// needs_you, review, failed or done requeues it as todo, or, once one of its
-// PRs is merged, starts a follow-up sub-task instead.
-func (s *Service) AddComment(key, author, body string) (store.Comment, error) {
+// needs_you, review, failed or done requeues it as todo; once one of its
+// PRs is merged, after decides instead (see AfterMerge).
+func (s *Service) AddComment(key, author, body string, after AfterMerge) (store.Comment, error) {
 	t, err := store.GetTaskByKey(s.DB, key)
 	if err != nil {
 		return store.Comment{}, err
@@ -152,7 +161,17 @@ func (s *Service) AddComment(key, author, body string) (store.Comment, error) {
 	switch t.Status {
 	case store.StatusNeedsYou, store.StatusReview, store.StatusFailed, store.StatusDone:
 		if pr := mergedPR(t); pr != "" {
-			return c, s.followUp(t, pr, body, actor)
+			switch after {
+			case Note:
+				return c, nil
+			case Ask:
+				note := fmt.Sprintf("%s is merged: answer the comment above without changing code or opening a PR. If it needs changes, say so; the human will start a follow-up.", pr)
+				if _, err := store.AddComment(s.DB, store.Comment{TaskID: t.ID, Author: store.AuthorSystem, Body: note}); err != nil {
+					return c, err
+				}
+			default:
+				return c, s.followUp(t, pr, body, actor)
+			}
 		}
 		if _, err := store.UpdateTaskStatus(s.DB, t.ID, store.StatusTodo, actor); err != nil {
 			return c, fmt.Errorf("requeue after comment: %w", err)
@@ -169,6 +188,20 @@ func mergedPR(t store.Task) string {
 		}
 	}
 	return ""
+}
+
+// MergedPR is the merged PR a comment on the task would trip over (see
+// AfterMerge), or "" when the comment just requeues or waits.
+func (s *Service) MergedPR(key string) (string, error) {
+	t, err := store.GetTaskByKey(s.DB, key)
+	if err != nil {
+		return "", err
+	}
+	switch t.Status {
+	case store.StatusNeedsYou, store.StatusReview, store.StatusFailed, store.StatusDone:
+		return mergedPR(t), nil
+	}
+	return "", nil
 }
 
 // followUp continues a task whose PR is merged in a new todo sub-task, so every

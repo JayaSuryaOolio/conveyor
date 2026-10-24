@@ -38,7 +38,7 @@ func TestListTasksAndGetTask(t *testing.T) {
 	run, _ := store.CreateRun(a.svc.DB, store.Run{TaskID: tk.ID, Kind: "auto", Mode: "fresh", Status: "finished", CtxPeak: 31000})
 	run.Summary = &sum
 	store.UpdateRun(a.svc.DB, run)
-	if err := a.AddComment(key, "hi"); err != nil {
+	if err := a.AddComment(key, "hi", ""); err != nil {
 		t.Fatal(err)
 	}
 	cs, _ := a.ListTasks()
