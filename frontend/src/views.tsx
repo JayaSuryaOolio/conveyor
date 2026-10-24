@@ -2,7 +2,7 @@ import {lazy, Suspense, useEffect, useRef, useState} from 'react'
 import {ActionIcon, Anchor, Box, Breadcrumbs, Button, Code, Group, Paper, Stack, Text, Timeline, Title} from '@mantine/core'
 import {useLocalStorage} from '@mantine/hooks'
 import {IconArrowDown, IconArrowUp, IconPencil, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconMessage, IconPlayerPlay} from '@tabler/icons-react'
-import {GetTask, ListTasks, RunLog, SetTaskDescription} from '../wailsjs/go/ui/App'
+import {GetTask, ListTasks, RunLog, SetTaskDescription, TakeQueuedComment} from '../wailsjs/go/ui/App'
 import {core, store, ui} from '../wailsjs/go/models'
 import {Card, CommentBox, Message, Nav, StatusBadge, Time, errMsg} from './components'
 import {Markdown, MarkdownEditor} from './markdown'
@@ -174,10 +174,13 @@ function Description({t, reload}: {t: store.Task; reload: () => void}) {
 export function TaskPage({k, nav}: {k: string; nav: Nav}) {
     const {data: d, error, reload} = useData(() => GetTask(k), [k])
     const [added, setAdded] = useState<ui.TermInfo>()
+    const [restored, setRestored] = useState<{body: string}>()
     const [side, setSide] = useLocalStorage({key: 'task-sidebar', defaultValue: true})
     if (error) return <Text c="red">{error}</Text>
     if (!d) return <Text c="dimmed">Loading…</Text>
     const t = d.task
+    // Takes the queued message out of the thread and drops its text into the editor.
+    const edit = (id: number) => TakeQueuedComment(k, id).then(body => setRestored({body}), errMsg).finally(reload)
     const items: Item[] = [
         ...d.runs.map((run): Item => ({t: run.started_at, run})),
         ...d.comments.map((comment): Item => ({t: comment.created_at, comment})),
@@ -211,13 +214,13 @@ export function TaskPage({k, nav}: {k: string; nav: Nav}) {
                                 </Timeline.Item>
                             ) : (
                                 <Timeline.Item key={'c' + it.comment!.id} bullet={<IconMessage size={12}/>}>
-                                    <Message m={it.comment!} queued={t.status === 'running' && it.comment!.author === 'human' && !it.comment!.consumed_by_run_id}/>
+                                    <Message m={it.comment!} onEdit={t.status === 'running' && it.comment!.author === 'human' && !it.comment!.consumed_by_run_id ? () => edit(it.comment!.id) : undefined}/>
                                 </Timeline.Item>
                             ))}
                         </Timeline>
                     </Stack>
                 </ScrollBox>
-                <Box style={{flex: 'none'}}><CommentBox k={t.key} onDone={reload}/></Box>
+                <Box style={{flex: 'none'}}><CommentBox k={t.key} onDone={reload} restored={restored}/></Box>
             </Stack>
             <Box mih={0} style={{overflowY: 'auto'}}>
                 <Group justify="flex-end" mb={4}>
