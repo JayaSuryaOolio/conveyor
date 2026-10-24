@@ -1,0 +1,289 @@
+export namespace core {
+	
+	export class NewTaskInput {
+	    Title: string;
+	    Description: string;
+	    Repos: string[];
+	    Primary: string;
+	    Start: boolean;
+	    Model: string;
+	    Agent: string;
+	    ParentKey: string;
+	    Priority: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new NewTaskInput(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Title = source["Title"];
+	        this.Description = source["Description"];
+	        this.Repos = source["Repos"];
+	        this.Primary = source["Primary"];
+	        this.Start = source["Start"];
+	        this.Model = source["Model"];
+	        this.Agent = source["Agent"];
+	        this.ParentKey = source["ParentKey"];
+	        this.Priority = source["Priority"];
+	    }
+	}
+
+}
+
+export namespace store {
+	
+	export class Comment {
+	    id: number;
+	    task_id: number;
+	    author: string;
+	    body: string;
+	    run_id?: number;
+	    consumed_by_run_id?: number;
+	    created_at: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Comment(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.task_id = source["task_id"];
+	        this.author = source["author"];
+	        this.body = source["body"];
+	        this.run_id = source["run_id"];
+	        this.consumed_by_run_id = source["consumed_by_run_id"];
+	        this.created_at = source["created_at"];
+	    }
+	}
+	export class Repo {
+	    id: number;
+	    name: string;
+	    path: string;
+	    default_branch: string;
+	    created_at: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Repo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.path = source["path"];
+	        this.default_branch = source["default_branch"];
+	        this.created_at = source["created_at"];
+	    }
+	}
+	export class Run {
+	    id: number;
+	    task_id: number;
+	    kind: string;
+	    mode: string;
+	    bg_id?: string;
+	    session_id?: string;
+	    status: string;
+	    prompt: string;
+	    block_status?: string;
+	    summary?: string;
+	    state?: string;
+	    next?: string;
+	    criteria?: string;
+	    final_message?: string;
+	    tokens_in: number;
+	    tokens_out: number;
+	    cache_read: number;
+	    cache_write: number;
+	    ctx_peak: number;
+	    api_calls: number;
+	    error?: string;
+	    started_at: string;
+	    ended_at?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Run(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.task_id = source["task_id"];
+	        this.kind = source["kind"];
+	        this.mode = source["mode"];
+	        this.bg_id = source["bg_id"];
+	        this.session_id = source["session_id"];
+	        this.status = source["status"];
+	        this.prompt = source["prompt"];
+	        this.block_status = source["block_status"];
+	        this.summary = source["summary"];
+	        this.state = source["state"];
+	        this.next = source["next"];
+	        this.criteria = source["criteria"];
+	        this.final_message = source["final_message"];
+	        this.tokens_in = source["tokens_in"];
+	        this.tokens_out = source["tokens_out"];
+	        this.cache_read = source["cache_read"];
+	        this.cache_write = source["cache_write"];
+	        this.ctx_peak = source["ctx_peak"];
+	        this.api_calls = source["api_calls"];
+	        this.error = source["error"];
+	        this.started_at = source["started_at"];
+	        this.ended_at = source["ended_at"];
+	    }
+	}
+	export class TaskRepo {
+	    task_id: number;
+	    repo_id: number;
+	    repo_name: string;
+	    is_primary: boolean;
+	    branch: string;
+	    worktree_path?: string;
+	    pr_url?: string;
+	    pr_state?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new TaskRepo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.task_id = source["task_id"];
+	        this.repo_id = source["repo_id"];
+	        this.repo_name = source["repo_name"];
+	        this.is_primary = source["is_primary"];
+	        this.branch = source["branch"];
+	        this.worktree_path = source["worktree_path"];
+	        this.pr_url = source["pr_url"];
+	        this.pr_state = source["pr_state"];
+	    }
+	}
+	export class Task {
+	    id: number;
+	    key: string;
+	    title: string;
+	    description: string;
+	    status: string;
+	    priority: number;
+	    model?: string;
+	    agent?: string;
+	    source: string;
+	    external_key?: string;
+	    external_url?: string;
+	    parent_id?: number;
+	    consecutive_failures: number;
+	    created_at: string;
+	    updated_at: string;
+	    repos?: TaskRepo[];
+	
+	    static createFrom(source: any = {}) {
+	        return new Task(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.key = source["key"];
+	        this.title = source["title"];
+	        this.description = source["description"];
+	        this.status = source["status"];
+	        this.priority = source["priority"];
+	        this.model = source["model"];
+	        this.agent = source["agent"];
+	        this.source = source["source"];
+	        this.external_key = source["external_key"];
+	        this.external_url = source["external_url"];
+	        this.parent_id = source["parent_id"];
+	        this.consecutive_failures = source["consecutive_failures"];
+	        this.created_at = source["created_at"];
+	        this.updated_at = source["updated_at"];
+	        this.repos = this.convertValues(source["repos"], TaskRepo);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+
+}
+
+export namespace ui {
+	
+	export class TaskCard {
+	    key: string;
+	    title: string;
+	    status: string;
+	    priority: number;
+	    repos: string[];
+	    lastSummary: string;
+	    ctxPeak: number;
+	    updatedAt: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new TaskCard(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.key = source["key"];
+	        this.title = source["title"];
+	        this.status = source["status"];
+	        this.priority = source["priority"];
+	        this.repos = source["repos"];
+	        this.lastSummary = source["lastSummary"];
+	        this.ctxPeak = source["ctxPeak"];
+	        this.updatedAt = source["updatedAt"];
+	    }
+	}
+	export class TaskDetail {
+	    task: store.Task;
+	    comments: store.Comment[];
+	    runs: store.Run[];
+	
+	    static createFrom(source: any = {}) {
+	        return new TaskDetail(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.task = this.convertValues(source["task"], store.Task);
+	        this.comments = this.convertValues(source["comments"], store.Comment);
+	        this.runs = this.convertValues(source["runs"], store.Run);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+
+}
+

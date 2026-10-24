@@ -1,0 +1,28 @@
+import {useCallback, useEffect, useState} from 'react'
+import {EventsOn} from '../wailsjs/runtime/runtime'
+
+/** Loads data with fn and reloads when the DB changes or deps change. */
+export function useData<T>(fn: () => Promise<T>, deps: unknown[]): {data?: T; error?: string; reload: () => void} {
+    const [data, setData] = useState<T>()
+    const [error, setError] = useState<string>()
+    const reload = useCallback(() => {
+        fn().then(d => { setData(d); setError(undefined) }, e => setError(String(e)))
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, deps)
+    useEffect(() => { reload(); return EventsOn('db:changed', reload) }, [reload])
+    return {data, error, reload}
+}
+
+export const fmtK = (n: number) => (n >= 1000 ? Math.round(n / 1000) + 'K' : String(n))
+
+export function fmtDuration(start: string, end?: string | null): string {
+    if (!end) return 'running'
+    const s = Math.max(0, Math.round((Date.parse(end) - Date.parse(start)) / 1000))
+    return s < 60 ? s + 's' : s < 3600 ? Math.round(s / 60) + 'm' : (s / 3600).toFixed(1) + 'h'
+}
+
+export const STATUS_LABEL: Record<string, string> = {
+    backlog: 'Backlog', todo: 'Todo', running: 'Running', needs_you: 'Needs you',
+    review: 'Review', done: 'Done', failed: 'Failed', cancelled: 'Cancelled',
+}
+export const ALL_STATUSES = Object.keys(STATUS_LABEL)

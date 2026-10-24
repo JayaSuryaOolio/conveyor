@@ -40,3 +40,22 @@ A working Wails v2 app (React + TS) over `internal/core` and `internal/store`, w
 - `cd frontend && npm ci && npm run build` passes; `wails build` passes on macOS.
 - `go test ./...` passes from the repo root, with the embed working against `.gitkeep`.
 - Manual smoke: run `wails dev` against a temp `CONVEYOR_HOME` seeded via the CLI. Record what you checked in the Outcome.
+
+## Outcome
+
+**Built**
+- Wails v2 shell at the repo root (`main.go`, `app.go`, `wails.json`, `frontend/`, `build/`), both thin over `internal/ui`. `frontend/dist/.gitkeep` is committed and the rest of `dist` is gitignored. `frontend/wailsjs` (generated bindings) is committed.
+- `internal/ui`: `App` with all bound methods from the spec, the 700 ms `PRAGMA data_version` poller emitting `db:changed` (it uses its own DB connection, so the app's own writes also fire), and a no-op `startDispatcher(ctx)` hook for task 007.
+- `core.Service.AddRepo` (moved from `cmd/conveyor`, which now calls it); the CLI behaviour is unchanged.
+- Frontend (React + TS, no UI lib): Board, Focus, Task page (criteria checklist, thread with run separators, comment box, status controls, placeholder `<aside>` for task 008), New task dialog, Repos, Settings, shortcuts `n`, `/`, `g b`, `g f`, and refetch on `db:changed`.
+
+**Tests**: `internal/ui` tests for `ListTasks`/`GetTask` shaping and for the poller emitting after a write. `gofmt -l`, `go vet ./...`, `go test ./...`, `npm ci && npm run build` and `wails build` pass.
+
+**Deviations**
+- The Board adds a Failed column when a failed task exists (spec §12 lists no such column, so failed tasks would otherwise be invisible there).
+- `NewTaskInput` has no json tags, so the TS side uses its Go field names (`Title`, `Repos` ...).
+- The Cancel button is on the Task page only.
+
+**Manual checks**: with a temp `CONVEYOR_HOME` seeded via the CLI (repo + task + a comment added while running), the built `Conveyor.app` launched and ran without errors or crashes. I used `wails build` and the binary rather than `wails dev`, and I did not visually inspect the UI, so layout, shortcuts and live refresh in the window are untested by eye.
+
+**Follow-ups**: none beyond the above; the 008 Workspace panel and 007 dispatcher plug into the placeholders.
