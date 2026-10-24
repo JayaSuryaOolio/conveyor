@@ -24,7 +24,7 @@ Requires Go 1.25, `git`, and the `claude` CLI (plus `gh` for PR tracking).
 scripts/install.sh             # CLI to ~/.local/bin (BIN_DIR), Conveyor.app to /Applications (APP_DIR)
 ```
 
-It runs `go install ./cmd/conveyor` and `wails build` (installing Wails if missing).
+It runs `go install ./cmd/conveyor` and `wails build` (installing Wails if missing), copies the user-level skills in `skills/` (e.g. `conveyor-doctor`) to `~/.claude/skills`, and, if this checkout is a registered repo, adds the weekly `conveyor-doctor` automation.
 
 ## First run
 
