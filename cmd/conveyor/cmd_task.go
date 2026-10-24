@@ -139,7 +139,7 @@ func taskNew(s *core.Service, args []string) error {
 	}
 	t, err := s.CreateTask(core.NewTaskInput{
 		Title: pos[0], Description: d, Repos: splitCSV(*repos), Primary: *primary, Start: *todo,
-		Model: *model, Agent: *agent, ParentKey: *parent, Priority: *prio,
+		Model: *model, Agent: *agent, ParentKey: *parent, Priority: *prio, CreatedBy: createdBy(*parent),
 	})
 	if err != nil {
 		return err
@@ -464,4 +464,15 @@ func taskBriefPreview(s *core.Service, key string) error {
 	}
 	fmt.Fprintf(out, "%s\n--- fresh prompt ---\n%s\n", text, prompt)
 	return nil
+}
+
+// createdBy attributes a CLI-made task: $CONVEYOR_CREATED_BY (set for automations), else the parent's agent, else a human.
+func createdBy(parent string) string {
+	if v := os.Getenv("CONVEYOR_CREATED_BY"); v != "" {
+		return v
+	}
+	if parent != "" {
+		return "agent:" + parent
+	}
+	return "human"
 }
