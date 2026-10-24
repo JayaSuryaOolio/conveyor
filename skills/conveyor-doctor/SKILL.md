@@ -1,6 +1,6 @@
 ---
 name: conveyor-doctor
-description: Review a sample of recent Conveyor task runs (longest, shortest, failed, most-commented) and Conveyor's logs, judge whether the prompts, brief and repo CLAUDE.md gave agents what they needed without waste, and propose concrete fixes. Use for the weekly Conveyor review task, or when asked to audit Conveyor runs, prompts or token use.
+description: Review a sample of recent Conveyor task runs (longest, shortest, failed, most-commented) and Conveyor's logs, judge whether the prompts, brief and repo CLAUDE.md gave agents what they needed without waste, and propose concrete fixes. Use for the weekly Conveyor review task, or when asked to audit Conveyor runs, prompts or token use, or to fix a stuck Conveyor task ("conveyor-doctor fix [KEY]").
 ---
 
 # Conveyor doctor
@@ -8,6 +8,13 @@ description: Review a sample of recent Conveyor task runs (longest, shortest, fa
 You audit how well Conveyor's context serves its agents and turn what you find into small, reviewable changes. You are usually running as a Conveyor task yourself (the weekly "Conveyor doctor" task); leave that task out of the sample.
 
 Read-only on everything except: your own task's worktree (the Conveyor repo), new backlog tasks you create, and your final report. Never edit `~/.conveyor/conveyor.db`, settings, or another repo directly.
+
+## Fix mode
+
+When asked to fix (`fix KEY`, or `fix` for every task), skip the review below. For each task, or each task in running, needs_you or review:
+1. Read `docs/troubleshooting.md` in the Conveyor repo and run each recipe's **Confirm** steps.
+2. Apply the **Fix** of every recipe that matches. Fixes go through `conveyor` commands (`conveyor hook ...`, `conveyor task set/sync/move`), never by editing the DB; that is the one exception to the read-only rule above.
+3. Report per task: what was wrong, the commands you ran, and the state afterwards. A stuck state no recipe covers: describe it and propose a recipe; do not improvise a fix.
 
 ## 1. Pick the sample (6-10 runs from the last 7 days)
 
@@ -39,7 +46,7 @@ For each run, note:
 
 ## 3. Check the logs (recent only)
 
-`~/.conveyor/conveyor.log` (+ `conveyor.log.1`), `~/.conveyor/logs/dispatcher.log`, `~/.conveyor/logs/hook.log`: errors and warnings from the last 7 days, grouped by message. Launch failures, hook errors and reaps explain bad runs that the transcript can't.
+`~/.conveyor/conveyor.log` (+ `conveyor.log.1`), `~/.conveyor/logs/dispatcher.log`, `~/.conveyor/logs/hook.log`: errors and warnings from the last 7 days, grouped by message. Launch failures, hook errors and reaps explain bad runs that the transcript can't. Match what you find against `docs/troubleshooting.md` in the Conveyor repo: a known failure gets its recipe applied or cited, not a new diagnosis.
 
 ## 4. Decide what to change
 
@@ -52,6 +59,7 @@ Where each kind of fix belongs:
 | A convention of one repo the agent kept missing | That repo's `CLAUDE.md`, a repo skill or agent | `conveyor task new "CLAUDE.md: <what>" --repo <repo> --desc "<the exact text to add and the runs that show why>"` (backlog; the human starts it) |
 | A lesson about the Conveyor repo itself | `learning:` line in your status block | It shows up on the Learnings page |
 | A Conveyor bug (dispatch, hooks, reaping) | Code fix | Small fix + test in the same PR, or a backlog task if it is not small |
+| A new failure mode with a manual fix | `docs/troubleshooting.md` | Add a recipe (symptom, confirm, fix) in the same PR |
 
 Rules for proposals:
 - Every change cites the runs that motivate it (task key + run number). One run is an anecdote; prefer patterns seen in 2+ runs.
