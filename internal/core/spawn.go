@@ -8,8 +8,9 @@ import (
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 )
 
-// SpawnChildren creates a backlog child task per title, with the parent's repos (same primary) and parent_id set.
-func SpawnChildren(db *sql.DB, parent store.Task, titles []string) ([]store.Task, error) {
+// SpawnChildren creates a backlog child task per title, with the parent's repos (same primary), parent_id set
+// and desc as its description (a spawn line carries only a title, so the caller passes the parent's context).
+func SpawnChildren(db *sql.DB, parent store.Task, titles []string, desc string) ([]store.Task, error) {
 	var out []store.Task
 	for _, title := range titles {
 		if title = strings.TrimSpace(title); title == "" {
@@ -19,7 +20,7 @@ func SpawnChildren(db *sql.DB, parent store.Task, titles []string) ([]store.Task
 		for i, r := range parent.Repos {
 			links[i] = store.TaskRepo{RepoID: r.RepoID, IsPrimary: r.IsPrimary, Branch: slug(title, 40)}
 		}
-		t, err := store.CreateTask(db, store.Task{Title: title, ParentID: &parent.ID}, links)
+		t, err := store.CreateTask(db, store.Task{Title: title, Description: desc, ParentID: &parent.ID}, links)
 		if err != nil {
 			return out, fmt.Errorf("spawn %q: %w", title, err)
 		}

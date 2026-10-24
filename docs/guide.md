@@ -72,6 +72,8 @@ spawn: title of a follow-up task
 </conveyor>
 ```
 
+Each `spawn:` line becomes a backlog sub-task with the parent's repos; its description names the parent and carries the block's summary, state and next, so its agent has context. For anything that needs more, the agent should run `conveyor task new --parent ... --desc ...` instead.
+
 Without a block the agent is treated as asking you a question. `BRIEF.md` explains this protocol to the agent, along with the task, repos, latest runs and your comments. The `brief_extra_rules` setting adds your own rules to it.
 
 **Repo context comes first.** The session's working directory is the primary repo's worktree, a normal checkout of that repo, so Claude Code loads its `CLAUDE.md` and `.claude` skills, commands, agents and settings as usual. The brief tells the agent these are the authority on how to work in the repo, over its own defaults and generic user-level skills; only the worktree, PR and status block rules are Conveyor's. The task's other repos are attached with `--add-dir`, which does not load their `CLAUDE.md`, commands or agents, so the brief lists them (paths and one-liners) under "Other repos' context" for the agent to read when it works there. Gitignored files (`CLAUDE.local.md`, `.claude/settings.local.json`) are not in a worktree.

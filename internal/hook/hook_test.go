@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/JayaSuryaOolio/conveyor/internal/core"
@@ -128,6 +129,9 @@ func TestStopDoneToReview(t *testing.T) {
 	if len(all) != 1 || all[0].Title != "child" || all[0].ParentID == nil || *all[0].ParentID != e.task.ID ||
 		len(all[0].Repos) != 1 || all[0].Repos[0].RepoName != "a" || !all[0].Repos[0].IsPrimary {
 		t.Fatalf("spawned child: %+v", all)
+	}
+	if d := all[0].Description; !strings.Contains(d, e.task.Key) || !strings.Contains(d, "## Parent summary\n\ns\n") {
+		t.Fatalf("spawned child description lacks parent context: %q", d)
 	}
 }
 
