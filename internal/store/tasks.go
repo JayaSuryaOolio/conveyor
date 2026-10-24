@@ -3,194 +3,196 @@ package store
 import (
 	"database/sql"
 	"fmt"
-	"time"
-
-	"github.com/google/uuid"
+	"strconv"
+	"strings"
 )
 
-// Task mirrors a kanban_tasks row (PRD Section 7).
-type Task struct {
-	ID                   string
-	Title                string
-	Description          string
-	Status               Status
-	Mode                 string // "headless" | "headful"
-	RemoteControlEnabled bool
-	Source               string // "manual" | "jira"
-	ExternalKey          string
-	ExternalURL          string
-	WorktreePath         string
-	WTSWorktreeID        string
-	WTSTerminalID        string
-	ClaudeSessionID      string
-	ClaimLock            string
-	ClaimedAt            string
-	ConsecutiveFailures  int
-	LatestMessage        string
-	CreatedAt            string
-	UpdatedAt            string
+const taskCols = `id, key, title, description, status, priority, model, agent, source, external_key,
+ external_url, parent_id, consecutive_failures, created_at, updated_at`
+
+func scanTask(r interface{ Scan(...any) error }) (Task, error) {
+	var t Task
+	err := r.Scan(&t.ID, &t.Key, &t.Title, &t.Description, &t.Status, &t.Priority, &t.Model, &t.Agent, &t.Source,
+		&t.ExternalKey, &t.ExternalURL, &t.ParentID, &t.ConsecutiveFailures, &t.CreatedAt, &t.UpdatedAt)
+	return t, err
 }
 
-// CreateTask inserts a new task, generating its id and timestamps. Status
-// defaults to draft and mode to headless per the DDL if left zero-valued.
-func CreateTask(db *sql.DB, t Task) (Task, error) {
-	if t.ID == "" {
-		t.ID = uuid.NewString()
-	}
-	if t.Status == "" {
-		t.Status = StatusDraft
-	}
-	if t.Mode == "" {
-		t.Mode = "headless"
-	}
-	now := time.Now().UTC().Format(time.RFC3339)
-	t.CreatedAt = now
-	t.UpdatedAt = now
-
-	_, err := db.Exec(`
-		INSERT INTO kanban_tasks (
-			id, title, description, status, mode, remote_control_enabled,
-			source, external_key, external_url, worktree_path,
-			wts_worktree_id, wts_terminal_id, claude_session_id,
-			claim_lock, claimed_at, consecutive_failures, latest_message,
-			created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		t.ID, t.Title, nullable(t.Description), t.Status, t.Mode, t.RemoteControlEnabled,
-		t.Source, nullable(t.ExternalKey), nullable(t.ExternalURL), nullable(t.WorktreePath),
-		nullable(t.WTSWorktreeID), nullable(t.WTSTerminalID), nullable(t.ClaudeSessionID),
-		nullable(t.ClaimLock), nullable(t.ClaimedAt), t.ConsecutiveFailures, nullable(t.LatestMessage),
-		t.CreatedAt, t.UpdatedAt,
-	)
+func loadRepos(db dbtx, taskID int64) ([]TaskRepo, error) {
+	rows, err := db.Query(`SELECT tr.task_id, tr.repo_id, r.name, tr.is_primary, tr.branch, tr.worktree_path, tr.pr_url, tr.pr_state
+ FROM task_repos tr JOIN repos r ON r.id=tr.repo_id WHERE tr.task_id=? ORDER BY tr.is_primary DESC, r.name`, taskID)
 	if err != nil {
-		return Task{}, fmt.Errorf("insert task: %w", err)
+		return nil, fmt.Errorf("load task repos: %w", err)
+	}
+	defer rows.Close()
+	var out []TaskRepo
+	for rows.Next() {
+		var x TaskRepo
+		if err := rows.Scan(&x.TaskID, &x.RepoID, &x.RepoName, &x.IsPrimary, &x.Branch, &x.WorktreePath, &x.PRURL, &x.PRState); err != nil {
+			return nil, fmt.Errorf("scan task repo: %w", err)
+		}
+		out = append(out, x)
+	}
+	return out, rows.Err()
+}
+
+func getTask(db dbtx, where string, arg any, what string) (Task, error) {
+	t, err := scanTask(db.QueryRow(`SELECT `+taskCols+` FROM tasks WHERE `+where, arg))
+	if err != nil {
+		return Task{}, fmt.Errorf("task %s: %w", what, err)
+	}
+	if t.Repos, err = loadRepos(db, t.ID); err != nil {
+		return Task{}, err
 	}
 	return t, nil
 }
 
-// GetTask fetches a single task by id.
-func GetTask(db *sql.DB, id string) (Task, error) {
-	row := db.QueryRow(`
-		SELECT id, title, description, status, mode, remote_control_enabled,
-			source, external_key, external_url, worktree_path,
-			wts_worktree_id, wts_terminal_id, claude_session_id,
-			claim_lock, claimed_at, consecutive_failures, latest_message,
-			created_at, updated_at
-		FROM kanban_tasks WHERE id = ?`, id)
-	return scanTask(row)
+// GetTask returns the task with its Repos, or a wrapped sql.ErrNoRows.
+func GetTask(db *sql.DB, id int64) (Task, error) {
+	return getTask(db, `id=?`, id, strconv.FormatInt(id, 10))
 }
 
-// ListTasks returns every task ordered by creation time. Status-based
-// filtering/grouping is a frontend/API concern, not the store's.
-func ListTasks(db *sql.DB) ([]Task, error) {
-	rows, err := db.Query(`
-		SELECT id, title, description, status, mode, remote_control_enabled,
-			source, external_key, external_url, worktree_path,
-			wts_worktree_id, wts_terminal_id, claude_session_id,
-			claim_lock, claimed_at, consecutive_failures, latest_message,
-			created_at, updated_at
-		FROM kanban_tasks ORDER BY created_at ASC`)
+// GetTaskByKey is GetTask by key (e.g. "CV-3").
+func GetTaskByKey(db *sql.DB, key string) (Task, error) {
+	return getTask(db, `key=?`, key, key)
+}
+
+// CreateTask inserts a task and its repo links in one transaction and assigns
+// key = <key_prefix>-<N>. Exactly one repo must be primary. Each repo's Branch
+// is taken as the slug and stored as cv/<KEY>-<slug>. Status defaults to backlog.
+func CreateTask(db *sql.DB, t Task, repos []TaskRepo) (Task, error) {
+	primaries := 0
+	for _, r := range repos {
+		if r.IsPrimary {
+			primaries++
+		}
+	}
+	if primaries != 1 {
+		return Task{}, fmt.Errorf("task needs exactly one primary repo, got %d", primaries)
+	}
+	if t.Status == "" {
+		t.Status = StatusBacklog
+	}
+	if t.Source == "" {
+		t.Source = "manual"
+	}
+	t.CreatedAt = now()
+	t.UpdatedAt = t.CreatedAt
+
+	var id int64
+	err := inTx(db, func(tx *sql.Tx) error {
+		prefix := getSetting(tx, "key_prefix")
+		var n int
+		if err := tx.QueryRow(`SELECT COALESCE(MAX(CAST(substr(key, ?) AS INTEGER)), 0) + 1 FROM tasks WHERE key LIKE ? ESCAPE '\'`,
+			len(prefix)+2, strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(prefix)+`-%`).Scan(&n); err != nil {
+			return fmt.Errorf("next key: %w", err)
+		}
+		t.Key = fmt.Sprintf("%s-%d", prefix, n)
+		res, err := tx.Exec(`INSERT INTO tasks (key, title, description, status, priority, model, agent, source, external_key,
+ external_url, parent_id, consecutive_failures, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			t.Key, t.Title, t.Description, t.Status, t.Priority, t.Model, t.Agent, t.Source, t.ExternalKey,
+			t.ExternalURL, t.ParentID, t.ConsecutiveFailures, t.CreatedAt, t.UpdatedAt)
+		if err != nil {
+			return fmt.Errorf("insert task: %w", err)
+		}
+		id, _ = res.LastInsertId()
+		for _, r := range repos {
+			if _, err := tx.Exec(`INSERT INTO task_repos (task_id, repo_id, is_primary, branch, worktree_path, pr_url, pr_state) VALUES (?,?,?,?,?,?,?)`,
+				id, r.RepoID, r.IsPrimary, fmt.Sprintf("cv/%s-%s", t.Key, r.Branch), r.WorktreePath, r.PRURL, r.PRState); err != nil {
+				return fmt.Errorf("link repo %d: %w", r.RepoID, err)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return Task{}, err
+	}
+	return GetTask(db, id)
+}
+
+// ListTasks returns tasks (with Repos), priority desc then created_at asc,
+// optionally filtered to the given statuses.
+func ListTasks(db *sql.DB, statuses ...Status) ([]Task, error) {
+	q := `SELECT ` + taskCols + ` FROM tasks`
+	var args []any
+	if len(statuses) > 0 {
+		q += ` WHERE status IN (` + placeholders(len(statuses)) + `)`
+		for _, s := range statuses {
+			args = append(args, string(s))
+		}
+	}
+	rows, err := db.Query(q+` ORDER BY priority DESC, created_at ASC, id ASC`, args...)
 	if err != nil {
 		return nil, fmt.Errorf("list tasks: %w", err)
 	}
-	defer rows.Close()
-
-	var tasks []Task
+	var out []Task
 	for rows.Next() {
 		t, err := scanTask(rows)
 		if err != nil {
+			rows.Close()
+			return nil, fmt.Errorf("scan task: %w", err)
+		}
+		out = append(out, t)
+	}
+	rows.Close() // single connection: free it before loading repos
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	for i := range out {
+		if out[i].Repos, err = loadRepos(db, out[i].ID); err != nil {
 			return nil, err
 		}
-		tasks = append(tasks, t)
 	}
-	return tasks, rows.Err()
+	return out, nil
 }
 
-// UpdateTaskStatus validates the transition (PRD Section 4 / status.go), then
-// applies it with a guarded UPDATE so a concurrent status change loses the
-// race cleanly instead of silently overwriting.
-func UpdateTaskStatus(db *sql.DB, id string, newStatus Status, actor Actor) (Task, error) {
-	current, err := GetTask(db, id)
+// UpdateTaskStatus moves a task if the transition is legal for actor, using
+// optimistic concurrency on the current status, and records a status_changed event.
+func UpdateTaskStatus(db *sql.DB, id int64, to Status, actor Actor) (Task, error) {
+	err := inTx(db, func(tx *sql.Tx) error {
+		var from Status
+		if err := tx.QueryRow(`SELECT status FROM tasks WHERE id=?`, id).Scan(&from); err != nil {
+			return fmt.Errorf("task %d: %w", id, err)
+		}
+		if err := ValidateTransition(from, to, actor); err != nil {
+			return err
+		}
+		res, err := tx.Exec(`UPDATE tasks SET status=?, updated_at=? WHERE id=? AND status=?`, to, now(), id, from)
+		if err != nil {
+			return fmt.Errorf("update status: %w", err)
+		}
+		if n, _ := res.RowsAffected(); n == 0 {
+			return fmt.Errorf("task %d changed concurrently (was %s)", id, from)
+		}
+		return recordEvent(tx, id, "status_changed", fmt.Sprintf("%s -> %s (%s)", from, to, actor))
+	})
 	if err != nil {
 		return Task{}, err
 	}
-	if err := ValidateTransition(current.Status, newStatus, actor); err != nil {
-		return Task{}, err
-	}
-
-	now := time.Now().UTC().Format(time.RFC3339)
-	res, err := db.Exec(
-		`UPDATE kanban_tasks SET status = ?, updated_at = ? WHERE id = ? AND status = ?`,
-		newStatus, now, id, current.Status,
-	)
-	if err != nil {
-		return Task{}, fmt.Errorf("update task status: %w", err)
-	}
-	n, err := res.RowsAffected()
-	if err != nil {
-		return Task{}, fmt.Errorf("update task status: %w", err)
-	}
-	if n == 0 {
-		return Task{}, fmt.Errorf("task %s status changed concurrently, retry", id)
-	}
-	current.Status = newStatus
-	current.UpdatedAt = now
-	return current, nil
+	return GetTask(db, id)
 }
 
-// RecordEvent inserts a kanban_task_events row. Callers decide when an event
-// is worth recording — not every entry in the event enum corresponds 1:1
-// with a status change.
-func RecordEvent(db *sql.DB, taskID, event, detail string) error {
-	_, err := db.Exec(
-		`INSERT INTO kanban_task_events (task_id, event, detail, created_at) VALUES (?, ?, ?, ?)`,
-		taskID, event, nullable(detail), time.Now().UTC().Format(time.RFC3339),
-	)
+// UpdateTask writes title, description, priority, model, agent and consecutive_failures.
+func UpdateTask(db *sql.DB, t Task) error {
+	res, err := db.Exec(`UPDATE tasks SET title=?, description=?, priority=?, model=?, agent=?, consecutive_failures=?, updated_at=? WHERE id=?`,
+		t.Title, t.Description, t.Priority, t.Model, t.Agent, t.ConsecutiveFailures, now(), t.ID)
 	if err != nil {
-		return fmt.Errorf("record event: %w", err)
+		return fmt.Errorf("update task %d: %w", t.ID, err)
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return fmt.Errorf("task %d: %w", t.ID, sql.ErrNoRows)
 	}
 	return nil
 }
 
-type scanner interface {
-	Scan(dest ...any) error
-}
-
-func scanTask(s scanner) (Task, error) {
-	var t Task
-	var description, externalKey, externalURL, worktreePath sql.NullString
-	var wtsWorktreeID, wtsTerminalID, claudeSessionID sql.NullString
-	var claimLock, claimedAt, latestMessage sql.NullString
-
-	err := s.Scan(
-		&t.ID, &t.Title, &description, &t.Status, &t.Mode, &t.RemoteControlEnabled,
-		&t.Source, &externalKey, &externalURL, &worktreePath,
-		&wtsWorktreeID, &wtsTerminalID, &claudeSessionID,
-		&claimLock, &claimedAt, &t.ConsecutiveFailures, &latestMessage,
-		&t.CreatedAt, &t.UpdatedAt,
-	)
+// UpdateTaskRepo writes worktree_path, pr_url and pr_state of one link.
+func UpdateTaskRepo(db *sql.DB, r TaskRepo) error {
+	res, err := db.Exec(`UPDATE task_repos SET worktree_path=?, pr_url=?, pr_state=? WHERE task_id=? AND repo_id=?`,
+		r.WorktreePath, r.PRURL, r.PRState, r.TaskID, r.RepoID)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return Task{}, err
-		}
-		return Task{}, fmt.Errorf("scan task: %w", err)
+		return fmt.Errorf("update task repo: %w", err)
 	}
-
-	t.Description = description.String
-	t.ExternalKey = externalKey.String
-	t.ExternalURL = externalURL.String
-	t.WorktreePath = worktreePath.String
-	t.WTSWorktreeID = wtsWorktreeID.String
-	t.WTSTerminalID = wtsTerminalID.String
-	t.ClaudeSessionID = claudeSessionID.String
-	t.ClaimLock = claimLock.String
-	t.ClaimedAt = claimedAt.String
-	t.LatestMessage = latestMessage.String
-	return t, nil
-}
-
-func nullable(s string) any {
-	if s == "" {
-		return nil
+	if n, _ := res.RowsAffected(); n == 0 {
+		return fmt.Errorf("task repo %d/%d: %w", r.TaskID, r.RepoID, sql.ErrNoRows)
 	}
-	return s
+	return nil
 }
