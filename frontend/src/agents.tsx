@@ -1,9 +1,11 @@
 import {useState} from 'react'
 import {Button, Group, Modal, Select, Stack, Table, Text, TextInput, Textarea, Title} from '@mantine/core'
 import {IconPlus} from '@tabler/icons-react'
-import {AddAgent, ListAgents, ListRepos} from '../wailsjs/go/ui/App'
+import {AddAgent, ListAgents, ListRepos, SetAgentModel} from '../wailsjs/go/ui/App'
 import {errMsg} from './components'
 import {useData} from './util'
+
+const MODELS = [{value: '', label: 'Default (inherit)'}, 'sonnet', 'opus', 'haiku']
 
 export function Agents() {
     const {data: repoList} = useData(ListRepos, [])
@@ -15,10 +17,11 @@ export function Agents() {
     const [desc, setDesc] = useState('')
     const [prompt, setPrompt] = useState('')
     const [scope, setScope] = useState('user')
+    const [model, setModel] = useState('')
     const [hint, setHint] = useState('')
-    const add = () => AddAgent(name, desc, prompt, scope).then(() => {
+    const add = () => AddAgent(name, desc, prompt, scope, model).then(() => {
         setHint(scope === 'user' ? '' : `Commit .claude/agents/${name}.md in ${scope}, or task worktrees will not see it.`)
-        setName(''); setDesc(''); setPrompt(''); setOpen(false); reload()
+        setName(''); setDesc(''); setPrompt(''); setModel(''); setOpen(false); reload()
     }, errMsg)
     const shown = data?.filter(a => filter === 'all' || a.scope === filter)
     return (
@@ -36,13 +39,17 @@ export function Agents() {
             {hint && <Text size="sm" c="dimmed">{hint}</Text>}
             <Table>
                 <Table.Thead>
-                    <Table.Tr><Table.Th miw={160}>Name</Table.Th><Table.Th miw={160}>Scope</Table.Th><Table.Th>Description</Table.Th></Table.Tr>
+                    <Table.Tr><Table.Th miw={160}>Name</Table.Th><Table.Th miw={160}>Scope</Table.Th><Table.Th miw={160}>Model</Table.Th><Table.Th>Description</Table.Th></Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
                     {shown?.map(a => (
                         <Table.Tr key={a.scope + a.name}>
                             <Table.Td fw={600} style={{whiteSpace: 'nowrap'}}>{a.name}</Table.Td>
                             <Table.Td style={{whiteSpace: 'nowrap'}}><Text size="sm" c={a.scope === 'user' ? 'dimmed' : 'blue'}>{a.scope}</Text></Table.Td>
+                            <Table.Td>
+                                <Select size="xs" aria-label={`Model of ${a.name}`} allowDeselect={false} data={MODELS.includes(a.model) || !a.model ? MODELS : [...MODELS, a.model]}
+                                        value={a.model} onChange={v => SetAgentModel(a.scope, a.name, v ?? '').then(reload, errMsg)}/>
+                            </Table.Td>
                             <Table.Td><Text size="sm" c="dimmed" lineClamp={2} title={a.description}>{a.description}</Text></Table.Td>
                         </Table.Tr>
                     ))}
@@ -55,6 +62,7 @@ export function Agents() {
                     <Textarea autosize minRows={4} maxRows={14} placeholder="Prompt" value={prompt} onChange={e => setPrompt(e.target.value)}/>
                     <Select label="Scope" allowDeselect={false} value={scope} onChange={v => setScope(v ?? 'user')}
                             data={[{value: 'user', label: 'user (~/.claude/agents)'}, ...repos.map(r => ({value: r, label: r}))]}/>
+                    <Select label="Model" allowDeselect={false} value={model} onChange={v => setModel(v ?? '')} data={MODELS}/>
                     <Group justify="flex-end">
                         <Button variant="default" onClick={() => setOpen(false)}>Cancel</Button>
                         <Button onClick={add} disabled={!name || !desc.trim()}>Add agent</Button>

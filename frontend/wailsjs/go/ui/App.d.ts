@@ -8,7 +8,7 @@ export function AcceptLearning(arg1:number,arg2:string):Promise<void>;
 
 export function Actions(arg1:string):Promise<Array<core.Action>>;
 
-export function AddAgent(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
+export function AddAgent(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<void>;
 
 export function AddApp(arg1:store.App):Promise<void>;
 
@@ -83,6 +83,8 @@ export function RunLog(arg1:number,arg2:number):Promise<core.RunLog>;
 export function SaveAttachment(arg1:string,arg2:string,arg3:string):Promise<string>;
 
 export function Sessions(arg1:string):Promise<Array<core.Session>>;
+
+export function SetAgentModel(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function SetAutomationEnabled(arg1:string,arg2:boolean):Promise<void>;
 
