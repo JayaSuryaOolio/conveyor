@@ -273,6 +273,7 @@ func (a *App) SetParent(key, parent string) error { return a.svc.SetParent(key, 
 
 // CreateTask creates a task and returns its key.
 func (a *App) CreateTask(in core.NewTaskInput) (string, error) {
+	in.AgentSet = true // the dialog prefills the parent's agent; a cleared field means none
 	t, err := a.svc.CreateTask(in)
 	return t.Key, err
 }
