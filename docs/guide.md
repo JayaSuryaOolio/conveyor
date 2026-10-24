@@ -233,7 +233,7 @@ conveyor app list|presets|add|global|rm|open
 conveyor hooks status|install|uninstall
 conveyor config list | get <key> | set <key> <value>
 conveyor state export [file] | import <file> [--repo A=name ...]
-conveyor --home <empty dir> mock seed
+conveyor --home <empty dir> mock seed          # mock repos, tasks, settings, apps, automations (fixtures: internal/core/mock.go)
 conveyor import jira --jql "..." --repo a      # needs acli
 conveyor daemon                                # run the dispatcher in the foreground
 ```

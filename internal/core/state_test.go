@@ -81,3 +81,28 @@ func TestSeedMock(t *testing.T) {
 		t.Fatal("want every scenario seeded once and a second seed refused")
 	}
 }
+
+func TestSeedMockState(t *testing.T) {
+	db, err := store.Open(filepath.Join(t.TempDir(), "c.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if err := (&Service{DB: db}).SeedMock(t.TempDir()); err != nil {
+		t.Fatal(err)
+	}
+	apps, _ := store.ListApps(db)
+	autos, _ := store.ListAutomations(db)
+	var global, local, out, enabled, disabled bool
+	for _, a := range apps {
+		global, local, out = global || a.Global, local || !a.Global, out || a.Output
+	}
+	kinds := map[string]bool{}
+	for _, a := range autos {
+		enabled, disabled = enabled || a.Enabled, disabled || !a.Enabled
+		kinds[a.ActionKind] = true
+	}
+	if store.GetSetting(db, "max_parallel") != "2" || !global || !local || !out || !enabled || !disabled || len(kinds) != 3 {
+		t.Fatalf("mock state incomplete: apps %+v autos %+v", apps, autos)
+	}
+}
