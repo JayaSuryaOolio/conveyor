@@ -1,11 +1,11 @@
 import {useState} from 'react'
-import {AddComment, Move} from '../wailsjs/go/ui/App'
+import {AddComment, Move, ShowError} from '../wailsjs/go/ui/App'
 import {ui} from '../wailsjs/go/models'
 import {ALL_STATUSES, STATUS_LABEL, fmtK} from './util'
 
 export type Nav = (v: {name: string; key?: string}) => void
 
-export const errMsg = (e: unknown) => alert(String(e))
+export const errMsg = (e: unknown) => ShowError(String(e))
 
 export function StatusSelect({k, status}: {k: string; status: string}) {
     return (
