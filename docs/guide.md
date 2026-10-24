@@ -204,7 +204,7 @@ Settings are in the app (Settings page) or `conveyor config list|get|set`.
 - **Dispatch**: `max_parallel` (3), `resume_threshold` (60000), `comment_debounce_secs` (20), `max_consecutive_failures` (3).
 - **External terminal**: `terminal_template`, the command for external terminals (`{cwd}` and `{cmd}` are substituted; default uses macOS Terminal).
 - **Prompts**: `pr_comment_prefix`, `brief_extra_rules`, and `prompt_fresh` / `prompt_resume` to replace the launch prompts (placeholders `{key}`, `{title}`, `{brief}`, `{comments}`). Empty means the built-in prompt. The page also shows the status block protocol the agent is given.
-- **Moving to a fresh install**: `conveyor state export [file]` / `import <file> [--repo A=name]` carries settings, apps, automations, user agents and tasks (with their comments, runs, parent/blocks/relates links, PR url/state and failure counts; not session ids or worktree paths) as JSON; repos are never exported (automations and tasks get placeholders `A`, `B`, ...; a task whose placeholder is not mapped with `--repo` is skipped), import only adds what's missing, gives imported tasks new keys and remaps their links, skips a task already present (same title and created time), and `scripts/uninstall.sh` saves it to `<home>/state.json` for the next `install.sh` to pick up.
+- **Moving to a fresh install**: `conveyor state export [file]` / `import <file> [--repo A=name]` carries settings, apps, automations and user agents as JSON; repos are never exported (automations get placeholders `A`, `B`, ...), import only adds what's missing, and `scripts/uninstall.sh` saves it to `<home>/state.json` for the next `install.sh` to pick up.
 
 ## CLI cheat-sheet
 
