@@ -6,9 +6,15 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"sync/atomic"
 	"time"
 
 	"github.com/JayaSuryaOolio/conveyor/internal/core"
+	"github.com/JayaSuryaOolio/conveyor/internal/dispatch"
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 	"github.com/JayaSuryaOolio/conveyor/internal/workspace"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -19,8 +25,9 @@ const pollEvery = 700 * time.Millisecond
 
 // App is bound to the frontend. Methods return plain JSON-friendly structs.
 type App struct {
-	svc    *core.Service
-	cancel context.CancelFunc
+	svc        *core.Service
+	cancel     context.CancelFunc
+	dispatcher atomic.Bool // true while this process holds the dispatcher lock
 }
 
 // NewApp returns an App; the DB is opened in Startup.
@@ -42,7 +49,7 @@ func (a *App) Startup(ctx context.Context) {
 	a.svc = &core.Service{DB: db, Home: home}
 	ctx, a.cancel = context.WithCancel(ctx)
 	go pollDataVersion(ctx, core.DBPath(home), pollEvery, func() { runtime.EventsEmit(ctx, "db:changed") })
-	startDispatcher(ctx)
+	go a.startDispatcher(ctx)
 }
 
 // Shutdown stops background work and closes the DB.
@@ -55,9 +62,61 @@ func (a *App) Shutdown(context.Context) {
 	}
 }
 
-// startDispatcher is the hook point for the dispatcher (task 007).
-// It is a no-op until then.
-func startDispatcher(ctx context.Context) {}
+// lockRetry is how often a UI-only app retries taking the dispatcher lock.
+const lockRetry = 10 * time.Second
+
+// startDispatcher tries the dispatcher lock every lockRetry; once held it runs the
+// dispatcher until ctx ends. Another process (conveyor daemon, a second app) may hold it.
+func (a *App) startDispatcher(ctx context.Context) {
+	for {
+		if release, err := dispatch.Lock(a.svc.Home); err == nil {
+			a.runDispatcher(ctx)
+			release()
+			return
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(lockRetry):
+		}
+	}
+}
+
+func (a *App) runDispatcher(ctx context.Context) {
+	db, err := store.Open(core.DBPath(a.svc.Home))
+	if err != nil {
+		log.Printf("dispatcher: %v", err)
+		return
+	}
+	defer db.Close()
+	a.dispatcher.Store(true)
+	defer a.dispatcher.Store(false)
+	d := &dispatch.Dispatcher{DB: db, Home: a.svc.Home, ConveyorBin: conveyorBin(), Log: log.New(os.Stderr, "dispatcher: ", log.LstdFlags)}
+	d.Run(ctx)
+}
+
+// conveyorBin finds the CLI the hooks should call: `conveyor` next to the app, else on PATH.
+func conveyorBin() string {
+	if exe, err := os.Executable(); err == nil {
+		if p := filepath.Join(filepath.Dir(exe), "conveyor"); fileExists(p) {
+			return p
+		}
+	}
+	if p, err := exec.LookPath("conveyor"); err == nil {
+		return p
+	}
+	return "conveyor"
+}
+
+func fileExists(p string) bool { _, err := os.Stat(p); return err == nil }
+
+// DispatcherState says whether this app is dispatching or only showing the UI.
+func (a *App) DispatcherState() string {
+	if a.dispatcher.Load() {
+		return "dispatching"
+	}
+	return "UI only"
+}
 
 // pollDataVersion emits whenever PRAGMA data_version changes. It uses its own
 // connection: data_version only moves for commits made by other connections,
