@@ -86,6 +86,14 @@ func TestCLIFlow(t *testing.T) {
 	if out := cv(t, home, "task", "show", "CV-2"); strings.Contains(out, "blocked") {
 		t.Fatal(out)
 	}
+	cv(t, home, "agent", "add", "rev", "--desc", "Reviews", "--prompt", "Be strict", "--model", "opus", "--repo", name)
+	if out := cv(t, home, "agent", "list", "--repo", name); !strings.Contains(out, "MODEL") || !strings.Contains(out, "opus") {
+		t.Fatal(out)
+	}
+	cv(t, home, "agent", "model", "rev", "", "--repo", name)
+	if out := cv(t, home, "agent", "list", "--repo", name); strings.Contains(out, "opus") {
+		t.Fatal(out)
+	}
 	cv(t, home, "task", "cancel", "CV-1")
 	if out := cv(t, home, "task", "list", "--status", "cancelled"); !strings.Contains(out, "CV-1") {
 		t.Fatal(out)

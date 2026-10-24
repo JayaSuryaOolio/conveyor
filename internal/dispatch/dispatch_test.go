@@ -449,3 +449,26 @@ func TestPRMergeRemovesSessions(t *testing.T) {
 		t.Fatalf("no rm call in log: %q", b)
 	}
 }
+
+func TestModelPrecedence(t *testing.T) {
+	e := setup(t)
+	t.Setenv("HOME", t.TempDir())
+	store.SetSetting(e.db, "default_model", "sonnet")
+	dir := filepath.Join(e.repo.Path, ".claude", "agents")
+	os.MkdirAll(dir, 0o755)
+	os.WriteFile(filepath.Join(dir, "a.md"), []byte("---\nname: a\nmodel: opus\n---\n"), 0o644)
+	os.WriteFile(filepath.Join(dir, "b.md"), []byte("---\nname: b\n---\n"), 0o644)
+	str := func(s string) *string { return &s }
+	for _, c := range []struct {
+		model, agent *string
+		want         string
+	}{
+		{nil, nil, "sonnet"}, {str("haiku"), str("a"), "haiku"}, {nil, str("a"), ""}, {nil, str("b"), "sonnet"},
+	} {
+		tk := e.task(t, "t", 0)
+		tk.Model, tk.Agent = c.model, c.agent
+		if got := e.d.model(tk); got != c.want {
+			t.Errorf("%v %v: got %q want %q", c.model, c.agent, got, c.want)
+		}
+	}
+}

@@ -9,7 +9,7 @@ This guide covers day-to-day use. For setup see the [README](../README.md); for 
 - **Task.** A card with a key (`CV-12`, the prefix is the `key_prefix` setting), a title, a description, one or more repos, a status, a priority, an optional model and agent, and a comment thread.
 - **Run.** One launch of Claude for a task. A run has its own status (`launching`, `running`, `finished`, `failed`), a Claude session id, token counts, and the summary the agent wrote. A task usually has several runs. Runs started by the dispatcher are `auto`; sessions you start yourself in a task worktree are `interactive`.
 - **Workspace and worktree.** Each task gets a folder `~/.conveyor/workspaces/<KEY>/` with one git worktree per repo, `<KEY>/<repo>`, on a branch named after the task title. The folder also holds `BRIEF.md`, which the agent reads first. A worktree branches from `origin/<default branch>` after a fetch, or reuses the branch if it already exists.
-- **Agent.** Optional. A named Claude Code agent (a prompt, optionally limited to one repo) that a task can run as. `conveyor agent list|add`.
+- **Agent.** Optional. A named Claude Code agent (a prompt, optionally limited to one repo) that a task can run as. Its `model:` frontmatter line is the agent's default model: a task's own model wins, then the agent's, then `default_model`. `conveyor agent list|add|model`, or the Agents page.
 - **Learning.** A lesson an agent proposes at the end of a run. You accept or reject it; accepted ones can be written into the repo's `CLAUDE.md` (or another file) by a follow-up task.
 - **Automation.** A cron schedule with an optional shell check that creates a task, comments on tasks, or runs a CLI command.
 - **App.** A named shell command that opens a task worktree in an editor, terminal or other program.
@@ -202,7 +202,8 @@ conveyor task sync KEY                    conveyor task brief KEY [--preview]
 conveyor task log KEY [--follow]          conveyor task attach KEY
 conveyor task open KEY [--shell|--resume|--fresh|--editor] [--repo r] [--print]
 
-conveyor agent list [--repo r]            conveyor agent add <name> --desc d (--prompt p | --prompt-file f) [--repo r]
+conveyor agent list [--repo r]            conveyor agent add <name> --desc d (--prompt p | --prompt-file f) [--model m] [--repo r]
+conveyor agent model <name> <model|""> [--repo r]
 conveyor learning list|accept|reject|edit|apply
 conveyor automation list|add|enable|disable|run|rm
 conveyor app list|presets|add|rm|open

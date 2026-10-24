@@ -24,6 +24,7 @@ export namespace core {
 	    name: string;
 	    description: string;
 	    scope: string;
+	    model: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Agent(source);
@@ -34,6 +35,7 @@ export namespace core {
 	        this.name = source["name"];
 	        this.description = source["description"];
 	        this.scope = source["scope"];
+	        this.model = source["model"];
 	    }
 	}
 	export class AppLog {
