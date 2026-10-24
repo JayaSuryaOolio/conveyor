@@ -179,7 +179,7 @@ For tasks in review, every 60 seconds Conveyor runs `gh pr list --head <branch>`
 
 Settings are in the app (Settings page) or `conveyor config list|get|set`.
 
-- **General**: `key_prefix` (CV), `default_model`, `editor_command`.
+- **General**: `key_prefix` (CV), `default_model`.
 - **Dispatch**: `max_parallel` (3), `resume_threshold` (60000), `comment_debounce_secs` (20), `max_consecutive_failures` (3).
 - **External terminal**: `terminal_template`, the command for external terminals (`{cwd}` and `{cmd}` are substituted; default uses macOS Terminal).
 - **Prompts**: `pr_comment_prefix`, `brief_extra_rules`, and `prompt_fresh` / `prompt_resume` to replace the launch prompts (placeholders `{key}`, `{title}`, `{brief}`, `{comments}`). Empty means the built-in prompt. The page also shows the status block protocol the agent is given.
@@ -196,7 +196,7 @@ conveyor task new "<title>" --repo a[,b] [--primary r] [--desc t | --desc-file f
 conveyor task list [--status a,b]         conveyor task show KEY [--thread] [--runs]
 conveyor task comment KEY <text|->        conveyor task move KEY <status>
 conveyor task done KEY                    conveyor task cancel KEY
-conveyor task set KEY [--repo r] [--branch b] [--pr url]
+conveyor task set KEY [--repo r] [--branch b] [--pr url] [--model m]
 conveyor task link KEY blocks|relates|duplicates OTHER    conveyor task unlink KEY kind OTHER
 conveyor task sync KEY                    conveyor task brief KEY [--preview]
 conveyor task log KEY [--follow]          conveyor task attach KEY

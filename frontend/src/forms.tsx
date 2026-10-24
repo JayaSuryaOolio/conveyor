@@ -1,6 +1,7 @@
 import {useState} from 'react'
-import {Button, Checkbox, Code, Group, Modal, MultiSelect, ScrollArea, SegmentedControl, Select, Stack, Table, Tabs, Text, TextInput, Textarea, Title} from '@mantine/core'
-import {AddRepo, CreateTask, GetPromptDefaults, GetSettings, ListAgents, ListRepos, ListTasks, PreviewBrief, SetSetting, SetTaskAgent} from '../wailsjs/go/ui/App'
+import {ActionIcon, Button, Checkbox, Code, Group, Modal, MultiSelect, ScrollArea, SegmentedControl, Select, SelectProps, Stack, Table, Tabs, Text, TextInput, Textarea, Title, Tooltip} from '@mantine/core'
+import {IconAdjustments} from '@tabler/icons-react'
+import {AddRepo, CreateTask, GetPromptDefaults, GetSettings, ListAgents, ListRepos, ListTasks, PreviewBrief, SetSetting, SetTaskAgent, SetTaskModel} from '../wailsjs/go/ui/App'
 import {core} from '../wailsjs/go/models'
 import {Nav, errMsg} from './components'
 import {Markdown, MarkdownEditor} from './markdown'
@@ -29,7 +30,7 @@ export function NewTask({nav, close}: {nav: Nav; close: () => void}) {
                 <MultiSelect label="Repos" placeholder="Pick repos" description={repos?.length === 0 ? 'Add one on the Repos page first' : undefined}
                              data={repos?.map(r => r.name) ?? []} value={sel} onChange={setSel}/>
                 {sel.length > 1 && <Select label="Primary repo" allowDeselect={false} data={sel} value={prim} onChange={v => setPrimary(v ?? '')}/>}
-                <TextInput placeholder="Model (optional)" value={model} onChange={e => setModel(e.target.value)}/>
+                <ModelSelect value={model} onChange={setModel}/>
                 <AgentSelect repos={sel} value={agent} onChange={setAgent}/>
                 <Checkbox label="Start now (todo)" checked={start} onChange={e => setStart(e.currentTarget.checked)}/>
                 <Group justify="flex-end">
@@ -51,6 +52,28 @@ export function AgentSelect({repos, value, onChange, size}: {repos: string[]; va
 
 export function TaskAgent({k, repos, agent}: {k: string; repos: string[]; agent: string}) {
     return <AgentSelect size="xs" repos={repos} value={agent} onChange={a => SetTaskAgent(k, a).catch(errMsg)}/>
+}
+
+const MODELS = ['sonnet', 'opus', 'haiku']
+
+/** Model choice; "" means the default (task: the agent's or default_model setting). A custom id already set is kept as an option. */
+export function ModelSelect({value, onChange, ...rest}: {value: string; onChange: (m: string) => void} & Omit<SelectProps, 'value' | 'onChange' | 'data'>) {
+    const data = [{value: '', label: 'Default'}, ...[...MODELS, ...(value && !MODELS.includes(value) ? [value] : [])].map(m => ({value: m, label: m}))]
+    return <Select aria-label="Model" allowDeselect={false} {...rest} value={value} onChange={v => onChange(v ?? '')} data={data}/>
+}
+
+/** Low-usage task settings behind one icon, so the sidebar stays short. */
+export function TaskSettings({k, model, reload}: {k: string; model: string; reload: () => void}) {
+    const [open, setOpen] = useState(false)
+    return <>
+        <Tooltip label="More settings">
+            <ActionIcon variant="subtle" color="gray" aria-label="More settings" onClick={() => setOpen(true)}><IconAdjustments size={16}/></ActionIcon>
+        </Tooltip>
+        <Modal opened={open} onClose={() => setOpen(false)} title={`${k} settings`} size="sm">
+            <ModelSelect label="Model" value={model} onChange={m => SetTaskModel(k, m).then(reload, errMsg)}/>
+            <Text size="xs" c="dimmed" mt={4}>Used from the next run. Default: the agent's model, else the default_model setting.</Text>
+        </Modal>
+    </>
 }
 
 export function Repos() {

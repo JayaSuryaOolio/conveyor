@@ -67,6 +67,10 @@ func TestCLIFlow(t *testing.T) {
 	if out := cv(t, home, "task", "show", "CV-1"); !strings.Contains(out, "branch feat/x") || !strings.Contains(out, "https://gh/pr/1") {
 		t.Fatal(out)
 	}
+	cv(t, home, "task", "set", "CV-1", "--model", "opus")
+	if out := cv(t, home, "task", "show", "CV-1", "--json"); !strings.Contains(out, `"model": "opus"`) {
+		t.Fatal(out)
+	}
 	cv(t, home, "task", "set", "CV-1", "--pr", "")
 	if out := cv(t, home, "task", "show", "CV-1"); !strings.Contains(out, "branch feat/x") || strings.Contains(out, "gh/pr") {
 		t.Fatal(out)
