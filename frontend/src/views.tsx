@@ -4,6 +4,7 @@ import {IconCheck, IconCircle, IconMessage, IconPlayerPlay} from '@tabler/icons-
 import {Cancel, Confirm, GetTask, ListTasks, RunLog} from '../wailsjs/go/ui/App'
 import {core, store} from '../wailsjs/go/models'
 import {Card, CommentBox, Message, Nav, StatusBadge, Time, errMsg} from './components'
+import {Markdown} from './markdown'
 import {TaskAgent} from './forms'
 import {TaskSidebar} from './workspace'
 import {fmtDuration, fmtK, useData} from './util'
@@ -131,7 +132,9 @@ function SessionLog({run}: {run: store.Run}) {
                     {entries.map((e, i) => (
                         e.kind === 'tool'
                             ? <Code key={i} block bg="transparent" c="dimmed" style={{whiteSpace: 'pre-wrap', wordBreak: 'break-word'}}>{e.text}</Code>
-                            : <Text key={i} size="sm" fw={e.kind === 'user' ? 600 : undefined} style={{whiteSpace: 'pre-wrap', wordBreak: 'break-word'}}>{e.text}</Text>
+                            : e.kind === 'user'
+                                ? <Text key={i} size="sm" fw={600} style={{whiteSpace: 'pre-wrap', wordBreak: 'break-word'}}>{e.text}</Text>
+                                : <Markdown key={i}>{e.text}</Markdown>
                     ))}
                 </Paper>
             )}
@@ -163,7 +166,7 @@ export function TaskPage({k, nav}: {k: string; nav: Nav}) {
                     <Button variant="default" color="red" size="xs" onClick={() => Confirm('Cancel this task?').then(ok => { if (ok) return Cancel(t.key) }).catch(errMsg)}>Cancel task</Button>
                 </Group>
                 <Paper withBorder p="md" radius="md">
-                    <Text size="sm" c={t.description ? undefined : 'dimmed'} style={{whiteSpace: 'pre-wrap', wordBreak: 'break-word'}}>{t.description || '(no description)'}</Text>
+                    <Markdown c={t.description ? undefined : 'dimmed'}>{t.description || '(no description)'}</Markdown>
                 </Paper>
                 {latest?.criteria && <><Title order={5}>Acceptance criteria</Title><Criteria text={latest.criteria}/></>}
                 <Title order={5}>Thread</Title>
