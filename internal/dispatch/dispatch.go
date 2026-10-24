@@ -116,6 +116,13 @@ func parseTime(s string) time.Time {
 
 func ptr(s string) *string { return &s }
 
+func deref(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
 // reap fails active runs whose background session no longer exists, or that never got one.
 func (d *Dispatcher) reap(ctx context.Context) error {
 	runs, err := store.ActiveRuns(d.DB)
@@ -135,18 +142,31 @@ func (d *Dispatcher) reap(ctx context.Context) error {
 	if len(cand) == 0 {
 		return nil
 	}
-	alive := map[string]bool{}
+	alive := map[string]claude.Agent{}
 	if needAgents {
 		agents, err := claude.Agents(ctx)
 		if err != nil {
 			return err
 		}
 		for _, a := range agents {
-			alive[a.ID] = true
+			alive[a.ID] = a
 		}
 	}
 	for _, r := range cand {
-		if (r.BgID != nil && alive[*r.BgID]) || d.now().Sub(parseTime(r.StartedAt)) <= reapGrace {
+		a, ok := alive[deref(r.BgID)]
+		ok = ok && r.BgID != nil
+		// Adopt sessions whose hooks never fired: the agents list knows the session id.
+		if ok && r.Status == "launching" && a.SessionID != "" {
+			if r.SessionID == nil {
+				r.SessionID = &a.SessionID
+			}
+			r.Status = "running"
+			if err := store.UpdateRun(d.DB, r); err != nil {
+				return err
+			}
+			continue
+		}
+		if ok || d.now().Sub(parseTime(r.StartedAt)) <= reapGrace {
 			continue
 		}
 		reason, note := "session vanished", "The Claude session vanished before finishing."

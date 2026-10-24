@@ -337,6 +337,18 @@ func TestReapVanished(t *testing.T) {
 	}
 }
 
+func TestAdoptSessionWithoutHooks(t *testing.T) {
+	e := setup(t)
+	tk := e.task(t, "t", 0)
+	e.tick(t) // launches, bg abcd0001, hooks never fire
+	os.WriteFile(filepath.Join(e.fake, "agents.json"), []byte(`[{"id":"abcd0001","sessionId":"sess-9","status":"busy"}]`), 0o644)
+	e.tick(t)
+	run, _ := store.LatestRun(e.db, tk.ID)
+	if run.Status != "running" || run.SessionID == nil || *run.SessionID != "sess-9" {
+		t.Fatalf("run %+v", run)
+	}
+}
+
 func TestReapLaunchingNoBg(t *testing.T) {
 	e := setup(t)
 	tk := e.task(t, "t", 0)

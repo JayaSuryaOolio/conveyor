@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 	"text/tabwriter"
+	"time"
 
 	"github.com/JayaSuryaOolio/conveyor/internal/brief"
 	"github.com/JayaSuryaOolio/conveyor/internal/core"
@@ -16,10 +17,10 @@ import (
 )
 
 func init() {
-	register("task", runTask, "manage tasks (new|list|show|comment|move|set|cancel|done|sync|brief|attach|open)")
+	register("task", runTask, "manage tasks (new|list|show|comment|move|set|cancel|done|sync|brief|log|attach|open)")
 }
 
-const taskUsage = "usage: conveyor task new|list|show|comment|move|set|cancel|done|sync|brief|attach|open ..."
+const taskUsage = "usage: conveyor task new|list|show|comment|move|set|cancel|done|sync|brief|log|attach|open ..."
 
 func runTask(home string, args []string) error {
 	if len(args) == 0 {
@@ -47,6 +48,8 @@ func runTask(home string, args []string) error {
 			return s.Move(rest[0], to)
 		case "set":
 			return taskSet(s, rest)
+		case "log":
+			return taskLog(s, rest)
 		case "attach":
 			return taskAttach(s, rest)
 		case "open":
@@ -275,6 +278,55 @@ func taskSet(s *core.Service, args []string) error {
 		*pr = deref(cur.PRURL)
 	}
 	return s.SetTaskRepo(t.Key, name, *branch, *pr)
+}
+
+// taskLog prints the latest run's session chat; --follow keeps polling until the run ends.
+func taskLog(s *core.Service, args []string) error {
+	fs := flag.NewFlagSet("task log", flag.ContinueOnError)
+	follow := fs.Bool("follow", false, "keep printing until the run ends")
+	pos, err := parseArgs(fs, args)
+	if err != nil {
+		return err
+	}
+	if len(pos) != 1 {
+		return fmt.Errorf("usage: conveyor task log KEY [--follow]")
+	}
+	t, err := store.GetTaskByKey(s.DB, pos[0])
+	if err != nil {
+		return err
+	}
+	run, err := store.LatestRun(s.DB, t.ID)
+	if err != nil {
+		return err
+	}
+	var after int64
+	for {
+		l, err := s.RunLog(run.ID, after)
+		if err != nil {
+			return err
+		}
+		after = l.Next
+		for _, e := range l.Entries {
+			switch e.Kind {
+			case "user":
+				fmt.Fprintf(out, "> %s\n", e.Text)
+			case "tool":
+				fmt.Fprintf(out, "  %s\n", e.Text)
+			default:
+				fmt.Fprintln(out, e.Text)
+			}
+		}
+		if !*follow {
+			return nil
+		}
+		if run, err = store.GetRun(s.DB, run.ID); err != nil {
+			return err
+		}
+		if run.Status != "launching" && run.Status != "running" && len(l.Entries) == 0 {
+			return nil
+		}
+		time.Sleep(time.Second)
+	}
 }
 
 // taskSync refreshes PR state from gh and prints it.
