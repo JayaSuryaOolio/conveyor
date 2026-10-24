@@ -20,6 +20,22 @@ export namespace core {
 	        this.kind = source["kind"];
 	    }
 	}
+	export class Agent {
+	    name: string;
+	    description: string;
+	    scope: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Agent(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.description = source["description"];
+	        this.scope = source["scope"];
+	    }
+	}
 	export class NewTaskInput {
 	    Title: string;
 	    Description: string;

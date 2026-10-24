@@ -295,6 +295,17 @@ func (a *App) EnsureWorkspace(key string) error {
 	return err
 }
 
+// ListAgents lists the Claude subagents of the given repos plus the user's.
+func (a *App) ListAgents(repos []string) ([]core.Agent, error) { return a.svc.ListAgents(repos) }
+
+// AddAgent creates an agent file in the repo's main checkout (scope = repo name) or ~/.claude/agents ("user").
+func (a *App) AddAgent(name, description, prompt, scope string) error {
+	return a.svc.AddAgent(name, description, prompt, scope)
+}
+
+// SetTaskAgent changes the task's agent ("" clears it).
+func (a *App) SetTaskAgent(key, agent string) error { return a.svc.SetTaskAgent(key, agent) }
+
 // LearningRow is a learning with its repo name ("" = personal).
 type LearningRow struct {
 	store.Learning

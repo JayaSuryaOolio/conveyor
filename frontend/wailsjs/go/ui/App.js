@@ -10,6 +10,10 @@ export function Actions(arg1) {
   return window['go']['ui']['App']['Actions'](arg1);
 }
 
+export function AddAgent(arg1, arg2, arg3, arg4) {
+  return window['go']['ui']['App']['AddAgent'](arg1, arg2, arg3, arg4);
+}
+
 export function AddComment(arg1, arg2) {
   return window['go']['ui']['App']['AddComment'](arg1, arg2);
 }
@@ -58,6 +62,10 @@ export function Learnings() {
   return window['go']['ui']['App']['Learnings']();
 }
 
+export function ListAgents(arg1) {
+  return window['go']['ui']['App']['ListAgents'](arg1);
+}
+
 export function ListAutomations() {
   return window['go']['ui']['App']['ListAutomations']();
 }
@@ -96,6 +104,10 @@ export function SetAutomationEnabled(arg1, arg2) {
 
 export function SetSetting(arg1, arg2) {
   return window['go']['ui']['App']['SetSetting'](arg1, arg2);
+}
+
+export function SetTaskAgent(arg1, arg2) {
+  return window['go']['ui']['App']['SetTaskAgent'](arg1, arg2);
 }
 
 export function ShowError(arg1) {
