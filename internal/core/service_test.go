@@ -190,6 +190,10 @@ func TestSubtaskDefaultsToParentAgent(t *testing.T) {
 	if err != nil || e.Agent == nil || *e.Agent != "other" {
 		t.Fatalf("%+v %v", e.Agent, err)
 	}
+	n, err := s.CreateTask(NewTaskInput{Title: "n", ParentKey: "CV-1", AgentSet: true})
+	if err != nil || n.Agent != nil {
+		t.Fatalf("cleared agent inherited: %+v %v", n.Agent, err)
+	}
 }
 
 func TestSetTaskDescriptionBacklogOnly(t *testing.T) {

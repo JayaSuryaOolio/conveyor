@@ -32,6 +32,7 @@ type NewTaskInput struct {
 	Start       bool // true: status todo instead of backlog
 	Model       string
 	Agent       string
+	AgentSet    bool // Agent is final: "" means no agent rather than the parent's
 	ParentKey   string
 	Priority    int
 	// Source, ExternalKey and ExternalURL come from importers (default source is manual).
@@ -83,7 +84,7 @@ func (s *Service) CreateTask(in NewTaskInput) (store.Task, error) {
 			}
 		}
 	}
-	if in.Agent == "" && parent != nil && parent.Agent != nil {
+	if in.Agent == "" && !in.AgentSet && parent != nil && parent.Agent != nil {
 		in.Agent = *parent.Agent // like repos: a sub-task starts with its parent's agent
 	}
 	if len(in.Repos) == 0 {
