@@ -1,5 +1,5 @@
 import {useState} from 'react'
-import {ActionIcon, Button, Checkbox, Code, Group, Modal, MultiSelect, ScrollArea, SegmentedControl, Select, Stack, Table, Tabs, Text, TextInput, Textarea, Title, Tooltip} from '@mantine/core'
+import {ActionIcon, Button, Checkbox, Code, Group, Modal, MultiSelect, ScrollArea, SegmentedControl, Select, SelectProps, Stack, Table, Tabs, Text, TextInput, Textarea, Title, Tooltip} from '@mantine/core'
 import {IconAdjustments} from '@tabler/icons-react'
 import {AddRepo, CreateTask, GetPromptDefaults, GetSettings, ListAgents, ListRepos, ListTasks, PreviewBrief, SetSetting, SetTaskAgent, SetTaskModel} from '../wailsjs/go/ui/App'
 import {core} from '../wailsjs/go/models'
@@ -57,9 +57,9 @@ export function TaskAgent({k, repos, agent}: {k: string; repos: string[]; agent:
 const MODELS = ['sonnet', 'opus', 'haiku']
 
 /** Model choice; "" means the default (task: the agent's or default_model setting). A custom id already set is kept as an option. */
-export function ModelSelect({value, onChange, label}: {value: string; onChange: (m: string) => void; label?: string}) {
+export function ModelSelect({value, onChange, ...rest}: {value: string; onChange: (m: string) => void} & Omit<SelectProps, 'value' | 'onChange' | 'data'>) {
     const data = [{value: '', label: 'Default'}, ...[...MODELS, ...(value && !MODELS.includes(value) ? [value] : [])].map(m => ({value: m, label: m}))]
-    return <Select label={label} aria-label="Model" allowDeselect={false} value={value} onChange={v => onChange(v ?? '')} data={data}/>
+    return <Select aria-label="Model" allowDeselect={false} {...rest} value={value} onChange={v => onChange(v ?? '')} data={data}/>
 }
 
 /** Low-usage task settings behind one icon, so the sidebar stays short. */
