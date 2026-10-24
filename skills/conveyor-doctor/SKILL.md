@@ -1,6 +1,6 @@
 ---
 name: conveyor-doctor
-description: Review a sample of recent Conveyor task runs (longest, shortest, failed, most-commented) and Conveyor's logs, judge whether the prompts, brief and repo CLAUDE.md gave agents what they needed without waste, and propose concrete fixes. Use for the weekly Conveyor review task, or when asked to audit Conveyor runs, prompts or token use.
+description: Review a sample of recent Conveyor task runs (longest, shortest, failed, most-commented) and Conveyor's logs, judge whether the prompts, brief and repo CLAUDE.md gave agents what they needed without waste, and propose concrete fixes. Use for the weekly Conveyor review task, or when asked to audit Conveyor runs, prompts or token use, or to fix a stuck Conveyor task ("conveyor-doctor fix [KEY]").
 ---
 
 # Conveyor doctor
@@ -8,6 +8,13 @@ description: Review a sample of recent Conveyor task runs (longest, shortest, fa
 You audit how well Conveyor's context serves its agents and turn what you find into small, reviewable changes. You are usually running as a Conveyor task yourself (the weekly "Conveyor doctor" task); leave that task out of the sample.
 
 Read-only on everything except: your own task's worktree (the Conveyor repo), new backlog tasks you create, and your final report. Never edit `~/.conveyor/conveyor.db`, settings, or another repo directly.
+
+## Fix mode
+
+When asked to fix (`fix KEY`, or `fix` for every task), skip the review below. For each task, or each task in running, needs_you or review:
+1. Read `docs/troubleshooting.md` in the Conveyor repo and run each recipe's **Confirm** steps.
+2. Apply the **Fix** of every recipe that matches. Fixes go through `conveyor` commands (`conveyor hook ...`, `conveyor task set/sync/move`), never by editing the DB; that is the one exception to the read-only rule above.
+3. Report per task: what was wrong, the commands you ran, and the state afterwards. A stuck state no recipe covers: describe it and propose a recipe; do not improvise a fix.
 
 ## 1. Pick the sample (6-10 runs from the last 7 days)
 

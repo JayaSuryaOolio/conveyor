@@ -2,6 +2,8 @@
 
 Each recipe names a symptom, how to confirm it, and the fix. Prefer the fix that goes through Conveyor (`conveyor hook`, `conveyor task ...`) over editing `conveyor.db` by hand: those paths run the same parsing and status moves a normal run does. The quick checks (nothing starts, untrusted workspace, logs) are in the [guide](guide.md#troubleshooting).
 
+To have an agent do it, run `claude "/conveyor-doctor fix CV-9"` (or `fix` with no key to scan every task) in the app's integrated terminal, or comment that request on any task that is not running. A comment on the stuck task itself only queues, because the task is still running.
+
 When you find a new failure mode and a manual fix for it, add it here. When the dispatcher learns to fix it on its own, keep the recipe and say since when it is automatic.
 
 ## A run stays "running" after its session finished
@@ -38,7 +40,7 @@ EOF
 conveyor task show KEY --runs                  # run finished with its summary
 ```
 
-**Automatic since #93.** The dispatcher's reaper does the same replay when a running run's session is `done` and its transcript has been quiet for 30s ("session done without a Stop hook" in the dispatcher log). Use the manual fix only when no dispatcher is running or the installed build predates #93.
+Conveyor does not detect this on its own: it is a Claude Code resume bug, and checking every session each tick costs more than the rare case is worth. The `conveyor-doctor` skill finds and fixes it on demand (see below).
 
 ## A task has a second PR that Conveyor doesn't track
 
@@ -50,5 +52,7 @@ Also seen on CV-9. After PR #90 merged, a comment reopened the task, and the age
 conveyor task set KEY --repo <repo> --pr https://github.com/<owner>/<repo>/pull/92
 conveyor task sync KEY
 ```
+
+If that PR is already merged, the task can simply be closed: `conveyor task move KEY done`.
 
 **Prevented since #95.** A comment on a task with a merged PR now starts a follow-up sub-task (`KEY` → `KEYA`) with its own branch, instead of reopening the task.
