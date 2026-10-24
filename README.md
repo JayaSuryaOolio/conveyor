@@ -1,5 +1,7 @@
 # Conveyor
 
+**[Why Conveyor: architecture, decisions and token-efficient runs →](docs/showcase.md)**
+
 A local kanban that runs tasks through Claude Code background sessions. Each task has a Jira-like page with a comment thread; a comment triggers the next run; every run is a real Claude session you can attach to; each task works in its own workspace folder holding one git worktree per repo.
 
 Design: `docs/tech-spec.md`. Verified Claude Code behaviour: `docs/research/spike-bg.md`. How to use it: [`docs/guide.md`](docs/guide.md). Agents working on or with Conveyor: [`.claude/skills/conveyor/SKILL.md`](.claude/skills/conveyor/SKILL.md) (commands, file locations, code map, troubleshooting).
