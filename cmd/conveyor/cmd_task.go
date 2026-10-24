@@ -98,7 +98,7 @@ func runTask(home string, args []string) error {
 
 func taskNew(s *core.Service, args []string) error {
 	fs := flag.NewFlagSet("task new", flag.ContinueOnError)
-	repos := fs.String("repo", "", "repo name(s), comma separated")
+	repos := fs.String("repo", "", "repo name(s), comma separated (sub-tasks default to the parent's)")
 	primary := fs.String("primary", "", "primary repo (default: first)")
 	desc := fs.String("desc", "", "description")
 	descFile := fs.String("desc-file", "", "read description from file")

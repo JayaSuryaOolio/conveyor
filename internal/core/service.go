@@ -66,6 +66,23 @@ func (s *Service) CreateTask(in NewTaskInput) (store.Task, error) {
 	if strings.TrimSpace(in.Title) == "" {
 		return store.Task{}, fmt.Errorf("title is required")
 	}
+	var parent *store.Task
+	if in.ParentKey != "" {
+		p, err := store.GetTaskByKey(s.DB, in.ParentKey)
+		if err != nil {
+			return store.Task{}, fmt.Errorf("parent: %w", err)
+		}
+		parent = &p
+	}
+	if len(in.Repos) == 0 && parent != nil {
+		// A sub-task defaults to its parent's repos and primary.
+		for _, r := range parent.Repos {
+			in.Repos = append(in.Repos, r.RepoName)
+			if r.IsPrimary && in.Primary == "" {
+				in.Primary = r.RepoName
+			}
+		}
+	}
 	if len(in.Repos) == 0 {
 		return store.Task{}, fmt.Errorf("at least one repo is required")
 	}
@@ -101,12 +118,8 @@ func (s *Service) CreateTask(in NewTaskInput) (store.Task, error) {
 	if in.Start {
 		t.Status = store.StatusTodo
 	}
-	if in.ParentKey != "" {
-		p, err := store.GetTaskByKey(s.DB, in.ParentKey)
-		if err != nil {
-			return store.Task{}, fmt.Errorf("parent: %w", err)
-		}
-		t.ParentID = &p.ID
+	if parent != nil {
+		t.ParentID = &parent.ID
 	}
 	return store.CreateTask(s.DB, t, links)
 }
