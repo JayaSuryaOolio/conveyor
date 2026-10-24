@@ -1,5 +1,6 @@
 import {useEffect, useRef, useState} from 'react'
 import {DispatcherState} from '../wailsjs/go/ui/App'
+import {Automations} from './automations'
 import {Nav} from './components'
 import {NewTask, Repos, Settings} from './forms'
 import {Board, Focus, TaskPage} from './views'
@@ -44,7 +45,7 @@ export default function App() {
         <>
             <header>
                 <b>Conveyor</b>
-                {['board', 'focus', 'repos', 'settings'].map(n => (
+                {['board', 'focus', 'automations', 'repos', 'settings'].map(n => (
                     <a key={n} href="#" className={view.name === n ? 'active' : ''}
                        onClick={e => { e.preventDefault(); setView({name: n}) }}>{n}</a>
                 ))}
@@ -56,6 +57,7 @@ export default function App() {
                 {view.name === 'board' && <Board nav={nav} q={q}/>}
                 {view.name === 'focus' && <Focus nav={nav} q={q}/>}
                 {view.name === 'task' && <TaskPage k={view.key!} nav={nav}/>}
+                {view.name === 'automations' && <Automations/>}
                 {view.name === 'repos' && <Repos/>}
                 {view.name === 'settings' && <Settings/>}
             </main>
