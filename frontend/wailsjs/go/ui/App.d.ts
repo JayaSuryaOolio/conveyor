@@ -58,4 +58,6 @@ export function SetSetting(arg1:string,arg2:string):Promise<void>;
 
 export function SetTaskAgent(arg1:string,arg2:string):Promise<void>;
 
+export function SetTaskRepo(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
+
 export function ShowError(arg1:string):Promise<void>;

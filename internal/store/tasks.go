@@ -186,10 +186,10 @@ func UpdateTask(db *sql.DB, t Task) error {
 	return nil
 }
 
-// UpdateTaskRepo writes worktree_path, pr_url and pr_state of one link.
+// UpdateTaskRepo writes branch, worktree_path, pr_url and pr_state of one link.
 func UpdateTaskRepo(db *sql.DB, r TaskRepo) error {
-	res, err := db.Exec(`UPDATE task_repos SET worktree_path=?, pr_url=?, pr_state=? WHERE task_id=? AND repo_id=?`,
-		r.WorktreePath, r.PRURL, r.PRState, r.TaskID, r.RepoID)
+	res, err := db.Exec(`UPDATE task_repos SET branch=?, worktree_path=?, pr_url=?, pr_state=? WHERE task_id=? AND repo_id=?`,
+		r.Branch, r.WorktreePath, r.PRURL, r.PRState, r.TaskID, r.RepoID)
 	if err != nil {
 		return fmt.Errorf("update task repo: %w", err)
 	}

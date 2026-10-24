@@ -255,6 +255,11 @@ func (a *App) Move(key, status string) error { return a.svc.Move(key, store.Stat
 // Cancel cancels a task.
 func (a *App) Cancel(key string) error { return a.svc.Cancel(key) }
 
+// SetTaskRepo sets a task repo's branch (before the worktree exists) and PR URL.
+func (a *App) SetTaskRepo(key, repo, branch, prURL string) error {
+	return a.svc.SetTaskRepo(key, repo, branch, prURL)
+}
+
 // ListRepos returns the registered repos.
 func (a *App) ListRepos() ([]store.Repo, error) {
 	r, err := store.ListRepos(a.svc.DB)
