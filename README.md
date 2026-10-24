@@ -2,7 +2,7 @@
 
 A local kanban that runs tasks through Claude Code background sessions. Each task has a Jira-like page with a comment thread; a comment triggers the next run; every run is a real Claude session you can attach to; each task works in its own workspace folder holding one git worktree per repo.
 
-Design: `docs/tech-spec.md`. Verified Claude Code behaviour: `docs/research/spike-bg.md`. How to use it: [`docs/guide.md`](docs/guide.md).
+Design: `docs/tech-spec.md`. Verified Claude Code behaviour: `docs/research/spike-bg.md`. How to use it: [`docs/guide.md`](docs/guide.md). Agents working on or with Conveyor: [`.claude/skills/conveyor/SKILL.md`](.claude/skills/conveyor/SKILL.md) (commands, file locations, code map, troubleshooting).
 
 ## Architecture
 
@@ -41,6 +41,8 @@ It runs `go install ./cmd/conveyor` and `wails build` (installing Wails if missi
 ```
 usage: conveyor [--home dir] <command> [args]
 
+commands:
+  agent      Claude subagents from repos and ~/.claude (list|add|model)
   app        open worktrees in external apps (list|presets|add|rm|open)
   automation manage automations (list|add|enable|disable|run|rm)
   config     list, get or set settings
@@ -50,10 +52,10 @@ usage: conveyor [--home dir] <command> [args]
   import     import tasks (jira --jql ... --repo a)
   learning   curate learnings (list|accept|reject|edit|apply)
   repo       manage registered repos (add|list|rm)
-  task       manage tasks (new|list|show|comment|move|link|unlink|cancel|done|sync|brief|attach|open)
+  task       manage tasks (new|list|show|comment|move|set|link|unlink|parent|cancel|done|sync|brief|log|attach|open)
 ```
 
-Tasks can have sub-tasks (`task new --parent CV-1` gives CV-1A, CV-1B ...) and links (`task link CV-1A blocks CV-1B`; kinds `blocks|relates`). A blocked todo task is not launched until its blockers are done or cancelled.
+Tasks can have sub-tasks (`task new --parent CV-1` gives CV-1A, CV-1B ...) and links (`task link CV-1A blocks CV-1B`; kinds `blocks|relates`), and `task parent KEY PARENT|--none` re-parents without changing keys. A blocked todo task is not launched until its blockers are done or cancelled.
 
 Run `conveyor <command>` with no arguments for per-command usage. Listing and show commands accept `--json`.
 
@@ -71,6 +73,7 @@ Run `conveyor <command>` with no arguments for per-command usage. Listing and sh
 
 ## TODO
 
+- Remote backend: run the dispatcher, DB and workspaces on a remote server and drive it from this UI (and the CLI) over an API, instead of the in-process Wails bindings.
 - Command palette (⌘K): jump to any task, view or action, and run commands (new task, move, comment, open terminal), more robust than the sidebar search.
 
 ## Development
