@@ -30,6 +30,10 @@ export function AddRepo(arg1, arg2) {
   return window['go']['ui']['App']['AddRepo'](arg1, arg2);
 }
 
+export function AdoptChild(arg1, arg2) {
+  return window['go']['ui']['App']['AdoptChild'](arg1, arg2);
+}
+
 export function AppIcons() {
   return window['go']['ui']['App']['AppIcons']();
 }
