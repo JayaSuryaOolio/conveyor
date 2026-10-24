@@ -240,6 +240,11 @@ func (d *Dispatcher) launchTodo(ctx context.Context) error {
 		if busy[t.ID] {
 			continue
 		}
+		if blockers, err := store.OpenBlockers(d.DB, t.ID); err != nil {
+			return err
+		} else if len(blockers) > 0 {
+			continue
+		}
 		pending, err := store.UnconsumedComments(d.DB, t.ID)
 		if err != nil {
 			return err

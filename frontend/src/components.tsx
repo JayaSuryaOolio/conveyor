@@ -51,7 +51,7 @@ export function Card({c, nav}: {c: ui.TaskCard; nav: Nav}) {
     return (
         <MCard withBorder padding="sm" radius="md" style={{cursor: 'pointer'}} onClick={() => nav({name: 'task', key: c.key})}>
             <Group justify="space-between" wrap="nowrap" gap="xs">
-                <Text size="xs" fw={600} c="dimmed">{c.key}</Text>
+                <Text size="xs" fw={600} c="dimmed">{c.key}{c.parent && <Text span size="xs" fw={400}> ↑ {c.parent}</Text>}</Text>
                 <Group gap={4} wrap="nowrap">
                     {c.ctxPeak > 0 && <Badge variant="outline" color="gray" size="xs" title="context peak">{fmtK(c.ctxPeak)}</Badge>}
                     <StatusMenu k={c.key} status={c.status}/>

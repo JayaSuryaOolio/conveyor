@@ -163,6 +163,30 @@ func TestLaunchFresh(t *testing.T) {
 	}
 }
 
+func TestBlockedTaskWaits(t *testing.T) {
+	e := setup(t)
+	blocker := e.task(t, "first", 0)
+	waiting := e.task(t, "second", 0)
+	if err := store.AddLink(e.db, blocker.ID, waiting.ID, store.LinkBlocks); err != nil {
+		t.Fatal(err)
+	}
+	// blocker is todo too, so it launches; the blocked task must not.
+	e.tick(t)
+	if e.get(t, waiting.ID).Status != store.StatusTodo || e.get(t, blocker.ID).Status != store.StatusRunning {
+		t.Fatal("blocked task launched, or blocker did not")
+	}
+	if _, err := store.UpdateTaskStatus(e.db, blocker.ID, store.StatusReview, store.ActorSystem); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.UpdateTaskStatus(e.db, blocker.ID, store.StatusDone, store.ActorHuman); err != nil {
+		t.Fatal(err)
+	}
+	e.tick(t)
+	if e.get(t, waiting.ID).Status != store.StatusRunning {
+		t.Fatal("task did not launch once its blocker was done")
+	}
+}
+
 func TestDebounce(t *testing.T) {
 	e := setup(t)
 	tk := e.task(t, "t", 0)

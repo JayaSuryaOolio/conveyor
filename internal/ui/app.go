@@ -184,6 +184,7 @@ type TaskCard struct {
 	Title       string   `json:"title"`
 	Status      string   `json:"status"`
 	Priority    int      `json:"priority"`
+	Parent      string   `json:"parent"` // parent task key, "" for top-level
 	Repos       []string `json:"repos"`
 	LastSummary string   `json:"lastSummary"`
 	CtxPeak     int64    `json:"ctxPeak"`
@@ -192,9 +193,10 @@ type TaskCard struct {
 
 // TaskDetail is the task page payload; Runs are oldest first (newest last).
 type TaskDetail struct {
-	Task     store.Task      `json:"task"`
-	Comments []store.Comment `json:"comments"`
-	Runs     []store.Run     `json:"runs"`
+	Task      store.Task      `json:"task"`
+	Comments  []store.Comment `json:"comments"`
+	Runs      []store.Run     `json:"runs"`
+	Relations store.Relations `json:"relations"`
 }
 
 // ListTasks returns every task as a card.
@@ -204,8 +206,15 @@ func (a *App) ListTasks() ([]TaskCard, error) {
 		return nil, err
 	}
 	cards := make([]TaskCard, 0, len(tasks))
+	keys := map[int64]string{}
+	for _, t := range tasks {
+		keys[t.ID] = t.Key
+	}
 	for _, t := range tasks {
 		c := TaskCard{Key: t.Key, Title: t.Title, Status: string(t.Status), Priority: t.Priority, Repos: []string{}, UpdatedAt: t.UpdatedAt}
+		if t.ParentID != nil {
+			c.Parent = keys[*t.ParentID]
+		}
 		for _, r := range t.Repos {
 			c.Repos = append(c.Repos, r.RepoName)
 		}
@@ -243,8 +252,18 @@ func (a *App) GetTask(key string) (TaskDetail, error) {
 	if rs == nil {
 		rs = []store.Run{}
 	}
-	return TaskDetail{Task: t, Comments: cs, Runs: rs}, nil
+	rel, err := store.ListRelations(a.svc.DB, t)
+	if err != nil {
+		return TaskDetail{}, err
+	}
+	return TaskDetail{Task: t, Comments: cs, Runs: rs, Relations: rel}, nil
 }
+
+// Link records "from <kind> to" (blocks, relates, duplicates).
+func (a *App) Link(from, kind, to string) error { return a.svc.Link(from, kind, to) }
+
+// Unlink removes "from <kind> to".
+func (a *App) Unlink(from, kind, to string) error { return a.svc.Unlink(from, kind, to) }
 
 // CreateTask creates a task and returns its key.
 func (a *App) CreateTask(in core.NewTaskInput) (string, error) {

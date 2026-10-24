@@ -76,6 +76,20 @@ Without a block the agent is treated as asking you a question. `BRIEF.md` explai
 
 PR comments: the agent is told to start every PR or issue comment with `pr_comment_prefix` (default `ai agent: `), and a hook blocks `gh` comment commands that lack it.
 
+## Task relations
+
+Tasks can be related, as in Jira. Conveyor only stores the relations; an agent (for example an "engineering manager" that writes a spec and splits it) creates the tasks and hands work off itself, using the CLI that `BRIEF.md` describes.
+
+- **Parent and sub-tasks**: `conveyor task new "..." --repo r --parent CV-1`. A sub-task may use a different repo than its parent. A sibling is just another child of the same parent. Child keys extend the parent's: CV-1A, CV-1B ... CV-1Z, CV-1AA, CV-1AB ... Grandchildren switch to digits so keys stay unambiguous: CV-1A1, CV-1A2 ..., then CV-1A1A. Top-level numbering (CV-2, CV-3 ...) ignores them.
+- **Links**: `blocks`, `relates` and `duplicates`, shown from the other side as "is blocked by", "relates to" and "is duplicated by". A todo task that is blocked by a task not yet done or cancelled is not launched; the task page says why.
+
+```
+conveyor task link CV-1A blocks CV-1B
+conveyor task unlink CV-1A blocks CV-1B
+```
+
+`conveyor task show` lists the parent, sub-tasks and links. The task page has a Relations section in the sidebar with the same, plus add and remove for links; board cards show the parent key.
+
 ## Comments, resume and fresh sessions
 
 A comment from you, or a system note, on a task in needs_you, review, failed or done puts it back in todo, and the dispatcher launches it again. A comment on a running task is kept and picked up when the run stops (the task then goes to todo instead of review). A comment on a backlog or todo task just waits.
@@ -183,6 +197,7 @@ conveyor task list [--status a,b]         conveyor task show KEY [--thread] [--r
 conveyor task comment KEY <text|->        conveyor task move KEY <status>
 conveyor task done KEY                    conveyor task cancel KEY
 conveyor task set KEY [--repo r] [--branch b] [--pr url]
+conveyor task link KEY blocks|relates|duplicates OTHER    conveyor task unlink KEY kind OTHER
 conveyor task sync KEY                    conveyor task brief KEY [--preview]
 conveyor task log KEY [--follow]          conveyor task attach KEY
 conveyor task open KEY [--shell|--resume|--fresh|--editor] [--repo r] [--print]

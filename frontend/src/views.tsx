@@ -189,7 +189,7 @@ export function TaskPage({k, nav}: {k: string; nav: Nav}) {
                 <Box style={{flex: 'none'}}><CommentBox k={t.key} onDone={reload}/></Box>
             </Stack>
             <Box mih={0} style={{overflowY: 'auto'}}>
-                <TaskSidebar t={t} runs={d.runs} reload={reload} onTerm={setAdded}/>
+                <TaskSidebar t={t} rel={d.relations} runs={d.runs} nav={nav} reload={reload} onTerm={setAdded}/>
             </Box>
         </Box>
         <Box mx="calc(-1 * var(--mantine-spacing-md))" mb="calc(-1 * var(--mantine-spacing-md))" mt="md" style={{flex: 'none'}}>

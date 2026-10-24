@@ -31,6 +31,20 @@ Next: wire up UI
 - please add tests
 - thanks
 
+## Relations
+
+
+To split work or hand a part off, create a sub-task (`--parent`, key CV-1A) or a sibling (same `--parent` as this task); give it `--repo` of the repo it must change, which may differ from this task's, and a description with everything its agent needs:
+
+```
+conveyor task new "title" --repo <repo> --parent <KEY> --desc "..." [--todo] [--agent <name>]
+conveyor task link <KEY> blocks <OTHER>      # OTHER waits until KEY is done or cancelled
+conveyor task link <KEY> relates|duplicates <OTHER>
+conveyor task unlink <KEY> blocks <OTHER>
+```
+
+New tasks start in backlog; pass `--todo` to let the dispatcher launch them.
+
 ## Status block
 
 End every final reply with this block. Omit it to ask the human a question instead.
