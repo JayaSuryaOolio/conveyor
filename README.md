@@ -6,56 +6,54 @@
 
 <p align="center">
   <b>A kanban board that runs Claude Code for you.</b><br>
-  Write a task, drop it in Todo, review the PR. Local, boring, fast.
+  Write a task, move it to Todo, and review the pull request when it's ready.
 </p>
 
 <!-- Screenshots: drop PNGs in docs/screenshots/ (board.png, task-page.png) -->
 
 ---
 
-## Why Conveyor
+## What it is
 
-Most "software factories" want you to move in: a server, an account, a new agent runtime, their own way of registering skills. Conveyor doesn't. It's a desktop app and a CLI over one SQLite file on your machine, and every run is a **real Claude Code session** in a **real git worktree** of your repo.
+Conveyor is a desktop app and a CLI that share one SQLite file on your machine. Each task runs as a regular Claude Code session in its own git worktree of your repo. We aim to keep it simple, predictable and intuitive.
 
-- **Your repo stays in charge.** Runs load the repo's own `CLAUDE.md`, skills, commands and agents. Nothing to register or sync.
-- **You can always jump in.** Attach to a running session, resume it in your terminal, or open a fresh one with the task's context.
-- **Comments drive the work.** Like Jira: comment on a finished task and the next run picks it up. Comment while it runs and it's queued.
-- **It finishes the job.** Conveyor follows each PR with `gh` and marks the task done when it merges.
-- **It gets cheaper over time.** It decides how much context each run starts with, and learns from its own runs (see below).
+- **Your repo's setup is used as is.** Runs load the repo's own `CLAUDE.md`, skills, commands and agents.
+- **You can step in at any time.** Attach to a running session, resume it in your terminal, or open a fresh one with the task's context.
+- **Comments move the work forward.** Comment on a finished task and the next run picks it up. Comments sent during a run are queued for the next one.
+- **Tasks close themselves.** Conveyor follows each PR with `gh` and marks the task done when it merges.
+- **Runs stay lean.** Each run starts with only the context it needs, and Conveyor learns from past runs (see below).
 
-Compared with kanban-code, multica, paperclip, orca and hermes, Conveyor keeps what we liked (real attachable sessions, worktree per task, repo-native config) and skips what we didn't (servers, headless-only agents, registries). The full comparison is in [`docs/research/landscape.md`](docs/research/landscape.md).
-
-## The architecture advantage
+## How it works
 
 ![Conveyor architecture](docs/diagrams/architecture.svg)
 
-**One task, one workspace.** Each task gets `~/.conveyor/workspaces/<KEY>/` with one git worktree per repo and a short `BRIEF.md`. Multi-repo tasks just work: the primary repo is the working directory, the rest come in with `--add-dir`, and there's at most one PR per repo.
+**One task, one workspace.** Each task gets `~/.conveyor/workspaces/<KEY>/` with one git worktree per repo and a short `BRIEF.md`. For multi-repo tasks, the primary repo is the working directory, the others are added with `--add-dir`, and each repo gets at most one PR.
 
-**Two front ends, one core.** The Wails app and the `conveyor` CLI call the same `core.Service`, so anything you can click, an agent can script. Agents use the CLI themselves to split work into sub-tasks and links.
+**The app and the CLI do the same things.** Both call the same `core.Service`, so anything you can click, you or an agent can also script. Agents use the CLI to split work into sub-tasks and links.
 
-**Hooks, not scraping.** Claude Code's hooks call `conveyor hook`. When an agent stops, its status block moves the task to Review or Needs you. No log parsing, no guessing.
+**Status comes from Claude Code's hooks.** The hooks call `conveyor hook`. When an agent stops, its status block moves the task to Review or Needs you.
 
-**Safe to leave alone.** Unattended runs bypass permission prompts, but the worktree is the boundary. Interactive sessions keep normal permissions.
+**The worktree is the boundary.** Unattended runs skip permission prompts but work only in the task's worktree. Interactive sessions keep the normal permission prompts.
 
-## Prompt and token optimizations
+## Keeping runs lean
 
-The expensive part of an agent run is the context it starts with. Conveyor picks it per run.
+Most of a run's cost is the context it starts with, so Conveyor chooses that context for each run.
 
-**Resume when cheap, start fresh when not.** If the last session ended under `resume_threshold` (60K tokens), the next comment resumes it with only the new comments. Above that, a fresh session starts from the brief, roughly 15–20K tokens instead of 78–150K.
+**Resume or start fresh.** If the last session ended under `resume_threshold` (60K tokens), the next comment resumes it and sends only the new comments. Above that, a fresh session starts from the brief, which is roughly 15–20K tokens instead of 78–150K.
 
-**A brief, not a history.** `BRIEF.md` is a few KB: description, acceptance criteria and their state, the last run's next step, one-line summaries of past runs, and your comments. The full thread is one command away if needed.
+**A short brief.** `BRIEF.md` is a few KB: the description, the acceptance criteria and their state, the last run's next step, one-line summaries of past runs, and your comments. The full thread is one command away.
 
-**Structured hand-offs.** Every run ends with a `status / summary / state / next / criteria / learning / spawn` block, which feeds the next brief. No agent re-reads a transcript to figure out where things stand.
+**A clear hand-off.** Every run ends with a `status / summary / state / next / criteria / learning / spawn` block, which feeds the next brief.
 
-**No duplicate context.** The primary repo's skills are already loaded by Claude Code, so the brief lists only the other repos' context. Runs use `--strict-mcp-config` with the repo's `.mcp.json`, so unrelated MCP servers stay out of the prompt.
+**Context isn't loaded twice.** Claude Code already loads the primary repo's skills, so the brief lists only the other repos' context. Runs use `--strict-mcp-config` with the repo's `.mcp.json`, so other MCP servers stay out of the prompt.
 
-**Measured, not guessed.** Every run records API calls, peak context and token counts, so you can tune from real numbers.
+**Usage is recorded.** Every run records API calls, peak context and token counts, so you can tune settings from real numbers.
 
-## It improves itself
+## Getting better over time
 
-- **Learnings.** Agents report `learning:` lines. Accept the good ones and Conveyor opens a PR to the repo's `CLAUDE.md` or skills.
-- **Conveyor doctor.** Every Monday a task reviews the week's longest, shortest, failed and most-commented runs and proposes concrete prompt and settings fixes.
-- **Automations.** Cron-scheduled tasks (e.g. sweeping PR review comments) are just more cards on the board.
+- **Learnings.** Agents report `learning:` lines. When you accept one, Conveyor opens a PR to the repo's `CLAUDE.md` or skills.
+- **Conveyor doctor.** Every Monday a task reviews the week's longest, shortest, failed and most-commented runs and suggests prompt and settings fixes.
+- **Automations.** Scheduled tasks, such as sweeping PR review comments, show up as cards on the board.
 
 More: [the showcase page](docs/showcase.md) (decisions and trade-offs) and the [user guide](docs/guide.md) (task states, hook flow, every feature).
 
