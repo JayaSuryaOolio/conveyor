@@ -116,35 +116,45 @@ func parseTime(s string) time.Time {
 
 func ptr(s string) *string { return &s }
 
-// reap fails active runs whose background session no longer exists.
+// reap fails active runs whose background session no longer exists, or that never got one.
 func (d *Dispatcher) reap(ctx context.Context) error {
 	runs, err := store.ActiveRuns(d.DB)
 	if err != nil {
 		return err
 	}
-	var withBg []store.Run
+	var cand []store.Run
+	needAgents := false
 	for _, r := range runs {
 		if r.BgID != nil {
-			withBg = append(withBg, r)
+			needAgents = true
+			cand = append(cand, r)
+		} else if r.Status == "launching" { // dispatcher died before saving the bg id
+			cand = append(cand, r)
 		}
 	}
-	if len(withBg) == 0 {
+	if len(cand) == 0 {
 		return nil
 	}
-	agents, err := claude.Agents(ctx)
-	if err != nil {
-		return err
-	}
 	alive := map[string]bool{}
-	for _, a := range agents {
-		alive[a.ID] = true
+	if needAgents {
+		agents, err := claude.Agents(ctx)
+		if err != nil {
+			return err
+		}
+		for _, a := range agents {
+			alive[a.ID] = true
+		}
 	}
-	for _, r := range withBg {
-		if alive[*r.BgID] || d.now().Sub(parseTime(r.StartedAt)) <= reapGrace {
+	for _, r := range cand {
+		if (r.BgID != nil && alive[*r.BgID]) || d.now().Sub(parseTime(r.StartedAt)) <= reapGrace {
 			continue
 		}
+		reason, note := "session vanished", "The Claude session vanished before finishing."
+		if r.BgID == nil {
+			reason, note = "launch interrupted", "The Claude launch was interrupted before a session started."
+		}
 		ended := d.now().UTC().Format(time.RFC3339)
-		r.Status, r.Error, r.EndedAt = "failed", ptr("session vanished"), &ended
+		r.Status, r.Error, r.EndedAt = "failed", ptr(reason), &ended
 		if err := store.UpdateRun(d.DB, r); err != nil {
 			return err
 		}
@@ -155,7 +165,7 @@ func (d *Dispatcher) reap(ctx context.Context) error {
 		if task.Status != store.StatusRunning {
 			continue
 		}
-		if _, err := store.AddComment(d.DB, store.Comment{TaskID: task.ID, Author: store.AuthorSystem, Body: "The Claude session vanished before finishing."}); err != nil {
+		if _, err := store.AddComment(d.DB, store.Comment{TaskID: task.ID, Author: store.AuthorSystem, Body: note}); err != nil {
 			return err
 		}
 		if _, err := store.UpdateTaskStatus(d.DB, task.ID, store.StatusNeedsYou, store.ActorSystem); err != nil {
