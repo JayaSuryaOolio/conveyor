@@ -137,6 +137,9 @@ func taskNew(s *core.Service, args []string) error {
 		}
 		d = string(b)
 	}
+	if *parent != "" && strings.TrimSpace(d) == "" {
+		return fmt.Errorf("a sub-task needs --desc or --desc-file: its agent sees only the title and description")
+	}
 	t, err := s.CreateTask(core.NewTaskInput{
 		Title: pos[0], Description: d, Repos: splitCSV(*repos), Primary: *primary, Start: *todo,
 		Model: *model, Agent: *agent, ParentKey: *parent, Priority: *prio,

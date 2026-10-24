@@ -76,7 +76,10 @@ func TestCLIFlow(t *testing.T) {
 	if out := cv(t, home, "task", "show", "CV-1"); !strings.Contains(out, "branch feat/x") || strings.Contains(out, "gh/pr") {
 		t.Fatal(out)
 	}
-	if out := cv(t, home, "task", "new", "Sub", "--repo", name, "--parent", "CV-1"); !strings.HasPrefix(out, "CV-1A ") {
+	if b, err := exec.Command(bin, "--home", home, "task", "new", "NoDesc", "--repo", name, "--parent", "CV-1").CombinedOutput(); err == nil {
+		t.Fatalf("sub-task without --desc was created: %s", b)
+	}
+	if out := cv(t, home, "task", "new", "Sub", "--repo", name, "--parent", "CV-1", "--desc", "d"); !strings.HasPrefix(out, "CV-1A ") {
 		t.Fatal(out)
 	}
 	cv(t, home, "task", "new", "Other", "--repo", name)
