@@ -56,6 +56,9 @@ func run(args []string, stdout, stderr io.Writer) int {
 		err = c.fn(home, rest[1:])
 	}
 	if err != nil {
+		if rest[0] == "hook" {
+			return 0 // hooks never fail Claude
+		}
 		fmt.Fprintln(stderr, "error:", err)
 		return 1
 	}
