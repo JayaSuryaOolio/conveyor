@@ -1,8 +1,8 @@
 import {useState} from 'react'
-import {ActionIcon, Anchor, Badge, Button, Code, Divider, Group, Paper, Stack, Text, TextInput, Title, Tooltip} from '@mantine/core'
+import {ActionIcon, Anchor, Badge, Button, Code, Divider, Group, Menu, Paper, Stack, Text, TextInput, Title, Tooltip} from '@mantine/core'
 import {useClipboard} from '@mantine/hooks'
-import {IconCopy, IconPencil, IconStar, IconTerminal, IconTerminal2} from '@tabler/icons-react'
-import {Actions, EnsureWorkspace, RunAction, Sessions, SetTaskRepo, TermStart} from '../wailsjs/go/ui/App'
+import {IconAppWindow, IconChevronDown, IconCopy, IconPencil, IconStar, IconTerminal, IconTerminal2} from '@tabler/icons-react'
+import {Actions, EnsureWorkspace, ListApps, OpenApp, RunAction, Sessions, SetTaskRepo, TermStart} from '../wailsjs/go/ui/App'
 import {core, store, ui} from '../wailsjs/go/models'
 import {BrowserOpenURL} from '../wailsjs/runtime/runtime'
 import {StatusSelect, Time, errMsg} from './components'
@@ -31,6 +31,21 @@ function ActionRow({k, a, kind, onTerm}: {k: string; a: core.Action; kind?: stri
                 </Tooltip>
             </Group>
         </Group>
+    )
+}
+
+/** "Open in…" menu listing the configured apps for one repo's worktree. */
+function OpenIn({k, repo, apps}: {k: string; repo: string; apps: store.App[]}) {
+    return (
+        <Menu position="bottom-start" withinPortal>
+            <Menu.Target>
+                <Button size="compact-sm" variant="default" leftSection={<IconAppWindow size={14}/>} rightSection={<IconChevronDown size={14}/>}>Open in…</Button>
+            </Menu.Target>
+            <Menu.Dropdown>
+                {apps.length === 0 && <Menu.Item disabled>No apps yet. Add them on the Apps page.</Menu.Item>}
+                {apps.map(a => <Menu.Item key={a.id} onClick={() => OpenApp(a.name, k, repo).catch(errMsg)}>{a.name}</Menu.Item>)}
+            </Menu.Dropdown>
+        </Menu>
     )
 }
 
@@ -97,6 +112,7 @@ export function TaskSidebar({t, runs, reload, onTerm}: {t: store.Task; runs: sto
     const repos = t.repos ?? []
     const {data: actions, error: actionsError, reload: reloadActions} = useData(() => Actions(k), [k])
     const {data: sessions, error: sessionsError, reload: reloadSessions} = useData(() => Sessions(k), [k])
+    const {data: apps} = useData(ListApps, [])
     const [busy, setBusy] = useState(false)
     const taskActions = (actions ?? []).filter(a => ['attach', 'resume', 'fresh'].includes(a.kind))
     const hasWorktree = repos.some(r => r.worktree_path)
@@ -118,6 +134,7 @@ export function TaskSidebar({t, runs, reload, onTerm}: {t: store.Task; runs: sto
             {repos.map(r => (
                 <RepoFields key={r.repo_id + '|' + r.branch + '|' + (r.pr_url ?? '')} k={k} r={r} reload={reload}>
                     {(actions ?? []).filter(a => a.repo === r.repo_name && ['shell', 'editor'].includes(a.kind)).map(a => <ActionRow key={a.kind} k={k} a={a} onTerm={onTerm}/>)}
+                    {r.worktree_path && <OpenIn k={k} repo={r.repo_name} apps={apps ?? []}/>}
                 </RepoFields>
             ))}
             {!hasWorktree && (

@@ -173,12 +173,19 @@ func FreshCommand(settingsPath, briefPath string, addDirs []string) string {
 	return c
 }
 
+// hookCommand is the command Claude Code runs for ev. The user-level install
+// (userhooks.go) writes the same string, so Claude Code runs it once per event.
+func hookCommand(conveyorBin, home, ev string) string {
+	return q(conveyorBin) + " --home " + q(home) + " hook " + ev
+}
+
+func hookEntry(conveyorBin, home, ev string) map[string]any {
+	return map[string]any{"hooks": []any{map[string]any{"type": "command", "command": hookCommand(conveyorBin, home, ev)}}}
+}
+
 // WriteSettings writes <home>/claude-settings.json atomically and returns its path.
 func WriteSettings(home, conveyorBin string) (string, error) {
-	hook := func(ev string) []any {
-		cmd := q(conveyorBin) + " --home " + q(home) + " hook " + ev
-		return []any{map[string]any{"hooks": []any{map[string]any{"type": "command", "command": cmd}}}}
-	}
+	hook := func(ev string) []any { return []any{hookEntry(conveyorBin, home, ev)} }
 	pre := hook("PreToolUse")
 	pre[0].(map[string]any)["matcher"] = "Bash"
 	b, err := json.MarshalIndent(map[string]any{

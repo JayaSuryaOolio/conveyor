@@ -1,8 +1,9 @@
 import {useEffect, useRef, useState} from 'react'
 import {AppShell, Badge, Button, Kbd, NavLink, Stack, Text, TextInput, Title} from '@mantine/core'
-import {IconBolt, IconBook2, IconClock, IconFolders, IconLayoutKanban, IconLogs, IconPlus, IconRobot, IconSearch, IconSettings} from '@tabler/icons-react'
+import {IconApps, IconBolt, IconBook2, IconClock, IconFolders, IconLayoutKanban, IconLogs, IconPlus, IconRobot, IconSearch, IconSettings} from '@tabler/icons-react'
 import {DispatcherState, Learnings} from '../wailsjs/go/ui/App'
 import {Agents} from './agents'
+import {Apps} from './apps'
 import {Automations} from './automations'
 import {Nav} from './components'
 import {NewTask, Repos, Settings} from './forms'
@@ -17,6 +18,7 @@ const NAV: {name: string; key?: string; label: string; icon: typeof IconBolt}[] 
     {name: 'learnings', label: 'Learnings', icon: IconBook2},
     {name: 'automations', label: 'Automations', icon: IconClock},
     {name: 'repos', label: 'Repos', icon: IconFolders},
+    {name: 'apps', label: 'Apps', icon: IconApps},
     {name: 'agents', key: 'a', label: 'Agents', icon: IconRobot},
     {name: 'logs', key: 'l', label: 'Logs', icon: IconLogs},
     {name: 'settings', label: 'Settings', icon: IconSettings},
@@ -85,6 +87,7 @@ export default function App() {
                 {view.name === 'learnings' && <LearningsPage nav={nav}/>}
                 {view.name === 'automations' && <Automations/>}
                 {view.name === 'repos' && <Repos/>}
+                {view.name === 'apps' && <Apps/>}
                 {view.name === 'agents' && <Agents/>}
                 {view.name === 'logs' && <Logs/>}
                 {view.name === 'settings' && <Settings/>}

@@ -14,6 +14,10 @@ export function AddAgent(arg1, arg2, arg3, arg4) {
   return window['go']['ui']['App']['AddAgent'](arg1, arg2, arg3, arg4);
 }
 
+export function AddApp(arg1) {
+  return window['go']['ui']['App']['AddApp'](arg1);
+}
+
 export function AddAutomation(arg1) {
   return window['go']['ui']['App']['AddAutomation'](arg1);
 }
@@ -30,6 +34,10 @@ export function AppLog(arg1) {
   return window['go']['ui']['App']['AppLog'](arg1);
 }
 
+export function AppPresets() {
+  return window['go']['ui']['App']['AppPresets']();
+}
+
 export function ApplyLearnings(arg1) {
   return window['go']['ui']['App']['ApplyLearnings'](arg1);
 }
@@ -40,6 +48,10 @@ export function Confirm(arg1) {
 
 export function CreateTask(arg1) {
   return window['go']['ui']['App']['CreateTask'](arg1);
+}
+
+export function DeleteApp(arg1) {
+  return window['go']['ui']['App']['DeleteApp'](arg1);
 }
 
 export function DeleteAutomation(arg1) {
@@ -86,6 +98,10 @@ export function ListAgents(arg1) {
   return window['go']['ui']['App']['ListAgents'](arg1);
 }
 
+export function ListApps() {
+  return window['go']['ui']['App']['ListApps']();
+}
+
 export function ListAutomations() {
   return window['go']['ui']['App']['ListAutomations']();
 }
@@ -102,12 +118,20 @@ export function Move(arg1, arg2) {
   return window['go']['ui']['App']['Move'](arg1, arg2);
 }
 
+export function OpenApp(arg1, arg2, arg3) {
+  return window['go']['ui']['App']['OpenApp'](arg1, arg2, arg3);
+}
+
 export function PreviewBrief(arg1) {
   return window['go']['ui']['App']['PreviewBrief'](arg1);
 }
 
 export function RejectLearning(arg1) {
   return window['go']['ui']['App']['RejectLearning'](arg1);
+}
+
+export function RenderApp(arg1, arg2) {
+  return window['go']['ui']['App']['RenderApp'](arg1, arg2);
 }
 
 export function RunAction(arg1, arg2, arg3) {
@@ -174,6 +198,18 @@ export function TermWrite(arg1, arg2) {
   return window['go']['ui']['App']['TermWrite'](arg1, arg2);
 }
 
+export function TestApp(arg1) {
+  return window['go']['ui']['App']['TestApp'](arg1);
+}
+
+export function UpdateApp(arg1) {
+  return window['go']['ui']['App']['UpdateApp'](arg1);
+}
+
 export function UpdateAutomation(arg1) {
   return window['go']['ui']['App']['UpdateAutomation'](arg1);
+}
+
+export function UserHooks(arg1) {
+  return window['go']['ui']['App']['UserHooks'](arg1);
 }
