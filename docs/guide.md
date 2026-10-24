@@ -204,6 +204,7 @@ Settings are in the app (Settings page) or `conveyor config list|get|set`.
 - **Dispatch**: `max_parallel` (3), `resume_threshold` (60000), `comment_debounce_secs` (20), `max_consecutive_failures` (3).
 - **External terminal**: `terminal_template`, the command for external terminals (`{cwd}` and `{cmd}` are substituted; default uses macOS Terminal).
 - **Prompts**: `pr_comment_prefix`, `brief_extra_rules`, and `prompt_fresh` / `prompt_resume` to replace the launch prompts (placeholders `{key}`, `{title}`, `{brief}`, `{comments}`). Empty means the built-in prompt. The page also shows the status block protocol the agent is given.
+- **Moving to a fresh install**: `conveyor state export [file]` / `import <file> [--repo A=name]` carries settings, apps, automations and user agents as JSON; repos are never exported (automations get placeholders `A`, `B`, ...), import only adds what's missing, and `scripts/uninstall.sh` saves it to `<home>/state.json` for the next `install.sh` to pick up.
 
 ## CLI cheat-sheet
 
@@ -231,6 +232,7 @@ conveyor automation list|add|enable|disable|run|rm
 conveyor app list|presets|add|global|rm|open
 conveyor hooks status|install|uninstall
 conveyor config list | get <key> | set <key> <value>
+conveyor state export [file] | import <file> [--repo A=name ...]
 conveyor import jira --jql "..." --repo a      # needs acli
 conveyor daemon                                # run the dispatcher in the foreground
 ```
