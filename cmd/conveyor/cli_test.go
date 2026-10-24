@@ -37,6 +37,7 @@ func cv(t *testing.T, home string, args ...string) string {
 
 func TestCLIFlow(t *testing.T) {
 	home := t.TempDir()
+	t.Setenv("HOME", t.TempDir()) // keep the real ~/.claude/agents out of `agent list`
 	repo := t.TempDir()
 	for _, args := range [][]string{{"init", "-b", "main"}, {"-c", "user.name=t", "-c", "user.email=t@t", "commit", "--allow-empty", "-m", "i"}} {
 		if b, err := exec.Command("git", append([]string{"-C", repo}, args...)...).CombinedOutput(); err != nil {
