@@ -73,6 +73,7 @@ Run `conveyor <command>` with no arguments for per-command usage. Listing and sh
 
 ## TODO
 
+- UI component layer: the UI imports Mantine directly in every file. Wrap the pieces we use (selects, modals, inputs, buttons, badges) in our own components with small, documented props contracts, so screens depend on those and Mantine can be swapped or upgraded in one place.
 - Remote backend: run the dispatcher, DB and workspaces on a remote server and drive it from this UI (and the CLI) over an API, instead of the in-process Wails bindings.
 - Command palette (⌘K): jump to any task, view or action, and run commands (new task, move, comment, open terminal), more robust than the sidebar search.
 

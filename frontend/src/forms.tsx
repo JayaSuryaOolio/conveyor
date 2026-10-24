@@ -179,7 +179,7 @@ function PromptsInfo({settings, protocol}: {settings: Record<string, string>; pr
             <Title order={5}>Preview</Title>
             <Text size="xs" c="dimmed">The brief and first prompt for a task as they would be sent now. Nothing is written.</Text>
             <Group>
-                <Select style={{flex: 1}} searchable placeholder="Pick a task" value={key} onChange={setKey}
+                <Select style={{flex: 1}} placeholder="Pick a task" value={key} onChange={setKey}
                         data={(tasks ?? []).filter(t => t.status !== 'done' && t.status !== 'cancelled').sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).map(t => ({value: t.key, label: `${t.key}  ${t.title}`}))}/>
                 <SegmentedControl value={raw} onChange={setRaw} data={[{value: "rendered", label: "Rendered"}, {value: "raw", label: "Raw"}]}/>
             </Group>
