@@ -33,6 +33,20 @@ spawn: child task title (repeatable line)
 ` + "```" + `
 `
 
+// relationsHelp tells the agent how to split work: Conveyor only stores the relations, the agent does the handoff.
+const relationsHelp = `
+To split work or hand a part off, create a sub-task (` + "`--parent`" + `, key CV-1A) or a sibling (same ` + "`--parent`" + ` as this task); give it ` + "`--repo`" + ` of the repo it must change, which may differ from this task's, and a description with everything its agent needs:
+
+` + "```" + `
+conveyor task new "title" --repo <repo> --parent <KEY> --desc "..." [--todo] [--agent <name>]
+conveyor task link <KEY> blocks <OTHER>      # OTHER waits until KEY is done or cancelled
+conveyor task link <KEY> relates|duplicates <OTHER>
+conveyor task unlink <KEY> blocks <OTHER>
+` + "```" + `
+
+New tasks start in backlog; pass ` + "`--todo`" + ` to let the dispatcher launch them.
+`
+
 const defaultRules = `- Work only inside the worktrees listed above.
 - Open at most one PR per repo.
 - Never push to the default branch.
@@ -162,6 +176,21 @@ func Build(db *sql.DB, task store.Task) (string, error) {
 	if len(human) > 0 {
 		fmt.Fprintf(&b, "\n## Human comments\n\n%s\n", strings.Join(human, "\n"))
 	}
+	rel, err := store.ListRelations(db, task)
+	if err != nil {
+		return "", err
+	}
+	fmt.Fprintf(&b, "\n## Relations\n\n")
+	if rel.Parent != nil {
+		fmt.Fprintf(&b, "- parent: %s %s (%s)\n", rel.Parent.Key, rel.Parent.Title, rel.Parent.Status)
+	}
+	for _, c := range rel.Children {
+		fmt.Fprintf(&b, "- sub-task: %s %s (%s)\n", c.Key, c.Title, c.Status)
+	}
+	for _, l := range rel.Links {
+		fmt.Fprintf(&b, "- %s: %s %s (%s)\n", l.Label, l.Task.Key, l.Task.Title, l.Task.Status)
+	}
+	b.WriteString(relationsHelp)
 	fmt.Fprintf(&b, "\n%s\n## Rules\n\n%s\n## Older history\n\nFull thread: `conveyor task show %s --thread --json`\n", statusBlock, rules(db, true), task.Key)
 	return b.String(), nil
 }

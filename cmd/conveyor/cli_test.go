@@ -71,6 +71,21 @@ func TestCLIFlow(t *testing.T) {
 	if out := cv(t, home, "task", "show", "CV-1"); !strings.Contains(out, "branch feat/x") || strings.Contains(out, "gh/pr") {
 		t.Fatal(out)
 	}
+	if out := cv(t, home, "task", "new", "Sub", "--repo", name, "--parent", "CV-1"); !strings.HasPrefix(out, "CV-1A ") {
+		t.Fatal(out)
+	}
+	cv(t, home, "task", "new", "Other", "--repo", name)
+	cv(t, home, "task", "link", "CV-1A", "blocks", "CV-2")
+	if out := cv(t, home, "task", "show", "CV-2"); !strings.Contains(out, "is blocked by: CV-1A") {
+		t.Fatal(out)
+	}
+	if out := cv(t, home, "task", "show", "CV-1"); !strings.Contains(out, "child: CV-1A") {
+		t.Fatal(out)
+	}
+	cv(t, home, "task", "unlink", "CV-1A", "blocks", "CV-2")
+	if out := cv(t, home, "task", "show", "CV-2"); strings.Contains(out, "blocked") {
+		t.Fatal(out)
+	}
 	cv(t, home, "task", "cancel", "CV-1")
 	if out := cv(t, home, "task", "list", "--status", "cancelled"); !strings.Contains(out, "CV-1") {
 		t.Fatal(out)

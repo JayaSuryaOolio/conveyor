@@ -52,6 +52,8 @@ export function Home():Promise<string>;
 
 export function Learnings():Promise<Array<ui.LearningRow>>;
 
+export function Link(arg1:string,arg2:string,arg3:string):Promise<void>;
+
 export function ListAgents(arg1:Array<string>):Promise<Array<core.Agent>>;
 
 export function ListApps():Promise<Array<store.App>>;
@@ -109,6 +111,8 @@ export function TermStart(arg1:string,arg2:string,arg3:string):Promise<ui.TermIn
 export function TermWrite(arg1:string,arg2:string):Promise<void>;
 
 export function TestApp(arg1:string):Promise<void>;
+
+export function Unlink(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function UpdateApp(arg1:store.App):Promise<void>;
 
