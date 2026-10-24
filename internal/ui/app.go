@@ -362,6 +362,9 @@ func (a *App) SetAgentModel(scope, name, model string) error {
 // SetTaskAgent changes the task's agent ("" clears it).
 func (a *App) SetTaskAgent(key, agent string) error { return a.svc.SetTaskAgent(key, agent) }
 
+// SetTaskModel changes the task's model override ("" clears it).
+func (a *App) SetTaskModel(key, model string) error { return a.svc.SetTaskModel(key, model) }
+
 // LearningRow is a learning with its repo name ("" = personal).
 type LearningRow struct {
 	store.Learning

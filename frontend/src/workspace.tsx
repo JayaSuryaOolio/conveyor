@@ -6,7 +6,7 @@ import {Actions, AppIcons, EnsureWorkspace, Link, ListApps, ListTasks, OpenApp, 
 import {core, store, ui} from '../wailsjs/go/models'
 import {BrowserOpenURL} from '../wailsjs/runtime/runtime'
 import {AppIcon, Nav, StatusBadge, StatusSelect, Time, errMsg} from './components'
-import {TaskAgent} from './forms'
+import {TaskAgent, TaskSettings} from './forms'
 import {useData} from './util'
 
 const SPOTLIGHT = 'Spotlight'
@@ -197,7 +197,7 @@ export function TaskSidebar({t, rel, runs, nav, reload, onTerm}: {t: store.Task;
     return (
         <Stack gap="sm" component="aside" miw={0}>
             <Group justify="space-between" wrap="nowrap">
-                <Text size="sm" fw={600}>Agent</Text>
+                <Group gap={4}><Text size="sm" fw={600}>Agent</Text><TaskSettings k={k} model={t.model ?? ''} reload={reload}/></Group>
                 <TaskAgent k={k} repos={repos.map(r => r.repo_name)} agent={t.agent ?? ''}/>
             </Group>
             <Group justify="space-between">
