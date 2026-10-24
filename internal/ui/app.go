@@ -116,6 +116,14 @@ func conveyorBin() string {
 	return "conveyor"
 }
 
+// Home is the conveyor home directory (the markdown renderer maps attachment paths under it).
+func (a *App) Home() string { return a.svc.Home }
+
+// SaveAttachment stores a pasted/dropped image (base64) and returns its absolute path.
+func (a *App) SaveAttachment(key, name, dataBase64 string) (string, error) {
+	return core.SaveAttachment(a.svc.Home, key, name, dataBase64)
+}
+
 // ShowError logs a frontend error and shows it in a native dialog
 // (the macOS webview silently drops window.alert).
 func (a *App) ShowError(msg string) {

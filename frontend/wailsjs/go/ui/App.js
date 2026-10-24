@@ -74,6 +74,10 @@ export function GetTask(arg1) {
   return window['go']['ui']['App']['GetTask'](arg1);
 }
 
+export function Home() {
+  return window['go']['ui']['App']['Home']();
+}
+
 export function Learnings() {
   return window['go']['ui']['App']['Learnings']();
 }
@@ -112,6 +116,10 @@ export function RunAutomation(arg1) {
 
 export function RunLog(arg1, arg2) {
   return window['go']['ui']['App']['RunLog'](arg1, arg2);
+}
+
+export function SaveAttachment(arg1, arg2, arg3) {
+  return window['go']['ui']['App']['SaveAttachment'](arg1, arg2, arg3);
 }
 
 export function Sessions(arg1) {
