@@ -1,11 +1,13 @@
 package core
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"regexp"
 	"strings"
 
+	"github.com/JayaSuryaOolio/conveyor/internal/claude"
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 )
 
@@ -130,18 +132,65 @@ func (s *Service) AddComment(key, author, body string) (store.Comment, error) {
 	return c, nil
 }
 
-// Move changes a task's status as a human.
+// Move changes a task's status as a human. Moving to done or cancelled also stops
+// and removes the task's background sessions (best effort).
 func (s *Service) Move(key string, to store.Status) error {
 	t, err := store.GetTaskByKey(s.DB, key)
 	if err != nil {
 		return err
 	}
-	_, err = store.UpdateTaskStatus(s.DB, t.ID, to, store.ActorHuman)
-	return err
+	if _, err = store.UpdateTaskStatus(s.DB, t.ID, to, store.ActorHuman); err != nil {
+		return err
+	}
+	if to == store.StatusDone || to == store.StatusCancelled {
+		s.cleanup(t.ID)
+	}
+	return nil
+}
+
+// bgIDs returns the bg ids of the task's runs, each once.
+func (s *Service) bgIDs(taskID int64) []string {
+	runs, _ := store.ListRuns(s.DB, taskID)
+	seen := map[string]bool{}
+	var ids []string
+	for _, r := range runs {
+		if r.BgID != nil && !seen[*r.BgID] {
+			seen[*r.BgID] = true
+			ids = append(ids, *r.BgID)
+		}
+	}
+	return ids
+}
+
+func (s *Service) cleanup(taskID int64) {
+	for _, id := range s.bgIDs(taskID) {
+		claude.Stop(context.Background(), id)
+		claude.Remove(context.Background(), id)
+	}
+}
+
+// Stop stops the task's background Claude sessions.
+func (s *Service) Stop(key string) error {
+	t, err := store.GetTaskByKey(s.DB, key)
+	if err != nil {
+		return err
+	}
+	runs, err := store.ActiveRuns(s.DB)
+	if err != nil {
+		return err
+	}
+	for _, r := range runs {
+		if r.TaskID == t.ID && r.BgID != nil {
+			if err := claude.Stop(context.Background(), *r.BgID); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // MarkDone moves a task to done.
 func (s *Service) MarkDone(key string) error { return s.Move(key, store.StatusDone) }
 
-// Cancel moves a task to cancelled. Stopping its session arrives with task 007.
+// Cancel moves a task to cancelled and stops its sessions.
 func (s *Service) Cancel(key string) error { return s.Move(key, store.StatusCancelled) }

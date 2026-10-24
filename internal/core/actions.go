@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/JayaSuryaOolio/conveyor/internal/brief"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -53,7 +54,6 @@ func (s *Service) settingsPath() (string, error) {
 }
 
 // Actions lists what can be opened for a task. Without a primary worktree it returns none.
-// ponytail: BRIEF.md is only referenced by path; rendering it belongs to task 007's brief package.
 func (s *Service) Actions(key string) ([]Action, error) {
 	t, err := store.GetTaskByKey(s.DB, key)
 	if err != nil {
@@ -85,8 +85,11 @@ func (s *Service) Actions(key string) ([]Action, error) {
 	case !isActive(run) && run.SessionID != nil:
 		out = append(out, Action{"Resume in terminal", primary, cwd, claude.ResumeCommand(*run.SessionID, settings), "resume"})
 	}
-	brief := filepath.Join(workspace.Dir(s.Home, t.Key), "BRIEF.md")
-	out = append(out, Action{"New session from brief", primary, cwd, claude.FreshCommand(settings, brief, workspace.OtherPaths(t)), "fresh"})
+	briefPath, err := brief.Render(s.DB, s.Home, t)
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, Action{"New session from brief", primary, cwd, claude.FreshCommand(settings, briefPath, workspace.OtherPaths(t)), "fresh"})
 	editor := store.GetSetting(s.DB, "editor_command")
 	for _, r := range t.Repos {
 		if r.WorktreePath == nil {

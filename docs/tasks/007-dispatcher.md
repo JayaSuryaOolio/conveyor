@@ -62,3 +62,21 @@ Use fake `claude` and `gh` scripts plus real git temp repos.
 - Reap of a vanished session.
 - The lock is exclusive between two `Lock` calls.
 - Brief golden-file test.
+
+## Outcome
+
+Built `internal/brief` (Render, FreshPrompt, ResumePrompt), `internal/dispatch` (Dispatcher, Lock, ErrLocked, Run, Tick), `conveyor daemon`, `conveyor task brief KEY`, `core.Service.Stop` plus stop/remove of bg sessions when a task moves to done or cancelled (in `Service.Move`, so `MarkDone`, `Cancel` and the UI's Move all get it), the app's lock-retry loop with a `DispatcherState()` header badge, and `hook` now uses `workspace.KeyFromCwd`.
+
+Deviations:
+- A launch failure before a run row exists (workspace, settings or brief errors) records an `error` event instead of a failed run. At the failure cap such a task goes todo -> running -> failed, because todo -> failed is not an edge in the status table.
+- BRIEF "acceptance criteria" uses the newest run that has criteria, not strictly the newest run, so an interactive run without a block does not erase them.
+- A resume run is created with the previous run's session id, so the hook (which matches by session id) attributes the Stop to the new run.
+- The app looks for the `conveyor` CLI next to the app binary, then on PATH, for the hook command in claude-settings.json.
+- `wails` is not installed on this machine, so `wails build` was not run. `go build .`, `npm ci && npm run build`, `gofmt`, `go vet` and `go test ./...` pass. The two Wails binding files were edited by hand to add `DispatcherState`.
+
+Manual checks: two `conveyor daemon` processes on one home: the second exits 1 with "dispatcher already running".
+
+Follow-ups:
+- Comments are consumed before the launch, so a failed launch loses the delta for the retry; an unconsume step would fix it.
+- The PR poller in the dispatcher is untested against a fake `gh`; `gh.SyncTask` has its own tests.
+- Marking done through the PR poller (review -> done) does not call `claude.Remove`.
