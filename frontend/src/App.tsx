@@ -2,11 +2,11 @@ import {useEffect, useRef, useState} from 'react'
 import {ActionIcon, AppShell, Badge, Box, Button, Group, Kbd, NavLink, Stack, TextInput, Title, Tooltip} from '@mantine/core'
 import {useLocalStorage} from '@mantine/hooks'
 import {IconApps, IconBolt, IconBook2, IconClock, IconFolders, IconLayoutKanban, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconLogs, IconPlus, IconRobot, IconSearch, IconSettings} from '@tabler/icons-react'
-import {DispatcherState, Learnings} from '../wailsjs/go/ui/App'
+import {AppIcons, DispatcherState, Learnings, ListApps, OpenApp} from '../wailsjs/go/ui/App'
 import {Agents} from './agents'
 import {Apps} from './apps'
 import {Automations} from './automations'
-import {Nav} from './components'
+import {AppIcon, errMsg, Nav} from './components'
 import {NewTask, Repos, Settings} from './forms'
 import {LearningsPage} from './learnings'
 import {Logs} from './logs'
@@ -36,6 +36,9 @@ export default function App() {
     const [mini, setMini] = useLocalStorage({key: 'nav-collapsed', defaultValue: false})
     const {data: learnings} = useData(Learnings, [])
     const proposed = learnings?.filter(l => l.status === 'proposed').length ?? 0
+    const {data: apps} = useData(ListApps, [])
+    const {data: icons} = useData(AppIcons, [])
+    const globalApps = (apps ?? []).filter(a => a.global)
     const nav: Nav = v => setView(v)
 
     useEffect(() => {
@@ -92,8 +95,17 @@ export default function App() {
                             </Tooltip>
                         ))}
                     </Stack>
+                    <Group mt="auto" gap={4} justify={mini ? 'center' : 'flex-start'}>
+                        {globalApps.map(a => (
+                            <Tooltip key={a.id} label={a.name} position="right">
+                                <ActionIcon variant="subtle" color="gray" aria-label={a.name} onClick={() => OpenApp(a.name, '', '').catch(errMsg)}>
+                                    <AppIcon name={a.name} icons={icons}/>
+                                </ActionIcon>
+                            </Tooltip>
+                        ))}
+                    </Group>
                     <Tooltip label={dispatcher === 'dispatching' ? 'Dispatcher running in this app' : 'UI only: another process dispatches'} position="right">
-                        <Box mt="auto" mx={mini ? 'auto' : 0} w={8} h={8} style={{borderRadius: '50%', background: `var(--mantine-color-${dispatcher === 'dispatching' ? 'green' : 'gray'}-6)`}}/>
+                        <Box mx={mini ? 'auto' : 0} w={8} h={8} style={{borderRadius: '50%', background: `var(--mantine-color-${dispatcher === 'dispatching' ? 'green' : 'gray'}-6)`}}/>
                     </Tooltip>
                 </Stack>
             </AppShell.Navbar>

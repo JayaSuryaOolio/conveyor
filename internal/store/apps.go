@@ -11,11 +11,13 @@ type App struct {
 	ID      int64  `json:"id"`
 	Name    string `json:"name"`
 	Command string `json:"command"`
+	// Global apps are not tied to a worktree: shown in the nav bar, not on task pages.
+	Global bool `json:"global"`
 }
 
 // CreateApp inserts an app; names are unique.
 func CreateApp(db *sql.DB, a App) (App, error) {
-	res, err := db.Exec(`INSERT INTO apps (name, command) VALUES (?,?)`, a.Name, a.Command)
+	res, err := db.Exec(`INSERT INTO apps (name, command, global) VALUES (?,?,?)`, a.Name, a.Command, a.Global)
 	if err != nil {
 		return App{}, fmt.Errorf("create app %q: %w", a.Name, err)
 	}
@@ -25,7 +27,7 @@ func CreateApp(db *sql.DB, a App) (App, error) {
 
 // ListApps returns all apps ordered by name.
 func ListApps(db *sql.DB) ([]App, error) {
-	rows, err := db.Query(`SELECT id, name, command FROM apps ORDER BY name COLLATE NOCASE`)
+	rows, err := db.Query(`SELECT id, name, command, global FROM apps ORDER BY name COLLATE NOCASE`)
 	if err != nil {
 		return nil, fmt.Errorf("list apps: %w", err)
 	}
@@ -33,7 +35,7 @@ func ListApps(db *sql.DB) ([]App, error) {
 	out := []App{}
 	for rows.Next() {
 		var a App
-		if err := rows.Scan(&a.ID, &a.Name, &a.Command); err != nil {
+		if err := rows.Scan(&a.ID, &a.Name, &a.Command, &a.Global); err != nil {
 			return nil, fmt.Errorf("scan app: %w", err)
 		}
 		out = append(out, a)
@@ -44,15 +46,15 @@ func ListApps(db *sql.DB) ([]App, error) {
 // GetApp returns the app or a wrapped sql.ErrNoRows.
 func GetApp(db *sql.DB, name string) (App, error) {
 	var a App
-	if err := db.QueryRow(`SELECT id, name, command FROM apps WHERE name=?`, name).Scan(&a.ID, &a.Name, &a.Command); err != nil {
+	if err := db.QueryRow(`SELECT id, name, command, global FROM apps WHERE name=?`, name).Scan(&a.ID, &a.Name, &a.Command, &a.Global); err != nil {
 		return App{}, fmt.Errorf("app %q: %w", name, err)
 	}
 	return a, nil
 }
 
-// UpdateApp renames and/or changes the command of the app with a.ID.
+// UpdateApp renames, changes the command and/or global flag of the app with a.ID.
 func UpdateApp(db *sql.DB, a App) error {
-	res, err := db.Exec(`UPDATE apps SET name=?, command=? WHERE id=?`, a.Name, a.Command, a.ID)
+	res, err := db.Exec(`UPDATE apps SET name=?, command=?, global=? WHERE id=?`, a.Name, a.Command, a.Global, a.ID)
 	if err != nil {
 		return fmt.Errorf("update app %q: %w", a.Name, err)
 	}
