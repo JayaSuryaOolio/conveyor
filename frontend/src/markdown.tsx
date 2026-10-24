@@ -188,7 +188,7 @@ export function MarkdownEditor({value, onChange, onSubmit, submitLabel = 'Send',
                             <Group key={i.insert} gap="xs" wrap="nowrap" px="xs" py={2} style={{cursor: 'pointer', borderRadius: 4}}
                                    bg={n === hi ? 'var(--mantine-color-default-hover)' : undefined}
                                    onMouseEnter={() => setHi(n)} onMouseDown={e => { e.preventDefault(); pick(i) }}>
-                                <Text size="sm" ff="monospace" c={trig?.kind === '@' ? 'blue' : 'violet'} truncate={trig?.kind === '@' ? 'start' : 'end'} style={{flex: 'none', maxWidth: '100%'}}>{i.label}</Text>
+                                <Text size="sm" ff="monospace" c={trig?.kind === '@' ? 'blue' : 'violet'} truncate={trig?.kind === '@' ? 'start' : 'end'} style={{flex: 'none', maxWidth: '100%'}}><span dir="ltr">{i.label}</span></Text>
                                 {i.hint && <Text size="xs" c="dimmed" truncate>{i.hint}</Text>}
                             </Group>
                         ))}
