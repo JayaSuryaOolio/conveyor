@@ -92,7 +92,7 @@ conveyor task unlink CV-1A blocks CV-1B
 
 ## Comments, resume and fresh sessions
 
-A comment from you, or a system note, on a task in needs_you, review, failed or done puts it back in todo, and the dispatcher launches it again. A comment on a running task is kept and picked up when the run stops (the task then goes to todo instead of review). A comment on a backlog or todo task just waits.
+A comment from you, or a system note, on a task in needs_you, review, failed or done puts it back in todo, and the dispatcher launches it again. A comment on a running task is queued (marked "queued" in the thread) and sent with the next run: when the run stops or its session vanishes, the task goes to todo instead of review or needs_you. A comment on a backlog or todo task just waits.
 
 When the dispatcher launches a task that already has runs, it chooses between:
 
