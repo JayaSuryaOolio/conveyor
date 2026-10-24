@@ -99,3 +99,19 @@ func TestSessions(t *testing.T) {
 		t.Fatalf("%+v %v", a, err)
 	}
 }
+
+func TestActionsUseBin(t *testing.T) {
+	s := newSvc(t)
+	tk := actionTask(t, s)
+	s.Bin = "/opt/cli/conveyor"
+	if _, err := s.Actions(tk.Key); err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(filepath.Join(s.Home, "claude-settings.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(b), "/opt/cli/conveyor") {
+		t.Fatalf("hooks do not call Bin: %s", b)
+	}
+}
