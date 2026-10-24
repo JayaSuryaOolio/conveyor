@@ -1,7 +1,7 @@
 import {useEffect, useState} from 'react'
 import {ActionIcon, Badge, Box, Button, Card as MCard, Group, Menu, Modal, Notification, Paper, Select, Stack, Text, Tooltip} from '@mantine/core'
-import {IconAppWindow, IconDots} from '@tabler/icons-react'
-import {AddComment, MergedPR, Move, ShowError} from '../wailsjs/go/ui/App'
+import {IconAppWindow, IconDots, IconPencil} from '@tabler/icons-react'
+import {AddComment, MergedPR, Move, ShowError, TakeQueuedComment} from '../wailsjs/go/ui/App'
 import {store, ui} from '../wailsjs/go/models'
 import {Markdown, MarkdownEditor} from './markdown'
 import {ALL_STATUSES, STATUS_COLOR, STATUS_LABEL, ago, fmtK, fmtTime} from './util'
@@ -92,8 +92,10 @@ export function Card({c, nav}: {c: ui.TaskCard; nav: Nav}) {
     )
 }
 
-export function CommentBox({k, placeholder = 'Comment…', onDone}: {k: string; placeholder?: string; onDone?: () => void}) {
+/** `restored` (a fresh object per request) appends a pulled-back queued message to the editor. */
+export function CommentBox({k, placeholder = 'Comment…', onDone, restored}: {k: string; placeholder?: string; onDone?: () => void; restored?: {body: string}}) {
     const [text, setText] = useState('')
+    useEffect(() => { if (restored) setText(t => t ? t + '\n\n' + restored.body : restored.body) }, [restored])
     const [busy, setBusy] = useState(false)
     const [merged, setMerged] = useState('')
     const post = (after: string) => {
@@ -120,13 +122,16 @@ export function CommentBox({k, placeholder = 'Comment…', onDone}: {k: string; 
 }
 
 /** One comment in the thread. */
-export function Message({m, queued}: {m: store.Comment; queued?: boolean}) {
+export function Message({m, onEdit}: {m: store.Comment; onEdit?: () => void}) {
     return (
         <Paper withBorder p="sm" radius="md" bg={m.author === 'human' ? 'var(--mantine-color-default-hover)' : undefined}>
             <Group gap="xs" mb={4}>
                 <Text size="xs" fw={600}>{m.author}</Text>
                 <Time iso={m.created_at}/>
-                {queued && <Tooltip label="Sent to the agent when the current run stops"><Badge size="xs" variant="light" color="gray">queued</Badge></Tooltip>}
+                {onEdit && <>
+                    <Tooltip label="Sent to the agent when the current run stops"><Badge size="xs" variant="light" color="gray">queued</Badge></Tooltip>
+                    <Tooltip label="Move back to the editor"><ActionIcon variant="subtle" color="gray" size="xs" aria-label="Edit queued message" onClick={onEdit}><IconPencil size={12}/></ActionIcon></Tooltip>
+                </>}
             </Group>
             <Markdown>{m.body}</Markdown>
         </Paper>

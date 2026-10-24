@@ -288,6 +288,20 @@ func (a *App) AddComment(key, body, after string) error {
 	return err
 }
 
+// TakeQueuedComment pulls a still-queued human comment out of the thread and returns its
+// body for re-editing; it errors if the agent already received it.
+func (a *App) TakeQueuedComment(key string, id int64) (string, error) {
+	t, err := store.GetTaskByKey(a.svc.DB, key)
+	if err != nil {
+		return "", err
+	}
+	body, ok, err := store.TakeQueuedComment(a.svc.DB, t.ID, id)
+	if err == nil && !ok {
+		err = fmt.Errorf("the agent already received this message")
+	}
+	return body, err
+}
+
 // MergedPR is the merged PR a comment on the task would trip over, or "".
 func (a *App) MergedPR(key string) (string, error) { return a.svc.MergedPR(key) }
 
