@@ -89,3 +89,45 @@ func TestOpenLogRotates(t *testing.T) {
 		t.Fatalf("old log not kept: %v", err)
 	}
 }
+
+func TestAutomationCRUDAndDescribeSchedule(t *testing.T) {
+	a, _ := newApp(t)
+	x := store.Automation{Name: "n", Schedule: "0 9 * * 1-5", ActionKind: "cli", ActionArg: `{"args":["list"]}`}
+	if err := a.AddAutomation(x); err != nil {
+		t.Fatal(err)
+	}
+	if a.AddAutomation(x) == nil {
+		t.Fatal("duplicate name accepted")
+	}
+	if a.AddAutomation(store.Automation{Name: "bad", Schedule: "nope", ActionKind: "cli", ActionArg: "{}"}) == nil {
+		t.Fatal("bad schedule accepted")
+	}
+	got, _ := store.GetAutomation(a.svc.DB, "n")
+	res := "ok"
+	got.LastResult = &res
+	store.UpdateAutomation(a.svc.DB, got)
+	x.Schedule, x.Precheck = "*/5 * * * *", "true"
+	if err := a.UpdateAutomation(x); err != nil {
+		t.Fatal(err)
+	}
+	got, _ = store.GetAutomation(a.svc.DB, "n")
+	if got.Schedule != "*/5 * * * *" || got.Precheck != "true" || got.LastResult == nil || !got.Enabled {
+		t.Fatalf("update: %+v", got)
+	}
+	x.Name = "missing"
+	if a.UpdateAutomation(x) == nil {
+		t.Fatal("update of missing automation succeeded")
+	}
+	if err := a.DeleteAutomation("n"); err != nil {
+		t.Fatal(err)
+	}
+	if a.DeleteAutomation("n") == nil {
+		t.Fatal("double delete succeeded")
+	}
+	if i := a.DescribeSchedule("0 9 * * 1-5"); !i.Valid || len(i.Next) != 3 || i.Description != "Every weekday at 09:00" {
+		t.Fatalf("describe: %+v", i)
+	}
+	if i := a.DescribeSchedule("x"); i.Valid || i.Error == "" {
+		t.Fatalf("describe invalid: %+v", i)
+	}
+}
