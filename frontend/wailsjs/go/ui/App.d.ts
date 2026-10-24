@@ -14,6 +14,8 @@ export function AddComment(arg1:string,arg2:string):Promise<void>;
 
 export function AddRepo(arg1:string,arg2:string):Promise<void>;
 
+export function AppLog(arg1:number):Promise<core.AppLog>;
+
 export function ApplyLearnings(arg1:string):Promise<string>;
 
 export function Cancel(arg1:string):Promise<void>;

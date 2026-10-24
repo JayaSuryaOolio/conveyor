@@ -10,7 +10,6 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"sync/atomic"
 	"time"
 
@@ -47,7 +46,7 @@ func (a *App) Startup(ctx context.Context) {
 		return
 	}
 	// A Finder-launched app's stderr goes nowhere; keep a log file in the home too.
-	if f, err := openLog(filepath.Join(home, "conveyor.log")); err == nil {
+	if f, err := openLog(core.LogPath(home)); err == nil {
 		log.SetOutput(io.MultiWriter(os.Stderr, f))
 	}
 	log.Printf("app start: home=%s cli=%s PATH=%s", home, conveyorBin(), os.Getenv("PATH"))
@@ -292,6 +291,9 @@ func (a *App) Sessions(key string) ([]core.Session, error) { return a.svc.Sessio
 
 // RunLog returns the run's session chat entries after byte offset after.
 func (a *App) RunLog(runID, after int64) (core.RunLog, error) { return a.svc.RunLog(runID, after) }
+
+// AppLog returns the app log from offset after; pass -1 for the recent tail.
+func (a *App) AppLog(after int64) (core.AppLog, error) { return core.ReadAppLog(a.svc.Home, after) }
 
 // EnsureWorkspace creates the task's worktrees (workspace.Ensure).
 func (a *App) EnsureWorkspace(key string) error {
