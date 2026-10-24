@@ -294,13 +294,25 @@ func (a *App) GetSettings() (map[string]string, error) { return store.ListSettin
 func (a *App) SetSetting(k, v string) error { return store.SetSetting(a.svc.DB, k, v) }
 
 // Actions lists the terminal/editor actions for a task's workspace.
-func (a *App) Actions(key string) ([]core.Action, error) { return a.svc.Actions(key) }
+func (a *App) Actions(key string) ([]core.Action, error) {
+	r, err := a.svc.Actions(key)
+	if err != nil {
+		log.Printf("actions %s: %v", key, err)
+	}
+	return r, err
+}
 
 // RunAction opens an action. Kind "resume:<id>" resumes a manual session.
 func (a *App) RunAction(key, kind, repo string) error { return a.svc.RunAction(key, kind, repo) }
 
 // Sessions lists manual Claude sessions in the task's worktrees.
-func (a *App) Sessions(key string) ([]core.Session, error) { return a.svc.Sessions(key) }
+func (a *App) Sessions(key string) ([]core.Session, error) {
+	r, err := a.svc.Sessions(key)
+	if err != nil {
+		log.Printf("sessions %s: %v", key, err)
+	}
+	return r, err
+}
 
 // RunLog returns the run's session chat entries after byte offset after.
 func (a *App) RunLog(runID, after int64) (core.RunLog, error) { return a.svc.RunLog(runID, after) }

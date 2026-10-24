@@ -95,8 +95,8 @@ function RepoFields({k, r, reload, children}: {k: string; r: store.TaskRepo; rel
 export function TaskSidebar({t, runs, reload, onTerm}: {t: store.Task; runs: store.Run[]; reload: () => void; onTerm: (t: ui.TermInfo) => void}) {
     const k = t.key
     const repos = t.repos ?? []
-    const {data: actions, reload: reloadActions} = useData(() => Actions(k), [k])
-    const {data: sessions, reload: reloadSessions} = useData(() => Sessions(k), [k])
+    const {data: actions, error: actionsError, reload: reloadActions} = useData(() => Actions(k), [k])
+    const {data: sessions, error: sessionsError, reload: reloadSessions} = useData(() => Sessions(k), [k])
     const [busy, setBusy] = useState(false)
     const taskActions = (actions ?? []).filter(a => ['attach', 'resume', 'fresh'].includes(a.kind))
     const hasWorktree = repos.some(r => r.worktree_path)
@@ -114,6 +114,7 @@ export function TaskSidebar({t, runs, reload, onTerm}: {t: store.Task; runs: sto
             <Group justify="space-between"><Text size="xs" c="dimmed">Updated</Text><Time iso={t.updated_at}/></Group>
             <Divider/>
             <Title order={6}>Repos</Title>
+            {actionsError && <Text size="xs" c="red">Failed to load actions: {actionsError}</Text>}
             {repos.map(r => (
                 <RepoFields key={r.repo_id + '|' + r.branch + '|' + (r.pr_url ?? '')} k={k} r={r} reload={reload}>
                     {(actions ?? []).filter(a => a.repo === r.repo_name && ['shell', 'editor'].includes(a.kind)).map(a => <ActionRow key={a.kind} k={k} a={a} onTerm={onTerm}/>)}
@@ -125,6 +126,7 @@ export function TaskSidebar({t, runs, reload, onTerm}: {t: store.Task; runs: sto
             {taskActions.map(a => <ActionRow key={a.kind} k={k} a={a} onTerm={onTerm}/>)}
             <Divider/>
             <Title order={6}>Sessions</Title>
+            {sessionsError && <Text size="xs" c="red">Failed to load sessions: {sessionsError}</Text>}
             {runs.length + (sessions?.length ?? 0) === 0 && <Text size="xs" c="dimmed">None yet.</Text>}
             {runs.map((r, i) => (
                 <Text key={r.id} size="xs" c="dimmed">#{i + 1} {r.kind} · {r.status}{r.block_status ? ' · ' + r.block_status : ''}</Text>
