@@ -112,7 +112,7 @@ type Learning struct {
 	CreatedAt     string  `json:"created_at"`
 }
 
-// Automation is a scheduled action (queries arrive with task 010).
+// Automation is a scheduled action.
 type Automation struct {
 	ID         int64   `json:"id"`
 	Name       string  `json:"name"`

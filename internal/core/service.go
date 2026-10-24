@@ -31,6 +31,10 @@ type NewTaskInput struct {
 	Agent       string
 	ParentKey   string
 	Priority    int
+	// Source, ExternalKey and ExternalURL come from importers (default source is manual).
+	Source      string
+	ExternalKey string
+	ExternalURL string
 }
 
 var nonAlnum = regexp.MustCompile(`[^a-z0-9]+`)
@@ -89,6 +93,7 @@ func (s *Service) CreateTask(in NewTaskInput) (store.Task, error) {
 	t := store.Task{
 		Title: in.Title, Description: in.Description, Priority: in.Priority,
 		Model: optional(in.Model), Agent: optional(in.Agent), Status: store.StatusBacklog,
+		Source: in.Source, ExternalKey: optional(in.ExternalKey), ExternalURL: optional(in.ExternalURL),
 	}
 	if in.Start {
 		t.Status = store.StatusTodo
