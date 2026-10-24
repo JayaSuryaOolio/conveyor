@@ -104,3 +104,28 @@ func TestApplyGroupsByRepo(t *testing.T) {
 		t.Fatal("unknown repo")
 	}
 }
+
+// A failure after the task is created (learnings still accepted) must not make a retry create a second task.
+func TestApplyRetryAfterPartialFailure(t *testing.T) {
+	svc, _ := setup(t)
+	Accept(svc.DB, 1, "")
+	Accept(svc.DB, 2, "")
+	// Simulate Apply dying right after CreateTask: make marking fail.
+	svc.DB.Exec(`CREATE TRIGGER fail_mark BEFORE UPDATE ON learnings BEGIN SELECT RAISE(ABORT, 'boom'); END`)
+	if _, err := Apply(svc, "a"); err == nil {
+		t.Fatal("expected failure")
+	}
+	svc.DB.Exec(`DROP TRIGGER fail_mark`)
+	keys, err := Apply(svc, "a")
+	if err != nil || len(keys) != 1 {
+		t.Fatalf("%v %v", keys, err)
+	}
+	var n int
+	svc.DB.QueryRow(`SELECT COUNT(*) FROM tasks WHERE source='learning'`).Scan(&n)
+	if n != 1 {
+		t.Fatalf("%d learning tasks, want 1", n)
+	}
+	if applied, _ := List(svc.DB, "applied"); len(applied) != 2 {
+		t.Fatalf("applied %d", len(applied))
+	}
+}
