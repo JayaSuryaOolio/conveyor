@@ -258,6 +258,27 @@ func TestLaunchFailures(t *testing.T) {
 	}
 }
 
+func TestFailedLaunchKeepsCommentDelta(t *testing.T) {
+	e := setup(t)
+	tk := e.task(t, "t", 0)
+	store.AddComment(e.db, store.Comment{TaskID: tk.ID, Author: store.AuthorHuman, Body: "please do X"})
+	fail := filepath.Join(e.fake, "fail")
+	os.WriteFile(fail, []byte("boom\n"), 0o644)
+	e.now = time.Now().Add(time.Minute)
+	e.tick(t)
+	if left, _ := store.UnconsumedComments(e.db, tk.ID); len(left) != 1 {
+		t.Fatalf("comment lost after failed launch: %d unconsumed", len(left))
+	}
+	os.Remove(fail)
+	e.tick(t)
+	if raw, _ := os.ReadFile(filepath.Join(e.fake, "log")); !strings.Contains(string(raw), "\n- [human] please do X") {
+		t.Error("retry prompt lacks the comment")
+	}
+	if left, _ := store.UnconsumedComments(e.db, tk.ID); len(left) != 0 {
+		t.Error("comment not consumed by the successful run")
+	}
+}
+
 func TestReapVanished(t *testing.T) {
 	e := setup(t)
 	tk := e.task(t, "t", 0)
