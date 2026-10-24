@@ -361,6 +361,43 @@ func TestReapVanished(t *testing.T) {
 	}
 }
 
+func TestReapInteractive(t *testing.T) {
+	e := setup(t)
+	tk := e.task(t, "t", 0)
+	sess := "sess-manual"
+	run, err := store.CreateRun(e.db, store.Run{TaskID: tk.ID, Kind: "interactive", Mode: "fresh", Status: "running", SessionID: &sess})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.UpdateTaskStatus(e.db, tk.ID, store.StatusRunning, store.ActorSystem); err != nil {
+		t.Fatal(err)
+	}
+
+	os.WriteFile(filepath.Join(e.fake, "agents.json"), []byte(`[{"sessionId":"sess-manual","pid":42}]`), 0o644)
+	e.now = time.Now().Add(time.Minute)
+	e.d.reap(t.Context())
+	if got, _ := store.GetRun(e.db, run.ID); got.Status != "running" {
+		t.Fatal("reaped a live session")
+	}
+
+	os.WriteFile(filepath.Join(e.fake, "agents.json"), []byte(`[]`), 0o644)
+	e.now = time.Now().Add(5 * time.Second) // younger than the grace period
+	e.d.reap(t.Context())
+	if got, _ := store.GetRun(e.db, run.ID); got.Status != "running" {
+		t.Fatal("reaped inside the grace period")
+	}
+
+	e.now = time.Now().Add(time.Minute)
+	e.d.reap(t.Context())
+	got, _ := store.GetRun(e.db, run.ID)
+	if got.Status != "finished" || got.Error != nil || got.EndedAt == nil {
+		t.Fatalf("run %+v", got)
+	}
+	if e.get(t, tk.ID).Status != store.StatusNeedsYou {
+		t.Fatalf("task %s", e.get(t, tk.ID).Status)
+	}
+}
+
 func TestReapVanishedWithQueuedCommentRequeues(t *testing.T) {
 	e := setup(t)
 	tk := e.task(t, "t", 0)
