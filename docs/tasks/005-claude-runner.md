@@ -69,3 +69,17 @@ func WriteSettings(home, conveyorBin string) (string, error)
 - `Agents` parses JSON that includes interactive sessions with no `id`.
 - The `WriteSettings` JSON round-trips and contains `worktree.bgIsolation: "none"` and the three hooks.
 - Command strings quote paths with spaces.
+
+## Outcome
+Built `internal/claude` (`claude.go`, `claude_test.go`) with the exact API from the spec. Tests use a fake `claude` bash script on a temp `PATH` that logs cwd, env and argv.
+
+Deviations and notes:
+- `Agent` JSON tags: `id`, `name`, `cwd`, `state`, `status`, `sessionId`, `pid` (from landscape.md; not verified against a real `claude`).
+- `Launch`, `Resume`, `Agents`, `Stop` and `Remove` map a missing binary to `ErrNotFound`. A non-zero exit returns a wrapped error that includes the output.
+- `FreshCommand` puts the quoted prompt before `--add-dir` (the flag is variadic). Hook command strings single-quote `<bin>` and `<home>`.
+- `--strict-mcp-config` is always passed, as in tech-spec §7.
+
+Manual checks: none against a real `claude`.
+
+### Follow-ups
+- Verify the `claude agents --json` field names against a real CLI.
