@@ -106,5 +106,8 @@ func TestAutomationCLI(t *testing.T) {
 	if b, err := exec.Command(bin, "--home", home, "automation", "add", "bad", "--schedule", "nope", "--kind", "cli", "--arg", "{}").CombinedOutput(); err == nil {
 		t.Fatalf("expected bad schedule to fail: %s", b)
 	}
+	if b, err := exec.Command(bin, "--home", home, "automation", "add", "bad", "--schedule", "* * * * *", "--kind", "cli", "--arg", "not json").CombinedOutput(); err == nil || !strings.Contains(string(b), "not valid JSON") {
+		t.Fatalf("expected invalid --arg to fail: %s", b)
+	}
 	cv(t, home, "automation", "rm", "pr-sweep")
 }
