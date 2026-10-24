@@ -9,25 +9,37 @@ import {TaskAgent} from './forms'
 import {TaskSidebar} from './workspace'
 import {fmtDuration, fmtK, useData} from './util'
 
-const COLUMNS = [['backlog', 'Backlog'], ['todo', 'Todo'], ['running', 'Running'], ['needs_you', 'Needs you'], ['review', 'Review'], ['done', 'Done (7d)']]
+const COLUMNS = [['backlog', 'Backlog'], ['todo', 'Todo'], ['running', 'Running'], ['needs_you', 'Needs you'], ['review', 'Review'], ['done', 'Done (7d)'], ['cancelled', 'Cancelled (7d)']]
 const FOCUS_ORDER = ['needs_you', 'review', 'failed', 'running', 'todo']
 const WEEK = 7 * 24 * 3600 * 1000
+const ARCHIVE = ['done', 'cancelled'] // collapsed until opened
 
 export function Board({nav, q}: {nav: Nav; q: string}) {
     const {data, error} = useData(ListTasks, [])
+    const [open, setOpen] = useState<string[]>([])
     if (error) return <Text c="red">{error}</Text>
+    const shut = (s: string) => ARCHIVE.includes(s) && !open.includes(s)
+    const toggle = (s: string) => setOpen(o => o.includes(s) ? o.filter(x => x !== s) : [...o, s])
     const needle = q.toLowerCase()
     const cards = (data ?? []).filter(c => !needle || (c.key + ' ' + c.title).toLowerCase().includes(needle))
     const cols = [...COLUMNS]
     if (cards.some(c => c.status === 'failed')) cols.splice(5, 0, ['failed', 'Failed'])
     return (
-        <Box style={{display: 'grid', gridTemplateColumns: `repeat(${cols.length}, minmax(180px, 1fr))`, gap: 'var(--mantine-spacing-sm)', alignItems: 'start', overflowX: 'auto'}}>
+        <Box style={{display: 'grid', gridTemplateColumns: cols.map(([s]) => shut(s) ? '36px' : 'minmax(180px, 1fr)').join(' '), gap: 'var(--mantine-spacing-sm)', alignItems: 'start', overflowX: 'auto'}}>
             {cols.map(([s, label]) => {
                 let list = cards.filter(c => c.status === s)
-                if (s === 'done') list = list.filter(c => Date.now() - Date.parse(c.updatedAt) < WEEK)
+                if (ARCHIVE.includes(s)) list = list.filter(c => Date.now() - Date.parse(c.updatedAt) < WEEK)
+                if (shut(s)) return (
+                    <Paper key={s} bg="var(--mantine-color-default-hover)" py="xs" radius="md" mih={120} title={'Show ' + label}
+                           style={{cursor: 'pointer', writingMode: 'vertical-rl', display: 'flex', alignItems: 'center', gap: 6}} onClick={() => toggle(s)}>
+                        <Text size="sm" fw={600}>{label}</Text>
+                        <Text size="xs" c="dimmed">{list.length}</Text>
+                    </Paper>
+                )
                 return (
                     <Paper key={s} bg="var(--mantine-color-default-hover)" p="xs" radius="md" mih={120}>
-                        <Group gap="xs" mb="xs" px={4}>
+                        <Group gap="xs" mb="xs" px={4} style={ARCHIVE.includes(s) ? {cursor: 'pointer'} : undefined}
+                               title={ARCHIVE.includes(s) ? 'Collapse' : undefined} onClick={ARCHIVE.includes(s) ? () => toggle(s) : undefined}>
                             <Text size="sm" fw={600}>{label}</Text>
                             <Text size="xs" c="dimmed">{list.length}</Text>
                         </Group>

@@ -41,8 +41,8 @@ export function Agents() {
                 <Table.Tbody>
                     {shown?.map(a => (
                         <Table.Tr key={a.scope + a.name}>
-                            <Table.Td fw={600}>{a.name}</Table.Td>
-                            <Table.Td><Badge variant="light" color={a.scope === 'user' ? 'gray' : 'blue'}>{a.scope}</Badge></Table.Td>
+                            <Table.Td fw={600} style={{whiteSpace: 'nowrap'}}>{a.name}</Table.Td>
+                            <Table.Td style={{whiteSpace: 'nowrap'}}><Badge variant="light" tt="none" style={{overflow: 'visible'}} color={a.scope === 'user' ? 'gray' : 'blue'}>{a.scope}</Badge></Table.Td>
                             <Table.Td><Text size="sm" c="dimmed" lineClamp={2} title={a.description}>{a.description}</Text></Table.Td>
                         </Table.Tr>
                     ))}
