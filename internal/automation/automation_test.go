@@ -78,13 +78,13 @@ func mk(t *testing.T, kind, arg, pre string) store.Automation {
 
 func TestRunOneCreateTask(t *testing.T) {
 	svc, _ := env(t)
-	a := mk(t, "create_task", `{"title":"Fix","description":"saw {output}","repos":["a"],"start":true}`, `echo boom`)
+	a := mk(t, "create_task", `{"title":"Fix","description":"saw {output}","repos":["a"],"agent":"reviewer","start":true}`, `echo boom`)
 	res, err := RunOne(context.Background(), svc, a)
 	if err != nil || res != "created CV-1" {
 		t.Fatalf("%q %v", res, err)
 	}
 	tk, _ := store.GetTaskByKey(svc.DB, "CV-1")
-	if tk.Description != "saw boom" || tk.Status != store.StatusTodo {
+	if tk.Description != "saw boom" || tk.Status != store.StatusTodo || tk.Agent == nil || *tk.Agent != "reviewer" {
 		t.Fatalf("%+v", tk)
 	}
 	// failing precheck skips

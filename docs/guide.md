@@ -150,7 +150,7 @@ An automation has a name, a standard 5-field cron schedule, an optional shell pr
 
 Kinds:
 
-- `create_task`: `{title, description, repos, start}`.
+- `create_task`: `{title, description, repos, agent, start}`. `agent` is optional (a Claude agent name, as on a task).
 - `comment`: `{task_key | task_status, body}`. With `task_status` it comments on every task in that status, running the precheck once per task with `CONVEYOR_TASK_KEY`, `CONVEYOR_TASK_BRANCH` and `CONVEYOR_TASK_PR` set.
 - `cli`: `{args}`, run as a `conveyor` command.
 
