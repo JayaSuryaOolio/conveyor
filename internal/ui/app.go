@@ -47,7 +47,7 @@ func (a *App) Startup(ctx context.Context) {
 		return
 	}
 	// A Finder-launched app's stderr goes nowhere; keep a log file in the home too.
-	if f, err := os.OpenFile(filepath.Join(home, "conveyor.log"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644); err == nil {
+	if f, err := openLog(filepath.Join(home, "conveyor.log")); err == nil {
 		log.SetOutput(io.MultiWriter(os.Stderr, f))
 	}
 	log.Printf("app start: home=%s cli=%s PATH=%s", home, conveyorBin(), os.Getenv("PATH"))
@@ -345,3 +345,14 @@ func (a *App) ApplyLearnings(repo string) (string, error) {
 	}
 	return keys[0], nil
 }
+
+// openLog appends to path, first moving it to path.1 once it passes maxLog.
+// ponytail: rotates only at startup; rotate on write if a single session ever logs that much.
+func openLog(path string) (*os.File, error) {
+	if fi, err := os.Stat(path); err == nil && fi.Size() > maxLog {
+		os.Rename(path, path+".1")
+	}
+	return os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+}
+
+const maxLog = 5 << 20
