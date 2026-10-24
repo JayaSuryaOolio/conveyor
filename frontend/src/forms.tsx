@@ -115,6 +115,7 @@ type Field = {k: string; label: string; desc: string; kind?: "area" | "md"}
 
 const TABS: {name: string; fields: Field[]}[] = [
     {name: "General", fields: [
+        {k: "user_name", label: "Your name", desc: "Shown as the creator of tasks you create. Empty shows \"human\"."},
         {k: "key_prefix", label: "Task key prefix", desc: "Prefix for new task keys, e.g. CV gives CV-12."},
         {k: "default_model", label: "Default model", desc: "Model for runs that do not set one. Empty uses the Claude Code default."},
     ]},
