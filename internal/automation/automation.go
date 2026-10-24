@@ -160,7 +160,7 @@ func (act action) run(ctx context.Context, svc *core.Service, kind, out, key str
 		if key == "" || act.Body == "" {
 			return "", errors.New("comment needs task_status or task_key, and body")
 		}
-		if _, err := svc.AddComment(key, store.AuthorSystem, sub(act.Body)); err != nil {
+		if _, err := svc.AddComment(key, store.AuthorSystem, sub(act.Body), core.FollowUp); err != nil {
 			return "", err
 		}
 		return "commented on " + key, nil

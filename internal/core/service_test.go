@@ -65,7 +65,7 @@ func TestAddCommentTransitions(t *testing.T) {
 		tk, _ := s.CreateTask(NewTaskInput{Title: "t", Repos: []string{"a"}})
 		// force the status directly; the table is tested in store
 		s.DB.Exec(`UPDATE tasks SET status=? WHERE id=?`, c.from, tk.ID)
-		if _, err := s.AddComment(tk.Key, c.author, "hi"); err != nil {
+		if _, err := s.AddComment(tk.Key, c.author, "hi", FollowUp); err != nil {
 			t.Fatal(err)
 		}
 		got, _ := store.GetTask(s.DB, tk.ID)
@@ -83,7 +83,7 @@ func TestCommentAfterMergeStartsFollowUp(t *testing.T) {
 	tr := tk.Repos[0]
 	tr.PRURL, tr.PRState = &url, &state
 	store.UpdateTaskRepo(s.DB, tr)
-	if _, err := s.AddComment(tk.Key, store.AuthorHuman, "tone it down\nmore detail"); err != nil {
+	if _, err := s.AddComment(tk.Key, store.AuthorHuman, "tone it down\nmore detail", FollowUp); err != nil {
 		t.Fatal(err)
 	}
 	parent, _ := store.GetTask(s.DB, tk.ID)
@@ -105,6 +105,32 @@ func TestCommentAfterMergeStartsFollowUp(t *testing.T) {
 	}
 	if !strings.Contains(text, "## Continues CV-1: readme") || !strings.Contains(text, "### Its description\n\nrewrite it") {
 		t.Fatalf("brief lacks the parent's context:\n%s", text)
+	}
+}
+
+func TestCommentAfterMergeAskOrNote(t *testing.T) {
+	s := newSvc(t)
+	for _, c := range []struct {
+		after AfterMerge
+		want  store.Status
+		notes int
+	}{{Ask, store.StatusTodo, 1}, {Note, store.StatusDone, 0}} {
+		tk, _ := s.CreateTask(NewTaskInput{Title: "t", Repos: []string{"a"}})
+		s.DB.Exec(`UPDATE tasks SET status=? WHERE id=?`, store.StatusDone, tk.ID)
+		url, state := "https://github.com/o/r/pull/1", "MERGED"
+		tr := tk.Repos[0]
+		tr.PRURL, tr.PRState = &url, &state
+		store.UpdateTaskRepo(s.DB, tr)
+		if pr, _ := s.MergedPR(tk.Key); pr != url {
+			t.Fatalf("MergedPR %q", pr)
+		}
+		s.AddComment(tk.Key, store.AuthorHuman, "why?", c.after)
+		got, _ := store.GetTask(s.DB, tk.ID)
+		rel, _ := store.ListRelations(s.DB, got)
+		cs, _ := store.ListComments(s.DB, tk.ID)
+		if got.Status != c.want || len(rel.Children) != 0 || len(cs) != 1+c.notes {
+			t.Errorf("%q: status %s, %d children, %d comments", c.after, got.Status, len(rel.Children), len(cs))
+		}
 	}
 }
 
@@ -179,7 +205,7 @@ func TestHumanRequeueResetsFailures(t *testing.T) {
 	s := newSvc(t)
 	for name, requeue := range map[string]func(key string) error{
 		"move":    func(k string) error { return s.Move(k, store.StatusTodo) },
-		"comment": func(k string) error { _, err := s.AddComment(k, store.AuthorHuman, "retry"); return err },
+		"comment": func(k string) error { _, err := s.AddComment(k, store.AuthorHuman, "retry", FollowUp); return err },
 	} {
 		tk, _ := s.CreateTask(NewTaskInput{Title: "t", Repos: []string{"a"}})
 		s.DB.Exec(`UPDATE tasks SET status='failed', consecutive_failures=3 WHERE id=?`, tk.ID)

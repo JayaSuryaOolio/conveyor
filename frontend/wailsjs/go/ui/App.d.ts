@@ -14,7 +14,7 @@ export function AddApp(arg1:store.App):Promise<void>;
 
 export function AddAutomation(arg1:store.Automation):Promise<void>;
 
-export function AddComment(arg1:string,arg2:string):Promise<void>;
+export function AddComment(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function AddRepo(arg1:string,arg2:string):Promise<void>;
 
@@ -65,6 +65,8 @@ export function ListAutomations():Promise<Array<store.Automation>>;
 export function ListRepos():Promise<Array<store.Repo>>;
 
 export function ListTasks():Promise<Array<ui.TaskCard>>;
+
+export function MergedPR(arg1:string):Promise<string>;
 
 export function Move(arg1:string,arg2:string):Promise<void>;
 
