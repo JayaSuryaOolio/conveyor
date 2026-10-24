@@ -192,3 +192,13 @@ func (s *Service) SetTaskAgent(key, agent string) error {
 	t.Agent = optional(agent)
 	return store.UpdateTask(s.DB, t)
 }
+
+// SetTaskModel sets (or with "" clears) the task's model override.
+func (s *Service) SetTaskModel(key, model string) error {
+	t, err := store.GetTaskByKey(s.DB, key)
+	if err != nil {
+		return err
+	}
+	t.Model = optional(model)
+	return store.UpdateTask(s.DB, t)
+}
