@@ -54,6 +54,10 @@ export function Learnings() {
   return window['go']['ui']['App']['Learnings']();
 }
 
+export function ListAutomations() {
+  return window['go']['ui']['App']['ListAutomations']();
+}
+
 export function ListRepos() {
   return window['go']['ui']['App']['ListRepos']();
 }
@@ -74,8 +78,16 @@ export function RunAction(arg1, arg2, arg3) {
   return window['go']['ui']['App']['RunAction'](arg1, arg2, arg3);
 }
 
+export function RunAutomation(arg1) {
+  return window['go']['ui']['App']['RunAutomation'](arg1);
+}
+
 export function Sessions(arg1) {
   return window['go']['ui']['App']['Sessions'](arg1);
+}
+
+export function SetAutomationEnabled(arg1, arg2) {
+  return window['go']['ui']['App']['SetAutomationEnabled'](arg1, arg2);
 }
 
 export function SetSetting(arg1, arg2) {
