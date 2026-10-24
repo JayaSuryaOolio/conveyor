@@ -50,6 +50,10 @@ export function ApplyLearnings(arg1) {
   return window['go']['ui']['App']['ApplyLearnings'](arg1);
 }
 
+export function Completions(arg1, arg2) {
+  return window['go']['ui']['App']['Completions'](arg1, arg2);
+}
+
 export function Confirm(arg1) {
   return window['go']['ui']['App']['Confirm'](arg1);
 }

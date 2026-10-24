@@ -37,7 +37,7 @@ export function NewTask({nav, close}: {nav: Nav; close: () => void}) {
         <Modal opened onClose={close} title="New task" size="md">
             <Stack gap="sm">
                 <TextInput data-autofocus placeholder="Title" value={title} onChange={e => setTitle(e.target.value)}/>
-                <MarkdownEditor minRows={4} placeholder="Description" value={desc} onChange={setDesc}/>
+                <MarkdownEditor minRows={4} placeholder="Description" value={desc} onChange={setDesc} repos={sel}/>
                 <Select label="Parent" placeholder="None" searchable clearable value={parent || null} onChange={pickParent}
                         data={(tasks ?? []).filter(t => t.status !== 'done' && t.status !== 'cancelled').map(t => ({value: t.key, label: `${t.key} ${t.title}`}))}/>
                 <MultiSelect label="Repos" placeholder="Pick repos" description={repos?.length === 0 ? 'Add one on the Repos page first' : undefined}

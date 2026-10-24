@@ -27,7 +27,35 @@ function Img({src, alt}: {src?: string; alt?: string}) {
     )
 }
 
-const plugins = [remarkGfm]
+/** @file and /command tokens (after a space or line start), as typed in the editor's autocomplete. */
+const REF = /(^|\s)(@[\w./-]*[\w/-]|\/[a-z][\w:-]*)(?=$|[\s,;:!?)]|\.(?:\s|$))/g
+
+type Node = {type: string; value?: string; children?: Node[]; data?: object}
+/** Wraps REF matches in text nodes (not in code or links) in <span class="md-ref md-ref-file|cmd">. */
+const remarkRefs = () => (tree: Node) => {
+    const walk = (n: Node) => {
+        if (!n.children || n.type === 'link' || n.type === 'linkReference') return
+        n.children = n.children.flatMap(c => {
+            if (c.type !== 'text') { walk(c); return [c] }
+            const out: Node[] = []
+            const v = c.value ?? ''
+            let at = 0
+            for (const m of v.matchAll(REF)) {
+                const start = m.index! + m[1].length
+                if (start > at) out.push({type: 'text', value: v.slice(at, start)})
+                const cls = 'md-ref md-ref-' + (m[2][0] === '@' ? 'file' : 'cmd')
+                out.push({type: 'ref', data: {hName: 'span', hProperties: {className: cls}}, children: [{type: 'text', value: m[2]}]})
+                at = start + m[2].length
+            }
+            if (!out.length) return [c]
+            if (at < v.length) out.push({type: 'text', value: v.slice(at)})
+            return out
+        })
+    }
+    walk(tree)
+}
+
+const plugins = [remarkGfm, remarkRefs]
 const components = {
     // Never navigate the webview: hand links to the system browser.
     a: ({href, children}: {href?: string; children?: React.ReactNode}) => (

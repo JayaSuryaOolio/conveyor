@@ -28,6 +28,8 @@ export function AppPresets():Promise<Array<store.App>>;
 
 export function ApplyLearnings(arg1:string):Promise<string>;
 
+export function Completions(arg1:string,arg2:Array<string>):Promise<core.Completions>;
+
 export function Confirm(arg1:string):Promise<boolean>;
 
 export function CreateTask(arg1:core.NewTaskInput):Promise<string>;
