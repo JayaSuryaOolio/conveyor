@@ -1,12 +1,14 @@
-import {useEffect, useRef, useState} from 'react'
+import {lazy, Suspense, useEffect, useRef, useState} from 'react'
 import {Anchor, Box, Breadcrumbs, Button, Code, Group, Paper, Stack, Text, Timeline, Title} from '@mantine/core'
 import {IconMessage, IconPlayerPlay} from '@tabler/icons-react'
 import {GetTask, ListTasks, RunLog} from '../wailsjs/go/ui/App'
-import {core, store} from '../wailsjs/go/models'
+import {core, store, ui} from '../wailsjs/go/models'
 import {Card, CommentBox, Message, Nav, StatusBadge, Time, errMsg} from './components'
 import {Markdown} from './markdown'
 import {TaskSidebar} from './workspace'
 import {fmtDuration, fmtK, useData} from './util'
+
+const TermDock = lazy(() => import('./terminals'))
 
 const COLUMNS = [['backlog', 'Backlog'], ['todo', 'Todo'], ['running', 'Running'], ['needs_you', 'Needs you'], ['review', 'Review'], ['done', 'Done (7d)'], ['cancelled', 'Cancelled (7d)']]
 const FOCUS_ORDER = ['needs_you', 'review', 'failed', 'running', 'todo']
@@ -140,6 +142,7 @@ function SessionLog({run}: {run: store.Run}) {
 
 export function TaskPage({k, nav}: {k: string; nav: Nav}) {
     const {data: d, error, reload} = useData(() => GetTask(k), [k])
+    const [added, setAdded] = useState<ui.TermInfo>()
     if (error) return <Text c="red">{error}</Text>
     if (!d) return <Text c="dimmed">Loading…</Text>
     const t = d.task
@@ -150,7 +153,8 @@ export function TaskPage({k, nav}: {k: string; nav: Nav}) {
     const runNo = new Map(d.runs.map((r, i) => [r.id, i + 1]))
     const latest = d.runs[d.runs.length - 1]
     return (
-        <Box style={{display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 300px', gap: 'var(--mantine-spacing-xl)', alignItems: 'start'}}>
+        <Box style={{display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 2 * var(--mantine-spacing-md))'}}>
+        <Box style={{flex: 1, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 300px', gap: 'var(--mantine-spacing-xl)', alignItems: 'start'}}>
             <Stack>
                 <Breadcrumbs>
                     <Anchor size="sm" component="button" onClick={() => nav({name: 'board'})}>Board</Anchor>
@@ -179,7 +183,11 @@ export function TaskPage({k, nav}: {k: string; nav: Nav}) {
                 </Timeline>
                 <CommentBox k={t.key} onDone={reload}/>
             </Stack>
-            <TaskSidebar t={t} runs={d.runs} reload={reload}/>
+            <TaskSidebar t={t} runs={d.runs} reload={reload} onTerm={setAdded}/>
+        </Box>
+        <Box mx="calc(-1 * var(--mantine-spacing-md))" mb="calc(-1 * var(--mantine-spacing-md))" mt="md">
+            <Suspense fallback={null}><TermDock k={t.key} added={added}/></Suspense>
+        </Box>
         </Box>
     )
 }
