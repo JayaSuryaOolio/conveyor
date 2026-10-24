@@ -1,6 +1,10 @@
 package core
 
-import "github.com/JayaSuryaOolio/conveyor/internal/store"
+import (
+	"fmt"
+
+	"github.com/JayaSuryaOolio/conveyor/internal/store"
+)
 
 // pair resolves two task keys to ids.
 func (s *Service) pair(a, b string) (int64, int64, error) {
@@ -47,4 +51,21 @@ func (s *Service) SetParent(key, parent string) error {
 		return err
 	}
 	return store.SetParent(s.DB, t.ID, &p.ID)
+}
+
+// AdoptChild makes child a sub-task of parent, refusing to silently move a task that
+// already has a different parent (the UI's "is parent of"). SetParent is the explicit re-parent.
+func (s *Service) AdoptChild(parent, child string) error {
+	c, err := store.GetTaskByKey(s.DB, child)
+	if err != nil {
+		return err
+	}
+	p, err := store.GetTaskByKey(s.DB, parent)
+	if err != nil {
+		return err
+	}
+	if c.ParentID != nil && *c.ParentID != p.ID {
+		return fmt.Errorf("%s already has a parent; re-parent it explicitly", child)
+	}
+	return store.SetParent(s.DB, c.ID, &p.ID)
 }

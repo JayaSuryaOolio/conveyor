@@ -265,6 +265,9 @@ func (a *App) Link(from, kind, to string) error { return a.svc.Link(from, kind, 
 // Unlink removes "from <kind> to".
 func (a *App) Unlink(from, kind, to string) error { return a.svc.Unlink(from, kind, to) }
 
+// AdoptChild makes child a sub-task of parent; errors if child already has another parent.
+func (a *App) AdoptChild(parent, child string) error { return a.svc.AdoptChild(parent, child) }
+
 // SetParent makes parent (empty: none) the parent of the task; keys don't change.
 func (a *App) SetParent(key, parent string) error { return a.svc.SetParent(key, parent) }
 

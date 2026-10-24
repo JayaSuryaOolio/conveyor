@@ -1,8 +1,8 @@
 import {useState} from 'react'
-import {ActionIcon, Anchor, Group, Select, Stack, Text, Title, Tooltip} from '@mantine/core'
+import {ActionIcon, Anchor, Badge, Group, Select, Stack, Text, Title, Tooltip} from '@mantine/core'
 import {IconPlus, IconTrash} from '@tabler/icons-react'
-import {Link, ListTasks, SetParent, Unlink} from '../wailsjs/go/ui/App'
-import {store} from '../wailsjs/go/models'
+import {AdoptChild, Link, ListTasks, SetParent, Unlink} from '../wailsjs/go/ui/App'
+import {store, ui} from '../wailsjs/go/models'
 import {Nav, StatusBadge, errMsg} from './components'
 import {useData} from './util'
 
@@ -13,11 +13,14 @@ const CHOICES: [string, string, string, boolean][] = [
     ['parent', 'is parent of', 'parent', true], ['subtask', 'is sub-task of', 'parent', false],
 ]
 
-/** Keys of tasks that can't take part in the chosen relation: already related that way, or it would close a loop. */
-export function disabledKeys(choice: string, rel: store.Relations): string[] {
+/** Tasks that never appear in the picker. */
+const closed = (t: ui.TaskCard) => t.status === 'done' || t.status === 'cancelled'
+
+/** Keys of tasks that can't take part in the chosen relation: already related that way, it would close a loop, or (is parent of) it already has a parent. */
+export function disabledKeys(choice: string, rel: store.Relations, tasks: ui.TaskCard[] = []): string[] {
     const [, , kind, from] = CHOICES.find(c => c[0] === choice)!
     if (kind === 'parent') {
-        return from ? [...rel.ancestors, ...rel.children.map(c => c.key)] : [...rel.descendants, ...(rel.parent ? [rel.parent.key] : [])]
+        return from ? [...rel.ancestors, ...rel.children.map(c => c.key), ...tasks.filter(t => t.parent).map(t => t.key)] : [...rel.descendants, ...(rel.parent ? [rel.parent.key] : [])]
     }
     const linked = rel.links.filter(l => l.kind === kind && (kind === 'relates' || l.from === from)).map(l => l.task.key)
     return kind === 'blocks' ? [...linked, ...(from ? rel.blocked_by_all : rel.blocks_all)] : linked
@@ -52,9 +55,12 @@ export function Relations({k, status, rel, nav, reload}: {k: string; status: str
         const [, , kind, from] = CHOICES.find(c => c[0] === choice)!
         if (!other) return
         const [a, b] = from ? [k, other] : [other, k]
-        done(kind === 'parent' ? SetParent(b, a) : Link(a, kind, b)).then(() => setOther(null))
+        done(kind === 'parent' ? (from ? AdoptChild(a, b) : SetParent(b, a)) : Link(a, kind, b)).then(() => setOther(null))
     }
-    const off = disabledKeys(choice, rel)
+    const options = (tasks ?? []).filter(x => x.key !== k && !closed(x))
+    const off = disabledKeys(choice, rel, options)
+    const hasParent = new Set(choice === 'parent' ? options.filter(t => t.parent && !rel.children.some(c => c.key === t.key)).map(t => t.key) : [])
+    const byKey = new Map(options.map(t => [t.key, t]))
     const labels = [...new Set(rel.links.map(l => l.label))]
     return (
         <Stack gap="xs">
@@ -79,7 +85,16 @@ export function Relations({k, status, rel, nav, reload}: {k: string; status: str
             <Group gap={4} wrap="nowrap">
                 <Select size="xs" w={130} allowDeselect={false} value={choice} onChange={v => { if (v) { setChoice(v); setOther(null) } }} data={CHOICES.map(c => ({value: c[0], label: c[1]}))}/>
                 <Select size="xs" clearable placeholder="Task" style={{flex: 1}} value={other} onChange={setOther}
-                        data={(tasks ?? []).filter(x => x.key !== k).map(x => ({value: x.key, label: `${x.key} ${x.title}`, disabled: off.includes(x.key)}))}/>
+                        data={options.map(x => ({value: x.key, label: `${x.key} ${x.title}`, disabled: off.includes(x.key)}))}
+                        renderOption={({option}) => (
+                            <Group gap={6} wrap="nowrap" justify="space-between" w="100%">
+                                <Text size="xs" lineClamp={1}>{option.label}</Text>
+                                <Group gap={4} wrap="nowrap">
+                                    {hasParent.has(option.value) && <Badge variant="outline" color="gray" size="xs">has parent</Badge>}
+                                    <StatusBadge status={byKey.get(option.value)?.status ?? ''}/>
+                                </Group>
+                            </Group>
+                        )}/>
                 <ActionIcon variant="default" size="md" aria-label="Add link" disabled={!other} onClick={add}><IconPlus size={14}/></ActionIcon>
             </Group>
         </Stack>
