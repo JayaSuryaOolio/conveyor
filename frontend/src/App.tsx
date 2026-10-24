@@ -1,6 +1,7 @@
 import {useEffect, useRef, useState} from 'react'
-import {AppShell, Badge, Button, Kbd, NavLink, Stack, Text, TextInput, Title} from '@mantine/core'
-import {IconApps, IconBolt, IconBook2, IconClock, IconFolders, IconLayoutKanban, IconLogs, IconPlus, IconRobot, IconSearch, IconSettings} from '@tabler/icons-react'
+import {ActionIcon, AppShell, Badge, Box, Button, Group, Kbd, NavLink, Stack, TextInput, Title, Tooltip} from '@mantine/core'
+import {useLocalStorage} from '@mantine/hooks'
+import {IconApps, IconBolt, IconBook2, IconClock, IconFolders, IconLayoutKanban, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconLogs, IconPlus, IconRobot, IconSearch, IconSettings} from '@tabler/icons-react'
 import {DispatcherState, Learnings} from '../wailsjs/go/ui/App'
 import {Agents} from './agents'
 import {Apps} from './apps'
@@ -32,6 +33,7 @@ export default function App() {
     const [q, setQ] = useState('')
     const search = useRef<HTMLInputElement>(null)
     const [dispatcher, setDispatcher] = useState('')
+    const [mini, setMini] = useLocalStorage({key: 'nav-collapsed', defaultValue: false})
     const {data: learnings} = useData(Learnings, [])
     const proposed = learnings?.filter(l => l.status === 'proposed').length ?? 0
     const nav: Nav = v => setView(v)
@@ -55,7 +57,7 @@ export default function App() {
                 return
             }
             if (e.key === 'n') { e.preventDefault(); setShowNew(true) }
-            else if (e.key === '/') { e.preventDefault(); search.current?.focus() }
+            else if (e.key === '/') { e.preventDefault(); setMini(false); setTimeout(() => search.current?.focus()) }
             else if (e.key === 'g') { g = true; setTimeout(() => (g = false), 1000) }
         }
         window.addEventListener('keydown', onKey)
@@ -63,21 +65,36 @@ export default function App() {
     }, [])
 
     return (
-        <AppShell navbar={{width: 220, breakpoint: 0}} padding="md">
+        <AppShell navbar={{width: mini ? 60 : 220, breakpoint: 0}} padding="md">
             <AppShell.Navbar p="sm">
                 <Stack gap="xs" h="100%">
-                    <Title order={4}>Conveyor</Title>
-                    <Button leftSection={<IconPlus size={16}/>} rightSection={<Kbd size="xs">n</Kbd>} onClick={() => setShowNew(true)}>New task</Button>
-                    <TextInput ref={search} placeholder="Search" leftSection={<IconSearch size={16}/>} rightSection={<Kbd size="xs">/</Kbd>}
-                               value={q} onChange={e => setQ(e.target.value)}/>
+                    <Group justify={mini ? 'center' : 'space-between'} wrap="nowrap">
+                        {!mini && <Title order={4}>Conveyor</Title>}
+                        <ActionIcon variant="subtle" color="gray" aria-label={mini ? 'Expand menu' : 'Collapse menu'} onClick={() => setMini(!mini)}>
+                            {mini ? <IconLayoutSidebarLeftExpand size={18}/> : <IconLayoutSidebarLeftCollapse size={18}/>}
+                        </ActionIcon>
+                    </Group>
+                    {mini ? (
+                        <Tooltip label="New task (n)" position="right">
+                            <ActionIcon size="lg" mx="auto" aria-label="New task" onClick={() => setShowNew(true)}><IconPlus size={18}/></ActionIcon>
+                        </Tooltip>
+                    ) : <>
+                        <Button leftSection={<IconPlus size={16}/>} rightSection={<Kbd size="xs">n</Kbd>} onClick={() => setShowNew(true)}>New task</Button>
+                        <TextInput ref={search} placeholder="Search" leftSection={<IconSearch size={16}/>} rightSection={<Kbd size="xs">/</Kbd>}
+                                   value={q} onChange={e => setQ(e.target.value)}/>
+                    </>}
                     <Stack gap={2} mt="xs">
                         {NAV.map(({name, key, label, icon: Icon}) => (
-                            <NavLink key={name} label={label} active={view.name === name} leftSection={<Icon size={18}/>}
-                                     rightSection={name === 'learnings' && proposed > 0 ? <Badge size="sm" circle>{proposed}</Badge> : key ? <Kbd size="xs" title={`g then ${key}`}>g {key}</Kbd> : undefined}
-                                     onClick={() => setView({name})}/>
+                            <Tooltip key={name} label={label} position="right" disabled={!mini}>
+                                <NavLink label={mini ? undefined : label} active={view.name === name} leftSection={<Icon size={18}/>} aria-label={label}
+                                         rightSection={mini ? undefined : name === 'learnings' && proposed > 0 ? <Badge size="sm" circle>{proposed}</Badge> : key ? <Kbd size="xs" title={`g then ${key}`}>g {key}</Kbd> : undefined}
+                                         onClick={() => setView({name})}/>
+                            </Tooltip>
                         ))}
                     </Stack>
-                    <Text mt="auto" size="xs" c="dimmed" title="Whether this app is running the dispatcher">{dispatcher}</Text>
+                    <Tooltip label={dispatcher === 'dispatching' ? 'Dispatcher running in this app' : 'UI only: another process dispatches'} position="right">
+                        <Box mt="auto" mx={mini ? 'auto' : 0} w={8} h={8} style={{borderRadius: '50%', background: `var(--mantine-color-${dispatcher === 'dispatching' ? 'green' : 'gray'}-6)`}}/>
+                    </Tooltip>
                 </Stack>
             </AppShell.Navbar>
             <AppShell.Main key={view.name + (view.key ?? '')} h="100vh" style={{overflow: view.name === 'task' ? 'hidden' : 'auto'}}>
