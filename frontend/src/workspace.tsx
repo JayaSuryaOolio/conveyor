@@ -2,8 +2,8 @@ import {useState} from 'react'
 import {ActionIcon, Anchor, Badge, Button, Code, Divider, Group, Paper, Stack, Text, TextInput, Title, Tooltip} from '@mantine/core'
 import {useClipboard} from '@mantine/hooks'
 import {IconCopy, IconPencil, IconStar, IconTerminal, IconTerminal2} from '@tabler/icons-react'
-import {Actions, EnsureWorkspace, RunAction, Sessions, SetTaskRepo} from '../wailsjs/go/ui/App'
-import {core, store} from '../wailsjs/go/models'
+import {Actions, EnsureWorkspace, RunAction, Sessions, SetTaskRepo, TermStart} from '../wailsjs/go/ui/App'
+import {core, store, ui} from '../wailsjs/go/models'
 import {BrowserOpenURL} from '../wailsjs/runtime/runtime'
 import {StatusSelect, Time, errMsg} from './components'
 import {TaskAgent} from './forms'
@@ -14,7 +14,7 @@ const sq = (s: string) => "'" + s.replace(/'/g, "'\\''") + "'"
 const cdCmd = (a: core.Action) => 'cd ' + sq(a.cwd) + (a.cmd && a.kind !== 'editor' ? ' && ' + a.cmd : '')
 
 /** One full-width row: label left, copy / external terminal / internal terminal icons right. */
-function ActionRow({k, a, kind}: {k: string; a: core.Action; kind?: string}) {
+function ActionRow({k, a, kind, onTerm}: {k: string; a: core.Action; kind?: string; onTerm: (t: ui.TermInfo) => void}) {
     return (
         <Group justify="space-between" wrap="nowrap" gap="xs">
             <Text size="sm" style={{wordBreak: 'break-word'}}>{a.label}</Text>
@@ -25,8 +25,9 @@ function ActionRow({k, a, kind}: {k: string; a: core.Action; kind?: string}) {
                 <Tooltip label={a.kind === 'editor' ? 'Open editor' : 'Open in external terminal'}>
                     <ActionIcon variant="default" size="sm" aria-label="Open in external terminal" onClick={() => RunAction(k, kind ?? a.kind, a.repo).catch(errMsg)}><IconTerminal2 size={14}/></ActionIcon>
                 </Tooltip>
-                <Tooltip label="coming next">
-                    <span><ActionIcon variant="default" size="sm" aria-label="Open in internal terminal" disabled><IconTerminal size={14}/></ActionIcon></span>
+                <Tooltip label={a.kind === 'editor' ? 'The editor opens externally' : 'Open in internal terminal'}>
+                    <span><ActionIcon variant="default" size="sm" aria-label="Open in internal terminal" disabled={a.kind === 'editor'}
+                                      onClick={() => TermStart(k, kind ?? a.kind, a.repo).then(onTerm).catch(errMsg)}><IconTerminal size={14}/></ActionIcon></span>
                 </Tooltip>
             </Group>
         </Group>
@@ -91,7 +92,7 @@ function RepoFields({k, r, reload, children}: {k: string; r: store.TaskRepo; rel
     )
 }
 
-export function TaskSidebar({t, runs, reload}: {t: store.Task; runs: store.Run[]; reload: () => void}) {
+export function TaskSidebar({t, runs, reload, onTerm}: {t: store.Task; runs: store.Run[]; reload: () => void; onTerm: (t: ui.TermInfo) => void}) {
     const k = t.key
     const repos = t.repos ?? []
     const {data: actions, reload: reloadActions} = useData(() => Actions(k), [k])
@@ -115,13 +116,13 @@ export function TaskSidebar({t, runs, reload}: {t: store.Task; runs: store.Run[]
             <Title order={6}>Repos</Title>
             {repos.map(r => (
                 <RepoFields key={r.repo_id + '|' + r.branch + '|' + (r.pr_url ?? '')} k={k} r={r} reload={reload}>
-                    {(actions ?? []).filter(a => a.repo === r.repo_name && ['shell', 'editor'].includes(a.kind)).map(a => <ActionRow key={a.kind} k={k} a={a}/>)}
+                    {(actions ?? []).filter(a => a.repo === r.repo_name && ['shell', 'editor'].includes(a.kind)).map(a => <ActionRow key={a.kind} k={k} a={a} onTerm={onTerm}/>)}
                 </RepoFields>
             ))}
             {!hasWorktree && (
                 <Button loading={busy} onClick={() => { setBusy(true); EnsureWorkspace(k).then(() => { reload(); reloadActions(); reloadSessions() }).catch(errMsg).finally(() => setBusy(false)) }}>Create workspace</Button>
             )}
-            {taskActions.map(a => <ActionRow key={a.kind} k={k} a={a}/>)}
+            {taskActions.map(a => <ActionRow key={a.kind} k={k} a={a} onTerm={onTerm}/>)}
             <Divider/>
             <Title order={6}>Sessions</Title>
             {runs.length + (sessions?.length ?? 0) === 0 && <Text size="xs" c="dimmed">None yet.</Text>}
@@ -130,7 +131,7 @@ export function TaskSidebar({t, runs, reload}: {t: store.Task; runs: store.Run[]
             ))}
             {sessions?.map(s => (
                 <Stack key={s.id} gap={2}>
-                    <ActionRow k={k} a={s.action} kind={'resume:' + s.id}/>
+                    <ActionRow k={k} a={s.action} kind={'resume:' + s.id} onTerm={onTerm}/>
                     <Text size="xs" c="dimmed" lineClamp={1} title={s.prompt}>{s.prompt || s.id}</Text>
                 </Stack>
             ))}

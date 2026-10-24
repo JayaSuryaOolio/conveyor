@@ -76,4 +76,16 @@ export function SetTaskRepo(arg1:string,arg2:string,arg3:string,arg4:string):Pro
 
 export function ShowError(arg1:string):Promise<void>;
 
+export function TermBuffer(arg1:string):Promise<ui.TermBuf>;
+
+export function TermClose(arg1:string,arg2:string):Promise<void>;
+
+export function TermList(arg1:string):Promise<Array<ui.TermInfo>>;
+
+export function TermResize(arg1:string,arg2:number,arg3:number):Promise<void>;
+
+export function TermStart(arg1:string,arg2:string,arg3:string):Promise<ui.TermInfo>;
+
+export function TermWrite(arg1:string,arg2:string):Promise<void>;
+
 export function UpdateAutomation(arg1:store.Automation):Promise<void>;
