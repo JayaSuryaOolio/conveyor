@@ -10,8 +10,8 @@ export function Actions(arg1) {
   return window['go']['ui']['App']['Actions'](arg1);
 }
 
-export function AddAgent(arg1, arg2, arg3, arg4) {
-  return window['go']['ui']['App']['AddAgent'](arg1, arg2, arg3, arg4);
+export function AddAgent(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['ui']['App']['AddAgent'](arg1, arg2, arg3, arg4, arg5);
 }
 
 export function AddApp(arg1) {
@@ -160,6 +160,10 @@ export function SaveAttachment(arg1, arg2, arg3) {
 
 export function Sessions(arg1) {
   return window['go']['ui']['App']['Sessions'](arg1);
+}
+
+export function SetAgentModel(arg1, arg2, arg3) {
+  return window['go']['ui']['App']['SetAgentModel'](arg1, arg2, arg3);
 }
 
 export function SetAutomationEnabled(arg1, arg2) {

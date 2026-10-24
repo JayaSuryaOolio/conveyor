@@ -336,18 +336,36 @@ func (d *Dispatcher) unconsume(run store.Run) {
 
 func (d *Dispatcher) spec(task store.Task, cwd, settings, prompt string) claude.LaunchSpec {
 	s := claude.LaunchSpec{Cwd: cwd, AddDirs: workspace.OtherPaths(task), Prompt: prompt, Name: task.Key, SettingsPath: settings, Bypass: true}
-	if task.Model != nil {
-		s.Model = *task.Model
-	} else {
-		s.Model = store.GetSetting(d.DB, "default_model")
-	}
 	if task.Agent != nil {
 		s.Agent = *task.Agent
 	}
+	s.Model = d.model(task)
 	if mcp := filepath.Join(cwd, ".mcp.json"); fileExists(mcp) {
 		s.MCPConfig = mcp
 	}
 	return s
+}
+
+// model picks the task's model, else "" (no --model) when its agent sets one, else default_model.
+func (d *Dispatcher) model(task store.Task) string {
+	if task.Model != nil {
+		return *task.Model
+	}
+	if task.Agent != nil {
+		var dirs []string
+		for _, r := range task.Repos {
+			if r.WorktreePath != nil {
+				dirs = append(dirs, *r.WorktreePath)
+			}
+			if repo, err := store.GetRepoByName(d.DB, r.RepoName); err == nil {
+				dirs = append(dirs, repo.Path)
+			}
+		}
+		if core.AgentModel(*task.Agent, dirs...) != "" {
+			return ""
+		}
+	}
+	return store.GetSetting(d.DB, "default_model")
 }
 
 func fileExists(p string) bool { _, err := os.Stat(p); return err == nil }

@@ -350,8 +350,13 @@ func (a *App) EnsureWorkspace(key string) error {
 func (a *App) ListAgents(repos []string) ([]core.Agent, error) { return a.svc.ListAgents(repos) }
 
 // AddAgent creates an agent file in the repo's main checkout (scope = repo name) or ~/.claude/agents ("user").
-func (a *App) AddAgent(name, description, prompt, scope string) error {
-	return a.svc.AddAgent(name, description, prompt, scope)
+func (a *App) AddAgent(name, description, prompt, scope, model string) error {
+	return a.svc.AddAgent(name, description, prompt, scope, model)
+}
+
+// SetAgentModel sets the agent's default model in its file ("" removes it).
+func (a *App) SetAgentModel(scope, name, model string) error {
+	return a.svc.SetAgentModel(scope, name, model)
 }
 
 // SetTaskAgent changes the task's agent ("" clears it).

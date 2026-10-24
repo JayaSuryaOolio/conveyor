@@ -16,14 +16,14 @@ func TestAgents(t *testing.T) {
 	if _, err := store.AddRepo(s.DB, store.Repo{Name: "a", Path: repo, DefaultBranch: "main"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.AddAgent("rev-1", "Reviews: code", "Be strict.", "a"); err != nil {
+	if err := s.AddAgent("rev-1", "Reviews: code", "Be strict.", "a", "opus"); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.AddAgent("me", "Mine", "Hi", "user"); err != nil {
+	if err := s.AddAgent("me", "Mine", "Hi", "user", ""); err != nil {
 		t.Fatal(err)
 	}
 	for _, bad := range [][]string{{"Bad Name", "d", "a"}, {"rev-1", "d", "a"}, {"x", "", "a"}, {"x", "d", "nope"}} {
-		if s.AddAgent(bad[0], bad[1], "p", bad[2]) == nil {
+		if s.AddAgent(bad[0], bad[1], "p", bad[2], "") == nil {
 			t.Errorf("%v should fail", bad)
 		}
 	}
@@ -32,9 +32,15 @@ func TestAgents(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []Agent{{"rev-1", "Reviews: code", "a"}, {"me", "Mine", "user"}}
+	want := []Agent{{"rev-1", "Reviews: code", "a", "opus"}, {"me", "Mine", "user", ""}}
 	if len(got) != 2 || got[0] != want[0] || got[1] != want[1] {
 		t.Fatalf("got %+v", got)
+	}
+	if err := s.SetAgentModel("user", "me", "haiku"); err != nil || AgentModel("me") != "haiku" || AgentModel("rev-1", repo) != "opus" {
+		t.Fatalf("set model: %v", err)
+	}
+	if s.SetAgentModel("user", "nope", "x") == nil {
+		t.Fatal("missing agent should fail")
 	}
 	tk, _ := s.CreateTask(NewTaskInput{Title: "t", Repos: []string{"a"}, Agent: "rev-1"})
 	if tk.Agent == nil || *tk.Agent != "rev-1" {
@@ -45,5 +51,22 @@ func TestAgents(t *testing.T) {
 	}
 	if tk, _ = store.GetTaskByKey(s.DB, tk.Key); tk.Agent != nil {
 		t.Fatal("agent not cleared")
+	}
+}
+
+func TestSetFrontmatterModel(t *testing.T) {
+	for _, c := range []struct{ in, model, want string }{
+		{"---\nname: a\n---\nbody\nmodel: x\n", "opus", "---\nname: a\nmodel: opus\n---\nbody\nmodel: x\n"},
+		{"---\nname: a\nmodel: haiku\ndescription: d\n---\nb", "opus", "---\nname: a\nmodel: opus\ndescription: d\n---\nb"},
+		{"---\nname: a\nmodel: haiku\ndescription: d\n---\nb", "", "---\nname: a\ndescription: d\n---\nb"},
+		{"---\nname: a\n---\nb", "", "---\nname: a\n---\nb"},
+	} {
+		got, err := setFrontmatterModel([]byte(c.in), c.model)
+		if err != nil || string(got) != c.want {
+			t.Errorf("%q -> %q, %v", c.in, got, err)
+		}
+	}
+	if _, err := setFrontmatterModel([]byte("no fm"), "x"); err == nil {
+		t.Error("want error")
 	}
 }
