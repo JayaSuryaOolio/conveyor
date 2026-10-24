@@ -204,12 +204,7 @@ Settings are in the app (Settings page) or `conveyor config list|get|set`.
 - **Dispatch**: `max_parallel` (3), `resume_threshold` (60000), `comment_debounce_secs` (20), `max_consecutive_failures` (3).
 - **External terminal**: `terminal_template`, the command for external terminals (`{cwd}` and `{cmd}` are substituted; default uses macOS Terminal).
 - **Prompts**: `pr_comment_prefix`, `brief_extra_rules`, and `prompt_fresh` / `prompt_resume` to replace the launch prompts (placeholders `{key}`, `{title}`, `{brief}`, `{comments}`). Empty means the built-in prompt. The page also shows the status block protocol the agent is given.
-
-## Moving to a fresh install
-
-`conveyor state export [file]` writes stored settings, apps, automations and user-level agents (`~/.claude/agents`) as JSON. Repos are never exported: the repo names automations use become placeholders `A`, `B`, ... `conveyor state import file --repo A=<name>` adds whatever is missing (it never overwrites) and maps each placeholder to a registered repo; an automation with an unmapped placeholder is added disabled.
-
-`scripts/uninstall.sh` exports to `~/conveyor-state.json` and `<home>/state.json`, then removes the CLI, app, skills and hooks, keeping the data folder. `scripts/install.sh` imports `<home>/state.json` if it finds one, says so, and renames it to `state.json.imported`.
+- **Moving to a fresh install**: `conveyor state export [file]` / `import <file> [--repo A=name]` carries settings, apps, automations and user agents as JSON; repos are never exported (automations get placeholders `A`, `B`, ...), import only adds what's missing, and `scripts/uninstall.sh` saves it to `<home>/state.json` for the next `install.sh` to pick up.
 
 ## CLI cheat-sheet
 
