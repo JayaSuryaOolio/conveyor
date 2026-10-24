@@ -34,10 +34,6 @@ export function ApplyLearnings(arg1) {
   return window['go']['ui']['App']['ApplyLearnings'](arg1);
 }
 
-export function Cancel(arg1) {
-  return window['go']['ui']['App']['Cancel'](arg1);
-}
-
 export function Confirm(arg1) {
   return window['go']['ui']['App']['Confirm'](arg1);
 }
