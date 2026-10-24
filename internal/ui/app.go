@@ -10,6 +10,7 @@ import (
 
 	"github.com/JayaSuryaOolio/conveyor/internal/core"
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
+	"github.com/JayaSuryaOolio/conveyor/internal/workspace"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -197,3 +198,22 @@ func (a *App) GetSettings() (map[string]string, error) { return store.ListSettin
 
 // SetSetting stores one setting.
 func (a *App) SetSetting(k, v string) error { return store.SetSetting(a.svc.DB, k, v) }
+
+// Actions lists the terminal/editor actions for a task's workspace.
+func (a *App) Actions(key string) ([]core.Action, error) { return a.svc.Actions(key) }
+
+// RunAction opens an action. Kind "resume:<id>" resumes a manual session.
+func (a *App) RunAction(key, kind, repo string) error { return a.svc.RunAction(key, kind, repo) }
+
+// Sessions lists manual Claude sessions in the task's worktrees.
+func (a *App) Sessions(key string) ([]core.Session, error) { return a.svc.Sessions(key) }
+
+// EnsureWorkspace creates the task's worktrees (workspace.Ensure).
+func (a *App) EnsureWorkspace(key string) error {
+	t, err := store.GetTaskByKey(a.svc.DB, key)
+	if err != nil {
+		return err
+	}
+	_, err = workspace.Ensure(a.svc.DB, a.svc.Home, t)
+	return err
+}

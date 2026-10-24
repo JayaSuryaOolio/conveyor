@@ -14,9 +14,11 @@ import (
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 )
 
-func init() { register("task", runTask, "manage tasks (new|list|show|comment|move|cancel|done|sync)") }
+func init() {
+	register("task", runTask, "manage tasks (new|list|show|comment|move|cancel|done|sync|attach|open)")
+}
 
-const taskUsage = "usage: conveyor task new|list|show|comment|move|cancel|done|sync ..."
+const taskUsage = "usage: conveyor task new|list|show|comment|move|cancel|done|sync|attach|open ..."
 
 func runTask(home string, args []string) error {
 	if len(args) == 0 {
@@ -42,6 +44,10 @@ func runTask(home string, args []string) error {
 				return fmt.Errorf("unknown status %q", rest[1])
 			}
 			return s.Move(rest[0], to)
+		case "attach":
+			return taskAttach(s, rest)
+		case "open":
+			return taskOpen(s, rest)
 		case "sync":
 			if len(rest) != 1 {
 				return fmt.Errorf("usage: conveyor task sync KEY")
