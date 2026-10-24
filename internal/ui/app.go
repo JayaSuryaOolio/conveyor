@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -27,6 +28,7 @@ const pollEvery = 700 * time.Millisecond
 
 // App is bound to the frontend. Methods return plain JSON-friendly structs.
 type App struct {
+	ctx        context.Context // Wails' context, for native dialogs
 	svc        *core.Service
 	cancel     context.CancelFunc
 	dispatcher atomic.Bool // true while this process holds the dispatcher lock
@@ -38,11 +40,17 @@ func NewApp() *App { return &App{} }
 // Startup opens the DB under CONVEYOR_HOME (default ~/.conveyor), starts the
 // change poller and the dispatcher hook. It matches Wails' OnStartup.
 func (a *App) Startup(ctx context.Context) {
+	a.ctx = ctx
 	home, err := core.Home("")
 	if err != nil {
 		runtime.LogFatalf(ctx, "conveyor home: %v", err)
 		return
 	}
+	// A Finder-launched app's stderr goes nowhere; keep a log file in the home too.
+	if f, err := os.OpenFile(filepath.Join(home, "conveyor.log"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644); err == nil {
+		log.SetOutput(io.MultiWriter(os.Stderr, f))
+	}
+	log.Printf("app start: home=%s cli=%s PATH=%s", home, conveyorBin(), os.Getenv("PATH"))
 	db, err := store.Open(core.DBPath(home))
 	if err != nil {
 		runtime.LogFatalf(ctx, "open db: %v", err)
@@ -94,7 +102,7 @@ func (a *App) runDispatcher(ctx context.Context) {
 	defer db.Close()
 	a.dispatcher.Store(true)
 	defer a.dispatcher.Store(false)
-	d := &dispatch.Dispatcher{DB: db, Home: a.svc.Home, ConveyorBin: conveyorBin(), Log: log.New(os.Stderr, "dispatcher: ", log.LstdFlags)}
+	d := &dispatch.Dispatcher{DB: db, Home: a.svc.Home, ConveyorBin: conveyorBin(), Log: log.New(log.Writer(), "dispatcher: ", log.LstdFlags)}
 	d.Run(ctx)
 }
 
@@ -112,6 +120,19 @@ func conveyorBin() string {
 }
 
 func fileExists(p string) bool { _, err := os.Stat(p); return err == nil }
+
+// ShowError logs a frontend error and shows it in a native dialog
+// (the macOS webview silently drops window.alert).
+func (a *App) ShowError(msg string) {
+	log.Printf("ui error: %s", msg)
+	runtime.MessageDialog(a.ctx, runtime.MessageDialogOptions{Type: runtime.ErrorDialog, Title: "Conveyor", Message: msg})
+}
+
+// Confirm asks a yes/no question in a native dialog (window.confirm always returns false in the macOS webview).
+func (a *App) Confirm(msg string) (bool, error) {
+	r, err := runtime.MessageDialog(a.ctx, runtime.MessageDialogOptions{Type: runtime.QuestionDialog, Title: "Conveyor", Message: msg})
+	return r == "Yes", err
+}
 
 // DispatcherState says whether this app is dispatching or only showing the UI.
 func (a *App) DispatcherState() string {

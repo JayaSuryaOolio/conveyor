@@ -38,7 +38,7 @@ export function NewTask({nav, close}: {nav: Nav; close: () => void}) {
                 <input placeholder="Model (optional)" value={model} onChange={e => setModel(e.target.value)}/>
                 <input placeholder="Agent (optional)" value={agent} onChange={e => setAgent(e.target.value)}/>
                 <label><input type="checkbox" checked={start} onChange={e => setStart(e.target.checked)}/> Start now (todo)</label>
-                <div className="row"><button onClick={submit}>Create</button><button onClick={close}>Cancel</button></div>
+                <div className="row"><button onClick={submit} disabled={!title.trim() || sel.length === 0}>Create</button><button onClick={close}>Cancel</button></div>
             </div>
         </div>
     )
