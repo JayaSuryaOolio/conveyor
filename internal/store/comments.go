@@ -68,3 +68,23 @@ func UnconsumeComments(db *sql.DB, runID int64) error {
 	}
 	return nil
 }
+
+// TakeQueuedComment deletes a human comment no run has received yet and returns
+// its body, so the UI can move it back into the editor. ok is false when a run
+// consumed it first (or it is not a human comment of that task).
+func TakeQueuedComment(db *sql.DB, taskID, id int64) (body string, ok bool, err error) {
+	err = db.QueryRow(`SELECT body FROM comments WHERE id=? AND task_id=? AND author='human' AND consumed_by_run_id IS NULL`, id, taskID).Scan(&body)
+	if err == sql.ErrNoRows {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, fmt.Errorf("take comment: %w", err)
+	}
+	// Re-check the condition: a run may consume it between the SELECT and here.
+	res, err := db.Exec(`DELETE FROM comments WHERE id=? AND consumed_by_run_id IS NULL`, id)
+	if err != nil {
+		return "", false, fmt.Errorf("take comment: %w", err)
+	}
+	n, _ := res.RowsAffected()
+	return body, n == 1, nil
+}

@@ -14,6 +14,8 @@ export function AddApp(arg1:store.App):Promise<void>;
 
 export function AddAutomation(arg1:store.Automation):Promise<void>;
 
+export function TakeQueuedComment(arg1:string,arg2:number):Promise<string>;
+
 export function AddComment(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function AddRepo(arg1:string,arg2:string):Promise<void>;
