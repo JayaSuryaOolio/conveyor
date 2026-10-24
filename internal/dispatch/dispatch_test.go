@@ -425,6 +425,38 @@ func TestAdoptSessionWithoutHooks(t *testing.T) {
 	}
 }
 
+func TestFinishMissedStop(t *testing.T) {
+	e := setup(t)
+	e.d.ProjectsDir = filepath.Join(e.root, "projects")
+	tk := e.task(t, "t", 0)
+	e.tick(t) // launches, bg abcd0001
+	run, _ := store.LatestRun(e.db, tk.ID)
+	run.Status, run.SessionID = "running", ptr("sess-9")
+	store.UpdateRun(e.db, run)
+	cwd := filepath.Join(e.d.Home, "workspaces", tk.Key, "api")
+	os.WriteFile(filepath.Join(e.fake, "agents.json"), []byte(`[{"id":"abcd0001","sessionId":"sess-9","state":"done","cwd":"`+cwd+`"}]`), 0o644)
+	tr := filepath.Join(e.d.ProjectsDir, "x", "sess-9.jsonl")
+	os.MkdirAll(filepath.Dir(tr), 0o755)
+	os.WriteFile(tr, []byte(`{"type":"assistant","message":{"content":[{"type":"text","text":"All done."}]}}`+"\n"), 0o644)
+	os.Chtimes(tr, time.Now().Add(time.Minute), time.Now().Add(time.Minute)) // written after the run started
+
+	e.now = time.Now().Add(time.Minute + 10*time.Second) // transcript still fresh: a hook may yet fire
+	e.tick(t)
+	if got, _ := store.GetRun(e.db, run.ID); got.Status != "running" {
+		t.Fatalf("finished too early: %+v", got)
+	}
+
+	e.now = time.Now().Add(2 * time.Minute)
+	e.tick(t)
+	got, _ := store.GetRun(e.db, run.ID)
+	if got.Status != "finished" || got.FinalMessage == nil || *got.FinalMessage != "All done." {
+		t.Fatalf("run %+v", got)
+	}
+	if e.get(t, tk.ID).Status == store.StatusRunning {
+		t.Fatal("task still running")
+	}
+}
+
 func TestReapLaunchingNoBg(t *testing.T) {
 	e := setup(t)
 	tk := e.task(t, "t", 0)

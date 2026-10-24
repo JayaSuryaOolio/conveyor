@@ -226,6 +226,15 @@ func (s *Service) Sessions(key string) ([]Session, error) {
 	return out, nil
 }
 
+// TranscriptPath finds a session's transcript under ~/.claude/projects, or "".
+func (s *Service) TranscriptPath(sessionID string) string {
+	files, _ := filepath.Glob(filepath.Join(s.projectsDir(), "*", sessionID+".jsonl"))
+	if len(files) == 0 {
+		return ""
+	}
+	return files[0]
+}
+
 // RunLog is a page of a run's session chat; pass Next as after to get only newer entries.
 type RunLog struct {
 	Entries []transcript.Entry `json:"entries"`
@@ -243,11 +252,11 @@ func (s *Service) RunLog(runID, after int64) (RunLog, error) {
 	if r.SessionID == nil {
 		return out, nil
 	}
-	files, _ := filepath.Glob(filepath.Join(s.projectsDir(), "*", *r.SessionID+".jsonl"))
-	if len(files) == 0 {
+	path := s.TranscriptPath(*r.SessionID)
+	if path == "" {
 		return out, nil
 	}
-	es, next, err := transcript.Log(files[0], after)
+	es, next, err := transcript.Log(path, after)
 	if err != nil {
 		return out, err
 	}

@@ -4,6 +4,7 @@ package dispatch
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -18,7 +19,9 @@ import (
 	"github.com/JayaSuryaOolio/conveyor/internal/claude"
 	"github.com/JayaSuryaOolio/conveyor/internal/core"
 	"github.com/JayaSuryaOolio/conveyor/internal/gh"
+	"github.com/JayaSuryaOolio/conveyor/internal/hook"
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
+	"github.com/JayaSuryaOolio/conveyor/internal/transcript"
 	"github.com/JayaSuryaOolio/conveyor/internal/workspace"
 )
 
@@ -34,6 +37,7 @@ type Dispatcher struct {
 	DB          *sql.DB
 	Home        string
 	ConveyorBin string
+	ProjectsDir string           // overrides ~/.claude/projects (tests)
 	Now         func() time.Time // injectable; defaults to time.Now
 	Log         *log.Logger      // defaults to log.Default()
 
@@ -179,6 +183,12 @@ func (d *Dispatcher) reap(ctx context.Context) error {
 			}
 			continue
 		}
+		if ok && r.Status == "running" && a.State == "done" {
+			if err := d.finishMissedStop(r, a); err != nil {
+				return err
+			}
+			continue
+		}
 		if ok || d.now().Sub(parseTime(r.StartedAt)) <= reapGrace {
 			continue
 		}
@@ -206,6 +216,36 @@ func (d *Dispatcher) reap(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+// finishMissedStop runs the Stop hook for an auto run whose session is done but whose hook never
+// fired (a resumed session can lose its --settings). It waits until the transcript was written for
+// this run and then sat still for reapGrace, so it never races a late hook or a resume still waking.
+func (d *Dispatcher) finishMissedStop(r store.Run, a claude.Agent) error {
+	if r.SessionID == nil || a.Cwd == "" {
+		return nil
+	}
+	path := (&core.Service{ProjectsDir: d.ProjectsDir}).TranscriptPath(*r.SessionID)
+	if path == "" {
+		return nil
+	}
+	fi, err := os.Stat(path)
+	if err != nil || !fi.ModTime().After(parseTime(r.StartedAt)) || d.now().Sub(fi.ModTime()) <= reapGrace {
+		return nil
+	}
+	es, _, err := transcript.Log(path, 0)
+	if err != nil {
+		return err
+	}
+	last := ""
+	for _, e := range es {
+		if e.Kind == "text" {
+			last = e.Text
+		}
+	}
+	raw, _ := json.Marshal(map[string]string{"session_id": *r.SessionID, "cwd": a.Cwd, "transcript_path": path, "last_assistant_message": last})
+	d.logf("run %d: session done without a Stop hook; finishing from its transcript", r.ID)
+	return hook.Handle(d.DB, d.Home, "Stop", raw)
 }
 
 // reapInteractive finishes a manual session's run once its session is gone (terminal closed, process
