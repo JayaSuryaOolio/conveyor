@@ -1,5 +1,5 @@
 import {useState} from 'react'
-import {Badge, Button, Group, Modal, Select, Stack, Table, Text, TextInput, Textarea, Title} from '@mantine/core'
+import {Button, Group, Modal, Select, Stack, Table, Text, TextInput, Textarea, Title} from '@mantine/core'
 import {IconPlus} from '@tabler/icons-react'
 import {AddAgent, ListAgents, ListRepos} from '../wailsjs/go/ui/App'
 import {errMsg} from './components'
@@ -36,13 +36,13 @@ export function Agents() {
             {hint && <Text size="sm" c="dimmed">{hint}</Text>}
             <Table>
                 <Table.Thead>
-                    <Table.Tr><Table.Th>Name</Table.Th><Table.Th>Scope</Table.Th><Table.Th>Description</Table.Th></Table.Tr>
+                    <Table.Tr><Table.Th miw={160}>Name</Table.Th><Table.Th miw={160}>Scope</Table.Th><Table.Th>Description</Table.Th></Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
                     {shown?.map(a => (
                         <Table.Tr key={a.scope + a.name}>
                             <Table.Td fw={600} style={{whiteSpace: 'nowrap'}}>{a.name}</Table.Td>
-                            <Table.Td style={{whiteSpace: 'nowrap'}}><Badge variant="light" tt="none" style={{overflow: 'visible'}} color={a.scope === 'user' ? 'gray' : 'blue'}>{a.scope}</Badge></Table.Td>
+                            <Table.Td style={{whiteSpace: 'nowrap'}}><Text size="sm" c={a.scope === 'user' ? 'dimmed' : 'blue'}>{a.scope}</Text></Table.Td>
                             <Table.Td><Text size="sm" c="dimmed" lineClamp={2} title={a.description}>{a.description}</Text></Table.Td>
                         </Table.Tr>
                     ))}
