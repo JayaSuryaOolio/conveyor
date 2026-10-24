@@ -97,7 +97,11 @@ conveyor task unlink CV-1A blocks CV-1B
 
 A comment from you, or a system note, on a task in needs_you, review, failed or done puts it back in todo, and the dispatcher launches it again. A comment on a running task is queued (marked "queued" in the thread) and sent with the next run: when the run stops or its session vanishes, the task goes to todo instead of review or needs_you. A comment on a backlog or todo task just waits.
 
-Once one of a task's PRs is merged, a comment on it no longer reopens it: a task keeps one branch and at most one PR per repo. Instead Conveyor creates a follow-up sub-task (`CV-9` → `CV-9A`, in todo, same repos and agent, a fresh branch from the default branch) whose description is your comment, closes the original as done, and says so in a system note on both threads. The follow-up's `BRIEF.md` carries the parent's description, acceptance criteria, latest run, run summaries and comments, so its agent starts from where the parent ended without the parent's transcript.
+Once one of a task's PRs is merged, a comment on it no longer simply reopens it: a task keeps one branch and at most one PR per repo. The app asks what the comment is for:
+
+- **More work** (the default, and what the CLI and automations do): Conveyor creates a follow-up sub-task (`CV-9` → `CV-9A`, in todo, same repos and agent, a fresh branch from the default branch) whose description is your comment, closes the original as done, and says so in a system note on both threads. The follow-up's `BRIEF.md` carries the parent's description, acceptance criteria, latest run, run summaries and comments, so its agent starts from where the parent ended without the parent's transcript.
+- **A question** (`conveyor task comment KEY "..." --ask`): the task is requeued with a system note telling its agent to answer without changing code or opening a PR.
+- **Just a note** (`--note`): the comment is saved and nothing runs.
 
 When the dispatcher launches a task that already has runs, it chooses between:
 
@@ -211,7 +215,7 @@ conveyor repo add <path> [--name n]       conveyor repo list | rm <name>
 conveyor task new "<title>" --repo a[,b] [--primary r] [--desc t | --desc-file f]
                   [--todo] [--model m] [--agent a] [--parent KEY] [--priority n]
 conveyor task list [--status a,b]         conveyor task show KEY [--thread] [--runs]
-conveyor task comment KEY <text|->        conveyor task move KEY <status>
+conveyor task comment KEY <text|-> [--ask|--note]   conveyor task move KEY <status>
 conveyor task done KEY                    conveyor task cancel KEY
 conveyor task set KEY [--repo r] [--branch b] [--pr url] [--model m] [--desc d | --desc-file f]
 conveyor task link KEY blocks|relates OTHER    conveyor task unlink KEY kind OTHER

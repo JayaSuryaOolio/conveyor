@@ -264,9 +264,24 @@ func taskShow(s *core.Service, args []string) error {
 	return nil
 }
 
+// taskComment posts a human comment. Once a PR of the task is merged it starts
+// a follow-up sub-task, unless --ask (requeue to answer) or --note (just comment).
 func taskComment(s *core.Service, args []string) error {
-	if len(args) != 2 {
-		return fmt.Errorf("usage: conveyor task comment KEY <text|->")
+	fs := flag.NewFlagSet("task comment", flag.ContinueOnError)
+	ask := fs.Bool("ask", false, "after a merged PR: requeue the task to answer, without changing code")
+	note := fs.Bool("note", false, "after a merged PR: only add the comment")
+	args, err := parseArgs(fs, args)
+	if err != nil {
+		return err
+	}
+	if len(args) != 2 || *ask && *note {
+		return fmt.Errorf("usage: conveyor task comment KEY <text|-> [--ask|--note]")
+	}
+	after := core.FollowUp
+	if *ask {
+		after = core.Ask
+	} else if *note {
+		after = core.Note
 	}
 	body := args[1]
 	if body == "-" {
@@ -279,7 +294,7 @@ func taskComment(s *core.Service, args []string) error {
 	if body == "" {
 		return fmt.Errorf("comment is empty")
 	}
-	_, err := s.AddComment(args[0], store.AuthorHuman, body)
+	_, err = s.AddComment(args[0], store.AuthorHuman, body, after)
 	return err
 }
 

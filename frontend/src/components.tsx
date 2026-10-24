@@ -1,7 +1,7 @@
 import {useEffect, useState} from 'react'
-import {ActionIcon, Badge, Box, Button, Card as MCard, Group, Menu, Notification, Paper, Select, Stack, Text, Tooltip} from '@mantine/core'
+import {ActionIcon, Badge, Box, Button, Card as MCard, Group, Menu, Modal, Notification, Paper, Select, Stack, Text, Tooltip} from '@mantine/core'
 import {IconAppWindow, IconDots} from '@tabler/icons-react'
-import {AddComment, Move, ShowError} from '../wailsjs/go/ui/App'
+import {AddComment, MergedPR, Move, ShowError} from '../wailsjs/go/ui/App'
 import {store, ui} from '../wailsjs/go/models'
 import {Markdown, MarkdownEditor} from './markdown'
 import {ALL_STATUSES, STATUS_COLOR, STATUS_LABEL, ago, fmtK, fmtTime} from './util'
@@ -95,12 +95,28 @@ export function Card({c, nav}: {c: ui.TaskCard; nav: Nav}) {
 export function CommentBox({k, placeholder = 'Comment…', onDone}: {k: string; placeholder?: string; onDone?: () => void}) {
     const [text, setText] = useState('')
     const [busy, setBusy] = useState(false)
+    const [merged, setMerged] = useState('')
+    const post = (after: string) => {
+        setMerged('')
+        setBusy(true)
+        AddComment(k, text, after).then(() => { setText(''); onDone?.() }, errMsg).finally(() => setBusy(false))
+    }
+    // Once a PR is merged, a comment no longer simply reopens the task: ask what it is for.
     const send = () => {
         if (!text.trim() || busy) return
-        setBusy(true)
-        AddComment(k, text).then(() => { setText(''); onDone?.() }, errMsg).finally(() => setBusy(false))
+        MergedPR(k).then(pr => pr ? setMerged(pr) : post(''), errMsg)
     }
-    return <MarkdownEditor value={text} onChange={setText} onSubmit={send} submitting={busy} canSubmit={!!text.trim()} attachKey={k} placeholder={placeholder}/>
+    return <>
+        <MarkdownEditor value={text} onChange={setText} onSubmit={send} submitting={busy} canSubmit={!!text.trim()} attachKey={k} placeholder={placeholder}/>
+        <Modal opened={!!merged} onClose={() => setMerged('')} title={`${k}'s PR is merged`}>
+            <Stack gap="sm">
+                <Text size="sm">{merged} is merged, so {k} can't take more changes on its branch: a task keeps one branch and one PR per repo. What is this comment for?</Text>
+                <Button data-autofocus onClick={() => post('')}>More work: start a follow-up sub-task</Button>
+                <Button variant="default" onClick={() => post('ask')}>A question: answer it, no code changes</Button>
+                <Button variant="subtle" color="gray" onClick={() => post('note')}>Just a note: nothing runs</Button>
+            </Stack>
+        </Modal>
+    </>
 }
 
 /** One comment in the thread. */
