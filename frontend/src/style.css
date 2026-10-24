@@ -1,3 +1,9 @@
 html, body, #root { height: 100%; margin: 0; }
 .pulse { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--mantine-color-cyan-5); animation: pulse 1.2s ease-in-out infinite; }
 @keyframes pulse { 50% { opacity: .25; transform: scale(.7); } }
+
+.md pre { overflow-x: auto; }
+.md pre, .md :not(pre) > code { font-family: var(--mantine-font-family-monospace); background: var(--mantine-color-default-hover); }
+.md > :first-child { margin-top: 0; }
+.md > :last-child { margin-bottom: 0; }
+.md input[type='checkbox'] { margin-right: 6px; }

@@ -3,6 +3,7 @@ import {Button, Checkbox, Group, Modal, MultiSelect, Select, Stack, Table, Text,
 import {AddAgent, AddRepo, CreateTask, GetSettings, ListAgents, ListRepos, SetSetting, SetTaskAgent} from '../wailsjs/go/ui/App'
 import {core} from '../wailsjs/go/models'
 import {Nav, errMsg} from './components'
+import {MarkdownEditor} from './markdown'
 import {useData} from './util'
 
 export function NewTask({nav, close}: {nav: Nav; close: () => void}) {
@@ -24,7 +25,7 @@ export function NewTask({nav, close}: {nav: Nav; close: () => void}) {
         <Modal opened onClose={close} title="New task" size="md">
             <Stack gap="sm">
                 <TextInput data-autofocus placeholder="Title" value={title} onChange={e => setTitle(e.target.value)}/>
-                <Textarea autosize minRows={4} maxRows={12} placeholder="Description" value={desc} onChange={e => setDesc(e.target.value)}/>
+                <MarkdownEditor minRows={4} placeholder="Description" value={desc} onChange={setDesc}/>
                 <MultiSelect label="Repos" placeholder="Pick repos" description={repos?.length === 0 ? 'Add one on the Repos page first' : undefined}
                              data={repos?.map(r => r.name) ?? []} value={sel} onChange={setSel}/>
                 {sel.length > 1 && <Select label="Primary repo" allowDeselect={false} data={sel} value={prim} onChange={v => setPrimary(v ?? '')}/>}

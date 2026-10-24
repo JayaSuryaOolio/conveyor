@@ -1,8 +1,9 @@
 import {useState} from 'react'
-import {ActionIcon, Badge, Button, Card as MCard, Group, Menu, Paper, Select, Stack, Text, Textarea, Tooltip} from '@mantine/core'
+import {ActionIcon, Badge, Button, Card as MCard, Group, Menu, Paper, Select, Stack, Text, Tooltip} from '@mantine/core'
 import {IconDots} from '@tabler/icons-react'
 import {AddComment, Move, ShowError} from '../wailsjs/go/ui/App'
 import {store, ui} from '../wailsjs/go/models'
+import {Markdown, MarkdownEditor} from './markdown'
 import {ALL_STATUSES, STATUS_COLOR, STATUS_LABEL, ago, fmtK, fmtTime} from './util'
 
 export type Nav = (v: {name: string; key?: string}) => void
@@ -68,8 +69,7 @@ export function CommentBox({k, placeholder = 'Comment…', onDone}: {k: string; 
     }
     return (
         <Stack gap="xs" align="flex-end">
-            <Textarea autosize minRows={2} maxRows={10} w="100%" value={text} placeholder={placeholder} onChange={e => setText(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) send() }}/>
+            <div style={{width: '100%'}}><MarkdownEditor value={text} onChange={setText} onSubmit={send} placeholder={placeholder}/></div>
             <Button size="xs" onClick={send} disabled={!text.trim()}>Send</Button>
         </Stack>
     )
@@ -83,7 +83,7 @@ export function Message({m}: {m: store.Comment}) {
                 <Text size="xs" fw={600}>{m.author}</Text>
                 <Time iso={m.created_at}/>
             </Group>
-            <Text size="sm" style={{whiteSpace: 'pre-wrap', wordBreak: 'break-word'}}>{m.body}</Text>
+            <Markdown>{m.body}</Markdown>
         </Paper>
     )
 }
