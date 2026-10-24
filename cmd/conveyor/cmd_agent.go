@@ -10,7 +10,9 @@ import (
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 )
 
-func init() { register("agent", runAgent, "Claude subagents from repos and ~/.claude (list|add|model)") }
+func init() {
+	register("agent", runAgent, "Claude subagents from repos and ~/.claude (list|add|model)")
+}
 
 const agentUsage = "usage: conveyor agent list [--repo r] | add <name> --desc d (--prompt p | --prompt-file f) [--model m] [--repo r] | model <name> <model|\"\"> [--repo r]"
 
