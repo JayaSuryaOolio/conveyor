@@ -235,7 +235,7 @@ Outside it, Conveyor reads `~/.claude/projects` (session transcripts), `~/.claud
 
 ## Troubleshooting
 
-- **Logs.** The Logs page in the app shows `~/.conveyor/conveyor.log`; from a terminal use `tail -f ~/.conveyor/conveyor.log`. If you run `conveyor daemon`, its log is `logs/dispatcher.log`. Hook problems are in `logs/hook.log`.
+- **Logs.** The Logs page in the app has a switch: App (`~/.conveyor/conveyor.log`), Dispatcher (`logs/dispatcher.log`, written by `conveyor daemon`) and Hooks (`logs/hook.log`, errors from `conveyor hook`). A log that has not been written yet shows an empty message. From a terminal use `tail -f ~/.conveyor/<file>`. The app rotates `conveyor.log` to `conveyor.log.1`, which is only readable from a terminal.
 - **Nothing starts.** Check that a dispatcher is running (the app, or `conveyor daemon`), the task is in todo, and fewer than `max_parallel` runs are active. A task you just commented on waits `comment_debounce_secs`.
 - **"workspace not trusted".** Run `claude` once in the main repo and accept the trust prompt. Worktrees inherit it.
 - **Task is failed.** Read the system comment on the thread, fix the cause, then comment to retry.

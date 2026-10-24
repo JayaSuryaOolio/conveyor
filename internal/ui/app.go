@@ -336,8 +336,10 @@ func (a *App) Sessions(key string) ([]core.Session, error) {
 // RunLog returns the run's session chat entries after byte offset after.
 func (a *App) RunLog(runID, after int64) (core.RunLog, error) { return a.svc.RunLog(runID, after) }
 
-// AppLog returns the app log from offset after; pass -1 for the recent tail.
-func (a *App) AppLog(after int64) (core.AppLog, error) { return core.ReadAppLog(a.svc.Home, after) }
+// AppLog returns a log (source: app, dispatcher or hooks) from offset after; pass -1 for the recent tail.
+func (a *App) AppLog(source string, after int64) (core.AppLog, error) {
+	return core.ReadAppLog(a.svc.Home, source, after)
+}
 
 // EnsureWorkspace creates the task's worktrees (workspace.Ensure).
 func (a *App) EnsureWorkspace(key string) error {

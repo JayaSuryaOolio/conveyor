@@ -34,8 +34,8 @@ export function AppIcons() {
   return window['go']['ui']['App']['AppIcons']();
 }
 
-export function AppLog(arg1) {
-  return window['go']['ui']['App']['AppLog'](arg1);
+export function AppLog(arg1, arg2) {
+  return window['go']['ui']['App']['AppLog'](arg1, arg2);
 }
 
 export function AppPresets() {
