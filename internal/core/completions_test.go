@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
@@ -31,19 +32,39 @@ func TestCompletions(t *testing.T) {
 	if _, err := store.AddRepo(s.DB, store.Repo{Name: "a", Path: repo, DefaultBranch: "main"}); err != nil {
 		t.Fatal(err)
 	}
-	got, err := s.Completions("", []string{"a", "nope"})
-	if err != nil {
-		t.Fatal(err)
+	labels := func(kind, q string, key string, repos []string) string {
+		got, err := s.Complete(key, repos, kind, q)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var l []string
+		for _, g := range got {
+			l = append(l, g.Label)
+		}
+		return strings.Join(l, ",")
 	}
-	if len(got.Files) != 3 || got.Files[2] != "src/a.go" {
-		t.Errorf("files %v", got.Files)
+	if got := labels("@", "", "", []string{"a", "nope"}); got != ".claude/commands/db/reset.md,.claude/skills/deploy/SKILL.md,src/a.go" {
+		t.Errorf("all files %q", got)
 	}
-	want := []Command{{"db:reset", "Reset"}, {"deploy", "Ship it"}, {"mine", ""}}
-	if len(got.Commands) != 3 || got.Commands[0] != want[0] || got.Commands[1] != want[1] || got.Commands[2] != want[2] {
-		t.Errorf("commands %+v", got.Commands)
+	if got := labels("@", "A", "", []string{"a"}); got != "src/a.go,.claude/commands/db/reset.md,.claude/skills/deploy/SKILL.md" { // basename prefix before substring
+		t.Errorf("ranked files %q", got)
+	}
+	if got := labels("/", "", "", []string{"a"}); got != "/db:reset,/deploy,/mine" { // repo deploy shadows the user's
+		t.Errorf("commands %q", got)
+	}
+	if g, _ := s.Complete("", []string{"a"}, "/", "dep"); len(g) != 1 || g[0].Insert != "/deploy" || g[0].Hint != "Ship it" {
+		t.Errorf("deploy %+v", g)
 	}
 	tk, _ := s.CreateTask(NewTaskInput{Title: "t", Repos: []string{"a"}})
-	if got, err = s.Completions(tk.Key, nil); err != nil || len(got.Files) != 3 {
-		t.Errorf("by key: %v %v", got.Files, err)
+	if got := labels("@", "a.go", tk.Key, nil); got != "src/a.go" {
+		t.Errorf("by key %q", got)
+	}
+	for _, ref := range []string{"@../../etc/passwd", "@nope.go", "@../a/../../x"} {
+		if err := s.OpenFile(tk.Key, ref, "Finder"); err == nil {
+			t.Errorf("OpenFile %s: want error", ref)
+		}
+	}
+	if err := s.OpenFile(tk.Key, "@src/a.go", "Terminal"); err == nil || !strings.Contains(err.Error(), "cannot open files") {
+		t.Errorf("Terminal: %v", err)
 	}
 }

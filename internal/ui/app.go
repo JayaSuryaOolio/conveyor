@@ -399,11 +399,17 @@ func (a *App) EnsureWorkspace(key string) error {
 // ListAgents lists the Claude subagents of the given repos plus the user's.
 func (a *App) ListAgents(repos []string) ([]core.Agent, error) { return a.svc.ListAgents(repos) }
 
-// Completions lists repo files and slash commands for the editor's @ and / autocomplete:
+// Complete returns the editor's @file or /command suggestions for query q:
 // the task's repos when key is set, else the named repos.
-func (a *App) Completions(key string, repos []string) (core.Completions, error) {
-	return a.svc.Completions(key, repos)
+func (a *App) Complete(key string, repos []string, kind, q string) ([]core.Suggestion, error) {
+	return a.svc.Complete(key, repos, kind, q)
 }
+
+// FileOpeners lists the apps a task's @file reference can open in; errors when it is not a file.
+func (a *App) FileOpeners(key, ref string) ([]string, error) { return a.svc.FileOpeners(key, ref) }
+
+// OpenFile opens a task's @file reference in app.
+func (a *App) OpenFile(key, ref, app string) error { return a.svc.OpenFile(key, ref, app) }
 
 // AddAgent creates an agent file in the repo's main checkout (scope = repo name) or ~/.claude/agents ("user").
 func (a *App) AddAgent(name, description, prompt, scope, model string) error {

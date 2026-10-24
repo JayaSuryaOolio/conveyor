@@ -28,7 +28,7 @@ export function AppPresets():Promise<Array<store.App>>;
 
 export function ApplyLearnings(arg1:string):Promise<string>;
 
-export function Completions(arg1:string,arg2:Array<string>):Promise<core.Completions>;
+export function Complete(arg1:string,arg2:Array<string>,arg3:string,arg4:string):Promise<Array<core.Suggestion>>;
 
 export function Confirm(arg1:string):Promise<boolean>;
 
@@ -47,6 +47,8 @@ export function EditLearning(arg1:number,arg2:string):Promise<void>;
 export function EnsureWorkspace(arg1:string):Promise<void>;
 
 export function ExportState():Promise<string>;
+
+export function FileOpeners(arg1:string,arg2:string):Promise<Array<string>>;
 
 export function GetPromptDefaults():Promise<ui.PromptDefaults>;
 
@@ -77,6 +79,8 @@ export function MergedPR(arg1:string):Promise<string>;
 export function Move(arg1:string,arg2:string):Promise<void>;
 
 export function OpenApp(arg1:string,arg2:string,arg3:string):Promise<string>;
+
+export function OpenFile(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function PreviewBrief(arg1:string):Promise<ui.BriefPreview>;
 
