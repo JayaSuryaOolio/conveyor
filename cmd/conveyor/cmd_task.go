@@ -276,25 +276,39 @@ func taskSet(s *core.Service, args []string) error {
 	branch := fs.String("branch", "", "worktree branch (only before the worktree exists)")
 	pr := fs.String("pr", "", "PR URL (empty clears it)")
 	model := fs.String("model", "", "model override (empty clears it)")
+	desc := fs.String("desc", "", "description (backlog only)")
+	descFile := fs.String("desc-file", "", "read the description from a file (backlog only)")
 	pos, err := parseArgs(fs, args)
 	if err != nil {
 		return err
 	}
 	if len(pos) != 1 {
-		return fmt.Errorf("usage: conveyor task set KEY [--repo r] [--branch b] [--pr url] [--model m]")
+		return fmt.Errorf("usage: conveyor task set KEY [--repo r] [--branch b] [--pr url] [--model m] [--desc d | --desc-file f]")
 	}
 	given := map[string]bool{}
 	fs.Visit(func(f *flag.Flag) { given[f.Name] = true })
+	if *descFile != "" {
+		b, err := os.ReadFile(*descFile)
+		if err != nil {
+			return err
+		}
+		*desc, given["desc"] = string(b), true
+	}
+	if given["desc"] {
+		if err := s.SetTaskDescription(pos[0], *desc); err != nil {
+			return err
+		}
+	}
 	if given["model"] {
 		if err := s.SetTaskModel(pos[0], *model); err != nil {
 			return err
 		}
 	}
 	if !given["branch"] && !given["pr"] {
-		if given["model"] {
+		if given["model"] || given["desc"] {
 			return nil
 		}
-		return fmt.Errorf("nothing to set: pass --branch, --pr and/or --model")
+		return fmt.Errorf("nothing to set: pass --branch, --pr, --model and/or --desc")
 	}
 	t, err := store.GetTaskByKey(s.DB, pos[0])
 	if err != nil {

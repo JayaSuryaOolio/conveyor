@@ -25,7 +25,7 @@ conveyor task brief KEY --preview     # what the agent is told
 conveyor task log KEY [--follow]      # live session output
 conveyor task new "t" --repo r [--desc ..] [--todo] [--parent KEY] (--repo optional with --parent: defaults to the parent's repos) [--model m] [--agent a]
 conveyor task comment KEY "text"      conveyor task move KEY <status>
-conveyor task set KEY [--branch b] [--pr url] [--model m]
+conveyor task set KEY [--branch b] [--pr url] [--model m] [--desc d]   # --desc: backlog only
 conveyor task link KEY blocks|relates OTHER     conveyor task unlink KEY kind OTHER
 conveyor task parent KEY PARENT|--none
 conveyor agent list|add|model         conveyor config list|get|set
@@ -66,7 +66,7 @@ Use a throwaway home for experiments: `conveyor --home $(mktemp -d) ...`. Never 
 
 - **Task not launching:** is a dispatcher running (`dispatcher.lock`, app status dot green)? Task in `todo`? Open blockers (`task show KEY --json` -> relations)? `max_parallel` reached? Recent comment still in `comment_debounce_secs`? Then `grep KEY ~/.conveyor/conveyor.log`.
 - **Launch fails:** read the system comment on the thread. "workspace not trusted" = run `claude` once in the main repo.
-- **Stuck in running:** `claude agents --json --all` - is the bg session alive? Interactive runs are never reaped. `logs/hook.log` for hook errors.
+- **Stuck in running:** `claude agents --json --all` - is the bg session alive? Interactive runs are reaped (finished, task -> needs_you) once their session leaves that list. `logs/hook.log` for hook errors.
 - **Wrong context for the agent:** `conveyor task brief KEY --preview`.
 - **UI shows stale data:** UI polls `PRAGMA data_version`; check the app log for binding errors.
 

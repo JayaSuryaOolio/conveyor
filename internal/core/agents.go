@@ -202,3 +202,17 @@ func (s *Service) SetTaskModel(key, model string) error {
 	t.Model = optional(model)
 	return store.UpdateTask(s.DB, t)
 }
+
+// SetTaskDescription replaces the description of a task still in backlog; once it
+// has been queued, the agent's brief was built from it, so changes go in comments.
+func (s *Service) SetTaskDescription(key, desc string) error {
+	t, err := store.GetTaskByKey(s.DB, key)
+	if err != nil {
+		return err
+	}
+	if t.Status != store.StatusBacklog {
+		return fmt.Errorf("%s is %s: the description can only be edited in backlog; add a comment instead", key, t.Status)
+	}
+	t.Description = desc
+	return store.UpdateTask(s.DB, t)
+}

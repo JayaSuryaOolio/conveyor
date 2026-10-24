@@ -1,11 +1,11 @@
 import {lazy, Suspense, useEffect, useRef, useState} from 'react'
 import {ActionIcon, Anchor, Box, Breadcrumbs, Button, Code, Group, Paper, Stack, Text, Timeline, Title} from '@mantine/core'
 import {useLocalStorage} from '@mantine/hooks'
-import {IconArrowDown, IconArrowUp, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconMessage, IconPlayerPlay} from '@tabler/icons-react'
-import {GetTask, ListTasks, RunLog} from '../wailsjs/go/ui/App'
+import {IconArrowDown, IconArrowUp, IconPencil, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconMessage, IconPlayerPlay} from '@tabler/icons-react'
+import {GetTask, ListTasks, RunLog, SetTaskDescription} from '../wailsjs/go/ui/App'
 import {core, store, ui} from '../wailsjs/go/models'
 import {Card, CommentBox, Message, Nav, StatusBadge, Time, errMsg} from './components'
-import {Markdown} from './markdown'
+import {Markdown, MarkdownEditor} from './markdown'
 import {Relations} from './relations'
 import {TaskSidebar} from './workspace'
 import {fmtDuration, fmtK, useData} from './util'
@@ -142,6 +142,35 @@ function SessionLog({run}: {run: store.Run}) {
     )
 }
 
+/** The task description; editable (pencil) only while the task is in backlog. */
+function Description({t, reload}: {t: store.Task; reload: () => void}) {
+    const [draft, setDraft] = useState<string | null>(null)
+    const [busy, setBusy] = useState(false)
+    const editable = t.status === 'backlog'
+    if (draft !== null && editable) {
+        const save = () => {
+            setBusy(true)
+            SetTaskDescription(t.key, draft).then(() => { setDraft(null); reload() }).catch(errMsg).finally(() => setBusy(false))
+        }
+        return (
+            <Stack gap={4}>
+                <MarkdownEditor minRows={4} value={draft} onChange={setDraft} onSubmit={save} submitLabel="Save" submitting={busy} attachKey={t.key}/>
+                <Button variant="default" size="compact-sm" style={{alignSelf: 'flex-start'}} onClick={() => setDraft(null)}>Cancel</Button>
+            </Stack>
+        )
+    }
+    return (
+        <Paper withBorder p="md" radius="md" pos="relative">
+            {editable && (
+                <ActionIcon variant="subtle" color="gray" size="sm" pos="absolute" top={8} right={8} aria-label="Edit description" onClick={() => setDraft(t.description)}>
+                    <IconPencil size={14}/>
+                </ActionIcon>
+            )}
+            <Markdown c={t.description ? undefined : 'dimmed'}>{t.description || '(no description)'}</Markdown>
+        </Paper>
+    )
+}
+
 export function TaskPage({k, nav}: {k: string; nav: Nav}) {
     const {data: d, error, reload} = useData(() => GetTask(k), [k])
     const [added, setAdded] = useState<ui.TermInfo>()
@@ -167,9 +196,7 @@ export function TaskPage({k, nav}: {k: string; nav: Nav}) {
                             <Text size="sm">{t.key}</Text>
                         </Breadcrumbs>
                         <Title order={3}>{t.title}</Title>
-                        <Paper withBorder p="md" radius="md">
-                            <Markdown c={t.description ? undefined : 'dimmed'}>{t.description || '(no description)'}</Markdown>
-                        </Paper>
+                        <Description t={t} reload={reload}/>
                         <Relations k={t.key} status={t.status} rel={d.relations} nav={nav} reload={reload}/>
                         {latest?.criteria && <><Title order={5}>Acceptance criteria</Title><Criteria text={latest.criteria}/></>}
                         <Title order={5}>Thread</Title>
