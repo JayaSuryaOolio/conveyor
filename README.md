@@ -1,84 +1,107 @@
-# Conveyor
+<p align="center">
+  <img src="build/appicon.png" alt="Conveyor" width="128">
+</p>
 
-**[Why Conveyor: architecture, decisions and token-efficient runs →](docs/showcase.md)**
+<h1 align="center">Conveyor</h1>
 
-A local kanban that runs tasks through Claude Code background sessions. Each task has a Jira-like page with a comment thread; a comment triggers the next run; every run is a real Claude session you can attach to; each task works in its own workspace folder holding one git worktree per repo.
+<p align="center">
+  <b>A kanban board that runs Claude Code for you.</b><br>
+  Write a task, drop it in Todo, review the PR. Local, boring, fast.
+</p>
 
-Design: `docs/tech-spec.md`. Verified Claude Code behaviour: `docs/research/spike-bg.md`. How to use it: [`docs/guide.md`](docs/guide.md). Agents working on or with Conveyor: [`.claude/skills/conveyor/SKILL.md`](.claude/skills/conveyor/SKILL.md) (commands, file locations, code map, troubleshooting).
+<!-- Screenshots: drop PNGs in docs/screenshots/ (board.png, task-page.png) -->
 
-## Architecture
+---
+
+## Why Conveyor
+
+Most "software factories" want you to move in: a server, an account, a new agent runtime, their own way of registering skills. Conveyor doesn't. It's a desktop app and a CLI over one SQLite file on your machine, and every run is a **real Claude Code session** in a **real git worktree** of your repo.
+
+- **Your repo stays in charge.** Runs load the repo's own `CLAUDE.md`, skills, commands and agents. Nothing to register or sync.
+- **You can always jump in.** Attach to a running session, resume it in your terminal, or open a fresh one with the task's context.
+- **Comments drive the work.** Like Jira: comment on a finished task and the next run picks it up. Comment while it runs and it's queued.
+- **It finishes the job.** Conveyor follows each PR with `gh` and marks the task done when it merges.
+- **It gets cheaper over time.** It decides how much context each run starts with, and learns from its own runs (see below).
+
+Compared with kanban-code, multica, paperclip, orca and hermes, Conveyor keeps what we liked (real attachable sessions, worktree per task, repo-native config) and skips what we didn't (servers, headless-only agents, registries). The full comparison is in [`docs/research/landscape.md`](docs/research/landscape.md).
+
+## The architecture advantage
 
 ![Conveyor architecture](docs/diagrams/architecture.svg)
 
-- **App and CLI.** The Wails desktop app (React UI, Go bindings in `internal/ui`) and the `conveyor` CLI (`cmd/conveyor`) are two front ends over the same `core.Service` (`internal/core`). Both read and write one SQLite database (`internal/store`) in `CONVEYOR_HOME`. The UI polls `PRAGMA data_version` and refreshes when the CLI or a hook changes the data.
-- **Dispatcher.** One dispatcher runs at a time (a lock file in the home directory). It lives in the app, or in `conveyor daemon` when the app is closed. Every 2 seconds it reaps dead runs, launches `todo` tasks within `max_parallel`, and now and then syncs PRs and runs automations.
-- **Workspaces and sessions.** A launch creates `~/.conveyor/workspaces/<KEY>/<repo>` (a git worktree per repo), writes `BRIEF.md`, and starts `claude --bg --settings claude-settings.json`. A comment on a finished task resumes the same session if its context is small, otherwise a fresh one starts.
-- **Hooks.** The settings file points Claude Code's `UserPromptSubmit`, `Stop`, `Notification` and `PreToolUse` hooks at `conveyor hook <Event>`. That is how a run reports its result and how a task moves to `review` or `needs_you`.
-- **Around the edges.** `gh` tracks PRs and finishes a task when they merge. Learnings, automations and apps are small modules on top of `core`. The app also embeds terminals (`internal/term`).
+**One task, one workspace.** Each task gets `~/.conveyor/workspaces/<KEY>/` with one git worktree per repo and a short `BRIEF.md`. Multi-repo tasks just work: the primary repo is the working directory, the rest come in with `--add-dir`, and there's at most one PR per repo.
 
-The task states and the hook flow have their own diagrams in the [guide](docs/guide.md). The diagram sources are `.excalidraw` files in `docs/diagrams/`.
+**Two front ends, one core.** The Wails app and the `conveyor` CLI call the same `core.Service`, so anything you can click, an agent can script. Agents use the CLI themselves to split work into sub-tasks and links.
 
-## Install
+**Hooks, not scraping.** Claude Code's hooks call `conveyor hook`. When an agent stops, its status block moves the task to Review or Needs you. No log parsing, no guessing.
 
-Requires Go 1.25, `git`, and the `claude` CLI (plus `gh` for PR tracking).
+**Safe to leave alone.** Unattended runs bypass permission prompts, but the worktree is the boundary. Interactive sessions keep normal permissions.
 
-```
-scripts/install.sh             # CLI to ~/.local/bin (BIN_DIR), Conveyor.app to /Applications (APP_DIR)
-```
+## Prompt and token optimizations
 
-It runs `go install ./cmd/conveyor` and `wails build` (installing Wails if missing), copies the user-level skills in `skills/` (e.g. `conveyor-doctor`) to `~/.claude/skills`, and, if this checkout is a registered repo, adds the weekly `conveyor-doctor` automation.
+The expensive part of an agent run is the context it starts with. Conveyor picks it per run.
 
-## First run
+**Resume when cheap, start fresh when not.** If the last session ended under `resume_threshold` (60K tokens), the next comment resumes it with only the new comments. Above that, a fresh session starts from the brief, roughly 15–20K tokens instead of 78–150K.
 
-1. **Trust your repos (once).** `claude --bg` refuses untrusted folders. Run `claude` in each repo you will register, accept the trust prompt, and exit. A linked worktree inherits trust from its main repo; a trusted parent folder does not extend to worktrees. If a launch fails with "workspace not trusted", this is why.
-2. Add repos: `conveyor repo add ~/work/my-repo`
-3. Create a task: `conveyor task new "Fix the thing" --repo my-repo --desc "..." --todo`
-4. Start dispatching: open the app, or run `conveyor daemon` (only one dispatcher runs at a time; the app takes over when the daemon quits).
-5. Watch it: `conveyor task show CV-1 --thread --runs`, or the board in the app. Comment to send it back: `conveyor task comment CV-1 "also do X"`.
+**A brief, not a history.** `BRIEF.md` is a few KB: description, acceptance criteria and their state, the last run's next step, one-line summaries of past runs, and your comments. The full thread is one command away if needed.
 
-`CONVEYOR_HOME` (default `~/.conveyor`) holds the DB, logs and workspaces; override with `--home` (before the subcommand) or the env var.
+**Structured hand-offs.** Every run ends with a `status / summary / state / next / criteria / learning / spawn` block, which feeds the next brief. No agent re-reads a transcript to figure out where things stand.
 
-## CLI reference
+**No duplicate context.** The primary repo's skills are already loaded by Claude Code, so the brief lists only the other repos' context. Runs use `--strict-mcp-config` with the repo's `.mcp.json`, so unrelated MCP servers stay out of the prompt.
 
-```
-usage: conveyor [--home dir] <command> [args]
+**Measured, not guessed.** Every run records API calls, peak context and token counts, so you can tune from real numbers.
 
-commands:
-  agent      Claude subagents from repos and ~/.claude (list|add|model)
-  app        open worktrees in external apps, run quick actions (list|presets|add|global|output|rm|open)
-  automation manage automations (list|add|enable|disable|run|rm)
-  config     list, get or set settings
-  daemon     run the dispatcher in the foreground
-  hook       handle a Claude Code hook event (internal)
-  hooks      Claude Code hooks in ~/.claude/settings.json (status|install|uninstall)
-  import     import tasks (jira --jql ... --repo a)
-  learning   curate learnings (list|accept|reject|edit|apply)
-  repo       manage registered repos (add|list|rm)
-  task       manage tasks (new|list|show|comment|move|set|link|unlink|parent|cancel|done|sync|brief|log|attach|open|sessions)
+## It improves itself
+
+- **Learnings.** Agents report `learning:` lines. Accept the good ones and Conveyor opens a PR to the repo's `CLAUDE.md` or skills.
+- **Conveyor doctor.** Every Monday a task reviews the week's longest, shortest, failed and most-commented runs and proposes concrete prompt and settings fixes.
+- **Automations.** Cron-scheduled tasks (e.g. sweeping PR review comments) are just more cards on the board.
+
+More: [the showcase page](docs/showcase.md) (decisions and trade-offs) and the [user guide](docs/guide.md) (task states, hook flow, every feature).
+
+---
+
+## Quick start
+
+Requires Go 1.25, `git`, the `claude` CLI, and `gh` for PR tracking.
+
+```sh
+scripts/install.sh                       # CLI → ~/.local/bin, Conveyor.app → /Applications
+claude                                   # once per repo: accept the trust prompt, then exit
+conveyor repo add ~/work/my-repo
+conveyor task new "Fix the thing" --repo my-repo --desc "..." --todo
+conveyor daemon                          # or just open the app
+conveyor task comment CV-1 "also do X"   # send it back for another pass
 ```
 
-Tasks can have sub-tasks (`task new --parent CV-1` gives CV-1A, CV-1B ...) and links (`task link CV-1A blocks CV-1B`; kinds `blocks|relates`), and `task parent KEY PARENT|--none` re-parents without changing keys. A blocked todo task is not launched until its blockers are done or cancelled.
+`claude --bg` refuses untrusted folders, so do the trust step once per repo. A "workspace not trusted" launch failure means it was skipped. `CONVEYOR_HOME` (default `~/.conveyor`) holds the DB, logs and workspaces.
 
-Run `conveyor <command>` with no arguments for per-command usage. Listing and show commands accept `--json`.
+## For AI agents
 
-## Integrations
+Start with [`.claude/skills/conveyor/SKILL.md`](.claude/skills/conveyor/SKILL.md): commands, file locations, code map, troubleshooting.
 
-- **Terminal template.** `conveyor task open KEY --shell|--resume|--fresh` opens a terminal via the `terminal_template` setting (default: macOS Terminal through `osascript`; `{cwd}` and `{cmd}` are substituted). Set an iTerm, Ghostty or tmux template with `conveyor config set terminal_template '...'`. `--print` shows the command instead.
-- **Apps.** Open a task's worktree in any app: an app is a name plus a shell command where `{cwd}` becomes the quoted worktree path and `{key}` the task key. Installed editors, terminals, git clients, Finder and the `spotlight` CLI are offered as presets. Manage them on the Apps page or with `conveyor app presets`, `conveyor app add Cursor` (preset), `conveyor app add Zed --command 'zed {cwd}'`, `conveyor app open Zed CV-12 [--repo r] [--print]` (or a directory instead of a key), `conveyor app rm Zed`. The task page shows them as icons on each repo. Quick actions (`--output`) run to completion instead and show their output; scripts can use `conveyor task sessions KEY --json` (e.g. to price a task's sessions with `ccusage`, see the guide).
-- **Agent hooks.** Conveyor-launched sessions always report through `--settings`. `conveyor hooks install` also adds the same hook commands (UserPromptSubmit, Stop, Notification) to `~/.claude/settings.json`, so a `claude` you start yourself in a task worktree (from an app or any terminal) shows up as an interactive run. Sessions outside Conveyor workspaces are ignored, and identical commands run once per event. `conveyor hooks status|uninstall`; the old file is kept as `settings.json.conveyor.bak`.
-- **Automations.** Cron-scheduled actions with an optional shell precheck: `conveyor automation add NAME --schedule "0 9 * * 1-5" --precheck "..." --kind create_task --arg '{...}'`. Actions: `create_task`, `comment`, `cli`.
-- **Jira.** `conveyor import jira --jql "..." --repo a` (needs `acli`).
+| Need | Where |
+|---|---|
+| How to use every feature | [`docs/guide.md`](docs/guide.md) |
+| Design and data model | [`docs/tech-spec.md`](docs/tech-spec.md) |
+| Verified Claude Code `--bg` behaviour | [`docs/research/spike-bg.md`](docs/research/spike-bg.md) |
+| Decisions and token strategy | [`docs/showcase.md`](docs/showcase.md) |
+| Diagrams (sources are `.excalidraw`) | [`docs/diagrams/`](docs/diagrams/) |
 
-## End-to-end test
+**Tech:** Go, SQLite (`internal/store`), Wails + React/Mantine (`frontend/`, bindings in `internal/ui`), core logic in `internal/core`, CLI in `cmd/conveyor`, embedded terminals in `internal/term`. One dispatcher at a time (lock file in `CONVEYOR_HOME`), in the app or `conveyor daemon`, ticking every 2 seconds.
 
-`scripts/e2e.sh` drives the full loop against the real `claude` (haiku) on two throwaway repos. The repos must already be trusted: by default they live in `~/work/conveyor-e2e/repo-a` and `repo-b` (override with `E2E_ROOT`); create them, run `claude` in each once by hand, then run the script.
+**CLI:** `conveyor <command>` with no args prints usage; list/show commands take `--json`.
 
-## TODO
+```
+agent  app  automation  config  daemon  hook  hooks  import  learning  repo  task
+```
 
-- UI component layer: the UI imports Mantine directly in every file. Wrap the pieces we use (selects, modals, inputs, buttons, badges) in our own components with small, documented props contracts, so screens depend on those and Mantine can be swapped or upgraded in one place.
-- Remote backend: run the dispatcher, DB and workspaces on a remote server and drive it from this UI (and the CLI) over an API, instead of the in-process Wails bindings.
-- Command palette (⌘K): jump to any task, view or action, and run commands (new task, move, comment, open terminal), more robust than the sidebar search.
+Integrations (terminal templates, external apps, global hooks, automations, Jira import) are covered in the [guide](docs/guide.md).
 
-## Development
+**Checks:** `gofmt -l .`, `go vet ./...`, `go test ./...`; frontend: `cd frontend && npm ci && npm run build`. End-to-end: `scripts/e2e.sh` against real `claude` (haiku) on two pre-trusted throwaway repos in `~/work/conveyor-e2e/` (override with `E2E_ROOT`).
 
-`gofmt -l .`, `go vet ./...`, `go test ./...`; frontend: `cd frontend && npm ci && npm run build`.
+## Roadmap
+
+- A wrapped UI component layer so Mantine can be swapped in one place.
+- A remote backend: dispatcher, DB and workspaces on a server, driven over an API.
+- A ⌘K command palette for tasks, views and actions.
