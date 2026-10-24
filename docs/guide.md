@@ -238,6 +238,6 @@ Outside it, Conveyor reads `~/.claude/projects` (session transcripts), `~/.claud
 - **Nothing starts.** Check that a dispatcher is running (the app, or `conveyor daemon`), the task is in todo, and fewer than `max_parallel` runs are active. A task you just commented on waits `comment_debounce_secs`.
 - **"workspace not trusted".** Run `claude` once in the main repo and accept the trust prompt. Worktrees inherit it.
 - **Task is failed.** Read the system comment on the thread, fix the cause, then comment to retry.
-- **Task stays in running after a manual session.** Runs of kind interactive are not reaped and do not move the task on stop. A human can move a running task only to review (or cancel it): `conveyor task move KEY review`.
+- **Task stays in running after a manual session.** Stopping a manual session does not move the task, but once the session is gone from `claude agents` (terminal closed, process killed) the dispatcher finishes its run after a 30s grace and moves a running task to needs_you. If the dispatcher is not running, a human can move a running task only to review (or cancel it): `conveyor task move KEY review`.
 - **Hooks do not fire for a manual session.** `conveyor hooks status`; the session must run inside `~/.conveyor/workspaces/<KEY>/...`.
 - **A comment on a running task seems ignored.** It is delivered when the run stops.

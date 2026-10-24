@@ -123,7 +123,8 @@ func deref(s *string) string {
 	return *s
 }
 
-// reap fails active runs whose background session no longer exists, or that never got one.
+// reap fails active auto runs whose background session no longer exists, or that never got one,
+// and finishes interactive runs whose session is gone from the agents list.
 func (d *Dispatcher) reap(ctx context.Context) error {
 	runs, err := store.ActiveRuns(d.DB)
 	if err != nil {
@@ -132,7 +133,12 @@ func (d *Dispatcher) reap(ctx context.Context) error {
 	var cand []store.Run
 	needAgents := false
 	for _, r := range runs {
-		if r.BgID != nil {
+		if r.Kind == "interactive" {
+			if r.SessionID != nil { // without a session id there is nothing to match
+				needAgents = true
+				cand = append(cand, r)
+			}
+		} else if r.BgID != nil {
 			needAgents = true
 			cand = append(cand, r)
 		} else if r.Status == "launching" { // dispatcher died before saving the bg id
@@ -142,7 +148,7 @@ func (d *Dispatcher) reap(ctx context.Context) error {
 	if len(cand) == 0 {
 		return nil
 	}
-	alive := map[string]claude.Agent{}
+	alive, sessions := map[string]claude.Agent{}, map[string]bool{}
 	if needAgents {
 		agents, err := claude.Agents(ctx)
 		if err != nil {
@@ -150,9 +156,16 @@ func (d *Dispatcher) reap(ctx context.Context) error {
 		}
 		for _, a := range agents {
 			alive[a.ID] = a
+			sessions[a.SessionID] = true
 		}
 	}
 	for _, r := range cand {
+		if r.Kind == "interactive" {
+			if err := d.reapInteractive(r, sessions[*r.SessionID]); err != nil {
+				return err
+			}
+			continue
+		}
 		a, ok := alive[deref(r.BgID)]
 		ok = ok && r.BgID != nil
 		// Adopt sessions whose hooks never fired: the agents list knows the session id.
@@ -193,6 +206,38 @@ func (d *Dispatcher) reap(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+// reapInteractive finishes a manual session's run once its session is gone (terminal closed, process
+// killed). The user ended it, so the run is finished, not failed. A running task then goes to needs_you
+// (the same edge as a vanished auto run): nothing says the work is done, so it is the human's turn.
+func (d *Dispatcher) reapInteractive(r store.Run, alive bool) error {
+	if alive || d.now().Sub(parseTime(r.StartedAt)) <= reapGrace {
+		return nil
+	}
+	ended := d.now().UTC().Format(time.RFC3339)
+	r.Status, r.EndedAt = "finished", &ended
+	if err := store.UpdateRun(d.DB, r); err != nil {
+		return err
+	}
+	task, err := store.GetTask(d.DB, r.TaskID)
+	if err != nil || task.Status != store.StatusRunning {
+		return err
+	}
+	if active, err := store.ActiveRuns(d.DB); err != nil {
+		return err
+	} else {
+		for _, o := range active {
+			if o.TaskID == task.ID { // another session still works the task
+				return nil
+			}
+		}
+	}
+	if _, err := store.AddComment(d.DB, store.Comment{TaskID: task.ID, Author: store.AuthorSystem, Body: "The manual Claude session ended."}); err != nil {
+		return err
+	}
+	_, err = store.UpdateTaskStatus(d.DB, task.ID, store.StatusNeedsYou, store.ActorSystem)
+	return err
 }
 
 func (d *Dispatcher) pollPRs(ctx context.Context) {
