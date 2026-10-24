@@ -11,14 +11,14 @@ import {Logs} from './logs'
 import {useData} from './util'
 import {Board, Focus, TaskPage} from './views'
 
-const NAV = [
-    {name: 'board', label: 'Board', icon: IconLayoutKanban},
-    {name: 'focus', label: 'Focus', icon: IconBolt},
+const NAV: {name: string; key?: string; label: string; icon: typeof IconBolt}[] = [
+    {name: 'board', key: 'b', label: 'Board', icon: IconLayoutKanban},
+    {name: 'focus', key: 'f', label: 'Focus', icon: IconBolt},
     {name: 'learnings', label: 'Learnings', icon: IconBook2},
     {name: 'automations', label: 'Automations', icon: IconClock},
     {name: 'repos', label: 'Repos', icon: IconFolders},
-    {name: 'agents', label: 'Agents', icon: IconRobot},
-    {name: 'logs', label: 'Logs', icon: IconLogs},
+    {name: 'agents', key: 'a', label: 'Agents', icon: IconRobot},
+    {name: 'logs', key: 'l', label: 'Logs', icon: IconLogs},
     {name: 'settings', label: 'Settings', icon: IconSettings},
 ]
 
@@ -48,8 +48,8 @@ export default function App() {
             if (el.matches('input,textarea,select') || e.metaKey || e.ctrlKey) return
             if (g) {
                 g = false
-                if (e.key === 'b') setView({name: 'board'})
-                if (e.key === 'f') setView({name: 'focus'})
+                const n = NAV.find(x => x.key === e.key)
+                if (n) setView({name: n.name})
                 return
             }
             if (e.key === 'n') { e.preventDefault(); setShowNew(true) }
@@ -69,9 +69,9 @@ export default function App() {
                     <TextInput ref={search} placeholder="Search" leftSection={<IconSearch size={16}/>} rightSection={<Kbd size="xs">/</Kbd>}
                                value={q} onChange={e => setQ(e.target.value)}/>
                     <Stack gap={2} mt="xs">
-                        {NAV.map(({name, label, icon: Icon}) => (
+                        {NAV.map(({name, key, label, icon: Icon}) => (
                             <NavLink key={name} label={label} active={view.name === name} leftSection={<Icon size={18}/>}
-                                     rightSection={name === 'learnings' && proposed > 0 ? <Badge size="sm" circle>{proposed}</Badge> : undefined}
+                                     rightSection={name === 'learnings' && proposed > 0 ? <Badge size="sm" circle>{proposed}</Badge> : key ? <Kbd size="xs" title={`g then ${key}`}>g {key}</Kbd> : undefined}
                                      onClick={() => setView({name})}/>
                         ))}
                     </Stack>

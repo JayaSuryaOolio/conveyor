@@ -1,5 +1,5 @@
 import {useState} from 'react'
-import {ActionIcon, Badge, Button, Card as MCard, Group, Menu, Paper, Select, Stack, Text, Tooltip} from '@mantine/core'
+import {ActionIcon, Badge, Box, Button, Card as MCard, Group, Menu, Paper, Select, Stack, Text, Tooltip} from '@mantine/core'
 import {IconDots} from '@tabler/icons-react'
 import {AddComment, Move, ShowError} from '../wailsjs/go/ui/App'
 import {store, ui} from '../wailsjs/go/models'
@@ -55,7 +55,7 @@ export function Card({c, nav}: {c: ui.TaskCard; nav: Nav}) {
             </Group>
             <Text size="sm" fw={500} mt={2}>{c.title}</Text>
             {c.repos.length > 0 && <Group gap={4} mt="xs">{c.repos.map(r => <Badge key={r} variant="light" size="xs">{r}</Badge>)}</Group>}
-            {c.lastSummary && <Text size="xs" c="dimmed" mt="xs" lineClamp={2}>{c.lastSummary}</Text>}
+            {c.lastSummary && <Box mt="xs" mah={40} style={{overflow: 'hidden'}}><Markdown c="dimmed">{c.lastSummary}</Markdown></Box>}
             <Group mt="xs"><StatusBadge status={c.status}/></Group>
         </MCard>
     )

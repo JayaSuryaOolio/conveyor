@@ -1,6 +1,6 @@
 import {useEffect, useRef, useState} from 'react'
-import {Anchor, Box, Breadcrumbs, Button, Code, Group, List, Paper, Stack, Text, ThemeIcon, Timeline, Title} from '@mantine/core'
-import {IconCheck, IconCircle, IconMessage, IconPlayerPlay} from '@tabler/icons-react'
+import {Anchor, Box, Breadcrumbs, Button, Code, Group, Paper, Stack, Text, Timeline, Title} from '@mantine/core'
+import {IconMessage, IconPlayerPlay} from '@tabler/icons-react'
 import {Cancel, Confirm, GetTask, ListTasks, RunLog} from '../wailsjs/go/ui/App'
 import {core, store} from '../wailsjs/go/models'
 import {Card, CommentBox, Message, Nav, StatusBadge, Time, errMsg} from './components'
@@ -59,7 +59,7 @@ export function Focus({nav, q}: {nav: Nav; q: string}) {
                             <Text size="sm" style={{flex: 1}} lineClamp={1}>{c.title}</Text>
                             <Button variant="default" size="xs" onClick={() => nav({name: 'task', key: c.key})}>Open</Button>
                         </Group>
-                        {c.lastSummary && <Text size="xs" c="dimmed" lineClamp={2}>{c.lastSummary}</Text>}
+                        {c.lastSummary && <Box mah={40} style={{overflow: 'hidden'}}><Markdown c="dimmed">{c.lastSummary}</Markdown></Box>}
                         <CommentBox k={c.key} onDone={reload}/>
                     </Stack>
                 </Paper>
@@ -70,22 +70,7 @@ export function Focus({nav, q}: {nav: Nav; q: string}) {
 
 type Item = {t: string; run?: store.Run; comment?: store.Comment}
 
-function Criteria({text}: {text: string}) {
-    const lines = text.split('\n').map(l => l.trim()).filter(l => /^[-*]\s*\[[ xX]\]/.test(l))
-    if (!lines.length) return null
-    return (
-        <List spacing="xs" size="sm" center>
-            {lines.map((l, i) => {
-                const done = /\[[xX]\]/.test(l)
-                return (
-                    <List.Item key={i} icon={<ThemeIcon size={20} radius="xl" variant={done ? 'filled' : 'default'} color="green">{done ? <IconCheck size={12}/> : <IconCircle size={10}/>}</ThemeIcon>}>
-                        {l.replace(/^[-*]\s*\[[ xX]\]\s*/, '')}
-                    </List.Item>
-                )
-            })}
-        </List>
-    )
-}
+const Criteria = ({text}: {text: string}) => <Markdown>{text}</Markdown>
 
 const secs = (n: number) => (n < 60 ? n + 's' : Math.floor(n / 60) + 'm ' + (n % 60) + 's')
 
