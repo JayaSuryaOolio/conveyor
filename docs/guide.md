@@ -148,7 +148,7 @@ conveyor automation list | enable NAME | disable NAME | run NAME | rm NAME
 
 ## Apps
 
-An app is a name plus a shell command in which `{cwd}` is replaced by the quoted worktree path. The Apps page offers presets detected on your Mac (editors, terminals, git clients, Finder). Apps show up under "Open in..." on each repo of the task page.
+An app is a name plus a shell command in which `{cwd}` is replaced by the quoted worktree path. The Apps page offers presets detected on your Mac (editors, terminals, git clients, Finder). Apps show up as a row of icons on each repo of the task page; hover for the name. A launched icon flashes a check or a cross, and Spotlight shows a green dot while it runs for that worktree (click again to stop it).
 
 ```
 conveyor app presets
@@ -167,7 +167,7 @@ Settings are in the app (Settings page) or `conveyor config list|get|set`.
 
 - **General**: `key_prefix` (CV), `default_model`, `editor_command`.
 - **Dispatch**: `max_parallel` (3), `resume_threshold` (60000), `comment_debounce_secs` (20), `max_consecutive_failures` (3).
-- **Terminal**: `terminal_template`, the command for external terminals (`{cwd}` and `{cmd}` are substituted; default uses macOS Terminal).
+- **External terminal**: `terminal_template`, the command for external terminals (`{cwd}` and `{cmd}` are substituted; default uses macOS Terminal).
 - **Prompts**: `pr_comment_prefix`, `brief_extra_rules`, and `prompt_fresh` / `prompt_resume` to replace the launch prompts (placeholders `{key}`, `{title}`, `{brief}`, `{comments}`). Empty means the built-in prompt. The page also shows the status block protocol the agent is given.
 
 ## CLI cheat-sheet
