@@ -2,7 +2,19 @@
 
 A local kanban that runs tasks through Claude Code background sessions. Each task has a Jira-like page with a comment thread; a comment triggers the next run; every run is a real Claude session you can attach to; each task works in its own workspace folder holding one git worktree per repo.
 
-Design: `docs/tech-spec.md`. Verified Claude Code behaviour: `docs/research/spike-bg.md`.
+Design: `docs/tech-spec.md`. Verified Claude Code behaviour: `docs/research/spike-bg.md`. How to use it: [`docs/guide.md`](docs/guide.md).
+
+## Architecture
+
+![Conveyor architecture](docs/diagrams/architecture.svg)
+
+- **App and CLI.** The Wails desktop app (React UI, Go bindings in `internal/ui`) and the `conveyor` CLI (`cmd/conveyor`) are two front ends over the same `core.Service` (`internal/core`). Both read and write one SQLite database (`internal/store`) in `CONVEYOR_HOME`. The UI polls `PRAGMA data_version` and refreshes when the CLI or a hook changes the data.
+- **Dispatcher.** One dispatcher runs at a time (a lock file in the home directory). It lives in the app, or in `conveyor daemon` when the app is closed. Every 2 seconds it reaps dead runs, launches `todo` tasks within `max_parallel`, and now and then syncs PRs and runs automations.
+- **Workspaces and sessions.** A launch creates `~/.conveyor/workspaces/<KEY>/<repo>` (a git worktree per repo), writes `BRIEF.md`, and starts `claude --bg --settings claude-settings.json`. A comment on a finished task resumes the same session if its context is small, otherwise a fresh one starts.
+- **Hooks.** The settings file points Claude Code's `UserPromptSubmit`, `Stop`, `Notification` and `PreToolUse` hooks at `conveyor hook <Event>`. That is how a run reports its result and how a task moves to `review` or `needs_you`.
+- **Around the edges.** `gh` tracks PRs and finishes a task when they merge. Learnings, automations and apps are small modules on top of `core`. The app also embeds terminals (`internal/term`).
+
+The task states and the hook flow have their own diagrams in the [guide](docs/guide.md). The diagram sources are `.excalidraw` files in `docs/diagrams/`.
 
 ## Install
 
