@@ -5,15 +5,14 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/JayaSuryaOolio/conveyor/internal/core"
 	"github.com/JayaSuryaOolio/conveyor/internal/statusblock"
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 	"github.com/JayaSuryaOolio/conveyor/internal/transcript"
+	"github.com/JayaSuryaOolio/conveyor/internal/workspace"
 )
 
 type payload struct {
@@ -25,36 +24,14 @@ type payload struct {
 	NotificationType     string `json:"notification_type"`
 }
 
-// keyFromCwd returns the task key: the first path segment of cwd under <home>/workspaces.
-// TODO(003): replace with workspace.KeyFromCwd once task 003 has merged.
-func keyFromCwd(home, cwd string) (string, bool) {
-	if cwd == "" {
-		return "", false
-	}
-	base := core.WorkspacesDir(home)
-	rel, err := filepath.Rel(base, cwd)
-	if err != nil || rel == "." || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-		// retry with symlinks resolved (macOS /var vs /private/var)
-		b, e1 := filepath.EvalSymlinks(base)
-		c, e2 := filepath.EvalSymlinks(cwd)
-		if e1 != nil || e2 != nil {
-			return "", false
-		}
-		if rel, err = filepath.Rel(b, c); err != nil || rel == "." || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-			return "", false
-		}
-	}
-	return strings.Split(rel, string(filepath.Separator))[0], true
-}
-
 // Handle processes one hook event. Callers log the returned error and still exit 0.
 func Handle(db *sql.DB, home, event string, raw []byte) error {
 	var p payload
 	if err := json.Unmarshal(raw, &p); err != nil {
 		return fmt.Errorf("parse %s payload: %w", event, err)
 	}
-	key, ok := keyFromCwd(home, p.Cwd)
-	if !ok {
+	key := workspace.KeyFromCwd(home, p.Cwd)
+	if key == "" {
 		return nil // not one of ours
 	}
 	task, err := store.GetTaskByKey(db, key)

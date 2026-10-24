@@ -18,6 +18,10 @@ export function CreateTask(arg1) {
   return window['go']['ui']['App']['CreateTask'](arg1);
 }
 
+export function DispatcherState() {
+  return window['go']['ui']['App']['DispatcherState']();
+}
+
 export function GetSettings() {
   return window['go']['ui']['App']['GetSettings']();
 }
