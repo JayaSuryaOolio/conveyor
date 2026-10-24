@@ -189,6 +189,9 @@ func (d *Dispatcher) pollPRs(ctx context.Context) {
 		if err := gh.SyncTask(ctx, d.DB, t); err != nil {
 			d.logf("pr poll %s: %v", t.Key, err)
 		}
+		if got, err := store.GetTask(d.DB, t.ID); err == nil && got.Status == store.StatusDone {
+			(&core.Service{DB: d.DB}).CleanupSessions(t.ID)
+		}
 	}
 }
 
