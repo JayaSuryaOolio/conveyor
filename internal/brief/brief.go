@@ -137,46 +137,17 @@ func Build(db *sql.DB, task store.Task) (string, error) {
 	if desc == "" {
 		desc = "(none)"
 	}
-	fmt.Fprintf(&b, "\n## Description\n\n%s\n\n## Acceptance criteria\n\n", desc)
-	criteria := "see description"
-	for i := len(runs) - 1; i >= 0; i-- {
-		if c := strings.TrimSpace(deref(runs[i].Criteria)); c != "" {
-			criteria = c
-			break
+	fmt.Fprintf(&b, "\n## Description\n\n%s\n", desc)
+	if task.Source == "followup" && task.ParentID != nil {
+		if err := parentContext(&b, db, *task.ParentID); err != nil {
+			return "", err
 		}
 	}
-	fmt.Fprintf(&b, "%s\n", criteria)
+	fmt.Fprintf(&b, "\n## Acceptance criteria\n\n%s\n", criteria(runs, "see description"))
 	if w := workflows(db, task); w != "" {
 		fmt.Fprintf(&b, "\n## Other repos' context\n\nClaude Code loaded only the primary repo's CLAUDE.md, skills, commands and agents. For these repos, read the files named here (`.claude/commands/<name>.md`, `.claude/skills/<name>/SKILL.md`, `.claude/agents/<name>.md`) when the work touches them.\n\n%s", w)
 	}
-	if len(runs) > 0 {
-		last := runs[len(runs)-1]
-		fmt.Fprintf(&b, "\n## Latest run\n\nState: %s\nNext: %s\n", oneLine(deref(last.State)), oneLine(deref(last.Next)))
-	}
-	var sums []string
-	for _, r := range runs {
-		if s := oneLine(deref(r.Summary)); s != "" {
-			sums = append(sums, fmt.Sprintf("- run %d: %s", r.ID, s))
-		}
-	}
-	if len(sums) > 3 {
-		sums = sums[len(sums)-3:]
-	}
-	if len(sums) > 0 {
-		fmt.Fprintf(&b, "\n## Recent runs\n\n%s\n", strings.Join(sums, "\n"))
-	}
-	var human []string
-	for _, c := range comments {
-		if c.Author == store.AuthorHuman {
-			human = append(human, "- "+firstLine(c.Body))
-		}
-	}
-	if len(human) > maxComments {
-		human = human[len(human)-maxComments:]
-	}
-	if len(human) > 0 {
-		fmt.Fprintf(&b, "\n## Human comments\n\n%s\n", strings.Join(human, "\n"))
-	}
+	history(&b, "##", runs, comments)
 	rel, err := store.ListRelations(db, task)
 	if err != nil {
 		return "", err
@@ -194,6 +165,76 @@ func Build(db *sql.DB, task store.Task) (string, error) {
 	b.WriteString(relationsHelp)
 	fmt.Fprintf(&b, "\n%s\n## Rules\n\n%s\n## Older history\n\nFull thread: `conveyor task show %s --thread --json`\n", statusBlock, rules(db, true), task.Key)
 	return b.String(), nil
+}
+
+// criteria is the latest run's acceptance criteria, or def.
+func criteria(runs []store.Run, def string) string {
+	for i := len(runs) - 1; i >= 0; i-- {
+		if c := strings.TrimSpace(deref(runs[i].Criteria)); c != "" {
+			return c
+		}
+	}
+	return def
+}
+
+// history writes the latest run, recent run summaries and human comments, with headings at level h.
+func history(b *strings.Builder, h string, runs []store.Run, comments []store.Comment) {
+	if len(runs) > 0 {
+		last := runs[len(runs)-1]
+		fmt.Fprintf(b, "\n%s Latest run\n\nState: %s\nNext: %s\n", h, oneLine(deref(last.State)), oneLine(deref(last.Next)))
+	}
+	var sums []string
+	for _, r := range runs {
+		if s := oneLine(deref(r.Summary)); s != "" {
+			sums = append(sums, fmt.Sprintf("- run %d: %s", r.ID, s))
+		}
+	}
+	if len(sums) > 3 {
+		sums = sums[len(sums)-3:]
+	}
+	if len(sums) > 0 {
+		fmt.Fprintf(b, "\n%s Recent runs\n\n%s\n", h, strings.Join(sums, "\n"))
+	}
+	var human []string
+	for _, c := range comments {
+		if c.Author == store.AuthorHuman {
+			human = append(human, "- "+firstLine(c.Body))
+		}
+	}
+	if len(human) > maxComments {
+		human = human[len(human)-maxComments:]
+	}
+	if len(human) > 0 {
+		fmt.Fprintf(b, "\n%s Human comments\n\n%s\n", h, strings.Join(human, "\n"))
+	}
+}
+
+// parentContext writes the context a follow-up continues from: the parent's
+// description, criteria, latest run, run summaries and human comments.
+func parentContext(b *strings.Builder, db *sql.DB, parentID int64) error {
+	p, err := store.GetTask(db, parentID)
+	if err != nil {
+		return err
+	}
+	runs, err := store.ListRuns(db, p.ID)
+	if err != nil {
+		return err
+	}
+	comments, err := store.ListComments(db, p.ID)
+	if err != nil {
+		return err
+	}
+	var prs []string
+	for _, r := range p.Repos {
+		if r.PRURL != nil {
+			prs = append(prs, fmt.Sprintf("%s (%s)", *r.PRURL, strings.ToLower(deref(r.PRState))))
+		}
+	}
+	fmt.Fprintf(b, "\n## Continues %s: %s\n\nThis task is a follow-up of %s, whose PR is merged (%s). Start from the default branch; the parent's work is already in it. Its context:\n",
+		p.Key, p.Title, p.Key, strings.Join(prs, ", "))
+	fmt.Fprintf(b, "\n### Its description\n\n%s\n\n### Its acceptance criteria\n\n%s\n", strings.TrimSpace(p.Description), criteria(runs, "(none recorded)"))
+	history(b, "###", runs, comments)
+	return nil
 }
 
 func deltaText(delta []store.Comment) string {

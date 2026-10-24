@@ -129,7 +129,8 @@ func (s *Service) CreateTask(in NewTaskInput) (store.Task, error) {
 }
 
 // AddComment appends a comment. A human or system comment on a task in
-// needs_you, review, failed or done requeues it as todo.
+// needs_you, review, failed or done requeues it as todo, or, once one of its
+// PRs is merged, starts a follow-up sub-task instead.
 func (s *Service) AddComment(key, author, body string) (store.Comment, error) {
 	t, err := store.GetTaskByKey(s.DB, key)
 	if err != nil {
@@ -150,11 +151,52 @@ func (s *Service) AddComment(key, author, body string) (store.Comment, error) {
 	}
 	switch t.Status {
 	case store.StatusNeedsYou, store.StatusReview, store.StatusFailed, store.StatusDone:
+		if pr := mergedPR(t); pr != "" {
+			return c, s.followUp(t, pr, body, actor)
+		}
 		if _, err := store.UpdateTaskStatus(s.DB, t.ID, store.StatusTodo, actor); err != nil {
 			return c, fmt.Errorf("requeue after comment: %w", err)
 		}
 	}
 	return c, nil
+}
+
+// mergedPR is the URL of one of the task's merged PRs, or "".
+func mergedPR(t store.Task) string {
+	for _, r := range t.Repos {
+		if r.PRState != nil && *r.PRState == "MERGED" && r.PRURL != nil {
+			return *r.PRURL
+		}
+	}
+	return ""
+}
+
+// followUp continues a task whose PR is merged in a new todo sub-task, so every
+// task keeps one branch and at most one PR per repo. The comment becomes the
+// sub-task's description; its brief carries the parent's context. The parent
+// is closed as done (best effort: some moves to done are human-only).
+func (s *Service) followUp(t store.Task, pr, body string, actor store.Actor) error {
+	line, _, _ := strings.Cut(strings.TrimSpace(body), "\n")
+	title := []rune(strings.Join(strings.Fields(line), " "))
+	if len(title) > 60 {
+		title = append(title[:57], '…')
+	}
+	child, err := s.CreateTask(NewTaskInput{Title: string(title), Description: body, ParentKey: t.Key, Source: "followup", Start: true})
+	if err != nil {
+		return fmt.Errorf("follow-up task: %w", err)
+	}
+	note := fmt.Sprintf("%s is merged, so this comment continues in %s on a fresh branch: a task keeps one branch and at most one PR per repo.", pr, child.Key)
+	if _, err := store.AddComment(s.DB, store.Comment{TaskID: t.ID, Author: store.AuthorSystem, Body: note}); err != nil {
+		return err
+	}
+	if _, err := store.AddComment(s.DB, store.Comment{TaskID: child.ID, Author: store.AuthorSystem,
+		Body: fmt.Sprintf("Follow-up of %s, whose PR %s is merged. The brief carries %s's context.", t.Key, pr, t.Key)}); err != nil {
+		return err
+	}
+	if t.Status != store.StatusDone {
+		store.UpdateTaskStatus(s.DB, t.ID, store.StatusDone, actor)
+	}
+	return nil
 }
 
 // Move changes a task's status as a human. Moving to done or cancelled also stops
