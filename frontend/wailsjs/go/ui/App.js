@@ -22,6 +22,10 @@ export function AddAutomation(arg1) {
   return window['go']['ui']['App']['AddAutomation'](arg1);
 }
 
+export function TakeQueuedComment(arg1, arg2) {
+  return window['go']['ui']['App']['TakeQueuedComment'](arg1, arg2);
+}
+
 export function AddComment(arg1, arg2, arg3) {
   return window['go']['ui']['App']['AddComment'](arg1, arg2, arg3);
 }
