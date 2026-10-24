@@ -111,7 +111,7 @@ export function TaskPage({k, nav}: {k: string; nav: Nav}) {
                 <CommentBox k={t.key} onDone={reload}/>
             </div>
             <div className="side">
-                <WorkspacePanel k={t.key} repos={t.repos ?? []} runs={d.runs}/>
+                <WorkspacePanel k={t.key} repos={t.repos ?? []} runs={d.runs} reload={reload}/>
             </div>
         </div>
     )
