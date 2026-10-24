@@ -110,7 +110,6 @@ Actions on a task:
 - **resume**: `claude --resume <session> --settings <home>/claude-settings.json` on the latest session.
 - **fresh**: a new interactive `claude` that is told to read `BRIEF.md` and wait for your instructions.
 - **shell**: a login shell in the worktree.
-- **editor**: the `editor_command` setting (default `code {cwd}`).
 
 Sessions you started by hand in a worktree also appear on the task page, found by scanning `~/.claude/projects` for that worktree path.
 
@@ -202,7 +201,7 @@ conveyor task link KEY blocks|relates OTHER    conveyor task unlink KEY kind OTH
 conveyor task parent KEY PARENT|--none
 conveyor task sync KEY                    conveyor task brief KEY [--preview]
 conveyor task log KEY [--follow]          conveyor task attach KEY
-conveyor task open KEY [--shell|--resume|--fresh|--editor] [--repo r] [--print]
+conveyor task open KEY [--shell|--resume|--fresh] [--repo r] [--print]
 
 conveyor agent list [--repo r]            conveyor agent add <name> --desc d (--prompt p | --prompt-file f) [--model m] [--repo r]
 conveyor agent model <name> <model|""> [--repo r]
