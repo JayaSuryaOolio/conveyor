@@ -1,23 +1,14 @@
-import {useRef, useState} from 'react'
+import {lazy, Suspense, useRef, useState} from 'react'
 import {ActionIcon, Group, Stack, Tabs, Text, Textarea, Tooltip, Typography} from '@mantine/core'
 import {IconBold, IconCode, IconItalic, IconLink, IconList, IconListCheck} from '@tabler/icons-react'
-import Md from 'react-markdown'
-import remarkGfm from 'remark-gfm'
-import {BrowserOpenURL} from '../wailsjs/runtime/runtime'
 
-const plugins = [remarkGfm]
-const components = {
-    // Never navigate the webview: hand links to the system browser.
-    a: ({href, children}: {href?: string; children?: React.ReactNode}) => (
-        <a href={href} onClick={e => { e.preventDefault(); if (href) BrowserOpenURL(href) }}>{children}</a>
-    ),
-}
+const MdRender = lazy(() => import('./md-render'))
 
 /** Renders GitHub-flavoured markdown; raw HTML stays escaped (react-markdown default). */
 export function Markdown({children, c}: {children: string; c?: string}) {
     return (
         <Typography fz="sm" c={c} className="md" style={{wordBreak: 'break-word'}}>
-            <Md remarkPlugins={plugins} components={components}>{children}</Md>
+            <Suspense fallback={<span style={{whiteSpace: 'pre-wrap'}}>{children}</span>}><MdRender>{children}</MdRender></Suspense>
         </Typography>
     )
 }
