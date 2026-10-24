@@ -94,6 +94,10 @@ export function RunAutomation(arg1) {
   return window['go']['ui']['App']['RunAutomation'](arg1);
 }
 
+export function RunLog(arg1, arg2) {
+  return window['go']['ui']['App']['RunLog'](arg1, arg2);
+}
+
 export function Sessions(arg1) {
   return window['go']['ui']['App']['Sessions'](arg1);
 }

@@ -18,6 +18,7 @@ import (
 	"github.com/JayaSuryaOolio/conveyor/internal/claude"
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 	"github.com/JayaSuryaOolio/conveyor/internal/terminal"
+	"github.com/JayaSuryaOolio/conveyor/internal/transcript"
 	"github.com/JayaSuryaOolio/conveyor/internal/workspace"
 )
 
@@ -195,6 +196,34 @@ func (s *Service) Sessions(key string) ([]Session, error) {
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].MTime > out[j].MTime })
 	return out, nil
+}
+
+// RunLog is a page of a run's session chat; pass Next as after to get only newer entries.
+type RunLog struct {
+	Entries []transcript.Entry `json:"entries"`
+	Next    int64              `json:"next"`
+}
+
+// RunLog reads the run's Claude transcript from byte offset after.
+// A run without a session or transcript yet returns no entries.
+func (s *Service) RunLog(runID, after int64) (RunLog, error) {
+	r, err := store.GetRun(s.DB, runID)
+	if err != nil {
+		return RunLog{}, err
+	}
+	out := RunLog{Entries: []transcript.Entry{}, Next: after}
+	if r.SessionID == nil {
+		return out, nil
+	}
+	files, _ := filepath.Glob(filepath.Join(s.projectsDir(), "*", *r.SessionID+".jsonl"))
+	if len(files) == 0 {
+		return out, nil
+	}
+	es, next, err := transcript.Log(files[0], after)
+	if err != nil {
+		return out, err
+	}
+	return RunLog{es, next}, nil
 }
 
 // FindAction picks an action by kind and repo ("" means the primary repo for shell and editor).
