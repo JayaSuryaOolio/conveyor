@@ -158,3 +158,21 @@ func TestHumanRequeueResetsFailures(t *testing.T) {
 		}
 	}
 }
+
+func TestSubtaskDefaultsToParentRepos(t *testing.T) {
+	s := newSvc(t)
+	if _, err := s.CreateTask(NewTaskInput{Title: "p", Repos: []string{"a", "b"}, Primary: "b"}); err != nil {
+		t.Fatal(err)
+	}
+	c, err := s.CreateTask(NewTaskInput{Title: "c", ParentKey: "CV-1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(c.Repos) != 2 || c.Repos[0].RepoName != "b" || !c.Repos[0].IsPrimary {
+		t.Fatalf("%+v", c.Repos)
+	}
+	e, err := s.CreateTask(NewTaskInput{Title: "e", ParentKey: "CV-1", Repos: []string{"a"}})
+	if err != nil || len(e.Repos) != 1 || e.Repos[0].RepoName != "a" {
+		t.Fatalf("%+v %v", e.Repos, err)
+	}
+}
