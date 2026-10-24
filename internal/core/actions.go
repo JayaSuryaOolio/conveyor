@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"github.com/JayaSuryaOolio/conveyor/internal/brief"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -47,14 +46,46 @@ func isActive(r store.Run) bool { return r.Status == "launching" || r.Status == 
 
 // settingsPath makes sure claude-settings.json exists and returns its path.
 func (s *Service) settingsPath() (string, error) {
+	bin, err := s.bin()
+	if err != nil {
+		return "", err
+	}
+	return claude.WriteSettings(s.Home, bin)
+}
+
+// bin is the conveyor CLI the hooks call: Bin if set, else this executable.
+func (s *Service) bin() (string, error) {
 	if s.Bin != "" {
-		return claude.WriteSettings(s.Home, s.Bin)
+		return s.Bin, nil
 	}
 	exe, err := os.Executable()
 	if err != nil {
 		return "", fmt.Errorf("find conveyor binary: %w", err)
 	}
-	return claude.WriteSettings(s.Home, exe)
+	return exe, nil
+}
+
+// UserHooks reports or changes Conveyor's hooks in ~/.claude/settings.json.
+// action is "status", "install" or "uninstall"; it returns the resulting status.
+func (s *Service) UserHooks(action string) (string, error) {
+	path, err := claude.UserSettingsPath()
+	if err != nil {
+		return "", err
+	}
+	bin, err := s.bin()
+	if err != nil {
+		return "", err
+	}
+	switch action {
+	case "status":
+	case "install", "uninstall":
+		if err := claude.SetUserHooks(path, bin, s.Home, action == "install"); err != nil {
+			return "", err
+		}
+	default:
+		return "", fmt.Errorf("unknown hooks action %q", action)
+	}
+	return claude.UserHooksStatus(path, bin, s.Home)
 }
 
 // Actions lists what can be opened for a task. Without a primary worktree it returns none.
@@ -273,10 +304,7 @@ func (s *Service) Render(a Action) string {
 // Launch runs the action: the editor directly, everything else in a terminal.
 func (s *Service) Launch(a Action) error {
 	if a.Kind == "editor" {
-		if out, err := exec.Command("sh", "-c", a.Cmd).CombinedOutput(); err != nil {
-			return fmt.Errorf("editor: %w: %s", err, strings.TrimSpace(string(out)))
-		}
-		return nil
+		return runShell("editor", a.Cmd)
 	}
 	return terminal.Open(store.GetSetting(s.DB, "terminal_template"), a.Cwd, a.Cmd)
 }

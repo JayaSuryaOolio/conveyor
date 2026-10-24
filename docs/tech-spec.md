@@ -360,6 +360,8 @@ conveyor learning list | accept ID [--target f] | reject ID | apply --repo r
 conveyor automation list | add --name n --schedule "…" [--precheck "…"] --action kind --arg json | enable/disable/run NAME | rm NAME
 conveyor import jira --jql "…" [--repo a]
 conveyor config list | get k | set k v
+conveyor app list | presets | add NAME [--command CMD] | rm NAME | open NAME KEY|DIR [--repo r] [--print]
+conveyor hooks status | install | uninstall   (Conveyor's hooks in ~/.claude/settings.json)
 ```
 
 ## 12. Desktop app (Wails v2, React + TS)

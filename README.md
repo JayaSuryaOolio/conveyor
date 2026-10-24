@@ -29,10 +29,12 @@ It runs `go install ./cmd/conveyor` and `wails build` (installing Wails if missi
 ```
 usage: conveyor [--home dir] <command> [args]
 
+  app        open worktrees in external apps (list|presets|add|rm|open)
   automation manage automations (list|add|enable|disable|run|rm)
   config     list, get or set settings
   daemon     run the dispatcher in the foreground
   hook       handle a Claude Code hook event (internal)
+  hooks      Claude Code hooks in ~/.claude/settings.json (status|install|uninstall)
   import     import tasks (jira --jql ... --repo a)
   learning   curate learnings (list|accept|reject|edit|apply)
   repo       manage registered repos (add|list|rm)
@@ -44,6 +46,8 @@ Run `conveyor <command>` with no arguments for per-command usage. Listing and sh
 ## Integrations
 
 - **Terminal template.** `conveyor task open KEY --shell|--resume|--fresh|--editor` opens a terminal via the `terminal_template` setting (default: macOS Terminal through `osascript`; `{cwd}` and `{cmd}` are substituted). Set an iTerm, Ghostty or tmux template with `conveyor config set terminal_template '...'`. `--print` shows the command instead.
+- **Apps.** Open a task's worktree in any app: an app is a name plus a shell command where `{cwd}` becomes the quoted worktree path. Installed editors, terminals, git clients, Finder and the `spotlight` CLI are offered as presets. Manage them on the Apps page or with `conveyor app presets`, `conveyor app add Cursor` (preset), `conveyor app add Zed --command 'zed {cwd}'`, `conveyor app open Zed CV-12 [--repo r] [--print]` (or a directory instead of a key), `conveyor app rm Zed`. The task page offers them under "Open in…" on each repo.
+- **Agent hooks.** Conveyor-launched sessions always report through `--settings`. `conveyor hooks install` also adds the same hook commands (UserPromptSubmit, Stop, Notification) to `~/.claude/settings.json`, so a `claude` you start yourself in a task worktree (from an app or any terminal) shows up as an interactive run. Sessions outside Conveyor workspaces are ignored, and identical commands run once per event. `conveyor hooks status|uninstall`; the old file is kept as `settings.json.conveyor.bak`.
 - **Automations.** Cron-scheduled actions with an optional shell precheck: `conveyor automation add --name n --schedule "0 9 * * 1-5" --precheck "..." --action create_task --arg '{...}'`. Actions: `create_task`, `comment`, `cli`.
 - **Jira.** `conveyor import jira --jql "..." --repo a` (needs `acli`).
 

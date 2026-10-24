@@ -159,6 +159,22 @@ export namespace core {
 
 export namespace store {
 	
+	export class App {
+	    id: number;
+	    name: string;
+	    command: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new App(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.command = source["command"];
+	    }
+	}
 	export class Automation {
 	    id: number;
 	    name: string;

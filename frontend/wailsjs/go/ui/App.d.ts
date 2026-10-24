@@ -10,6 +10,8 @@ export function Actions(arg1:string):Promise<Array<core.Action>>;
 
 export function AddAgent(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
 
+export function AddApp(arg1:store.App):Promise<void>;
+
 export function AddAutomation(arg1:store.Automation):Promise<void>;
 
 export function AddComment(arg1:string,arg2:string):Promise<void>;
@@ -18,11 +20,15 @@ export function AddRepo(arg1:string,arg2:string):Promise<void>;
 
 export function AppLog(arg1:number):Promise<core.AppLog>;
 
+export function AppPresets():Promise<Array<store.App>>;
+
 export function ApplyLearnings(arg1:string):Promise<string>;
 
 export function Confirm(arg1:string):Promise<boolean>;
 
 export function CreateTask(arg1:core.NewTaskInput):Promise<string>;
+
+export function DeleteApp(arg1:string):Promise<void>;
 
 export function DeleteAutomation(arg1:string):Promise<void>;
 
@@ -46,6 +52,8 @@ export function Learnings():Promise<Array<ui.LearningRow>>;
 
 export function ListAgents(arg1:Array<string>):Promise<Array<core.Agent>>;
 
+export function ListApps():Promise<Array<store.App>>;
+
 export function ListAutomations():Promise<Array<store.Automation>>;
 
 export function ListRepos():Promise<Array<store.Repo>>;
@@ -54,9 +62,13 @@ export function ListTasks():Promise<Array<ui.TaskCard>>;
 
 export function Move(arg1:string,arg2:string):Promise<void>;
 
+export function OpenApp(arg1:string,arg2:string,arg3:string):Promise<void>;
+
 export function PreviewBrief(arg1:string):Promise<ui.BriefPreview>;
 
 export function RejectLearning(arg1:number):Promise<void>;
+
+export function RenderApp(arg1:string,arg2:string):Promise<string>;
 
 export function RunAction(arg1:string,arg2:string,arg3:string):Promise<void>;
 
@@ -90,4 +102,10 @@ export function TermStart(arg1:string,arg2:string,arg3:string):Promise<ui.TermIn
 
 export function TermWrite(arg1:string,arg2:string):Promise<void>;
 
+export function TestApp(arg1:string):Promise<void>;
+
+export function UpdateApp(arg1:store.App):Promise<void>;
+
 export function UpdateAutomation(arg1:store.Automation):Promise<void>;
+
+export function UserHooks(arg1:string):Promise<string>;

@@ -38,4 +38,19 @@ func TestTaskOpenPrint(t *testing.T) {
 	if out := cv(t, home, "task", "open", tk.Key, "--editor", "--repo", "r", "--print"); strings.TrimSpace(out) != "myed '"+wt+"'" {
 		t.Fatal(out)
 	}
+
+	cv(t, home, "app", "add", "Ed", "--command", "ed {cwd}")
+	if out := cv(t, home, "app", "list"); !strings.Contains(out, "ed {cwd}") {
+		t.Fatal(out)
+	}
+	if out := cv(t, home, "app", "open", "Ed", tk.Key, "--print"); strings.TrimSpace(out) != "ed '"+wt+"'" {
+		t.Fatal(out)
+	}
+	if out := cv(t, home, "app", "open", "Ed", home, "--print"); strings.TrimSpace(out) != "ed '"+home+"'" {
+		t.Fatal(out)
+	}
+	cv(t, home, "app", "rm", "Ed")
+	if out := cv(t, home, "app", "list"); strings.Contains(out, "Ed") {
+		t.Fatal(out)
+	}
 }
