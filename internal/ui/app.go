@@ -19,6 +19,7 @@ import (
 	"github.com/JayaSuryaOolio/conveyor/internal/dispatch"
 	"github.com/JayaSuryaOolio/conveyor/internal/learning"
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
+	"github.com/JayaSuryaOolio/conveyor/internal/term"
 	"github.com/JayaSuryaOolio/conveyor/internal/workspace"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
@@ -58,6 +59,7 @@ func (a *App) Startup(ctx context.Context) {
 		return
 	}
 	a.svc = &core.Service{DB: db, Home: home, Bin: conveyorBin()}
+	a.startTerms()
 	automation.Bin = conveyorBin() // the cli automation kind runs the CLI, not the app binary
 	ctx, a.cancel = context.WithCancel(ctx)
 	go pollDataVersion(ctx, core.DBPath(home), pollEvery, func() { runtime.EventsEmit(ctx, "db:changed") })
@@ -66,6 +68,7 @@ func (a *App) Startup(ctx context.Context) {
 
 // Shutdown stops background work and closes the DB.
 func (a *App) Shutdown(context.Context) {
+	term.CloseAll()
 	if a.cancel != nil {
 		a.cancel()
 	}

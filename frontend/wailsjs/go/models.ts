@@ -507,6 +507,36 @@ export namespace ui {
 		    return a;
 		}
 	}
+	export class TermBuf {
+	    data: string;
+	    end: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new TermBuf(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.data = source["data"];
+	        this.end = source["end"];
+	    }
+	}
+	export class TermInfo {
+	    id: string;
+	    title: string;
+	    exited: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new TermInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.title = source["title"];
+	        this.exited = source["exited"];
+	    }
+	}
 
 }
 

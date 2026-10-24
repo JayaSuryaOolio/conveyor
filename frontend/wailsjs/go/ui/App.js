@@ -146,6 +146,30 @@ export function ShowError(arg1) {
   return window['go']['ui']['App']['ShowError'](arg1);
 }
 
+export function TermBuffer(arg1) {
+  return window['go']['ui']['App']['TermBuffer'](arg1);
+}
+
+export function TermClose(arg1, arg2) {
+  return window['go']['ui']['App']['TermClose'](arg1, arg2);
+}
+
+export function TermList(arg1) {
+  return window['go']['ui']['App']['TermList'](arg1);
+}
+
+export function TermResize(arg1, arg2, arg3) {
+  return window['go']['ui']['App']['TermResize'](arg1, arg2, arg3);
+}
+
+export function TermStart(arg1, arg2, arg3) {
+  return window['go']['ui']['App']['TermStart'](arg1, arg2, arg3);
+}
+
+export function TermWrite(arg1, arg2) {
+  return window['go']['ui']['App']['TermWrite'](arg1, arg2);
+}
+
 export function UpdateAutomation(arg1) {
   return window['go']['ui']['App']['UpdateAutomation'](arg1);
 }
