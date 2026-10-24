@@ -84,3 +84,19 @@ func TestHookAlwaysExitsZero(t *testing.T) {
 		t.Fatalf("log: %v %q", err, b)
 	}
 }
+
+func TestAutomationCLI(t *testing.T) {
+	home := t.TempDir()
+	cv(t, home, "automation", "add", "--template", "pr-sweep")
+	if out := cv(t, home, "automation", "list"); !strings.Contains(out, "pr-sweep") || !strings.Contains(out, "*/15 * * * *") {
+		t.Fatal(out)
+	}
+	cv(t, home, "automation", "disable", "pr-sweep")
+	if out := cv(t, home, "automation", "list"); !strings.Contains(out, "false") {
+		t.Fatal(out)
+	}
+	if b, err := exec.Command(bin, "--home", home, "automation", "add", "bad", "--schedule", "nope", "--kind", "cli", "--arg", "{}").CombinedOutput(); err == nil {
+		t.Fatalf("expected bad schedule to fail: %s", b)
+	}
+	cv(t, home, "automation", "rm", "pr-sweep")
+}
