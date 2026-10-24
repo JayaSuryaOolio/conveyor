@@ -203,3 +203,37 @@ func (s *Service) MarkDone(key string) error { return s.Move(key, store.StatusDo
 
 // Cancel moves a task to cancelled and stops its sessions.
 func (s *Service) Cancel(key string) error { return s.Move(key, store.StatusCancelled) }
+
+// SetTaskRepo sets the branch and PR URL of the task's link to repo. The branch
+// can only change before the worktree exists; an empty prURL clears the PR.
+func (s *Service) SetTaskRepo(key, repo, branch, prURL string) error {
+	t, err := store.GetTaskByKey(s.DB, key)
+	if err != nil {
+		return err
+	}
+	branch, prURL = strings.TrimSpace(branch), strings.TrimSpace(prURL)
+	if branch == "" {
+		return fmt.Errorf("branch is required")
+	}
+	for _, r := range t.Repos {
+		if r.RepoName != repo {
+			continue
+		}
+		if branch != r.Branch && r.WorktreePath != nil && *r.WorktreePath != "" {
+			return fmt.Errorf("branch can't change once the worktree exists (%s)", *r.WorktreePath)
+		}
+		r.Branch = branch
+		if prURL != deref(r.PRURL) {
+			r.PRURL, r.PRState = optional(prURL), nil // state is refreshed by sync
+		}
+		return store.UpdateTaskRepo(s.DB, r)
+	}
+	return fmt.Errorf("task %s has no repo %q", key, repo)
+}
+
+func deref(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}

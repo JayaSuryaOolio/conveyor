@@ -91,6 +91,56 @@ func TestMoveCancelDone(t *testing.T) {
 	}
 }
 
+func TestSetTaskRepo(t *testing.T) {
+	s := newSvc(t)
+	tk, _ := s.CreateTask(NewTaskInput{Title: "t", Repos: []string{"a", "b"}})
+	get := func() store.TaskRepo { g, _ := store.GetTask(s.DB, tk.ID); return g.Repos[0] }
+	if err := s.SetTaskRepo(tk.Key, "a", "feat/x", "https://gh/pr/1"); err != nil {
+		t.Fatal(err)
+	}
+	if r := get(); r.Branch != "feat/x" || deref(r.PRURL) != "https://gh/pr/1" {
+		t.Fatalf("%+v", r)
+	}
+	// an unchanged URL keeps its state; a new one drops it
+	st := "OPEN"
+	r := get()
+	r.PRState = &st
+	store.UpdateTaskRepo(s.DB, r)
+	s.SetTaskRepo(tk.Key, "a", "feat/x", "https://gh/pr/1")
+	if deref(get().PRState) != "OPEN" {
+		t.Fatal("state lost for same url")
+	}
+	s.SetTaskRepo(tk.Key, "a", "feat/x", "https://gh/pr/2")
+	if get().PRState != nil {
+		t.Fatal("stale state kept")
+	}
+	if err := s.SetTaskRepo(tk.Key, "a", "feat/x", ""); err != nil || get().PRURL != nil {
+		t.Fatalf("clear: %v %+v", err, get())
+	}
+	for name, args := range map[string][3]string{
+		"empty branch": {"a", " ", ""},
+		"unknown repo": {"zzz", "x", ""},
+	} {
+		if err := s.SetTaskRepo(tk.Key, args[0], args[1], args[2]); err == nil {
+			t.Errorf("%s should fail", name)
+		}
+	}
+	if err := s.SetTaskRepo("CV-99", "a", "x", ""); err == nil {
+		t.Error("unknown task should fail")
+	}
+	// once the worktree exists the branch is frozen, the PR is not
+	wt := "/tmp/wt"
+	r = get()
+	r.WorktreePath = &wt
+	store.UpdateTaskRepo(s.DB, r)
+	if err := s.SetTaskRepo(tk.Key, "a", "other", ""); err == nil {
+		t.Fatal("branch change with worktree should fail")
+	}
+	if err := s.SetTaskRepo(tk.Key, "a", "feat/x", "https://gh/pr/3"); err != nil || deref(get().PRURL) != "https://gh/pr/3" {
+		t.Fatalf("pr with worktree: %v", err)
+	}
+}
+
 func TestHumanRequeueResetsFailures(t *testing.T) {
 	s := newSvc(t)
 	for name, requeue := range map[string]func(key string) error{

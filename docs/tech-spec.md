@@ -350,6 +350,7 @@ conveyor repo add <path> [--name n] | repo list | repo rm <name>
 conveyor task new <title> --repo a[,b] [--primary a] [--desc s | --desc-file f] [--todo] [--model m] [--agent a] [--parent KEY] [--priority n]
 conveyor task list [--status s[,s]] | task show KEY [--thread] [--runs]
 conveyor task comment KEY <text|->     task move KEY <status>     task cancel KEY     task done KEY
+conveyor task set KEY [--repo r] [--branch b] [--pr url]   (branch only before the worktree exists; --pr "" clears)
 conveyor task attach KEY               (execs `claude attach <bg_id>` in this terminal)
 conveyor task open KEY [--shell|--resume|--fresh|--editor] [--repo r] [--print]
 conveyor task brief KEY                (prints the rendered brief)
