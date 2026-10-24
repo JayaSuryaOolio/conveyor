@@ -39,7 +39,7 @@ For each run, note:
 
 ## 3. Check the logs (recent only)
 
-`~/.conveyor/conveyor.log` (+ `conveyor.log.1`), `~/.conveyor/logs/dispatcher.log`, `~/.conveyor/logs/hook.log`: errors and warnings from the last 7 days, grouped by message. Launch failures, hook errors and reaps explain bad runs that the transcript can't.
+`~/.conveyor/conveyor.log` (+ `conveyor.log.1`), `~/.conveyor/logs/dispatcher.log`, `~/.conveyor/logs/hook.log`: errors and warnings from the last 7 days, grouped by message. Launch failures, hook errors and reaps explain bad runs that the transcript can't. Match what you find against `docs/troubleshooting.md` in the Conveyor repo: a known failure gets its recipe applied or cited, not a new diagnosis.
 
 ## 4. Decide what to change
 
@@ -52,6 +52,7 @@ Where each kind of fix belongs:
 | A convention of one repo the agent kept missing | That repo's `CLAUDE.md`, a repo skill or agent | `conveyor task new "CLAUDE.md: <what>" --repo <repo> --desc "<the exact text to add and the runs that show why>"` (backlog; the human starts it) |
 | A lesson about the Conveyor repo itself | `learning:` line in your status block | It shows up on the Learnings page |
 | A Conveyor bug (dispatch, hooks, reaping) | Code fix | Small fix + test in the same PR, or a backlog task if it is not small |
+| A new failure mode with a manual fix | `docs/troubleshooting.md` | Add a recipe (symptom, confirm, fix) in the same PR |
 
 Rules for proposals:
 - Every change cites the runs that motivate it (task key + run number). One run is an anecdote; prefer patterns seen in 2+ runs.
