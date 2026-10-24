@@ -285,6 +285,10 @@ export namespace store {
 	    parent?: TaskRef;
 	    children: TaskRef[];
 	    links: Relation[];
+	    blocked_by_all: string[];
+	    blocks_all: string[];
+	    ancestors: string[];
+	    descendants: string[];
 	
 	    static createFrom(source: any = {}) {
 	        return new Relations(source);
@@ -295,6 +299,10 @@ export namespace store {
 	        this.parent = this.convertValues(source["parent"], TaskRef);
 	        this.children = this.convertValues(source["children"], TaskRef);
 	        this.links = this.convertValues(source["links"], Relation);
+	        this.blocked_by_all = source["blocked_by_all"];
+	        this.blocks_all = source["blocks_all"];
+	        this.ancestors = source["ancestors"];
+	        this.descendants = source["descendants"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

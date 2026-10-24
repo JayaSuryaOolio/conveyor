@@ -134,5 +134,8 @@ func Migrate(db *sql.DB) error {
 	if _, err := db.Exec(schema); err != nil {
 		return fmt.Errorf("migrate: %w", err)
 	}
+	if _, err := db.Exec(`DELETE FROM task_links WHERE kind='duplicates'`); err != nil {
+		return fmt.Errorf("drop duplicates links: %w", err)
+	}
 	return nil
 }

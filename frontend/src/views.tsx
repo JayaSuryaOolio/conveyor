@@ -6,6 +6,7 @@ import {GetTask, ListTasks, RunLog} from '../wailsjs/go/ui/App'
 import {core, store, ui} from '../wailsjs/go/models'
 import {Card, CommentBox, Message, Nav, StatusBadge, Time, errMsg} from './components'
 import {Markdown} from './markdown'
+import {Relations} from './relations'
 import {TaskSidebar} from './workspace'
 import {fmtDuration, fmtK, useData} from './util'
 
@@ -169,6 +170,7 @@ export function TaskPage({k, nav}: {k: string; nav: Nav}) {
                         <Paper withBorder p="md" radius="md">
                             <Markdown c={t.description ? undefined : 'dimmed'}>{t.description || '(no description)'}</Markdown>
                         </Paper>
+                        <Relations k={t.key} status={t.status} rel={d.relations} nav={nav} reload={reload}/>
                         {latest?.criteria && <><Title order={5}>Acceptance criteria</Title><Criteria text={latest.criteria}/></>}
                         <Title order={5}>Thread</Title>
                         <Timeline bulletSize={24} lineWidth={2}>
@@ -196,7 +198,7 @@ export function TaskPage({k, nav}: {k: string; nav: Nav}) {
                         {side ? <IconLayoutSidebarRightCollapse size={18}/> : <IconLayoutSidebarRightExpand size={18}/>}
                     </ActionIcon>
                 </Group>
-                {side && <TaskSidebar t={t} rel={d.relations} runs={d.runs} nav={nav} reload={reload} onTerm={setAdded}/>}
+                {side && <TaskSidebar t={t} runs={d.runs} reload={reload} onTerm={setAdded}/>}
             </Box>
         </Box>
         <Box mx="calc(-1 * var(--mantine-spacing-md))" mb="calc(-1 * var(--mantine-spacing-md))" mt="md" style={{flex: 'none'}}>

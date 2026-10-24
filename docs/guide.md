@@ -81,14 +81,15 @@ PR comments: the agent is told to start every PR or issue comment with `pr_comme
 Tasks can be related, as in Jira. Conveyor only stores the relations; an agent (for example an "engineering manager" that writes a spec and splits it) creates the tasks and hands work off itself, using the CLI that `BRIEF.md` describes.
 
 - **Parent and sub-tasks**: `conveyor task new "..." --repo r --parent CV-1`. A sub-task may use a different repo than its parent. A sibling is just another child of the same parent. Child keys extend the parent's: CV-1A, CV-1B ... CV-1Z, CV-1AA, CV-1AB ... Grandchildren switch to digits so keys stay unambiguous: CV-1A1, CV-1A2 ..., then CV-1A1A. Top-level numbering (CV-2, CV-3 ...) ignores them.
-- **Links**: `blocks`, `relates` and `duplicates`, shown from the other side as "is blocked by", "relates to" and "is duplicated by". A todo task that is blocked by a task not yet done or cancelled is not launched; the task page says why.
+- **Re-parenting**: `conveyor task parent CV-2 CV-1` makes an existing task a sub-task of another, `--none` clears it. Existing keys never change; only creating a task with `--parent` derives a CV-1A style key. A task can't become a sub-task of itself or of one of its own sub-tasks.
+- **Links**: `blocks` and `relates`, shown from the other side as "is blocked by" and "relates to". A todo task that is blocked by a task not yet done or cancelled is not launched; the task page says why. Blocking loops are rejected: if A blocks B and B blocks C, then C can't block A.
 
 ```
 conveyor task link CV-1A blocks CV-1B
 conveyor task unlink CV-1A blocks CV-1B
 ```
 
-`conveyor task show` lists the parent, sub-tasks and links. The task page has a Relations section in the sidebar with the same, plus add and remove for links; board cards show the parent key.
+`conveyor task show` lists the parent, sub-tasks and links. The task page has a Relations section right below the description with the same: parent, sub-tasks and links, each with a trash icon to remove it, plus a row to add "blocks", "is blocked by", "relates to", "is parent of" or "is sub-task of". Tasks that would form a loop, or are already related that way, are greyed out in the picker. Board cards show the parent key.
 
 ## Comments, resume and fresh sessions
 
@@ -197,7 +198,8 @@ conveyor task list [--status a,b]         conveyor task show KEY [--thread] [--r
 conveyor task comment KEY <text|->        conveyor task move KEY <status>
 conveyor task done KEY                    conveyor task cancel KEY
 conveyor task set KEY [--repo r] [--branch b] [--pr url] [--model m]
-conveyor task link KEY blocks|relates|duplicates OTHER    conveyor task unlink KEY kind OTHER
+conveyor task link KEY blocks|relates OTHER    conveyor task unlink KEY kind OTHER
+conveyor task parent KEY PARENT|--none
 conveyor task sync KEY                    conveyor task brief KEY [--preview]
 conveyor task log KEY [--follow]          conveyor task attach KEY
 conveyor task open KEY [--shell|--resume|--fresh|--editor] [--repo r] [--print]

@@ -88,6 +88,8 @@ export function SetAgentModel(arg1:string,arg2:string,arg3:string):Promise<void>
 
 export function SetAutomationEnabled(arg1:string,arg2:boolean):Promise<void>;
 
+export function SetParent(arg1:string,arg2:string):Promise<void>;
+
 export function SetSetting(arg1:string,arg2:string):Promise<void>;
 
 export function SetTaskAgent(arg1:string,arg2:string):Promise<void>;

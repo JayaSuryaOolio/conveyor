@@ -17,10 +17,10 @@ import (
 )
 
 func init() {
-	register("task", runTask, "manage tasks (new|list|show|comment|move|set|link|unlink|cancel|done|sync|brief|log|attach|open)")
+	register("task", runTask, "manage tasks (new|list|show|comment|move|set|link|unlink|parent|cancel|done|sync|brief|log|attach|open)")
 }
 
-const taskUsage = "usage: conveyor task new|list|show|comment|move|set|link|unlink|cancel|done|sync|brief|log|attach|open ..."
+const taskUsage = "usage: conveyor task new|list|show|comment|move|set|link|unlink|parent|cancel|done|sync|brief|log|attach|open ..."
 
 func runTask(home string, args []string) error {
 	if len(args) == 0 {
@@ -50,12 +50,20 @@ func runTask(home string, args []string) error {
 			return taskSet(s, rest)
 		case "link", "unlink":
 			if len(rest) != 3 {
-				return fmt.Errorf("usage: conveyor task %s KEY blocks|relates|duplicates OTHER", cmd)
+				return fmt.Errorf("usage: conveyor task %s KEY blocks|relates OTHER", cmd)
 			}
 			if cmd == "link" {
 				return s.Link(rest[0], rest[1], rest[2])
 			}
 			return s.Unlink(rest[0], rest[1], rest[2])
+		case "parent":
+			if len(rest) != 2 {
+				return fmt.Errorf("usage: conveyor task parent KEY PARENT|--none")
+			}
+			if rest[1] == "--none" {
+				rest[1] = ""
+			}
+			return s.SetParent(rest[0], rest[1])
 		case "log":
 			return taskLog(s, rest)
 		case "attach":

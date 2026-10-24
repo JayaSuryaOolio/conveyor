@@ -15,7 +15,7 @@ func (s *Service) pair(a, b string) (int64, int64, error) {
 	return ta.ID, tb.ID, nil
 }
 
-// Link records "from <kind> to" (kind: blocks, relates, duplicates).
+// Link records "from <kind> to" (kind: blocks, relates).
 func (s *Service) Link(from, kind, to string) error {
 	a, b, err := s.pair(from, to)
 	if err != nil {
@@ -31,4 +31,20 @@ func (s *Service) Unlink(from, kind, to string) error {
 		return err
 	}
 	return store.RemoveLink(s.DB, a, b, kind)
+}
+
+// SetParent makes the task with key parent (empty: none) the parent of key. Keys don't change.
+func (s *Service) SetParent(key, parent string) error {
+	t, err := store.GetTaskByKey(s.DB, key)
+	if err != nil {
+		return err
+	}
+	if parent == "" {
+		return store.SetParent(s.DB, t.ID, nil)
+	}
+	p, err := store.GetTaskByKey(s.DB, parent)
+	if err != nil {
+		return err
+	}
+	return store.SetParent(s.DB, t.ID, &p.ID)
 }
