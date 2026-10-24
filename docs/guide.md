@@ -20,7 +20,7 @@ The sidebar has Board, Focus, Learnings, Automations, Repos, Apps, Agents, Logs 
 
 The board has a column per status: Backlog, Todo, Running, Needs you, Review, Failed (only shown when something has failed), Done and Cancelled. Done and Cancelled are collapsed and show the last 7 days. Focus is a single list of what wants your attention, in this order: needs_you, review, failed, running, todo.
 
-The task page shows the description, the comment thread (yours, the agent's final replies, and system notes), the runs with their summaries and acceptance criteria, PR links per repo, and buttons to open a terminal, an editor or an app. Comments can include pasted images; they are saved under `~/.conveyor/workspaces/<KEY>/attachments`.
+The task page shows the description, the comment thread (yours, the agent's final replies, and system notes), the runs with their summaries and acceptance criteria, PR links per repo, and buttons to open a terminal, an editor or an app. Comments can include pasted images; they are saved under `~/.conveyor/workspaces/<KEY>/attachments`. In the comment and description editors, `@` autocompletes files tracked in the task's repos (its worktrees once created; files of non-primary repos as `../<repo>/path`) and `/` autocompletes skills and commands from the repos' and your `~/.claude/skills` and `~/.claude/commands`; rendered markdown colors `@file` and `/command` tokens.
 
 ### Statuses
 
