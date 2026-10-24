@@ -4,3 +4,4 @@
 .conveyor/
 node_modules/
 web/dist/
+.DS_Store
