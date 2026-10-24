@@ -124,6 +124,11 @@ func TestStopDoneToReview(t *testing.T) {
 	if spawn != 1 {
 		t.Fatal("want spawn event")
 	}
+	all, _ := store.ListTasks(e.db, store.StatusBacklog)
+	if len(all) != 1 || all[0].Title != "child" || all[0].ParentID == nil || *all[0].ParentID != e.task.ID ||
+		len(all[0].Repos) != 1 || all[0].Repos[0].RepoName != "a" || !all[0].Repos[0].IsPrimary {
+		t.Fatalf("spawned child: %+v", all)
+	}
 }
 
 func TestStopNoBlockNeedsYou(t *testing.T) {

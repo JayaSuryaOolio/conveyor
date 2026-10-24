@@ -16,6 +16,7 @@ import (
 	"github.com/JayaSuryaOolio/conveyor/internal/automation"
 	"github.com/JayaSuryaOolio/conveyor/internal/core"
 	"github.com/JayaSuryaOolio/conveyor/internal/dispatch"
+	"github.com/JayaSuryaOolio/conveyor/internal/learning"
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 	"github.com/JayaSuryaOolio/conveyor/internal/workspace"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -277,4 +278,55 @@ func (a *App) EnsureWorkspace(key string) error {
 	}
 	_, err = workspace.Ensure(a.svc.DB, a.svc.Home, t)
 	return err
+}
+
+// LearningRow is a learning with its repo name ("" = personal).
+type LearningRow struct {
+	store.Learning
+	Repo string `json:"repo"`
+}
+
+// Learnings returns proposed and accepted learnings.
+func (a *App) Learnings() ([]LearningRow, error) {
+	ls, err := learning.List(a.svc.DB, store.LearningProposed, store.LearningAccepted)
+	if err != nil {
+		return nil, err
+	}
+	repos, err := store.ListRepos(a.svc.DB)
+	if err != nil {
+		return nil, err
+	}
+	names := map[int64]string{}
+	for _, r := range repos {
+		names[r.ID] = r.Name
+	}
+	out := make([]LearningRow, 0, len(ls))
+	for _, l := range ls {
+		row := LearningRow{Learning: l}
+		if l.RepoID != nil {
+			row.Repo = names[*l.RepoID]
+		}
+		out = append(out, row)
+	}
+	return out, nil
+}
+
+// AcceptLearning accepts a learning for target (default CLAUDE.md).
+func (a *App) AcceptLearning(id int64, target string) error {
+	return learning.Accept(a.svc.DB, id, target)
+}
+
+// RejectLearning rejects a learning.
+func (a *App) RejectLearning(id int64) error { return learning.Reject(a.svc.DB, id) }
+
+// EditLearning replaces a learning's body.
+func (a *App) EditLearning(id int64, body string) error { return learning.Edit(a.svc.DB, id, body) }
+
+// ApplyLearnings creates the "Apply learnings" task for repo and returns its key (none: "").
+func (a *App) ApplyLearnings(repo string) (string, error) {
+	keys, err := learning.Apply(a.svc, repo)
+	if err != nil || len(keys) == 0 {
+		return "", err
+	}
+	return keys[0], nil
 }

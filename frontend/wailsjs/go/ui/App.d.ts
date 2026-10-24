@@ -4,11 +4,15 @@ import {core} from '../models';
 import {ui} from '../models';
 import {store} from '../models';
 
+export function AcceptLearning(arg1:number,arg2:string):Promise<void>;
+
 export function Actions(arg1:string):Promise<Array<core.Action>>;
 
 export function AddComment(arg1:string,arg2:string):Promise<void>;
 
 export function AddRepo(arg1:string,arg2:string):Promise<void>;
+
+export function ApplyLearnings(arg1:string):Promise<string>;
 
 export function Cancel(arg1:string):Promise<void>;
 
@@ -16,11 +20,15 @@ export function CreateTask(arg1:core.NewTaskInput):Promise<string>;
 
 export function DispatcherState():Promise<string>;
 
+export function EditLearning(arg1:number,arg2:string):Promise<void>;
+
 export function EnsureWorkspace(arg1:string):Promise<void>;
 
 export function GetSettings():Promise<Record<string, string>>;
 
 export function GetTask(arg1:string):Promise<ui.TaskDetail>;
+
+export function Learnings():Promise<Array<ui.LearningRow>>;
 
 export function ListAutomations():Promise<Array<store.Automation>>;
 
@@ -29,6 +37,8 @@ export function ListRepos():Promise<Array<store.Repo>>;
 export function ListTasks():Promise<Array<ui.TaskCard>>;
 
 export function Move(arg1:string,arg2:string):Promise<void>;
+
+export function RejectLearning(arg1:number):Promise<void>;
 
 export function RunAction(arg1:string,arg2:string,arg3:string):Promise<void>;
 
