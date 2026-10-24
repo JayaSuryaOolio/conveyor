@@ -51,7 +51,7 @@ New tasks start in backlog; pass ` + "`--todo`" + ` to let the dispatcher launch
 const defaultRules = `- Work only inside the worktrees listed above.
 - Open at most one PR per repo.
 - Never push to the default branch.
-- Prefer the repo's own commands and skills over ad-hoc steps. When one matches what you are doing (e.g. creating a PR, adding tests, writing a changeset), use it: run the slash command via the Skill tool, or Read the command file and follow it.
+- The repo's CLAUDE.md, skills, commands and agents are the authority on how to work in it (build, test, commit, PR, changesets). Use them over your own defaults and over generic user-level skills; where they disagree with this brief, follow the repo, except for the worktree, PR and status block rules here.
 `
 
 // Built-in prompt templates; empty prompt_fresh / prompt_resume settings use these.
@@ -147,7 +147,7 @@ func Build(db *sql.DB, task store.Task) (string, error) {
 	}
 	fmt.Fprintf(&b, "%s\n", criteria)
 	if w := workflows(db, task); w != "" {
-		fmt.Fprintf(&b, "\n## Repo workflows\n\n%s", w)
+		fmt.Fprintf(&b, "\n## Other repos' context\n\nClaude Code loaded only the primary repo's CLAUDE.md, skills, commands and agents. For these repos, read the files named here (`.claude/commands/<name>.md`, `.claude/skills/<name>/SKILL.md`, `.claude/agents/<name>.md`) when the work touches them.\n\n%s", w)
 	}
 	if len(runs) > 0 {
 		last := runs[len(runs)-1]
