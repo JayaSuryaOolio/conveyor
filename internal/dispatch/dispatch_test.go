@@ -279,6 +279,29 @@ func TestFailedLaunchKeepsCommentDelta(t *testing.T) {
 	}
 }
 
+func TestStatusFailureReleasesComments(t *testing.T) {
+	e := setup(t)
+	tk := e.task(t, "t", 0)
+	c, _ := store.AddComment(e.db, store.Comment{TaskID: tk.ID, Author: store.AuthorHuman, Body: "please do X"})
+	// Another actor moves the task off todo after the dispatcher picked it, so todo->running fails.
+	if _, err := store.UpdateTaskStatus(e.db, tk.ID, store.StatusRunning, store.ActorSystem); err != nil {
+		t.Fatal(err)
+	}
+	run, err := e.d.start(t.Context(), tk, []store.Comment{c})
+	if err == nil {
+		t.Fatal("start succeeded despite the status conflict")
+	}
+	if left, _ := store.UnconsumedComments(e.db, tk.ID); len(left) != 1 {
+		t.Fatalf("comment stays consumed by a run that never launched: %d unconsumed", len(left))
+	}
+	if err := e.d.fail(tk, run, err); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := store.GetRun(e.db, run.ID); got.Status != "failed" {
+		t.Fatalf("run left %s", got.Status)
+	}
+}
+
 func TestReapVanished(t *testing.T) {
 	e := setup(t)
 	tk := e.task(t, "t", 0)
