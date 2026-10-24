@@ -1,0 +1,41 @@
+package main
+
+import (
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/JayaSuryaOolio/conveyor/internal/core"
+	"github.com/JayaSuryaOolio/conveyor/internal/store"
+)
+
+func TestTaskOpenPrint(t *testing.T) {
+	home := t.TempDir()
+	db, err := store.Open(core.DBPath(home))
+	if err != nil {
+		t.Fatal(err)
+	}
+	store.AddRepo(db, store.Repo{Name: "r", Path: "/x/r", DefaultBranch: "main"})
+	s := &core.Service{DB: db, Home: home}
+	tk, err := s.CreateTask(core.NewTaskInput{Title: "x", Repos: []string{"r"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	wt := filepath.Join(home, "my ws", "r")
+	tk.Repos[0].WorktreePath = &wt
+	if err := store.UpdateTaskRepo(db, tk.Repos[0]); err != nil {
+		t.Fatal(err)
+	}
+	db.Close()
+
+	if out := cv(t, home, "task", "open", tk.Key, "--print"); !strings.Contains(out, "osascript") || !strings.Contains(out, `cd '\''`+wt+`'\'' && :`) {
+		t.Fatal(out)
+	}
+	if out := cv(t, home, "task", "open", tk.Key, "--fresh", "--print"); !strings.Contains(out, "claude --settings") || !strings.Contains(out, "BRIEF.md") {
+		t.Fatal(out)
+	}
+	cv(t, home, "config", "set", "editor_command", "myed {cwd}")
+	if out := cv(t, home, "task", "open", tk.Key, "--editor", "--repo", "r", "--print"); strings.TrimSpace(out) != "myed '"+wt+"'" {
+		t.Fatal(out)
+	}
+}

@@ -2,6 +2,7 @@ import {Fragment} from 'react'
 import {Cancel, GetTask, ListTasks} from '../wailsjs/go/ui/App'
 import {store} from '../wailsjs/go/models'
 import {Card, CommentBox, Nav, StatusSelect, errMsg} from './components'
+import {WorkspacePanel} from './workspace'
 import {fmtDuration, fmtK, useData} from './util'
 
 const COLUMNS = [['backlog', 'Backlog'], ['todo', 'Todo'], ['running', 'Running'], ['needs_you', 'Needs you'], ['review', 'Review'], ['done', 'Done (7d)']]
@@ -110,13 +111,7 @@ export function TaskPage({k, nav}: {k: string; nav: Nav}) {
                 <CommentBox k={t.key} onDone={reload}/>
             </div>
             <div className="side">
-                {/* Workspace panel: filled in by task 008. */}
-                <aside className="workspace muted">Workspace (coming soon)</aside>
-                <h4>Runs</h4>
-                {d.runs.length === 0 && <p className="muted">No runs yet.</p>}
-                {d.runs.map((r, i) => (
-                    <div key={r.id} className="muted">#{i + 1} {r.kind} · {r.status}{r.block_status ? ' · ' + r.block_status : ''}</div>
-                ))}
+                <WorkspacePanel k={t.key} repos={t.repos ?? []} runs={d.runs}/>
             </div>
         </div>
     )

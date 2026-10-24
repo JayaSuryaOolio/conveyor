@@ -15,6 +15,8 @@ import (
 type Service struct {
 	DB   *sql.DB
 	Home string
+	// ProjectsDir overrides ~/.claude/projects (tests).
+	ProjectsDir string
 }
 
 // NewTaskInput describes a task to create. Repos are registered repo names;

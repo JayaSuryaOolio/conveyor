@@ -16,10 +16,10 @@ import (
 )
 
 func init() {
-	register("task", runTask, "manage tasks (new|list|show|comment|move|cancel|done|sync|brief)")
+	register("task", runTask, "manage tasks (new|list|show|comment|move|cancel|done|sync|brief|attach|open)")
 }
 
-const taskUsage = "usage: conveyor task new|list|show|comment|move|cancel|done|sync|brief ..."
+const taskUsage = "usage: conveyor task new|list|show|comment|move|cancel|done|sync|brief|attach|open ..."
 
 func runTask(home string, args []string) error {
 	if len(args) == 0 {
@@ -45,6 +45,10 @@ func runTask(home string, args []string) error {
 				return fmt.Errorf("unknown status %q", rest[1])
 			}
 			return s.Move(rest[0], to)
+		case "attach":
+			return taskAttach(s, rest)
+		case "open":
+			return taskOpen(s, rest)
 		case "brief":
 			if len(rest) != 1 {
 				return fmt.Errorf("usage: conveyor task brief KEY")
