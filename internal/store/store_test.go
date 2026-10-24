@@ -265,3 +265,20 @@ func TestCreateTaskConcurrentHandles(t *testing.T) {
 		t.Fatalf("got %d unique keys, want %d", len(keys), 2*per)
 	}
 }
+
+func TestCreatedBy(t *testing.T) {
+	db := openTest(t)
+	r := mkRepo(t, db, "a")
+	by := "automation:nightly"
+	tk, err := CreateTask(db, Task{Title: "t", CreatedBy: &by}, []TaskRepo{{RepoID: r.ID, IsPrimary: true, Branch: "t"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := GetTask(db, tk.ID); got.CreatedBy == nil || *got.CreatedBy != by {
+		t.Fatalf("created_by = %v, want %q", got.CreatedBy, by)
+	}
+	old := mkTask(t, db, StatusBacklog) // no creator: stays NULL, the frontend falls back to inference
+	if old.CreatedBy != nil {
+		t.Fatalf("created_by = %q, want NULL", *old.CreatedBy)
+	}
+}

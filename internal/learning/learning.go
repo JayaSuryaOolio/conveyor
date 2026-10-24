@@ -120,7 +120,7 @@ func Apply(svc *core.Service, repo string) ([]string, error) {
 		}
 		if !found {
 			if t, err = svc.CreateTask(core.NewTaskInput{
-				Title: title, Description: sb.String(), Repos: []string{r.Name}, Start: true, Source: "learning",
+				Title: title, Description: sb.String(), Repos: []string{r.Name}, Start: true, Source: "learning", CreatedBy: "learning",
 			}); err != nil {
 				return keys, err
 			}
