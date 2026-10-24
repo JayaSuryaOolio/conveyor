@@ -1,9 +1,9 @@
-# Case study: multica run economics on OOLIO-98
+# Case study: multica run economics on one long-lived task
 
 Source data, collected 2026-10-24:
-- `multica issue get|runs|usage|timeline OOLIO-98`
-- the local Claude transcript, `~/.claude/projects/-Users-jayasurya-multica-workspaces-oolio-956527b6ae16-oolio-98-1a51c53eb92b-workdir/c4b83834-….jsonl` (4,439 lines, 11.6 MB)
-- the task workspace, `~/multica_workspaces/oolio-956527b6ae16/oolio-98-1a51c53eb92b/`
+- `multica issue get|runs|usage|timeline <KEY>`
+- the local Claude transcript, `~/.claude/projects/<escaped-workspace-path>/c4b83834-….jsonl` (4,439 lines, 11.6 MB)
+- the task workspace, `~/multica_workspaces/<workspace>/<task>/`
 
 ## What happened
 

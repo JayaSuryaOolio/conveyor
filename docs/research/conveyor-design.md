@@ -2,7 +2,7 @@
 
 Inputs:
 - [landscape.md](landscape.md): kanban-code, multica, orca, paperclip, hermes, and Claude Code's native mechanisms
-- [multica-oolio-98.md](multica-oolio-98.md): measured token costs of a real multica task
+- [multica-case-study.md](multica-case-study.md): measured token costs of a real multica task
 - worktree-studio's integration seams: `internal/claudehook`, `internal/spotlight`, `server.addr`, the `?terminal=` deep link
 - the operator's stated wants (2026-10-24)
 
@@ -44,7 +44,7 @@ Task ──1:1── Workspace folder  ~/.conveyor/workspaces/<KEY>/
 
 - **Task keys** are human-readable: `CV-12`, or the Jira key when imported. The key names the worktree, the branch (`<type>/<KEY>-<slug>`) and the Claude session (`--name KEY`).
 - **A task can span several repos.** Each repo gets one worktree in the task's workspace folder, all on the same branch name. One repo is **primary**: it is the session's cwd, and the others are passed with `--add-dir` plus `CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD=1`. Verified in [spike-bg.md](spike-bg.md): every repo's `CLAUDE.md`, skills and agents load. Running from the parent folder (multica's layout) loads none of them.
-- **At most one PR per repo per task, enforced.** Follow-up work that needs a second PR in the same repo becomes a child task; the agent may suggest it via `<spawn>` in its status block (§5.3). This removes the "two PRs on one task" confusion from OOLIO-98.
+- **At most one PR per repo per task, enforced.** Follow-up work that needs a second PR in the same repo becomes a child task; the agent may suggest it via `<spawn>` in its status block (§5.3). This removes the "two PRs on one task" confusion from the case-study task.
 - **A session lineage, not a single session.** A task has many runs. Consecutive runs either resume the previous session or start fresh from the brief (§6). `runs.session_id` keeps every session reachable.
 - `kanban_task_events` stays as the history log. The existing store package from Task 001 extends rather than restarts. Its status set changes (§3).
 
@@ -142,7 +142,7 @@ spawn: optional child-task titles
 
 ### 5.4 Comment → run
 - A human comment on a task that isn't running → enqueue a run. Comments that arrive while a run is queued or in flight are **coalesced**: the next run gets all unconsumed comments.
-- A 20 s debounce absorbs the "second comment 24 s later" pattern seen on OOLIO-98.
+- A 20 s debounce absorbs the "second comment 24 s later" pattern seen on the case-study task.
 - A comment on a running task is shown as "queued" and delivered on the next `Stop`. We never inject keystrokes mid-turn.
 - Agent output lands in the thread as an `agent` comment: the run's final message minus the block, with the block rendered as a card.
 
@@ -168,7 +168,7 @@ Three tiers. Only the first two are ever injected.
 - resume: `New comments on CV-12:\n<delta>\n(brief updated at .conveyor/brief.md if needed)`
 - fresh: `You're continuing task CV-12. Read .conveyor/brief.md first. New comments:\n<delta>`
 
-**Why 60K.** On OOLIO-98, small follow-ups started at 78–150K of resumed context. A fresh session pays about 15–20K baseline plus a few K of brief, then re-reads only the files it touches. Below about 60K, resuming is cheaper and keeps warm file context. Expose `ctx_peak` per run on the card so the threshold can be tuned from real data.
+**Why 60K.** On the case-study task, small follow-ups started at 78–150K of resumed context. A fresh session pays about 15–20K baseline plus a few K of brief, then re-reads only the files it touches. Below about 60K, resuming is cheaper and keeps warm file context. Expose `ctx_peak` per run on the card so the threshold can be tuned from real data.
 
 **Baseline trim:**
 - Launch with `--strict-mcp-config --mcp-config <wt>/.mcp.json` when the repo has one. That drops every global MCP server the task doesn't need.
@@ -200,7 +200,7 @@ action = create_task(template) | comment(task selector, text) | cli(command)
 
 - **Precheck** spends zero tokens until there's work (orca's best idea). Example: `gh pr view $PR --json reviews,comments` → new unresolved review threads since the last sweep.
 - Built-in examples:
-  - **PR review sweep**: for tasks in `review`, a precheck finds new review comments, then posts the system comment "Sweep new PR review comments" → run. This is the exact loop the operator did by hand 6+ times on OOLIO-98.
+  - **PR review sweep**: for tasks in `review`, a precheck finds new review comments, then posts the system comment "Sweep new PR review comments" → run. This is the exact loop the operator did by hand 6+ times on the case-study task.
   - **Jira import**: replaces the PRD's bespoke sync ticker with an automation whose action is `cli: conveyor import jira --jql ...`.
   - **Learnings curation** (§8).
 - Missed-run policy: run once on startup if it was missed, no backfill.
