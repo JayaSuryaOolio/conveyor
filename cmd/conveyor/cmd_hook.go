@@ -31,6 +31,20 @@ func doHook(home string, args []string) error {
 	if err != nil {
 		return fmt.Errorf("read stdin: %w", err)
 	}
+	if args[0] == "PreToolUse" { // the only hook that answers on stdout
+		var openErr error
+		res := hook.PreToolUse(raw, func() string {
+			db, err := store.Open(core.DBPath(home))
+			if err != nil {
+				openErr = err
+				return ""
+			}
+			defer db.Close()
+			return store.GetSetting(db, "pr_comment_prefix")
+		})
+		fmt.Fprintf(out, "%s", res)
+		return openErr
+	}
 	db, err := store.Open(core.DBPath(home))
 	if err != nil {
 		return err

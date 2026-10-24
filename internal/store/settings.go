@@ -15,6 +15,10 @@ var Defaults = map[string]string{
 	"default_model":            "",
 	"terminal_template":        `osascript -e 'tell application "Terminal" to do script "cd {cwd} && {cmd}"' -e 'tell application "Terminal" to activate'`,
 	"editor_command":           "code {cwd}",
+	"brief_extra_rules":        "",
+	"prompt_fresh":             "",
+	"prompt_resume":            "",
+	"pr_comment_prefix":        "ai agent: ",
 }
 
 func getSetting(db dbtx, key string) string {

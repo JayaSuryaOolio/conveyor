@@ -66,6 +66,10 @@ export function EnsureWorkspace(arg1) {
   return window['go']['ui']['App']['EnsureWorkspace'](arg1);
 }
 
+export function GetPromptDefaults() {
+  return window['go']['ui']['App']['GetPromptDefaults']();
+}
+
 export function GetSettings() {
   return window['go']['ui']['App']['GetSettings']();
 }
@@ -100,6 +104,10 @@ export function ListTasks() {
 
 export function Move(arg1, arg2) {
   return window['go']['ui']['App']['Move'](arg1, arg2);
+}
+
+export function PreviewBrief(arg1) {
+  return window['go']['ui']['App']['PreviewBrief'](arg1);
 }
 
 export function RejectLearning(arg1) {

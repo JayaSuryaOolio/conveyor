@@ -158,8 +158,11 @@ func TestWriteSettings(t *testing.T) {
 	if err := json.Unmarshal(b, &m); err != nil {
 		t.Fatal(err)
 	}
-	if m.Worktree.BgIsolation != "none" || len(m.Hooks) != 3 {
+	if m.Worktree.BgIsolation != "none" || len(m.Hooks) != 4 {
 		t.Fatalf("settings %s", b)
+	}
+	if !strings.Contains(string(b), `"matcher": "Bash"`) {
+		t.Fatalf("PreToolUse needs a Bash matcher: %s", b)
 	}
 	want := "'/bin dir/conveyor' --home '" + home + "' hook Stop"
 	if got := m.Hooks["Stop"][0].Hooks[0].Command; got != want {

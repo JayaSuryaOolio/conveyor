@@ -36,6 +36,8 @@ export function EditLearning(arg1:number,arg2:string):Promise<void>;
 
 export function EnsureWorkspace(arg1:string):Promise<void>;
 
+export function GetPromptDefaults():Promise<ui.PromptDefaults>;
+
 export function GetSettings():Promise<Record<string, string>>;
 
 export function GetTask(arg1:string):Promise<ui.TaskDetail>;
@@ -53,6 +55,8 @@ export function ListRepos():Promise<Array<store.Repo>>;
 export function ListTasks():Promise<Array<ui.TaskCard>>;
 
 export function Move(arg1:string,arg2:string):Promise<void>;
+
+export function PreviewBrief(arg1:string):Promise<ui.BriefPreview>;
 
 export function RejectLearning(arg1:number):Promise<void>;
 

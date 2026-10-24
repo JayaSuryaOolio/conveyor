@@ -179,9 +179,12 @@ func WriteSettings(home, conveyorBin string) (string, error) {
 		cmd := q(conveyorBin) + " --home " + q(home) + " hook " + ev
 		return []any{map[string]any{"hooks": []any{map[string]any{"type": "command", "command": cmd}}}}
 	}
+	pre := hook("PreToolUse")
+	pre[0].(map[string]any)["matcher"] = "Bash"
 	b, err := json.MarshalIndent(map[string]any{
 		"worktree": map[string]any{"bgIsolation": "none"},
 		"hooks": map[string]any{
+			"PreToolUse":       pre,
 			"UserPromptSubmit": hook("UserPromptSubmit"),
 			"Stop":             hook("Stop"),
 			"Notification":     hook("Notification"),

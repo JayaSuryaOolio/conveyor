@@ -399,6 +399,20 @@ export namespace transcript {
 
 export namespace ui {
 	
+	export class BriefPreview {
+	    brief: string;
+	    prompt: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new BriefPreview(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.brief = source["brief"];
+	        this.prompt = source["prompt"];
+	    }
+	}
 	export class LearningRow {
 	    id: number;
 	    task_id?: number;
@@ -427,6 +441,22 @@ export namespace ui {
 	        this.applied_task_id = source["applied_task_id"];
 	        this.created_at = source["created_at"];
 	        this.repo = source["repo"];
+	    }
+	}
+	export class PromptDefaults {
+	    protocol: string;
+	    fresh: string;
+	    resume: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PromptDefaults(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.protocol = source["protocol"];
+	        this.fresh = source["fresh"];
+	        this.resume = source["resume"];
 	    }
 	}
 	export class ScheduleInfo {

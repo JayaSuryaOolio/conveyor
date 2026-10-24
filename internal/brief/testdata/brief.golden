@@ -55,6 +55,7 @@ spawn: child task title (repeatable line)
 - Open at most one PR per repo.
 - Never push to the default branch.
 - Prefer the repo's own commands and skills over ad-hoc steps. When one matches what you are doing (e.g. creating a PR, adding tests, writing a changeset), use it: run the slash command via the Skill tool, or Read the command file and follow it.
+- Start every comment or reply you post on a PR or issue with `ai agent: `.
 
 ## Older history
 
