@@ -9,9 +9,10 @@ Design: `docs/tech-spec.md`. Verified Claude Code behaviour: `docs/research/spik
 Requires Go 1.25, `git`, and the `claude` CLI (plus `gh` for PR tracking).
 
 ```
-go install ./cmd/conveyor      # the CLI
-wails build                    # the desktop app (Wails v2, Node 22)
+scripts/install.sh             # CLI to $(go env GOPATH)/bin, Conveyor.app to /Applications (APP_DIR overrides)
 ```
+
+It runs `go install ./cmd/conveyor` and `wails build` (installing Wails if missing).
 
 ## First run
 
