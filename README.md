@@ -50,8 +50,10 @@ usage: conveyor [--home dir] <command> [args]
   import     import tasks (jira --jql ... --repo a)
   learning   curate learnings (list|accept|reject|edit|apply)
   repo       manage registered repos (add|list|rm)
-  task       manage tasks (new|list|show|comment|move|cancel|done|sync|brief|attach|open)
+  task       manage tasks (new|list|show|comment|move|link|unlink|cancel|done|sync|brief|attach|open)
 ```
+
+Tasks can have sub-tasks (`task new --parent CV-1` gives CV-1A, CV-1B ...) and links (`task link CV-1A blocks CV-1B`; kinds `blocks|relates|duplicates`). A blocked todo task is not launched until its blockers are done or cancelled.
 
 Run `conveyor <command>` with no arguments for per-command usage. Listing and show commands accept `--json`.
 

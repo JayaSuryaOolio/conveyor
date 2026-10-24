@@ -57,7 +57,7 @@ func GetTaskByKey(db *sql.DB, key string) (Task, error) {
 }
 
 // CreateTask inserts a task and its repo links in one transaction and assigns
-// key = <key_prefix>-<N>. Exactly one repo must be primary. Each repo's Branch
+// key = <key_prefix>-<N>, or ChildKey of the parent when ParentID is set. Exactly one repo must be primary. Each repo's Branch
 // is taken as the slug and stored as cv/<KEY>-<slug>. Status defaults to backlog.
 func CreateTask(db *sql.DB, t Task, repos []TaskRepo) (Task, error) {
 	primaries := 0
@@ -82,11 +82,21 @@ func CreateTask(db *sql.DB, t Task, repos []TaskRepo) (Task, error) {
 	err := inTx(db, func(tx *sql.Tx) error {
 		prefix := getSetting(tx, "key_prefix")
 		var n int
-		if err := tx.QueryRow(`SELECT COALESCE(MAX(CAST(substr(key, ?) AS INTEGER)), 0) + 1 FROM tasks WHERE key LIKE ? ESCAPE '\'`,
-			len(prefix)+2, strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(prefix)+`-%`).Scan(&n); err != nil {
+		if err := tx.QueryRow(`SELECT COALESCE(MAX(CAST(substr(key, ?) AS INTEGER)), 0) + 1 FROM tasks WHERE substr(key, ?) NOT GLOB '*[^0-9]*' AND key LIKE ? ESCAPE '\'`,
+			len(prefix)+2, len(prefix)+2, strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(prefix)+`-%`).Scan(&n); err != nil {
 			return fmt.Errorf("next key: %w", err)
 		}
 		t.Key = fmt.Sprintf("%s-%d", prefix, n)
+		if t.ParentID != nil {
+			var pkey string
+			if err := tx.QueryRow(`SELECT key FROM tasks WHERE id=?`, *t.ParentID).Scan(&pkey); err != nil {
+				return fmt.Errorf("parent task %d: %w", *t.ParentID, err)
+			}
+			var err error
+			if t.Key, err = nextChildKey(tx, *t.ParentID, pkey); err != nil {
+				return err
+			}
+		}
 		res, err := tx.Exec(`INSERT INTO tasks (key, title, description, status, priority, model, agent, source, external_key,
  external_url, parent_id, consecutive_failures, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 			t.Key, t.Title, t.Description, t.Status, t.Priority, t.Model, t.Agent, t.Source, t.ExternalKey,

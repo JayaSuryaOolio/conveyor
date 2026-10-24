@@ -17,10 +17,10 @@ import (
 )
 
 func init() {
-	register("task", runTask, "manage tasks (new|list|show|comment|move|set|cancel|done|sync|brief|log|attach|open)")
+	register("task", runTask, "manage tasks (new|list|show|comment|move|set|link|unlink|cancel|done|sync|brief|log|attach|open)")
 }
 
-const taskUsage = "usage: conveyor task new|list|show|comment|move|set|cancel|done|sync|brief|log|attach|open ..."
+const taskUsage = "usage: conveyor task new|list|show|comment|move|set|link|unlink|cancel|done|sync|brief|log|attach|open ..."
 
 func runTask(home string, args []string) error {
 	if len(args) == 0 {
@@ -48,6 +48,14 @@ func runTask(home string, args []string) error {
 			return s.Move(rest[0], to)
 		case "set":
 			return taskSet(s, rest)
+		case "link", "unlink":
+			if len(rest) != 3 {
+				return fmt.Errorf("usage: conveyor task %s KEY blocks|relates|duplicates OTHER", cmd)
+			}
+			if cmd == "link" {
+				return s.Link(rest[0], rest[1], rest[2])
+			}
+			return s.Unlink(rest[0], rest[1], rest[2])
 		case "log":
 			return taskLog(s, rest)
 		case "attach":
@@ -89,7 +97,7 @@ func taskNew(s *core.Service, args []string) error {
 	todo := fs.Bool("todo", false, "start in todo instead of backlog")
 	model := fs.String("model", "", "model override")
 	agent := fs.String("agent", "", "Claude subagent name (see conveyor agent list)")
-	parent := fs.String("parent", "", "parent task key")
+	parent := fs.String("parent", "", "parent task key (the new task becomes its sub-task, e.g. CV-1A)")
 	prio := fs.Int("priority", 0, "priority (higher first)")
 	pos, err := parseArgs(fs, args)
 	if err != nil {
@@ -176,6 +184,10 @@ func taskShow(s *core.Service, args []string) error {
 	}
 	var comments []store.Comment
 	var rs []store.Run
+	rel, err := store.ListRelations(s.DB, t)
+	if err != nil {
+		return err
+	}
 	if *thread {
 		if comments, err = store.ListComments(s.DB, t.ID); err != nil {
 			return err
@@ -189,9 +201,10 @@ func taskShow(s *core.Service, args []string) error {
 	if *asJSON {
 		return printJSON(struct {
 			store.Task
-			Comments []store.Comment `json:"comments,omitempty"`
-			Runs     []store.Run     `json:"runs,omitempty"`
-		}{t, comments, rs})
+			Comments  []store.Comment `json:"comments,omitempty"`
+			Runs      []store.Run     `json:"runs,omitempty"`
+			Relations store.Relations `json:"relations"`
+		}{t, comments, rs, rel})
 	}
 	fmt.Fprintf(out, "%s  %s\nstatus: %s  priority: %d\n", t.Key, t.Title, t.Status, t.Priority)
 	for _, r := range t.Repos {
@@ -200,6 +213,15 @@ func taskShow(s *core.Service, args []string) error {
 			p = " (primary)"
 		}
 		fmt.Fprintf(out, "repo: %s%s  branch %s  worktree %s  pr %s %s\n", r.RepoName, p, r.Branch, deref(r.WorktreePath), deref(r.PRURL), deref(r.PRState))
+	}
+	if rel.Parent != nil {
+		fmt.Fprintf(out, "parent: %s  %s (%s)\n", rel.Parent.Key, rel.Parent.Title, rel.Parent.Status)
+	}
+	for _, c := range rel.Children {
+		fmt.Fprintf(out, "child: %s  %s (%s)\n", c.Key, c.Title, c.Status)
+	}
+	for _, l := range rel.Links {
+		fmt.Fprintf(out, "%s: %s  %s (%s)\n", l.Label, l.Task.Key, l.Task.Title, l.Task.Status)
 	}
 	if t.Description != "" {
 		fmt.Fprintf(out, "\n%s\n", t.Description)

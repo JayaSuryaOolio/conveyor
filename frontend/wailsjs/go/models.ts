@@ -227,6 +227,92 @@ export namespace store {
 	        this.created_at = source["created_at"];
 	    }
 	}
+	export class TaskRef {
+	    key: string;
+	    title: string;
+	    status: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new TaskRef(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.key = source["key"];
+	        this.title = source["title"];
+	        this.status = source["status"];
+	    }
+	}
+	export class Relation {
+	    kind: string;
+	    label: string;
+	    from: boolean;
+	    task: TaskRef;
+	
+	    static createFrom(source: any = {}) {
+	        return new Relation(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.kind = source["kind"];
+	        this.label = source["label"];
+	        this.from = source["from"];
+	        this.task = this.convertValues(source["task"], TaskRef);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class Relations {
+	    parent?: TaskRef;
+	    children: TaskRef[];
+	    links: Relation[];
+	
+	    static createFrom(source: any = {}) {
+	        return new Relations(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.parent = this.convertValues(source["parent"], TaskRef);
+	        this.children = this.convertValues(source["children"], TaskRef);
+	        this.links = this.convertValues(source["links"], Relation);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class Repo {
 	    id: number;
 	    name: string;
@@ -389,6 +475,7 @@ export namespace store {
 		    return a;
 		}
 	}
+	
 
 }
 
@@ -498,6 +585,7 @@ export namespace ui {
 	    title: string;
 	    status: string;
 	    priority: number;
+	    parent: string;
 	    repos: string[];
 	    lastSummary: string;
 	    ctxPeak: number;
@@ -513,6 +601,7 @@ export namespace ui {
 	        this.title = source["title"];
 	        this.status = source["status"];
 	        this.priority = source["priority"];
+	        this.parent = source["parent"];
 	        this.repos = source["repos"];
 	        this.lastSummary = source["lastSummary"];
 	        this.ctxPeak = source["ctxPeak"];
@@ -523,6 +612,7 @@ export namespace ui {
 	    task: store.Task;
 	    comments: store.Comment[];
 	    runs: store.Run[];
+	    relations: store.Relations;
 	
 	    static createFrom(source: any = {}) {
 	        return new TaskDetail(source);
@@ -533,6 +623,7 @@ export namespace ui {
 	        this.task = this.convertValues(source["task"], store.Task);
 	        this.comments = this.convertValues(source["comments"], store.Comment);
 	        this.runs = this.convertValues(source["runs"], store.Run);
+	        this.relations = this.convertValues(source["relations"], store.Relations);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

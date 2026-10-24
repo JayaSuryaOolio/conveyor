@@ -98,6 +98,10 @@ export function Learnings() {
   return window['go']['ui']['App']['Learnings']();
 }
 
+export function Link(arg1, arg2, arg3) {
+  return window['go']['ui']['App']['Link'](arg1, arg2, arg3);
+}
+
 export function ListAgents(arg1) {
   return window['go']['ui']['App']['ListAgents'](arg1);
 }
@@ -212,6 +216,10 @@ export function TermWrite(arg1, arg2) {
 
 export function TestApp(arg1) {
   return window['go']['ui']['App']['TestApp'](arg1);
+}
+
+export function Unlink(arg1, arg2, arg3) {
+  return window['go']['ui']['App']['Unlink'](arg1, arg2, arg3);
 }
 
 export function UpdateApp(arg1) {
