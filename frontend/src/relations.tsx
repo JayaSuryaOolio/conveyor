@@ -78,7 +78,7 @@ export function Relations({k, status, rel, nav, reload}: {k: string; status: str
             ))}
             <Group gap={4} wrap="nowrap">
                 <Select size="xs" w={130} allowDeselect={false} value={choice} onChange={v => { if (v) { setChoice(v); setOther(null) } }} data={CHOICES.map(c => ({value: c[0], label: c[1]}))}/>
-                <Select size="xs" searchable clearable placeholder="Task" style={{flex: 1}} value={other} onChange={setOther}
+                <Select size="xs" clearable placeholder="Task" style={{flex: 1}} value={other} onChange={setOther}
                         data={(tasks ?? []).filter(x => x.key !== k).map(x => ({value: x.key, label: `${x.key} ${x.title}`, disabled: off.includes(x.key)}))}/>
                 <ActionIcon variant="default" size="md" aria-label="Add link" disabled={!other} onClick={add}><IconPlus size={14}/></ActionIcon>
             </Group>
