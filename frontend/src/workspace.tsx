@@ -10,7 +10,7 @@ import {TaskAgent} from './forms'
 import {useData} from './util'
 
 const SPOTLIGHT = 'Spotlight'
-const copy =(s: string) => navigator.clipboard.writeText(s).catch(errMsg)
+const copy = (s: string) => navigator.clipboard.writeText(s).catch(errMsg)
 const sq = (s: string) => "'" + s.replace(/'/g, "'\\''") + "'"
 const cdCmd = (a: core.Action) => 'cd ' + sq(a.cwd) + (a.cmd && a.kind !== 'editor' ? ' && ' + a.cmd : '')
 
