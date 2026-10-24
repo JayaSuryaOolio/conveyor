@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/JayaSuryaOolio/conveyor/internal/brief"
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 )
 
@@ -71,6 +72,39 @@ func TestAddCommentTransitions(t *testing.T) {
 		if got.Status != c.want {
 			t.Errorf("%s + %s comment: %s want %s", c.from, c.author, got.Status, c.want)
 		}
+	}
+}
+
+func TestCommentAfterMergeStartsFollowUp(t *testing.T) {
+	s := newSvc(t)
+	tk, _ := s.CreateTask(NewTaskInput{Title: "readme", Description: "rewrite it", Repos: []string{"a"}})
+	s.DB.Exec(`UPDATE tasks SET status=? WHERE id=?`, store.StatusReview, tk.ID)
+	url, state := "https://github.com/o/r/pull/90", "MERGED"
+	tr := tk.Repos[0]
+	tr.PRURL, tr.PRState = &url, &state
+	store.UpdateTaskRepo(s.DB, tr)
+	if _, err := s.AddComment(tk.Key, store.AuthorHuman, "tone it down\nmore detail"); err != nil {
+		t.Fatal(err)
+	}
+	parent, _ := store.GetTask(s.DB, tk.ID)
+	child, err := store.GetTaskByKey(s.DB, "CV-1A")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parent.Status != store.StatusDone || child.Status != store.StatusTodo || child.Title != "tone it down" ||
+		child.Description != "tone it down\nmore detail" || *child.ParentID != tk.ID || child.Repos[0].Branch != "cv/CV-1A-tone-it-down" {
+		t.Fatalf("parent %s, child %+v", parent.Status, child)
+	}
+	cs, _ := store.ListComments(s.DB, tk.ID)
+	if last := cs[len(cs)-1]; last.Author != store.AuthorSystem || !strings.Contains(last.Body, "continues in CV-1A") {
+		t.Fatalf("parent note %+v", last)
+	}
+	text, err := brief.Build(s.DB, child)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(text, "## Continues CV-1: readme") || !strings.Contains(text, "### Its description\n\nrewrite it") {
+		t.Fatalf("brief lacks the parent's context:\n%s", text)
 	}
 }
 
