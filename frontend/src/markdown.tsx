@@ -41,7 +41,10 @@ export function MarkdownEditor({value, onChange, onSubmit, submitLabel = 'Send',
     const [tab, setTab] = useState('write')
     const [focus, setFocus] = useState(false)
     const [over, setOver] = useState(false)
+    const [pending, setPending] = useState(0)
+    const submit = pending ? undefined : onSubmit
     const upload = (files: File[]) => files.filter(f => f.type.startsWith('image/')).forEach(f => {
+        setPending(n => n + 1)
         const tok = `![Uploading…](#${++uploads})`
         const t = ref.current
         const at = t ? t.selectionStart : cur.current.length
@@ -49,6 +52,7 @@ export function MarkdownEditor({value, onChange, onSubmit, submitLabel = 'Send',
         const done = (s: string) => onChange(cur.current.replace(tok, s))
         toBase64(f).then(b => SaveAttachment(attachKey, f.name || 'image.' + f.type.split('/')[1], b))
             .then(p => done(`![image](${p})`), e => { done(''); ShowError(String(e)) })
+            .finally(() => setPending(n => n - 1))
     })
     const onPaste = (e: React.ClipboardEvent) => {
         const files = [...e.clipboardData.items].filter(i => i.type.startsWith('image/')).flatMap(i => i.getAsFile() ?? [])
@@ -82,7 +86,7 @@ export function MarkdownEditor({value, onChange, onSubmit, submitLabel = 'Send',
     })
     const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
         const mod = e.metaKey || e.ctrlKey
-        if (mod && e.key === 'Enter') { e.preventDefault(); onSubmit?.() }
+        if (mod && e.key === 'Enter') { e.preventDefault(); submit?.() }
         else if (mod && e.key === 'b') { e.preventDefault(); wrap('**')() }
         else if (mod && e.key === 'i') { e.preventDefault(); wrap('_')() }
         else if (e.key === 'Tab' && !e.shiftKey && !mod) {
@@ -130,8 +134,8 @@ export function MarkdownEditor({value, onChange, onSubmit, submitLabel = 'Send',
                     {value.trim() ? <Markdown>{value}</Markdown> : <Text size="sm" c="dimmed">Nothing to preview</Text>}
                 </Stack>}
             <Group justify="space-between" wrap="nowrap" px="xs" py={6} style={{borderTop: '1px solid var(--mantine-color-default-border)'}}>
-                <Text size="xs" c="dimmed">Markdown supported · paste or drop images{onSubmit && ' · ⌘↵ to send'}</Text>
-                {onSubmit && <Button size="compact-sm" onClick={onSubmit} loading={submitting} disabled={!canSubmit}>{submitLabel}</Button>}
+                <Text size="xs" c="dimmed">{pending ? 'Uploading…' : <>Markdown supported · paste or drop images{onSubmit && ' · ⌘↵ to send'}</>}</Text>
+                {onSubmit && <Button size="compact-sm" onClick={submit} loading={submitting} disabled={!canSubmit || pending > 0}>{submitLabel}</Button>}
             </Group>
         </Box>
     )

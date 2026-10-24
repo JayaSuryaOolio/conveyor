@@ -48,11 +48,10 @@ func SaveAttachment(home, key, name, dataB64 string) (string, error) {
 
 // AttachmentHandler serves GET /attachments/<abs path> for image files under
 // the conveyor home, so the webview can show them.
-func AttachmentHandler() http.Handler {
+func AttachmentHandler(home string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rest, ok := strings.CutPrefix(r.URL.Path, "/attachments/")
-		home, err := Home("")
-		if !ok || err != nil || r.Method != http.MethodGet {
+		if !ok || r.Method != http.MethodGet {
 			http.NotFound(w, r)
 			return
 		}

@@ -32,8 +32,7 @@ func TestSaveAttachment(t *testing.T) {
 }
 
 func TestAttachmentHandler(t *testing.T) {
-	t.Setenv("CONVEYOR_HOME", t.TempDir())
-	home, _ := Home("")
+	home := t.TempDir()
 	p, _ := SaveAttachment(home, "", "a.png", base64.StdEncoding.EncodeToString([]byte("png")))
 	os.WriteFile(filepath.Join(home, "secret.txt"), []byte("x"), 0o644)
 	for u, want := range map[string]int{
@@ -43,7 +42,7 @@ func TestAttachmentHandler(t *testing.T) {
 		"/attachments" + filepath.Dir(home) + "/x.png": http.StatusNotFound,
 	} {
 		w := httptest.NewRecorder()
-		AttachmentHandler().ServeHTTP(w, httptest.NewRequest("GET", u, nil))
+		AttachmentHandler(home).ServeHTTP(w, httptest.NewRequest("GET", u, nil))
 		if w.Code != want {
 			t.Errorf("%s: %d want %d", u, w.Code, want)
 		}

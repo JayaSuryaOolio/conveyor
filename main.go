@@ -15,11 +15,16 @@ var assets embed.FS
 func main() {
 	useLoginShellPath()
 	app := newApp()
-	err := wails.Run(&options.App{
+	home, err := core.Home("") // same resolution as App.Startup
+	if err != nil {
+		println("Error:", err.Error())
+		return
+	}
+	err = wails.Run(&options.App{
 		Title:            "Conveyor",
 		Width:            1280,
 		Height:           820,
-		AssetServer:      &assetserver.Options{Assets: assets, Handler: core.AttachmentHandler()},
+		AssetServer:      &assetserver.Options{Assets: assets, Handler: core.AttachmentHandler(home)},
 		BackgroundColour: &options.RGBA{R: 27, G: 38, B: 54, A: 1},
 		OnStartup:        app.Startup,
 		OnShutdown:       app.Shutdown,
