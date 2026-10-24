@@ -106,20 +106,14 @@ func (a *App) runDispatcher(ctx context.Context) {
 	d.Run(ctx)
 }
 
-// conveyorBin finds the CLI the hooks should call: `conveyor` next to the app, else on PATH.
+// conveyorBin finds the CLI the hooks should call on PATH. It never looks next to the app:
+// on a case-insensitive filesystem Contents/MacOS/conveyor is the app binary itself.
 func conveyorBin() string {
-	if exe, err := os.Executable(); err == nil {
-		if p := filepath.Join(filepath.Dir(exe), "conveyor"); fileExists(p) {
-			return p
-		}
-	}
 	if p, err := exec.LookPath("conveyor"); err == nil {
 		return p
 	}
 	return "conveyor"
 }
-
-func fileExists(p string) bool { _, err := os.Stat(p); return err == nil }
 
 // ShowError logs a frontend error and shows it in a native dialog
 // (the macOS webview silently drops window.alert).
