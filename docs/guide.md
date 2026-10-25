@@ -249,8 +249,8 @@ conveyor.db                 tasks, runs, comments, events, learnings, automation
 conveyor.log                app log (rotated at 5 MB to conveyor.log.1)
 claude-settings.json        hooks and options passed to launched sessions, rewritten at each launch
 dispatcher.lock             held by whichever process is dispatching
-logs/dispatcher.log         output of `conveyor daemon`
-logs/hook.log               errors from `conveyor hook`
+logs/dispatcher.log         dispatcher output (app or `conveyor daemon`): launches, reaps, errors
+logs/hook.log               one line per Conveyor-session hook event (not PreToolUse), plus errors
 workspaces/<KEY>/<repo>/    git worktrees
 workspaces/<KEY>/BRIEF.md   the agent's brief
 workspaces/<KEY>/attachments/   pasted images
@@ -262,7 +262,7 @@ Outside it, Conveyor reads `~/.claude/projects` (session transcripts), `~/.claud
 
 Recipes for specific failures (a run stuck after its session finished, an untracked PR) are in [troubleshooting.md](troubleshooting.md).
 
-- **Logs.** The Logs page in the app has a switch: App (`~/.conveyor/conveyor.log`), Dispatcher (`logs/dispatcher.log`, written by `conveyor daemon`) and Hooks (`logs/hook.log`, errors from `conveyor hook`). A log that has not been written yet shows an empty message. From a terminal use `tail -f ~/.conveyor/<file>`. The app rotates `conveyor.log` to `conveyor.log.1`, which is only readable from a terminal.
+- **Logs.** The Logs page in the app has a switch: App (`~/.conveyor/conveyor.log`), Dispatcher (`logs/dispatcher.log`, written by whichever process holds the dispatcher lock: the app or `conveyor daemon`) and Hooks (`logs/hook.log`, a line per hook event of a Conveyor session except PreToolUse, and every error). A log that has not been written yet shows an empty message. From a terminal use `tail -f ~/.conveyor/<file>`. Each log rotates to `<file>.1` when opened past 5 MB; `.1` is only readable from a terminal.
 - **Nothing starts.** Check that a dispatcher is running (the app, or `conveyor daemon`), the task is in todo, and fewer than `max_parallel` runs are active. A task you just commented on waits `comment_debounce_secs`.
 - **"workspace not trusted".** Run `claude` once in the main repo and accept the trust prompt. Worktrees inherit it.
 - **Task is failed.** Read the system comment on the thread, fix the cause, then comment to retry.

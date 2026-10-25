@@ -48,3 +48,31 @@ func TestLogSources(t *testing.T) {
 		t.Fatal("free path accepted")
 	}
 }
+
+// OpenLog must create logs/ (nothing else does) and rotate an oversized file.
+func TestOpenLogCreatesDirAndRotates(t *testing.T) {
+	home := t.TempDir()
+	p := DispatcherLogPath(home)
+	f, err := OpenLog(p)
+	if err != nil {
+		t.Fatalf("missing logs dir: %v", err)
+	}
+	f.Close()
+	os.WriteFile(p, make([]byte, maxLog+1), 0o644)
+	if f, err = OpenLog(p); err != nil {
+		t.Fatal(err)
+	}
+	f.Close()
+	if fi, _ := os.Stat(p); fi.Size() != 0 {
+		t.Fatalf("log not rotated: %d bytes", fi.Size())
+	}
+	if fi, err := os.Stat(p + ".1"); err != nil || fi.Size() != maxLog+1 {
+		t.Fatalf("old log not kept: %v", err)
+	}
+	if sp, _ := SourcePath(home, "dispatcher"); sp != p {
+		t.Fatalf("dispatcher source %s, writer %s", sp, p)
+	}
+	if sp, _ := SourcePath(home, "hooks"); sp != HookLogPath(home) {
+		t.Fatalf("hooks source %s, writer %s", sp, HookLogPath(home))
+	}
+}

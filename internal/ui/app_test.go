@@ -2,7 +2,6 @@ package ui
 
 import (
 	"context"
-	"os"
 	"path/filepath"
 	"sync/atomic"
 	"testing"
@@ -71,22 +70,6 @@ func TestPollEmitsOnExternalWrite(t *testing.T) {
 	}
 	if n.Load() == 0 {
 		t.Fatal("no emit after write")
-	}
-}
-
-func TestOpenLogRotates(t *testing.T) {
-	p := filepath.Join(t.TempDir(), "conveyor.log")
-	os.WriteFile(p, make([]byte, maxLog+1), 0o644)
-	f, err := openLog(p)
-	if err != nil {
-		t.Fatal(err)
-	}
-	f.Close()
-	if fi, _ := os.Stat(p); fi.Size() != 0 {
-		t.Fatalf("log not rotated: %d bytes", fi.Size())
-	}
-	if fi, err := os.Stat(p + ".1"); err != nil || fi.Size() != maxLog+1 {
-		t.Fatalf("old log not kept: %v", err)
 	}
 }
 

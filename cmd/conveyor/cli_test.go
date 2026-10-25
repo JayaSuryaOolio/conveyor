@@ -124,6 +124,27 @@ func TestHookAlwaysExitsZero(t *testing.T) {
 	}
 }
 
+// hook.log gets a line per Conveyor-session event (so a missing Stop shows) and none for foreign sessions.
+func TestHookLogScope(t *testing.T) {
+	home := t.TempDir()
+	hook := func(event, cwd string) {
+		cmd := exec.Command(bin, "--home", home, "hook", event)
+		cmd.Stdin = strings.NewReader(`{"session_id":"s1","cwd":"` + cwd + `"}`)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("hook failed: %v %s", err, out)
+		}
+	}
+	hook("Stop", t.TempDir())
+	if _, err := os.Stat(filepath.Join(home, "logs", "hook.log")); !os.IsNotExist(err) {
+		t.Fatalf("foreign session logged: %v", err)
+	}
+	hook("Stop", filepath.Join(home, "workspaces", "CV-9", "repo"))
+	b, _ := os.ReadFile(filepath.Join(home, "logs", "hook.log"))
+	if !strings.Contains(string(b), "CV-9 [Stop] session=s1") {
+		t.Fatalf("log: %q", b)
+	}
+}
+
 func TestAutomationCLI(t *testing.T) {
 	home := t.TempDir()
 	cv(t, home, "automation", "add", "--template", "pr-sweep")
