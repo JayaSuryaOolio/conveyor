@@ -240,12 +240,13 @@ func (d *Dispatcher) reapInteractive(r store.Run, alive bool) error {
 	return err
 }
 
+// pollPRs is the fallback for the Stop hook's per-task refresh (hook.Handle) and covers PRs merged elsewhere.
 func (d *Dispatcher) pollPRs(ctx context.Context) {
 	if !d.lastPoll.IsZero() && d.now().Sub(d.lastPoll) < prPollEach {
 		return
 	}
 	d.lastPoll = d.now()
-	tasks, err := store.ListTasks(d.DB, store.StatusReview)
+	tasks, err := store.ListTasks(d.DB, store.StatusRunning, store.StatusNeedsYou, store.StatusReview)
 	if err != nil {
 		d.logf("pr poll: %v", err)
 		return
