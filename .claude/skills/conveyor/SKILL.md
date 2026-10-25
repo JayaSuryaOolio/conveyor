@@ -44,7 +44,7 @@ Use a throwaway home for experiments: `conveyor --home $(mktemp -d) ...`. Never 
 |---|---|
 | DB (sqlite) | `~/.conveyor/conveyor.db` - `sqlite3 ~/.conveyor/conveyor.db '.tables'` |
 | App log | `~/.conveyor/conveyor.log` (+ `.1`) |
-| Daemon / hook logs | `~/.conveyor/logs/dispatcher.log`, `logs/hook.log` |
+| Dispatcher / hook logs | `~/.conveyor/logs/dispatcher.log` (launch/reap/errors, app or daemon), `logs/hook.log` (one line per non-PreToolUse hook event of a Conveyor session, + errors) |
 | Task workspace | `~/.conveyor/workspaces/<KEY>/{<repo>/,BRIEF.md,attachments/}` |
 | Session hooks file | `~/.conveyor/claude-settings.json` (rewritten each launch) |
 | Session transcripts | `~/.claude/projects/...` (token counts come from here) |

@@ -10,6 +10,24 @@ import (
 // LogPath is the desktop app's log file under home.
 func LogPath(home string) string { return filepath.Join(home, "conveyor.log") }
 
+// DispatcherLogPath and HookLogPath are the dispatcher's and the hook command's logs under home.
+func DispatcherLogPath(home string) string { return filepath.Join(home, "logs", "dispatcher.log") }
+func HookLogPath(home string) string       { return filepath.Join(home, "logs", "hook.log") }
+
+// OpenLog appends to path, creating its directory, first moving it to path.1 once it passes maxLog.
+// ponytail: rotates only on open; rotate on write if a single process ever logs that much.
+func OpenLog(path string) (*os.File, error) {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return nil, err
+	}
+	if fi, err := os.Stat(path); err == nil && fi.Size() > maxLog {
+		os.Rename(path, path+".1")
+	}
+	return os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+}
+
+const maxLog = 5 << 20
+
 // logSources maps the fixed source names the UI may ask for to files under home.
 var logSources = map[string]string{
 	"app":        "conveyor.log",

@@ -8,7 +8,6 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"syscall"
 
 	"github.com/JayaSuryaOolio/conveyor/internal/core"
@@ -25,11 +24,11 @@ func runDaemon(home string, args []string) error {
 	}
 	defer release()
 	var w io.Writer = os.Stderr
-	if err := os.MkdirAll(filepath.Join(home, "logs"), 0o755); err == nil {
-		if f, err := os.OpenFile(filepath.Join(home, "logs", "dispatcher.log"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644); err == nil {
-			defer f.Close()
-			w = io.MultiWriter(os.Stderr, f)
-		}
+	if f, err := core.OpenLog(core.DispatcherLogPath(home)); err == nil {
+		defer f.Close()
+		w = io.MultiWriter(os.Stderr, f)
+	} else {
+		fmt.Fprintf(os.Stderr, "dispatcher log: %v\n", err)
 	}
 	db, err := store.Open(core.DBPath(home))
 	if err != nil {
@@ -43,7 +42,7 @@ func runDaemon(home string, args []string) error {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 	d := &dispatch.Dispatcher{DB: db, Home: home, ConveyorBin: bin, Log: log.New(w, "dispatcher: ", log.LstdFlags)}
-	d.Log.Printf("started")
+	d.Log.Printf("started (daemon)")
 	err = d.Run(ctx)
 	if errors.Is(err, context.Canceled) {
 		return nil

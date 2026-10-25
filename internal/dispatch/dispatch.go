@@ -186,6 +186,7 @@ func (d *Dispatcher) reap(ctx context.Context) error {
 		if r.BgID == nil {
 			reason, note = "launch interrupted", "The Claude launch was interrupted before a session started."
 		}
+		d.logf("reap run %d (task %d, bg %s, session %s, status %s): %s", r.ID, r.TaskID, deref(r.BgID), deref(r.SessionID), r.Status, reason)
 		ended := d.now().UTC().Format(time.RFC3339)
 		r.Status, r.Error, r.EndedAt = "failed", ptr(reason), &ended
 		if err := store.UpdateRun(d.DB, r); err != nil {
@@ -216,6 +217,7 @@ func (d *Dispatcher) reapInteractive(r store.Run, alive bool) error {
 		return nil
 	}
 	ended := d.now().UTC().Format(time.RFC3339)
+	d.logf("reap interactive run %d (task %d, session %s): session ended", r.ID, r.TaskID, deref(r.SessionID))
 	r.Status, r.EndedAt = "finished", &ended
 	if err := store.UpdateRun(d.DB, r); err != nil {
 		return err
@@ -368,6 +370,7 @@ func (d *Dispatcher) start(ctx context.Context, task store.Task, delta []store.C
 	if err := store.UpdateRun(d.DB, run); err != nil {
 		return run, err
 	}
+	d.logf("launch %s: run %d (%s) bg %s", task.Key, run.ID, run.Mode, bg)
 	store.RecordEvent(d.DB, task.ID, "run_started", fmt.Sprintf("run %d (%s) bg %s", run.ID, run.Mode, bg))
 	return run, nil
 }

@@ -49,13 +49,14 @@ func (a *App) Startup(ctx context.Context) {
 		return
 	}
 	// A Finder-launched app's stderr goes nowhere; keep a log file in the home too.
-	if f, err := openLog(core.LogPath(home)); err == nil {
+	if f, err := core.OpenLog(core.LogPath(home)); err == nil {
 		log.SetOutput(io.MultiWriter(os.Stderr, f))
 	}
 	pe := filepath.SplitList(os.Getenv("PATH"))
 	log.Printf("app start: home=%s cli=%s PATH entries=%d first=%v", home, conveyorBin(), len(pe), pe[:min(len(pe), 5)])
 	db, err := store.Open(core.DBPath(home))
 	if err != nil {
+		log.Printf("open db: %v", err) // LogFatalf writes only to the Wails logger
 		runtime.LogFatalf(ctx, "open db: %v", err)
 		return
 	}
@@ -107,7 +108,16 @@ func (a *App) runDispatcher(ctx context.Context) {
 	defer db.Close()
 	a.dispatcher.Store(true)
 	defer a.dispatcher.Store(false)
-	d := &dispatch.Dispatcher{DB: db, Home: a.svc.Home, ConveyorBin: a.svc.Bin, Log: log.New(log.Writer(), "dispatcher: ", log.LstdFlags)}
+	// Tee to logs/dispatcher.log so the Logs view's dispatcher source works whichever process dispatches.
+	w := log.Writer()
+	if f, err := core.OpenLog(core.DispatcherLogPath(a.svc.Home)); err == nil {
+		defer f.Close()
+		w = io.MultiWriter(w, f)
+	} else {
+		log.Printf("dispatcher log: %v", err)
+	}
+	d := &dispatch.Dispatcher{DB: db, Home: a.svc.Home, ConveyorBin: a.svc.Bin, Log: log.New(w, "dispatcher: ", log.LstdFlags)}
+	d.Log.Printf("started (app)")
 	d.Run(ctx)
 }
 
@@ -494,14 +504,3 @@ func (a *App) ApplyLearnings(repo string) (string, error) {
 	}
 	return keys[0], nil
 }
-
-// openLog appends to path, first moving it to path.1 once it passes maxLog.
-// ponytail: rotates only at startup; rotate on write if a single session ever logs that much.
-func openLog(path string) (*os.File, error) {
-	if fi, err := os.Stat(path); err == nil && fi.Size() > maxLog {
-		os.Rename(path, path+".1")
-	}
-	return os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
-}
-
-const maxLog = 5 << 20
