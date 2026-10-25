@@ -78,9 +78,14 @@ Known failure modes with confirm/fix steps: `docs/troubleshooting.md` (e.g. a ru
 ## Changing the code
 
 - Tests: `go test ./...` (fast, uses fake `claude` via `execCommand`); `gofmt -l .`; `go vet ./...`.
-- Frontend: `cd frontend && npm ci && npm run build` (tsc + vite).
-- New/changed Go binding in `internal/ui`: `wails generate module`, then `git checkout -- frontend/wailsjs/runtime` (don't commit runtime churn).
+- Frontend: `cd frontend && npm ci && npm run build` (tsc + vite). A fresh worktree has no `frontend/node_modules`, so run `npm ci` before `tsc` or vite.
+- New/changed Go binding in `internal/ui`: `wails generate module`, then `git checkout -- frontend/wailsjs/runtime` (don't commit runtime churn). `wails dev` hot-reloads frontend changes but not Go: restart it after a binding change.
 - After `wails build`/`npm run build`: `git checkout -- frontend/dist/.gitkeep frontend/package.json.md5`.
 - Run the UI live: `wails dev` (browser at http://localhost:34115). Install: `scripts/install.sh`.
+- UI on a throwaway home: `CONVEYOR_HOME=<tmp> wails dev -devserver localhost:<port>`.
+- Frontend PRs: add a Playwright screenshot to the PR description (`scripts/screenshot/`, mocks the Wails bindings with a Proxy on `window.go.ui.App`, no Go backend needed). If the latest playwright wants a newer chromium than installed, pass the cached one (e.g. chromium-1243 or the headless shell) via `executablePath`. Don't commit the image: GitHub has no CLI upload for PR images, so ask the human to drag it into the description, or link it by commit SHA and remove the file in a later commit.
+- App commands (`apps`): `{key}` is substituted already shell-quoted, so never put it inside double quotes or the quotes show in the toast. Never open a user-supplied file with a configured app's command (`open -a Terminal file.sh` runs it); limit file opening to known editors and `open -R`.
+- Bot review comments (cubic, coderabbit) start with HTML comments and tags; strip them before showing a comment in a toast.
+- Sub-tasks: always set `--desc`/`--desc-file` at creation, or the agent has no context. A `spawn:` line in the status block only gives the sub-task the parent's summary/state/next; when it needs real context use `conveyor task new --parent KEY --desc ...`.
 - Keep every major action reachable from the CLI; the UI calls the same `core.Service`.
 - Update `docs/guide.md` (and this file) when behaviour or commands change.
