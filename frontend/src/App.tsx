@@ -57,7 +57,6 @@ export default function App() {
         let g = false
         const onKey = (e: KeyboardEvent) => {
             const el = e.target as HTMLElement
-            if ((e.metaKey && e.key === '[') || (e.altKey && e.key === 'ArrowLeft')) { e.preventDefault(); back(); return }
             if (el.matches('input,textarea,select') || e.metaKey || e.ctrlKey) return
             if (g) {
                 g = false
@@ -79,7 +78,7 @@ export default function App() {
                 <Stack gap="xs" h="100%">
                     <Group justify={mini ? 'center' : 'space-between'} wrap="nowrap">
                         {!mini && <Group gap={4} wrap="nowrap">
-                            <Tooltip label="Back (⌘[ or Alt+←)" position="right">
+                            <Tooltip label="Back" position="right">
                                 <ActionIcon variant="subtle" color="gray" aria-label="Back" disabled={!past.length} onClick={back}><IconArrowLeft size={18}/></ActionIcon>
                             </Tooltip>
                             <Title order={4}>Conveyor</Title>
