@@ -2,6 +2,7 @@
 package hook
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/JayaSuryaOolio/conveyor/internal/core"
+	"github.com/JayaSuryaOolio/conveyor/internal/gh"
 	"github.com/JayaSuryaOolio/conveyor/internal/statusblock"
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 	"github.com/JayaSuryaOolio/conveyor/internal/transcript"
@@ -52,7 +54,24 @@ func Handle(db *sql.DB, home, event string, raw []byte) error {
 	if event == "UserPromptSubmit" {
 		return onPrompt(db, task, run)
 	}
-	return onStop(db, task, run, p)
+	if err := onStop(db, task, run, p); err != nil {
+		return err
+	}
+	if err := refreshPR(db, task.ID); err != nil { // best effort: the run is already recorded
+		store.RecordEvent(db, task.ID, "error", "pr refresh: "+err.Error())
+	}
+	return nil
+}
+
+// refreshPR syncs the task's PR state once its session returns; the dispatcher poll is the fallback.
+func refreshPR(db *sql.DB, id int64) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	t, err := store.GetTask(db, id) // re-read: onStop may have moved the task
+	if err != nil {
+		return err
+	}
+	return gh.SyncTask(ctx, db, t)
 }
 
 // resolveRun finds the run for the session, adopts a launching one, or creates an interactive run.
@@ -196,4 +215,3 @@ func onStop(db *sql.DB, task store.Task, run store.Run, p payload) error {
 	_, err = store.UpdateTaskStatus(db, task.ID, to, store.ActorSystem)
 	return err
 }
-
