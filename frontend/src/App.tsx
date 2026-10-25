@@ -1,7 +1,7 @@
 import {useEffect, useRef, useState} from 'react'
 import {ActionIcon, AppShell, Badge, Box, Button, Group, Kbd, NavLink, Stack, TextInput, Title, Tooltip} from '@mantine/core'
 import {useLocalStorage} from '@mantine/hooks'
-import {IconApps, IconBolt, IconBook2, IconClock, IconFolders, IconLayoutKanban, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconLogs, IconPlus, IconRobot, IconSearch, IconSettings} from '@tabler/icons-react'
+import {IconApps, IconBolt, IconArrowLeft, IconBook2, IconClock, IconFolders, IconLayoutKanban, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconLogs, IconPlus, IconRobot, IconSearch, IconSettings} from '@tabler/icons-react'
 import {AppIcons, DispatcherState, Learnings, ListApps, OpenApp} from '../wailsjs/go/ui/App'
 import {Agents} from './agents'
 import {Apps} from './apps'
@@ -27,8 +27,13 @@ const NAV: {name: string; key?: string; label: string; icon: typeof IconBolt}[] 
 
 type View = {name: string; key?: string}
 
+const HISTORY_MAX = 50 // ponytail: in-memory only; persist to localStorage if history should survive reloads
+
 export default function App() {
-    const [view, setView] = useState<View>({name: 'board'})
+    // refactor: view + history could move into a small useHistory hook / router if more screens need deep links
+    const [{view, past}, hist] = useState<{view: View; past: View[]}>({view: {name: 'board'}, past: []})
+    const setView = (v: View) => hist(s => s.view.name === v.name && s.view.key === v.key ? s : {view: v, past: [...s.past, s.view].slice(-HISTORY_MAX)})
+    const back = () => hist(s => s.past.length ? {view: s.past[s.past.length - 1], past: s.past.slice(0, -1)} : s)
     const [showNew, setShowNew] = useState(false)
     const [q, setQ] = useState('')
     const search = useRef<HTMLInputElement>(null)
@@ -52,6 +57,7 @@ export default function App() {
         let g = false
         const onKey = (e: KeyboardEvent) => {
             const el = e.target as HTMLElement
+            if ((e.metaKey && e.key === '[') || (e.altKey && e.key === 'ArrowLeft')) { e.preventDefault(); back(); return }
             if (el.matches('input,textarea,select') || e.metaKey || e.ctrlKey) return
             if (g) {
                 g = false
@@ -72,7 +78,12 @@ export default function App() {
             <AppShell.Navbar p="sm">
                 <Stack gap="xs" h="100%">
                     <Group justify={mini ? 'center' : 'space-between'} wrap="nowrap">
-                        {!mini && <Title order={4}>Conveyor</Title>}
+                        {!mini && <Group gap={4} wrap="nowrap">
+                            <Tooltip label="Back (⌘[ or Alt+←)" position="right">
+                                <ActionIcon variant="subtle" color="gray" aria-label="Back" disabled={!past.length} onClick={back}><IconArrowLeft size={18}/></ActionIcon>
+                            </Tooltip>
+                            <Title order={4}>Conveyor</Title>
+                        </Group>}
                         <ActionIcon variant="subtle" color="gray" aria-label={mini ? 'Expand menu' : 'Collapse menu'} onClick={() => setMini(!mini)}>
                             {mini ? <IconLayoutSidebarLeftExpand size={18}/> : <IconLayoutSidebarLeftCollapse size={18}/>}
                         </ActionIcon>
