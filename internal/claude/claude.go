@@ -60,7 +60,7 @@ func (s LaunchSpec) Args() []string {
 
 var (
 	bgRe   = regexp.MustCompile(`backgrounded\s*·\s*(\S+)`)
-	copyRe = regexp.MustCompile(`started a copy as\s+(\S+)`)
+	copyRe = regexp.MustCompile(`started a copy as\s+([0-9A-Za-z_-]+)`)
 )
 
 // run executes claude with args in dir and returns combined output.
