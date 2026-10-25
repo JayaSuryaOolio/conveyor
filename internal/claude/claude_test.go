@@ -115,7 +115,7 @@ func TestResume(t *testing.T) {
 }
 
 func TestResumeCopy(t *testing.T) {
-	fakeClaude(t, map[string]string{"resume": "started a copy as newid\nbackgrounded · other\n"})
+	fakeClaude(t, map[string]string{"resume": "started a copy as newid.\nbackgrounded · other\n"})
 	id, err := Resume(context.Background(), t.TempDir(), "bg1", "s", "p")
 	if err != nil || id != "newid" {
 		t.Fatalf("id=%q err=%v", id, err)
