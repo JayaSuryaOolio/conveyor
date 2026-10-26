@@ -136,16 +136,3 @@ func splitCSV(s string) []string {
 	}
 	return r
 }
-
-// checkModel validates m against the detected models unless force. When
-// detection fails it only warns (on stderr), so an override still works.
-func checkModel(s *core.Service, m string, force bool) error {
-	if force {
-		return nil
-	}
-	w, err := s.Models(false).Check(m)
-	if w != "" {
-		fmt.Fprintln(os.Stderr, "warning:", w)
-	}
-	return err
-}

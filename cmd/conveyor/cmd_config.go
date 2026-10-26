@@ -12,7 +12,7 @@ func init() { register("config", runConfig, "list, get or set settings") }
 
 func runConfig(home string, args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("usage: conveyor config list | get k | set k v [--force]")
+		return fmt.Errorf("usage: conveyor config list | get k | set k v")
 	}
 	return withService(home, func(s *core.Service) error {
 		switch {
@@ -30,14 +30,9 @@ func runConfig(home string, args []string) error {
 		case args[0] == "get" && len(args) == 2:
 			fmt.Fprintln(out, store.GetSetting(s.DB, args[1]))
 			return nil
-		case args[0] == "set" && (len(args) == 3 || len(args) == 4 && args[3] == "--force"):
-			if args[1] == "default_model" {
-				if err := checkModel(s, args[2], len(args) == 4); err != nil {
-					return err
-				}
-			}
+		case args[0] == "set" && len(args) == 3:
 			return store.SetSetting(s.DB, args[1], args[2])
 		}
-		return fmt.Errorf("usage: conveyor config list | get k | set k v [--force]")
+		return fmt.Errorf("usage: conveyor config list | get k | set k v")
 	})
 }

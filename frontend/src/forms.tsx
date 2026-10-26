@@ -70,18 +70,15 @@ export function TaskAgent({k, repos, agent}: {k: string; repos: string[]; agent:
 let modelsP: Promise<core.ModelList> | undefined
 const listModels = () => modelsP ??= ListModels()
 
-/** Model choice from the models detected at runtime; "" means the default (task: the agent's or default_model setting).
- *  A value that is not detected is kept as an option, marked unknown. If detection failed it is a free-text input. */
+/** Model choice; "" means the default (task: the agent's or default_model setting). A value not in the list is kept as an option. */
 export function ModelSelect({value, onChange, ...rest}: {value: string; onChange: (m: string) => void} & Omit<SelectProps, 'value' | 'onChange' | 'data'>) {
     const {data: ml} = useData(listModels, [])
-    if (ml?.error) return <TextInput aria-label="Model" label={rest.label} size={rest.size} defaultValue={value} placeholder="Default"
-        description={`Model detection failed (${ml.error}); not checked`} onBlur={e => e.target.value !== value && onChange(e.target.value.trim())}/>
     const ms = ml?.models ?? []
     const known = !value || ms.some(m => m.id === value || m.id.replace(/-\d{8}$/, '') === value || (m.latest && m.tier === value))
     const data = [{value: '', label: 'Default'},
         ...ms.filter(m => m.latest).map(m => ({value: m.tier, label: `${m.tier} (latest: ${m.id})`})),
         ...ms.map(m => ({value: m.id, label: m.id})),
-        ...(known ? [] : [{value, label: ml ? `${value} (unknown)` : value}])]
+        ...(known ? [] : [{value, label: value}])]
     return <Select aria-label="Model" allowDeselect={false} searchable {...rest} value={value} onChange={v => onChange(v ?? '')} data={data}/>
 }
 

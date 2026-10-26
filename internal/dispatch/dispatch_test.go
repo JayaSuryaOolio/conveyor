@@ -361,6 +361,29 @@ func TestReapVanished(t *testing.T) {
 	}
 }
 
+// A session that errored at startup (unknown model) stays in `claude agents` with state failed:
+// the task goes to needs_you at once, with a hint, instead of sitting in running forever.
+func TestReapFailedSession(t *testing.T) {
+	e := setup(t)
+	tk := e.task(t, "t", 0)
+	e.tick(t) // launches, bg abcd0001
+	run, _ := store.LatestRun(e.db, tk.ID)
+
+	os.WriteFile(filepath.Join(e.fake, "agents.json"), []byte(`[{"id":"abcd0001","sessionId":"s1","state":"failed"}]`), 0o644)
+	e.tick(t) // inside the grace period: a vanished session would be spared
+	got, _ := store.GetRun(e.db, run.ID)
+	if got.Status != "failed" || got.Error == nil || *got.Error != "session failed" {
+		t.Fatalf("run %+v", got)
+	}
+	if e.get(t, tk.ID).Status != store.StatusNeedsYou {
+		t.Fatalf("task %s", e.get(t, tk.ID).Status)
+	}
+	cs, _ := store.ListComments(e.db, tk.ID)
+	if len(cs) != 1 || !strings.Contains(cs[0].Body, "unknown model") {
+		t.Fatalf("comments %+v", cs)
+	}
+}
+
 func TestReapInteractive(t *testing.T) {
 	e := setup(t)
 	tk := e.task(t, "t", 0)

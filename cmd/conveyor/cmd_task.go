@@ -118,8 +118,7 @@ func taskNew(s *core.Service, args []string) error {
 	desc := fs.String("desc", "", "description")
 	descFile := fs.String("desc-file", "", "read description from file")
 	todo := fs.Bool("todo", false, "start in todo instead of backlog")
-	model := fs.String("model", "", "model override: a tier alias or id from `conveyor models`")
-	force := fs.Bool("force", false, "skip checking --model against the detected models")
+	model := fs.String("model", "", "model override: a tier alias or id (see `conveyor models`); a wrong one fails the run and the task goes to needs_you")
 	agent := fs.String("agent", "", "Claude subagent name (see conveyor agent list; sub-tasks default to the parent's)")
 	parent := fs.String("parent", "", "parent task key (the new task becomes its sub-task, e.g. CV-1A)")
 	prio := fs.Int("priority", 0, "priority (higher first)")
@@ -140,9 +139,6 @@ func taskNew(s *core.Service, args []string) error {
 	}
 	if *parent != "" && strings.TrimSpace(d) == "" {
 		return fmt.Errorf("a sub-task needs --desc or --desc-file: its agent sees only the title and description")
-	}
-	if err := checkModel(s, *model, *force); err != nil {
-		return err
 	}
 	t, err := s.CreateTask(core.NewTaskInput{
 		Title: pos[0], Description: d, Repos: splitCSV(*repos), Primary: *primary, Start: *todo,
@@ -313,7 +309,6 @@ func taskSet(s *core.Service, args []string) error {
 	branch := fs.String("branch", "", "worktree branch (only before the worktree exists)")
 	pr := fs.String("pr", "", "PR URL (empty clears it)")
 	model := fs.String("model", "", "model override (empty clears it); see `conveyor models`")
-	force := fs.Bool("force", false, "skip checking --model against the detected models")
 	desc := fs.String("desc", "", "description (backlog only)")
 	descFile := fs.String("desc-file", "", "read the description from a file (backlog only)")
 	pos, err := parseArgs(fs, args)
@@ -338,9 +333,6 @@ func taskSet(s *core.Service, args []string) error {
 		}
 	}
 	if given["model"] {
-		if err := checkModel(s, *model, *force); err != nil {
-			return err
-		}
 		if err := s.SetTaskModel(pos[0], *model); err != nil {
 			return err
 		}
