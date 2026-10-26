@@ -16,6 +16,8 @@ Write a task, move it to Todo, and Conveyor runs it in a real Claude Code sessio
 
 ![Task lifecycle](diagrams/task-lifecycle.svg)
 
+_Not yet shown: reviving a cancelled task to backlog or todo._
+
 ![Task page](screenshots/task-page.png)
 
 ## Decisions

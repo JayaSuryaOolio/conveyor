@@ -27,6 +27,8 @@ The task page shows the description, the comment thread (yours, the agent's fina
 
 ![Task lifecycle](diagrams/task-lifecycle.svg)
 
+The diagram does not yet show reviving a cancelled task (cancelled -> backlog / todo); `internal/store/status.go` is the source of truth.
+
 - **backlog**: parked. Nothing runs. The description can be edited only here (pencil on the task page, or `conveyor task set KEY --desc ...`); after that, changes go in comments.
 - **todo**: waiting for the dispatcher.
 - **running**: a session is working on it.
@@ -34,9 +36,9 @@ The task page shows the description, the comment thread (yours, the agent's fina
 - **review**: the agent said it is done. If there is a PR, Conveyor watches it.
 - **failed**: repeated failures. Comment to retry.
 - **done**: finished, either by you or because every PR merged.
-- **cancelled**: only you can cancel, from any status except done.
+- **cancelled**: only you can cancel, from any status except done. You can revive a cancelled task by moving it back to backlog or todo.
 
-Moving a task to done or cancelled also stops and removes its Claude background sessions.
+Moving a task to done or cancelled also stops and removes its Claude background sessions. Its workspace (worktrees, `BRIEF.md`, attachments) is kept, so a revived task picks up where it left off; its next run starts a fresh session with a re-rendered brief.
 
 ## How dispatch works
 

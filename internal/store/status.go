@@ -50,21 +50,23 @@ type edge struct{ from, to Status }
 
 // transitions is the table from tech-spec §6: edge -> allowed actors.
 var transitions = map[edge]actors{
-	{StatusBacklog, StatusTodo}:     byHuman,
-	{StatusTodo, StatusBacklog}:     byHuman,
-	{StatusTodo, StatusRunning}:     bySystem,
-	{StatusRunning, StatusNeedsYou}: bySystem,
-	{StatusRunning, StatusReview}:   byAny, // system (hook) or human manual override
-	{StatusRunning, StatusFailed}:   bySystem,
-	{StatusRunning, StatusTodo}:     bySystem,
-	{StatusNeedsYou, StatusRunning}: bySystem,
-	{StatusNeedsYou, StatusTodo}:    byAny,
-	{StatusNeedsYou, StatusDone}:    byHuman,
-	{StatusReview, StatusTodo}:      byAny,
-	{StatusReview, StatusNeedsYou}:  bySystem, // all PRs closed without merge
-	{StatusReview, StatusDone}:      byAny,
-	{StatusFailed, StatusTodo}:      byAny,
-	{StatusDone, StatusTodo}:        byAny,
+	{StatusBacklog, StatusTodo}:      byHuman,
+	{StatusTodo, StatusBacklog}:      byHuman,
+	{StatusTodo, StatusRunning}:      bySystem,
+	{StatusRunning, StatusNeedsYou}:  bySystem,
+	{StatusRunning, StatusReview}:    byAny, // system (hook) or human manual override
+	{StatusRunning, StatusFailed}:    bySystem,
+	{StatusRunning, StatusTodo}:      bySystem,
+	{StatusNeedsYou, StatusRunning}:  bySystem,
+	{StatusNeedsYou, StatusTodo}:     byAny,
+	{StatusNeedsYou, StatusDone}:     byHuman,
+	{StatusReview, StatusTodo}:       byAny,
+	{StatusReview, StatusNeedsYou}:   bySystem, // all PRs closed without merge
+	{StatusReview, StatusDone}:       byAny,
+	{StatusFailed, StatusTodo}:       byAny,
+	{StatusDone, StatusTodo}:         byAny,
+	{StatusCancelled, StatusBacklog}: byHuman, // revive
+	{StatusCancelled, StatusTodo}:    byHuman, // revive
 }
 
 // ValidateTransition reports whether actor may move a task from -> to.
