@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 )
 
 // Usage is the token accounting for one run.
@@ -98,4 +99,72 @@ func Sum(path string, promptText string) (Usage, error) {
 		}
 	}
 	return u, nil
+}
+
+// maxPendingAge bounds how long a launched background job keeps a task running, so a hung
+// job cannot hold it forever.
+const maxPendingAge = 2 * time.Hour
+
+// BackgroundPending reports whether the run (entries after the last user entry equal to
+// promptText) launched a Monitor or a Bash run_in_background call that has not yet delivered
+// a <task-notification>. A last assistant entry flagged as an API error (e.g. an invalid model)
+// never counts as pending: that run is stalled, not waiting.
+func BackgroundPending(path, promptText string, now time.Time) (bool, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return false, fmt.Errorf("open transcript: %w", err)
+	}
+	defer f.Close()
+	want := strings.TrimSpace(promptText)
+	var launched, done int
+	var lastLaunch time.Time
+	apiErr := false
+	sc := bufio.NewScanner(f)
+	sc.Buffer(make([]byte, 1<<20), 64<<20)
+	for sc.Scan() {
+		var l struct {
+			Type      string `json:"type"`
+			Timestamp string `json:"timestamp"`
+			APIError  bool   `json:"isApiErrorMessage"`
+			Message   struct {
+				Content json.RawMessage `json:"content"`
+			} `json:"message"`
+		}
+		if json.Unmarshal(sc.Bytes(), &l) != nil {
+			continue
+		}
+		switch l.Type {
+		case "user":
+			text := userText(l.Message.Content)
+			if want != "" && strings.TrimSpace(text) == want {
+				launched, done, apiErr = 0, 0, false
+			} else if strings.Contains(text, "<task-notification>") {
+				done++
+			}
+		case "assistant":
+			apiErr = l.APIError
+			var blocks []struct {
+				Type  string `json:"type"`
+				Name  string `json:"name"`
+				Input struct {
+					Background bool `json:"run_in_background"`
+				} `json:"input"`
+			}
+			if json.Unmarshal(l.Message.Content, &blocks) != nil {
+				continue
+			}
+			for _, b := range blocks {
+				if b.Type == "tool_use" && (b.Name == "Monitor" || b.Name == "Bash" && b.Input.Background) {
+					launched++
+					if t, err := time.Parse(time.RFC3339, l.Timestamp); err == nil {
+						lastLaunch = t
+					}
+				}
+			}
+		}
+	}
+	if err := sc.Err(); err != nil {
+		return false, fmt.Errorf("read transcript: %w", err)
+	}
+	return !apiErr && launched > done && now.Sub(lastLaunch) < maxPendingAge, nil
 }
