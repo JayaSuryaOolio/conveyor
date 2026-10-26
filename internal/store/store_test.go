@@ -61,6 +61,8 @@ func TestTransitionTable(t *testing.T) {
 		{StatusReview, StatusDone, []Actor{H, S}},
 		{StatusFailed, StatusTodo, []Actor{H, S}},
 		{StatusDone, StatusTodo, []Actor{H, S}},
+		{StatusCancelled, StatusBacklog, []Actor{H}},
+		{StatusCancelled, StatusTodo, []Actor{H}},
 	}
 	for _, v := range valid {
 		for _, a := range []Actor{H, S} {
@@ -83,7 +85,7 @@ func TestTransitionTable(t *testing.T) {
 			t.Errorf("cancel from %s by system must fail", from)
 		}
 	}
-	for _, e := range [][2]Status{{StatusBacklog, StatusRunning}, {StatusTodo, StatusDone}, {StatusDone, StatusReview}, {StatusCancelled, StatusTodo}, {StatusRunning, StatusBacklog}} {
+	for _, e := range [][2]Status{{StatusBacklog, StatusRunning}, {StatusTodo, StatusDone}, {StatusDone, StatusReview}, {StatusRunning, StatusBacklog}, {StatusCancelled, StatusRunning}, {StatusCancelled, StatusDone}} {
 		if ValidateTransition(e[0], e[1], H) == nil || ValidateTransition(e[0], e[1], S) == nil {
 			t.Errorf("%s->%s must be invalid", e[0], e[1])
 		}

@@ -34,7 +34,7 @@ The task page shows the description, the comment thread (yours, the agent's fina
 - **review**: the agent said it is done. If there is a PR, Conveyor watches it.
 - **failed**: repeated failures. Comment to retry.
 - **done**: finished, either by you or because every PR merged.
-- **cancelled**: only you can cancel, from any status except done.
+- **cancelled**: only you can cancel, from any status except done. You can revive a cancelled task by moving it back to backlog or todo.
 
 Moving a task to done or cancelled also stops and removes its Claude background sessions.
 
