@@ -54,7 +54,7 @@ func TestActionsByState(t *testing.T) {
 	check("attach:a," + base)
 	r.Status, r.SessionID = "finished", &sess
 	store.UpdateRun(s.DB, r)
-	check("resume:a," + base)
+	check("resume:a," + base + ",resume:sess1:a")
 	r.SessionID = nil
 	store.UpdateRun(s.DB, r)
 	check(base)

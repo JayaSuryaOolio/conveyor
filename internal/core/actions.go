@@ -131,6 +131,15 @@ func (s *Service) Actions(key string) ([]Action, error) {
 		}
 		out = append(out, Action{"Shell in " + r.RepoName, r.RepoName, *r.WorktreePath, "", "shell"})
 	}
+	runs, err := store.ListRuns(s.DB, t.ID)
+	if err != nil {
+		return nil, err
+	}
+	for i, r := range runs {
+		if r.SessionID != nil && !isActive(r) {
+			out = append(out, Action{fmt.Sprintf("Resume run #%d", i+1), primary, cwd, claude.ResumeCommand(*r.SessionID, settings), "resume:" + *r.SessionID})
+		}
+	}
 	return out, nil
 }
 
@@ -267,7 +276,6 @@ func (s *Service) FindAction(key, kind, repo string) (Action, error) {
 				return x.Action, nil
 			}
 		}
-		return Action{}, fmt.Errorf("no session %q for %s", id, key)
 	}
 	as, err := s.Actions(key)
 	if err != nil {
