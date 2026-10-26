@@ -19,6 +19,15 @@ function ActionRow({k, a, kind, onTerm}: {k: string; a: core.Action; kind?: stri
     return (
         <Group justify="space-between" wrap="nowrap" gap="xs">
             <Text size="sm" style={{wordBreak: 'break-word'}}>{a.label}</Text>
+            <ActionIcons k={k} a={a} kind={kind} onTerm={onTerm}/>
+        </Group>
+    )
+}
+
+/** Copy / external terminal / internal terminal icons for one action. */
+function ActionIcons({k, a, kind, onTerm}: {k: string; a: core.Action; kind?: string; onTerm: (t: ui.TermInfo) => void}) {
+    return (
+        <>
             <Group gap={2} wrap="nowrap">
                 <Tooltip label="Copy command">
                     <ActionIcon variant="default" size="sm" aria-label="Copy command" onClick={() => copy(cdCmd(a))}><IconCopy size={14}/></ActionIcon>
@@ -31,7 +40,7 @@ function ActionRow({k, a, kind, onTerm}: {k: string; a: core.Action; kind?: stri
                                 onClick={() => TermStart(k, kind ?? a.kind, a.repo).then(onTerm).catch(errMsg)}><IconTerminal size={14}/></ActionIcon>
                 </Tooltip>
             </Group>
-        </Group>
+        </>
     )
 }
 
@@ -165,7 +174,8 @@ export function TaskSidebar({t, runs, reload, onTerm}: {t: store.Task; runs: sto
     const by = creator(k, t.source, settings?.user_name, t.created_by)
     const {data: icons} = useData(AppIcons, [])
     const [busy, setBusy] = useState(false)
-    const taskActions = (actions ?? []).filter(a => ['attach', 'resume', 'fresh', 'shell'].includes(a.kind))
+    const taskActions = (actions ?? []).filter(a => ['attach', 'fresh', 'shell'].includes(a.kind))
+    const resume = new Map((actions ?? []).filter(a => a.kind.startsWith('resume:')).map(a => [a.kind.slice(7), a]))
     const hasWorktree = repos.some(r => r.worktree_path)
     return (
         <Stack gap="sm" component="aside" miw={0}>
@@ -202,10 +212,13 @@ export function TaskSidebar({t, runs, reload, onTerm}: {t: store.Task; runs: sto
             {sessionsError && <Text size="xs" c="red">Failed to load sessions: {sessionsError}</Text>}
             {runs.length + (sessions?.length ?? 0) === 0 && <Text size="xs" c="dimmed">None yet.</Text>}
             {runs.map((r, i) => (
-                <Anchor key={r.id} size="xs" c="dimmed" component="button" ta="left" title="Show in thread"
-                        onClick={() => document.getElementById('run-' + r.id)?.scrollIntoView({behavior: 'smooth', block: 'start'})}>
-                    #{i + 1} {r.kind} · {r.status}{r.block_status ? ' · ' + r.block_status : ''}
-                </Anchor>
+                <Group key={r.id} justify="space-between" wrap="nowrap" gap="xs">
+                    <Anchor size="xs" c="dimmed" component="button" ta="left" title="Show in thread"
+                            onClick={() => document.getElementById('run-' + r.id)?.scrollIntoView({behavior: 'smooth', block: 'start'})}>
+                        #{i + 1} {r.kind} · {r.status}{r.block_status ? ' · ' + r.block_status : ''}
+                    </Anchor>
+                    {resume.get(r.session_id ?? '') && <ActionIcons k={k} a={resume.get(r.session_id!)!} onTerm={onTerm}/>}
+                </Group>
             ))}
             {sessions?.map(s => (
                 <Stack key={s.id} gap={2}>
