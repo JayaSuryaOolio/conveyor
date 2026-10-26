@@ -22,10 +22,6 @@ export function AddAutomation(arg1) {
   return window['go']['ui']['App']['AddAutomation'](arg1);
 }
 
-export function TakeQueuedComment(arg1, arg2) {
-  return window['go']['ui']['App']['TakeQueuedComment'](arg1, arg2);
-}
-
 export function AddComment(arg1, arg2, arg3) {
   return window['go']['ui']['App']['AddComment'](arg1, arg2, arg3);
 }
@@ -138,6 +134,10 @@ export function ListAutomations() {
   return window['go']['ui']['App']['ListAutomations']();
 }
 
+export function ListModels() {
+  return window['go']['ui']['App']['ListModels']();
+}
+
 export function ListRepos() {
   return window['go']['ui']['App']['ListRepos']();
 }
@@ -236,6 +236,10 @@ export function SpotlightRoot(arg1) {
 
 export function SpotlightStop(arg1) {
   return window['go']['ui']['App']['SpotlightStop'](arg1);
+}
+
+export function TakeQueuedComment(arg1, arg2) {
+  return window['go']['ui']['App']['TakeQueuedComment'](arg1, arg2);
 }
 
 export function TermBuffer(arg1) {

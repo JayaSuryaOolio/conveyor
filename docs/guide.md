@@ -10,6 +10,7 @@ This guide covers day-to-day use. For setup see the [README](../README.md); for 
 - **Run.** One launch of Claude for a task. A run has its own status (`launching`, `running`, `finished`, `failed`), a Claude session id, token counts, and the summary the agent wrote. A task usually has several runs. Runs started by the dispatcher are `auto`; sessions you start yourself in a task worktree are `interactive`.
 - **Workspace and worktree.** Each task gets a folder `~/.conveyor/workspaces/<KEY>/` with one git worktree per repo, `<KEY>/<repo>`, on a branch named after the task title. The folder also holds `BRIEF.md`, which the agent reads first. A worktree branches from `origin/<default branch>` after a fetch, or reuses the branch if it already exists.
 - **Agent.** Optional. A named Claude Code agent (a prompt, optionally limited to one repo) that a task can run as. Its `model:` frontmatter line is the agent's default model: a task's own model wins, then the agent's, then `default_model`. `conveyor agent list|add|model`, or the Agents page.
+- **Models.** Model pickers and checks use the models detected at runtime, not a built-in list: the Anthropic Models API when `ANTHROPIC_API_KEY` is set (`ANTHROPIC_BASE_URL` honoured), else the `claude-*` ids in the tail of Claude Code transcripts from the last 30 days. Cached for an hour in `<home>/models.json` (`conveyor models --refresh` re-detects). A tier alias (`opus`, `sonnet`, `haiku`, ...) resolves to the newest id of that tier. `agent add/model`, `task new/set --model` and `config set default_model` reject an unknown name with the closest match (`--force` sets it anyway); if detection fails they only warn. `agent list` shows what an alias resolves to, `(default: X)` for a blank and `(unknown!)` for an id not detected.
 - **Learning.** A lesson an agent proposes at the end of a run. You accept or reject it; accepted ones can be written into the repo's `CLAUDE.md` (or another file) by a follow-up task.
 - **Automation.** A cron schedule with an optional shell check that creates a task, comments on tasks, or runs a CLI command.
 - **App.** A named shell command that opens a task worktree in an editor, terminal or other program.
@@ -228,7 +229,8 @@ conveyor task log KEY [--follow]          conveyor task attach KEY
 conveyor task open KEY [--shell|--resume|--fresh] [--repo r] [--print]
 
 conveyor agent list [--repo r]            conveyor agent add <name> --desc d (--prompt p | --prompt-file f) [--model m] [--repo r]
-conveyor agent model <name> <model|""> [--repo r]
+conveyor agent model <name> <model|""> [--repo r] [--force]   ("" inherits default_model)
+conveyor models [--refresh] [--json]      # detected models, tier and alias
 conveyor learning list|accept|reject|edit|apply
 conveyor automation list|add|enable|disable|run|rm
 conveyor app list|presets|add|global|rm|open

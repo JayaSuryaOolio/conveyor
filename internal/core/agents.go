@@ -18,6 +18,10 @@ type Agent struct {
 	Description string `json:"description"`
 	Scope       string `json:"scope"`
 	Model       string `json:"model"`
+	// Resolved is the model id Model resolves to; Unknown flags a Model not
+	// among the detected models. Set by `conveyor agent list`, not ListAgents.
+	Resolved string `json:"resolved,omitempty"`
+	Unknown  bool   `json:"unknown,omitempty"`
 }
 
 var agentName = regexp.MustCompile(`^[a-z0-9-]+$`)

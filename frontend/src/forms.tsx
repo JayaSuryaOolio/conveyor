@@ -1,7 +1,7 @@
 import {useState} from 'react'
 import {ActionIcon, Button, Checkbox, Code, Group, Modal, MultiSelect, ScrollArea, SegmentedControl, Select, SelectProps, Stack, Table, Tabs, Text, TextInput, Textarea, Title, Tooltip} from '@mantine/core'
 import {IconAdjustments} from '@tabler/icons-react'
-import {AddRepo, CreateTask, ExportState, GetPromptDefaults, GetTask, GetSettings, ImportState, ListAgents, ListRepos, ListTasks, PreviewBrief, SetSetting, SetTaskAgent, SetTaskModel} from '../wailsjs/go/ui/App'
+import {AddRepo, CreateTask, ExportState, GetPromptDefaults, GetTask, GetSettings, ImportState, ListAgents, ListModels, ListRepos, ListTasks, PreviewBrief, SetSetting, SetTaskAgent, SetTaskModel} from '../wailsjs/go/ui/App'
 import {core} from '../wailsjs/go/models'
 import {Nav, errMsg} from './components'
 import {Markdown, MarkdownEditor} from './markdown'
@@ -67,15 +67,24 @@ export function TaskAgent({k, repos, agent}: {k: string; repos: string[]; agent:
     return <AgentSelect size="xs" repos={repos} value={agent} onChange={a => SetTaskAgent(k, a).catch(errMsg)}/>
 }
 
-const MODELS = ['sonnet', 'opus', 'haiku']
+let modelsP: Promise<core.ModelList> | undefined
+const listModels = () => modelsP ??= ListModels()
 
-/** Model choice; "" means the default (task: the agent's or default_model setting). A custom id already set is kept as an option. */
+/** Model choice from the models detected at runtime; "" means the default (task: the agent's or default_model setting).
+ *  A value that is not detected is kept as an option, marked unknown. If detection failed it is a free-text input. */
 export function ModelSelect({value, onChange, ...rest}: {value: string; onChange: (m: string) => void} & Omit<SelectProps, 'value' | 'onChange' | 'data'>) {
-    const data = [{value: '', label: 'Default'}, ...[...MODELS, ...(value && !MODELS.includes(value) ? [value] : [])].map(m => ({value: m, label: m}))]
-    return <Select aria-label="Model" allowDeselect={false} {...rest} value={value} onChange={v => onChange(v ?? '')} data={data}/>
+    const {data: ml} = useData(listModels, [])
+    if (ml?.error) return <TextInput aria-label="Model" label={rest.label} size={rest.size} defaultValue={value} placeholder="Default"
+        description={`Model detection failed (${ml.error}); not checked`} onBlur={e => e.target.value !== value && onChange(e.target.value.trim())}/>
+    const ms = ml?.models ?? []
+    const known = !value || ms.some(m => m.id === value || m.id.replace(/-\d{8}$/, '') === value || (m.latest && m.tier === value))
+    const data = [{value: '', label: 'Default'},
+        ...ms.filter(m => m.latest).map(m => ({value: m.tier, label: `${m.tier} (latest: ${m.id})`})),
+        ...ms.map(m => ({value: m.id, label: m.id})),
+        ...(known ? [] : [{value, label: ml ? `${value} (unknown)` : value}])]
+    return <Select aria-label="Model" allowDeselect={false} searchable {...rest} value={value} onChange={v => onChange(v ?? '')} data={data}/>
 }
 
-/** Low-usage task settings behind one icon, so the sidebar stays short. */
 export function TaskSettings({k, model, reload}: {k: string; model: string; reload: () => void}) {
     const [open, setOpen] = useState(false)
     return <>
@@ -111,13 +120,13 @@ export function Repos() {
     )
 }
 
-type Field = {k: string; label: string; desc: string; kind?: "area" | "md"}
+type Field = {k: string; label: string; desc: string; kind?: "area" | "md" | "model"}
 
 const TABS: {name: string; fields: Field[]}[] = [
     {name: "General", fields: [
         {k: "user_name", label: "Your name", desc: "Shown as the creator of tasks you create. Empty shows \"human\"."},
         {k: "key_prefix", label: "Task key prefix", desc: "Prefix for new task keys, e.g. CV gives CV-12."},
-        {k: "default_model", label: "Default model", desc: "Model for runs that do not set one. Empty uses the Claude Code default."},
+        {k: "default_model", label: "Default model", desc: "Model for runs that do not set one. Default uses the Claude Code default.", kind: "model"},
     ]},
     {name: "Dispatch", fields: [
         {k: "max_parallel", label: "Max parallel runs", desc: "How many tasks run at once."},
@@ -188,6 +197,7 @@ function SettingRow({f, v, ph, reload}: {f: Field; v: string; ph?: string; reloa
                 <Text size="sm" fw={500}>{f.label}</Text><Text size="xs" c="dimmed">{f.desc}</Text>
                 <MarkdownEditor minRows={4} value={val} onChange={setVal}/>
             </Stack>
+                : f.kind === "model" ? <ModelSelect {...props} value={val} onChange={setVal}/>
                 : f.kind === "area" ? <Textarea {...props} autosize minRows={2} maxRows={10} value={val} onChange={e => setVal(e.target.value)}/>
                 : <TextInput {...props} value={val} onChange={e => setVal(e.target.value)}/>}
             <Button disabled={val === v} onClick={() => SetSetting(f.k, val).then(reload, errMsg)}>Save</Button>

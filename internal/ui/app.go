@@ -445,6 +445,9 @@ func (a *App) SetAgentModel(scope, name, model string) error {
 	return a.svc.SetAgentModel(scope, name, model)
 }
 
+// ListModels returns the Claude models detected at runtime (cached for an hour).
+func (a *App) ListModels() core.ModelList { return a.svc.Models(false) }
+
 // SetTaskAgent changes the task's agent ("" clears it).
 func (a *App) SetTaskAgent(key, agent string) error { return a.svc.SetTaskAgent(key, agent) }
 

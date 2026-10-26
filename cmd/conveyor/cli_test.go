@@ -163,3 +163,45 @@ func TestAutomationCLI(t *testing.T) {
 	}
 	cv(t, home, "automation", "rm", "pr-sweep")
 }
+
+func TestCLIModelValidation(t *testing.T) {
+	home, h := t.TempDir(), t.TempDir()
+	t.Setenv("HOME", h)
+	t.Setenv("ANTHROPIC_API_KEY", "")
+	fails := func(args ...string) string {
+		t.Helper()
+		b, err := exec.Command(bin, append([]string{"--home", home}, args...)...).CombinedOutput()
+		if err == nil {
+			t.Fatalf("conveyor %v: expected failure\n%s", args, b)
+		}
+		return string(b)
+	}
+	// No transcripts: detection fails, so any model is accepted with a warning.
+	if out := cv(t, home, "config", "set", "default_model", "whatever"); !strings.Contains(out, "warning: model detection failed") {
+		t.Fatal(out)
+	}
+	dir := filepath.Join(h, ".claude", "projects", "p")
+	os.MkdirAll(dir, 0o755)
+	os.WriteFile(filepath.Join(dir, "s.jsonl"), []byte(`{"message":{"model":"claude-opus-5-5"}}`+"\n"+`{"message":{"model":"claude-sonnet-5-5"}}`), 0o644)
+	if out := strings.Join(strings.Fields(cv(t, home, "models", "--refresh")), " "); !strings.Contains(out, "claude-opus-5-5 opus opus") {
+		t.Fatal(out)
+	}
+	if out := fails("config", "set", "default_model", "sonet"); !strings.Contains(out, `did you mean "sonnet"`) {
+		t.Fatal(out)
+	}
+	cv(t, home, "config", "set", "default_model", "sonnet")
+	cv(t, home, "agent", "add", "a", "--desc", "d", "--prompt", "p", "--model", "opus")
+	cv(t, home, "agent", "add", "b", "--desc", "d", "--prompt", "p")
+	fails("agent", "model", "b", "claude-opus-9")
+	cv(t, home, "agent", "model", "b", "claude-opus-9", "--force")
+	out := cv(t, home, "agent", "list")
+	for _, want := range []string{"opus -> claude-opus-5-5", "claude-opus-9 (unknown!)"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("missing %q:\n%s", want, out)
+		}
+	}
+	cv(t, home, "agent", "model", "b", "")
+	if out := cv(t, home, "agent", "list"); !strings.Contains(out, "(default: sonnet)") {
+		t.Fatal(out)
+	}
+}
