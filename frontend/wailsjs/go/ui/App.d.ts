@@ -14,8 +14,6 @@ export function AddApp(arg1:store.App):Promise<void>;
 
 export function AddAutomation(arg1:store.Automation):Promise<void>;
 
-export function TakeQueuedComment(arg1:string,arg2:number):Promise<string>;
-
 export function AddComment(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function AddRepo(arg1:string,arg2:string):Promise<void>;
@@ -72,6 +70,8 @@ export function ListApps():Promise<Array<store.App>>;
 
 export function ListAutomations():Promise<Array<store.Automation>>;
 
+export function ListModels():Promise<core.ModelList>;
+
 export function ListRepos():Promise<Array<store.Repo>>;
 
 export function ListTasks():Promise<Array<ui.TaskCard>>;
@@ -121,6 +121,8 @@ export function ShowError(arg1:string):Promise<void>;
 export function SpotlightRoot(arg1:string):Promise<string>;
 
 export function SpotlightStop(arg1:string):Promise<void>;
+
+export function TakeQueuedComment(arg1:string,arg2:number):Promise<string>;
 
 export function TermBuffer(arg1:string):Promise<ui.TermBuf>;
 

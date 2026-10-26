@@ -25,6 +25,8 @@ export namespace core {
 	    description: string;
 	    scope: string;
 	    model: string;
+	    resolved?: string;
+	    unknown?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new Agent(source);
@@ -36,6 +38,8 @@ export namespace core {
 	        this.description = source["description"];
 	        this.scope = source["scope"];
 	        this.model = source["model"];
+	        this.resolved = source["resolved"];
+	        this.unknown = source["unknown"];
 	    }
 	}
 	export class AppLog {
@@ -51,6 +55,59 @@ export namespace core {
 	        this.text = source["text"];
 	        this.next = source["next"];
 	    }
+	}
+	export class Model {
+	    id: string;
+	    tier: string;
+	    latest: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new Model(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.tier = source["tier"];
+	        this.latest = source["latest"];
+	    }
+	}
+	export class ModelList {
+	    models: Model[];
+	    source: string;
+	    error?: string;
+	    // Go type: time
+	    at: any;
+	
+	    static createFrom(source: any = {}) {
+	        return new ModelList(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.models = this.convertValues(source["models"], Model);
+	        this.source = source["source"];
+	        this.error = source["error"];
+	        this.at = this.convertValues(source["at"], null);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class NewTaskInput {
 	    Title: string;

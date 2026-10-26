@@ -31,6 +31,7 @@ conveyor task set KEY [--branch b] [--pr url] [--model m] [--desc d]   # --desc:
 conveyor task link KEY blocks|relates OTHER     conveyor task unlink KEY kind OTHER
 conveyor task parent KEY PARENT|--none
 conveyor agent list|add|model         conveyor config list|get|set
+conveyor models [--json]            # model list (API with ANTHROPIC_API_KEY, else built-in); names are not validated, a bad model fails the session -> needs_you
 conveyor state export [FILE] | import FILE [--repo A=name]   # settings/apps/automations/user agents, repos as placeholders
 conveyor hooks status|install|uninstall
 conveyor daemon                       # dispatcher in the foreground

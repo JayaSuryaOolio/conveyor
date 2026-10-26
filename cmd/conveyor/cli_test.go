@@ -163,3 +163,23 @@ func TestAutomationCLI(t *testing.T) {
 	}
 	cv(t, home, "automation", "rm", "pr-sweep")
 }
+
+// Model names are not validated: agent list resolves aliases, shows the default for a blank, and keeps unknown names.
+func TestCLIModels(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("ANTHROPIC_API_KEY", "")
+	if out := strings.Join(strings.Fields(cv(t, home, "models")), " "); !strings.Contains(out, "claude-fable-5-1 fable fable") || !strings.Contains(out, "(source: builtin)") {
+		t.Fatal(out)
+	}
+	cv(t, home, "config", "set", "default_model", "sonnet")
+	cv(t, home, "agent", "add", "a", "--desc", "d", "--prompt", "p", "--model", "opus")
+	cv(t, home, "agent", "add", "b", "--desc", "d", "--prompt", "p")
+	cv(t, home, "agent", "add", "c", "--desc", "d", "--prompt", "p", "--model", "claude-whatever-1")
+	out := cv(t, home, "agent", "list")
+	for _, want := range []string{"opus -> claude-opus-5-5", "(default: sonnet)", "claude-whatever-1"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("missing %q:\n%s", want, out)
+		}
+	}
+}

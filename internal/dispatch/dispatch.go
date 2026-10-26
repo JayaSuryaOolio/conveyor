@@ -168,8 +168,10 @@ func (d *Dispatcher) reap(ctx context.Context) error {
 		}
 		a, ok := alive[deref(r.BgID)]
 		ok = ok && r.BgID != nil
+		// A session that errored at startup (e.g. an unknown model) stays listed as failed and never ends.
+		failed := ok && a.State == "failed"
 		// Adopt sessions whose hooks never fired: the agents list knows the session id.
-		if ok && r.Status == "launching" && a.SessionID != "" {
+		if ok && !failed && r.Status == "launching" && a.SessionID != "" {
 			if r.SessionID == nil {
 				r.SessionID = &a.SessionID
 			}
@@ -179,11 +181,13 @@ func (d *Dispatcher) reap(ctx context.Context) error {
 			}
 			continue
 		}
-		if ok || d.now().Sub(parseTime(r.StartedAt)) <= reapGrace {
+		if !failed && (ok || d.now().Sub(parseTime(r.StartedAt)) <= reapGrace) {
 			continue
 		}
 		reason, note := "session vanished", "The Claude session vanished before finishing."
-		if r.BgID == nil {
+		if failed {
+			reason, note = "session failed", "The Claude session failed to start or run. A common cause is an unknown model: check the task's model, its agent's model and the default_model setting (`claude logs "+deref(r.BgID)+"` shows the error), fix it, then comment to retry."
+		} else if r.BgID == nil {
 			reason, note = "launch interrupted", "The Claude launch was interrupted before a session started."
 		}
 		d.logf("reap run %d (task %d, bg %s, session %s, status %s): %s", r.ID, r.TaskID, deref(r.BgID), deref(r.SessionID), r.Status, reason)

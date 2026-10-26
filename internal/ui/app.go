@@ -445,6 +445,9 @@ func (a *App) SetAgentModel(scope, name, model string) error {
 	return a.svc.SetAgentModel(scope, name, model)
 }
 
+// ListModels returns the Claude models the pickers offer.
+func (a *App) ListModels() core.ModelList { return a.svc.Models() }
+
 // SetTaskAgent changes the task's agent ("" clears it).
 func (a *App) SetTaskAgent(key, agent string) error { return a.svc.SetTaskAgent(key, agent) }
 

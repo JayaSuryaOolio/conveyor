@@ -32,7 +32,7 @@ func TestAgents(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []Agent{{"rev-1", "Reviews: code", "a", "opus"}, {"me", "Mine", "user", ""}}
+	want := []Agent{{Name: "rev-1", Description: "Reviews: code", Scope: "a", Model: "opus"}, {Name: "me", Description: "Mine", Scope: "user"}}
 	if len(got) != 2 || got[0] != want[0] || got[1] != want[1] {
 		t.Fatalf("got %+v", got)
 	}
