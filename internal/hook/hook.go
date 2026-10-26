@@ -196,6 +196,8 @@ func onStop(db *sql.DB, task store.Task, run store.Run, p payload) error {
 	switch {
 	case len(pending) > 0:
 		to = store.StatusTodo
+	case !hasBlock && bgPending(p.TranscriptPath, run.Prompt):
+		return nil // waiting on its own background job; its completion wakes the session and Stops again
 	case hasBlock && block.Status == "done":
 		to = store.StatusReview
 		task.ConsecutiveFailures = 0
@@ -214,4 +216,12 @@ func onStop(db *sql.DB, task store.Task, run store.Run, p payload) error {
 	}
 	_, err = store.UpdateTaskStatus(db, task.ID, to, store.ActorSystem)
 	return err
+}
+
+func bgPending(path, prompt string) bool {
+	if path == "" {
+		return false
+	}
+	ok, err := transcript.BackgroundPending(path, prompt, time.Now())
+	return err == nil && ok
 }

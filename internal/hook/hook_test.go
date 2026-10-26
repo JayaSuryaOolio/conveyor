@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/JayaSuryaOolio/conveyor/internal/core"
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
@@ -260,5 +261,34 @@ func TestMalformedJSON(t *testing.T) {
 	e := setup(t, store.StatusRunning)
 	if err := Handle(e.db, e.home, "Stop", []byte("{nope")); err == nil {
 		t.Fatal("want error")
+	}
+}
+
+func TestStopWithPendingBackgroundJobStaysRunning(t *testing.T) {
+	now := time.Now().UTC().Format(time.RFC3339)
+	prompt := `{"type":"user","message":{"content":"do it"}}` + "\n"
+	launch := `{"type":"assistant","timestamp":"` + now + `","message":{"content":[{"type":"tool_use","name":"Monitor","input":{}}]}}` + "\n"
+	cases := []struct {
+		name, transcript string
+		want             store.Status
+	}{
+		{"pending", prompt + launch, store.StatusRunning},
+		{"notified", prompt + launch + `{"type":"user","message":{"content":"<task-notification>done</task-notification>"}}` + "\n", store.StatusNeedsYou},
+		{"api error after launch", prompt + launch + `{"type":"assistant","isApiErrorMessage":true,"message":{"content":[{"type":"text","text":"bad model"}]}}` + "\n", store.StatusNeedsYou},
+		{"no launch", prompt, store.StatusNeedsYou},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			e := setup(t, store.StatusRunning)
+			e.run(t, "auto", "running", "S1", "do it")
+			tp := filepath.Join(t.TempDir(), "t.jsonl")
+			os.WriteFile(tp, []byte(c.transcript), 0o644)
+			if err := e.fire(t, "Stop", map[string]any{"session_id": "S1", "last_assistant_message": "waiting", "transcript_path": tp}); err != nil {
+				t.Fatal(err)
+			}
+			if got := e.status(t).Status; got != c.want {
+				t.Fatalf("got %s want %s", got, c.want)
+			}
+		})
 	}
 }
