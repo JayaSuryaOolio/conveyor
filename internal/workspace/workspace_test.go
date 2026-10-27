@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
@@ -140,5 +141,27 @@ func TestRemoveDirty(t *testing.T) {
 	}
 	if _, err := os.Stat(Dir(home, tk.Key)); !os.IsNotExist(err) {
 		t.Fatal("workspace dir remains")
+	}
+}
+
+func TestEnsureRunsSetup(t *testing.T) {
+	db, home, tk := setup(t)
+	if err := store.SetRepoSetupScript(db, "a", `[ -f marker ] || { touch marker; echo first try failed; exit 3; }; echo ok "$CONVEYOR_REPO"`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Ensure(db, home, tk); err == nil || !strings.Contains(err.Error(), "first try failed") {
+		t.Fatalf("want setup failure, got %v", err)
+	}
+	tk, _ = store.GetTaskByKey(db, tk.Key)
+	if tk.Repos[0].WorktreePath != nil {
+		t.Fatal("worktree path persisted despite failed setup")
+	}
+	got, err := Ensure(db, home, tk) // adopts the existing worktree and reruns setup
+	if err != nil {
+		t.Fatal(err)
+	}
+	log, _ := os.ReadFile(filepath.Join(Dir(home, tk.Key), "setup-a.log"))
+	if PrimaryPath(got) == "" || strings.TrimSpace(string(log)) != "ok a" {
+		t.Fatalf("path %q log %q", PrimaryPath(got), log)
 	}
 }

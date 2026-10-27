@@ -206,6 +206,10 @@ export function SetParent(arg1, arg2) {
   return window['go']['ui']['App']['SetParent'](arg1, arg2);
 }
 
+export function SetRepoSetupScript(arg1, arg2) {
+  return window['go']['ui']['App']['SetRepoSetupScript'](arg1, arg2);
+}
+
 export function SetSetting(arg1, arg2) {
   return window['go']['ui']['App']['SetSetting'](arg1, arg2);
 }

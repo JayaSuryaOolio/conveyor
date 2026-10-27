@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"io"
+	"os"
 	"text/tabwriter"
 
 	"flag"
@@ -10,11 +12,11 @@ import (
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 )
 
-func init() { register("repo", runRepo, "manage registered repos (add|list|rm)") }
+func init() { register("repo", runRepo, "manage registered repos (add|list|rm|setup)") }
 
 func runRepo(home string, args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("usage: conveyor repo add <path> [--name n] | list | rm <name>")
+		return fmt.Errorf("usage: conveyor repo add <path> [--name n] | list | rm <name> | setup <name> [script|-]")
 	}
 	switch args[0] {
 	case "add":
@@ -58,6 +60,33 @@ func runRepo(home string, args []string) error {
 				fmt.Fprintf(tw, "%s\t%s\t%s\n", r.Name, r.DefaultBranch, r.Path)
 			}
 			return tw.Flush()
+		})
+	case "setup":
+		if len(args) < 2 || len(args) > 3 {
+			return fmt.Errorf("usage: conveyor repo setup <name> [script|-]  (no script prints it, - reads stdin, \"\" clears)")
+		}
+		return withService(home, func(s *core.Service) error {
+			if len(args) == 2 {
+				r, err := store.GetRepoByName(s.DB, args[1])
+				if err != nil {
+					return err
+				}
+				fmt.Fprintln(out, r.SetupScript)
+				return nil
+			}
+			script := args[2]
+			if script == "-" {
+				b, err := io.ReadAll(os.Stdin)
+				if err != nil {
+					return err
+				}
+				script = string(b)
+			}
+			if err := store.SetRepoSetupScript(s.DB, args[1], script); err != nil {
+				return err
+			}
+			fmt.Fprintf(out, "setup script for %s saved\n", args[1])
+			return nil
 		})
 	case "rm":
 		if len(args) != 2 {

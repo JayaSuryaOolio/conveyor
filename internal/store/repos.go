@@ -5,11 +5,11 @@ import (
 	"fmt"
 )
 
-const repoCols = `id, name, path, default_branch, created_at`
+const repoCols = `id, name, path, default_branch, created_at, setup_script`
 
 func scanRepo(r interface{ Scan(...any) error }) (Repo, error) {
 	var x Repo
-	err := r.Scan(&x.ID, &x.Name, &x.Path, &x.DefaultBranch, &x.CreatedAt)
+	err := r.Scan(&x.ID, &x.Name, &x.Path, &x.DefaultBranch, &x.CreatedAt, &x.SetupScript)
 	return x, err
 }
 
@@ -50,6 +50,18 @@ func GetRepoByName(db *sql.DB, name string) (Repo, error) {
 		return Repo{}, fmt.Errorf("repo %q: %w", name, err)
 	}
 	return r, nil
+}
+
+// SetRepoSetupScript sets the script run in each new worktree of the repo; "" clears it.
+func SetRepoSetupScript(db *sql.DB, name, script string) error {
+	res, err := db.Exec(`UPDATE repos SET setup_script=? WHERE name=?`, script, name)
+	if err != nil {
+		return fmt.Errorf("set setup script %q: %w", name, err)
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return fmt.Errorf("repo %q: %w", name, sql.ErrNoRows)
+	}
+	return nil
 }
 
 // RemoveRepo deletes a repo; it fails while tasks reference it.

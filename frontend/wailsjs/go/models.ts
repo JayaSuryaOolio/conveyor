@@ -410,6 +410,7 @@ export namespace store {
 	    path: string;
 	    default_branch: string;
 	    created_at: string;
+	    setup_script: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Repo(source);
@@ -422,6 +423,7 @@ export namespace store {
 	        this.path = source["path"];
 	        this.default_branch = source["default_branch"];
 	        this.created_at = source["created_at"];
+	        this.setup_script = source["setup_script"];
 	    }
 	}
 	export class Run {
