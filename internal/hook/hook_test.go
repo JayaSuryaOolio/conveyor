@@ -71,7 +71,7 @@ func (e env) status(t *testing.T) store.Task {
 	return tk
 }
 
-const doneMsg = "All good.\n<conveyor>\nstatus: done\nsummary: s\ncriteria:\n- [x] AC1 — ok\nlearning: l1\nspawn: child | do the thing\nspawn: nodesc\n</conveyor>"
+const doneMsg = "All good.\n<conveyor>\nstatus: done\nsummary: s\ncriteria:\n- [x] AC1 — ok\nlearning: l1\nlearning: l1\nspawn: child | do the thing\nspawn: nodesc\n</conveyor>"
 const failMsg = "<conveyor>\nstatus: failed\nsummary: nope\n</conveyor>"
 
 func TestPromptSetsSessionAndNeedsYouResumes(t *testing.T) {

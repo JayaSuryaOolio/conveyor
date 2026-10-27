@@ -20,6 +20,11 @@ var ErrDirty = errors.New("workspace has uncommitted changes")
 // Dir returns <home>/workspaces/<KEY>.
 func Dir(home, key string) string { return filepath.Join(home, "workspaces", key) }
 
+// LearningsFile is <home>/repos/<repo>/LEARNINGS.md: a repo's accepted learnings, kept out of the repo itself.
+func LearningsFile(home, repo string) string {
+	return filepath.Join(home, "repos", repo, "LEARNINGS.md")
+}
+
 func git(dir string, args ...string) (string, error) {
 	out, err := exec.Command("git", append([]string{"-C", dir}, args...)...).CombinedOutput()
 	s := strings.TrimSpace(string(out))

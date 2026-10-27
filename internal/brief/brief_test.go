@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
+	"github.com/JayaSuryaOolio/conveyor/internal/workspace"
 )
 
 var update = flag.Bool("update", false, "rewrite golden files")
@@ -61,6 +62,24 @@ func TestRenderGolden(t *testing.T) {
 	}
 	if string(got) != string(want) {
 		t.Errorf("brief differs from %s (run with -update):\n%s", golden, got)
+	}
+
+	// Repo learnings land in the workspace CLAUDE.md, which goes away when they do.
+	ws := filepath.Join(dir, "workspaces", "CV-1", "CLAUDE.md")
+	if _, err := os.Stat(ws); !os.IsNotExist(err) {
+		t.Fatalf("CLAUDE.md without learnings: %v", err)
+	}
+	lf := workspace.LearningsFile(dir, "api")
+	os.MkdirAll(filepath.Dir(lf), 0o755)
+	os.WriteFile(lf, []byte("- use make test\n"), 0o644)
+	Render(db, dir, tk)
+	if b, _ := os.ReadFile(ws); string(b) != "# api learnings\n\n- use make test\n\n" {
+		t.Fatalf("CLAUDE.md %q", b)
+	}
+	os.WriteFile(lf, nil, 0o644)
+	Render(db, dir, tk)
+	if _, err := os.Stat(ws); !os.IsNotExist(err) {
+		t.Fatalf("stale CLAUDE.md: %v", err)
 	}
 }
 

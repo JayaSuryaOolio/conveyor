@@ -1,12 +1,14 @@
 package learning
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/JayaSuryaOolio/conveyor/internal/core"
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
+	"github.com/JayaSuryaOolio/conveyor/internal/workspace"
 )
 
 func setup(t *testing.T) (*core.Service, []string) {
@@ -36,14 +38,14 @@ func setup(t *testing.T) (*core.Service, []string) {
 func TestTransitions(t *testing.T) {
 	svc, _ := setup(t)
 	db := svc.DB
-	if err := Accept(db, 1, ""); err != nil {
+	if err := Accept(db, "", 1, "CLAUDE.md"); err != nil {
 		t.Fatal(err)
 	}
 	l, _ := store.GetLearning(db, 1)
 	if l.Status != "accepted" || *l.Target != "CLAUDE.md" {
 		t.Fatalf("%+v", l)
 	}
-	Accept(db, 2, "docs/AGENTS.md")
+	Accept(db, "", 2, "docs/AGENTS.md")
 	Edit(db, 2, " better ")
 	Reject(db, 3)
 	l2, _ := store.GetLearning(db, 2)
@@ -60,7 +62,7 @@ func TestTransitions(t *testing.T) {
 	if _, err := Apply(svc, "a"); err != nil {
 		t.Fatal(err)
 	}
-	if Reject(db, 1) == nil || Accept(db, 1, "") == nil || Edit(db, 1, "x") == nil {
+	if Reject(db, 1) == nil || Accept(db, "", 1, "CLAUDE.md") == nil || Edit(db, 1, "x") == nil {
 		t.Fatal("applied learnings are immutable")
 	}
 }
@@ -69,10 +71,10 @@ func TestApplyGroupsByRepo(t *testing.T) {
 	svc, src := setup(t)
 	for id := 1; id <= 5; id++ {
 		if id != 3 {
-			Accept(svc.DB, int64(id), "")
+			Accept(svc.DB, "", int64(id), "CLAUDE.md")
 		}
 	}
-	Accept(svc.DB, 4, "docs/X.md")
+	Accept(svc.DB, "", 4, "docs/X.md")
 	keys, err := Apply(svc, "")
 	if err != nil || len(keys) != 2 {
 		t.Fatalf("%v %v", keys, err)
@@ -108,8 +110,8 @@ func TestApplyGroupsByRepo(t *testing.T) {
 // A failure after the task is created (learnings still accepted) must not make a retry create a second task.
 func TestApplyRetryAfterPartialFailure(t *testing.T) {
 	svc, _ := setup(t)
-	Accept(svc.DB, 1, "")
-	Accept(svc.DB, 2, "")
+	Accept(svc.DB, "", 1, "CLAUDE.md")
+	Accept(svc.DB, "", 2, "CLAUDE.md")
 	// Simulate Apply dying right after CreateTask: make marking fail.
 	svc.DB.Exec(`CREATE TRIGGER fail_mark BEFORE UPDATE ON learnings BEGIN SELECT RAISE(ABORT, 'boom'); END`)
 	if _, err := Apply(svc, "a"); err == nil {
@@ -127,5 +129,28 @@ func TestApplyRetryAfterPartialFailure(t *testing.T) {
 	}
 	if applied, _ := List(svc.DB, "applied"); len(applied) != 2 {
 		t.Fatalf("applied %d", len(applied))
+	}
+}
+
+// A repo learning accepted with no target goes straight to Conveyor's LEARNINGS.md and is applied; Apply ignores it.
+func TestAcceptLocal(t *testing.T) {
+	svc, _ := setup(t)
+	home := t.TempDir()
+	if err := Accept(svc.DB, home, 1, ""); err != nil {
+		t.Fatal(err)
+	}
+	Accept(svc.DB, home, 2, Local)
+	b, err := os.ReadFile(workspace.LearningsFile(home, "a"))
+	if err != nil || string(b) != "- a1\n- a2\n" {
+		t.Fatalf("%q %v", b, err)
+	}
+	if l, _ := store.GetLearning(svc.DB, 1); l.Status != store.LearningApplied || *l.Target != Local {
+		t.Fatalf("%+v", l)
+	}
+	if Accept(svc.DB, home, 1, "") == nil {
+		t.Fatal("re-accepting an applied learning must fail, not append twice")
+	}
+	if keys, _ := Apply(svc, ""); len(keys) != 0 {
+		t.Fatalf("apply made %v", keys)
 	}
 }

@@ -59,7 +59,7 @@ next: what remains
 criteria:
 - [x] AC1 - evidence
 - [ ] AC2 - why not
-learning: a lesson (repeatable line)
+learning: a non-obvious fact about this repo that would save a future task real time; not a recap of this task or a one-off workaround; usually none (repeatable line)
 spawn: child task title | description with everything its agent needs (repeatable line)
 </conveyor>
 ```

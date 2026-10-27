@@ -61,7 +61,7 @@ Most of a run's cost is the context it starts with, so Conveyor chooses that con
 
 ## Getting better over time
 
-- **Learnings.** Agents report `learning:` lines. When you accept one, Conveyor opens a PR to the repo's `CLAUDE.md` or skills.
+- **Learnings.** Agents report `learning:` lines. Accepted ones are kept in Conveyor's data folder and loaded into every task on that repo; the few the team should share can go to the repo's `CLAUDE.md` through a PR.
 - **Conveyor doctor.** Every Monday a task reviews the week's longest, shortest, failed and most-commented runs and suggests prompt and settings fixes.
 - **Automations.** Scheduled tasks, such as sweeping PR review comments, show up as cards on the board.
 

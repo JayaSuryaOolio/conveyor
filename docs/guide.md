@@ -11,7 +11,7 @@ This guide covers day-to-day use. For setup see the [README](../README.md); for 
 - **Workspace and worktree.** Each task gets a folder `~/.conveyor/workspaces/<KEY>/` with one git worktree per repo, `<KEY>/<repo>`, on a branch named after the task title. The folder also holds `BRIEF.md`, which the agent reads first. A worktree branches from `origin/<default branch>` after a fetch, or reuses the branch if it already exists.
 - **Agent.** Optional. A named Claude Code agent (a prompt, optionally limited to one repo) that a task can run as. Its `model:` frontmatter line is the agent's default model: a task's own model wins, then the agent's, then `default_model`. `conveyor agent list|add|model`, or the Agents page.
 - **Models.** The model pickers list the Anthropic Models API result when `ANTHROPIC_API_KEY` is set (`ANTHROPIC_BASE_URL` honoured), else a built-in list (`builtinModels` in `internal/core/models.go`; refresh it when models ship). A tier alias (`opus`, `sonnet`, `haiku`, `fable`) resolves to the newest id of that tier; `conveyor models` shows the list. Model names are not validated when set. If one is wrong, the Claude session fails at startup and the dispatcher moves the task to `needs_you` with a comment saying so (fix the model on the task, its agent or `default_model`, then comment to retry). A blank model means the default: the agent's, else `default_model`, else Claude Code's. `agent list` shows what an alias resolves to and `(default: X)` for a blank.
-- **Learning.** A lesson an agent proposes at the end of a run. You accept or reject it; accepted ones can be written into the repo's `CLAUDE.md` (or another file) by a follow-up task.
+- **Learning.** A lesson an agent proposes at the end of a run. You accept or reject it; accepted ones go to Conveyor's own `repos/<repo>/LEARNINGS.md`, which every task on that repo loads, or, if you choose, into the repo's `CLAUDE.md` by a follow-up task.
 - **Automation.** A cron schedule with an optional shell check that creates a task, comments on tasks, or runs a CLI command.
 - **App.** A named shell command that opens a task worktree in an editor, terminal or other program.
 
@@ -70,7 +70,7 @@ state: branch ..., PR #N, tests: pass|fail|not run
 next: what remains
 criteria:
 - [x] AC1 - evidence
-learning: a lesson
+learning: a non-obvious fact about this repo that would save a future task real time; ...
 spawn: title of a follow-up task | its description
 </conveyor>
 ```
@@ -144,14 +144,16 @@ This adds `UserPromptSubmit`, `Stop` and `Notification` to `~/.claude/settings.j
 
 At the end of a run the agent can add `learning:` lines. Each becomes a proposed learning on the Learnings page, linked to its task and repo.
 
-- **Accept** only marks the learning as accepted in Conveyor's database and sets a target file (default `CLAUDE.md`). Nothing is written to your repo yet.
+- **Accept** with the default target `local` appends the learning to `~/.conveyor/repos/<repo>/LEARNINGS.md` and marks it applied. Nothing is written to your repo; edit that file to change or drop a learning.
+- Every launch writes the task's repos' `LEARNINGS.md` into `workspaces/<KEY>/CLAUDE.md`. That folder is above the session's working directory, so Claude Code loads it on its own.
+- **Accept** with a repo file as target (`CLAUDE.md`, a skill) is for the few lessons the whole team should share: it only marks the learning accepted until you Apply it.
 - **Apply** (per repo) creates one todo task, "Apply learnings to <repo>", whose description lists the accepted learnings with their target files. Its agent edits those files and opens a PR like any other task. The learnings are marked applied. If an identical task is already pending, it is reused.
 - **Personal** learnings (no repo) are not applied by a task. The page shows them for you to paste into `~/.claude/CLAUDE.md` yourself.
 - **Reject** and **edit** work on proposed ones.
 
 ```
 conveyor learning list [--status s]
-conveyor learning accept ID [--target f]
+conveyor learning accept ID [--target local|f]
 conveyor learning apply [--repo r]
 ```
 
@@ -249,6 +251,7 @@ conveyor daemon                                # run the dispatcher in the foreg
 `~/.conveyor` (or `CONVEYOR_HOME`, or `--home`):
 
 ```
+repos/<repo>/LEARNINGS.md   accepted local learnings, loaded into that repo's tasks
 conveyor.db                 tasks, runs, comments, events, learnings, automations, settings, apps
 conveyor.log                app log (rotated at 5 MB to conveyor.log.1)
 claude-settings.json        hooks and options passed to launched sessions, rewritten at each launch
