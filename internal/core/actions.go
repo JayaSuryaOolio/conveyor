@@ -136,8 +136,12 @@ func (s *Service) Actions(key string) ([]Action, error) {
 		return nil, err
 	}
 	for i, r := range runs {
-		if r.SessionID != nil && !isActive(r) {
+		switch {
+		case r.SessionID == nil:
+		case !isActive(r):
 			out = append(out, Action{fmt.Sprintf("Resume run #%d", i+1), primary, cwd, claude.ResumeCommand(*r.SessionID, settings), "resume:" + *r.SessionID})
+		case r.BgID != nil: // a run that is not the latest, e.g. blocked on a question, still needs its attach icon
+			out = append(out, Action{fmt.Sprintf("Attach to run #%d", i+1), primary, cwd, claude.AttachCommand(*r.BgID), "attach:" + *r.SessionID})
 		}
 	}
 	return out, nil

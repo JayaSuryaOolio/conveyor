@@ -175,7 +175,7 @@ export function TaskSidebar({t, runs, reload, onTerm}: {t: store.Task; runs: sto
     const {data: icons} = useData(AppIcons, [])
     const [busy, setBusy] = useState(false)
     const taskActions = (actions ?? []).filter(a => ['attach', 'fresh', 'shell'].includes(a.kind))
-    const resume = new Map((actions ?? []).filter(a => a.kind.startsWith('resume:')).map(a => [a.kind.slice(7), a]))
+    const resume = new Map((actions ?? []).filter(a => /^(resume|attach):/.test(a.kind)).map(a => [a.kind.split(':')[1], a]))
     const hasWorktree = repos.some(r => r.worktree_path)
     return (
         <Stack gap="sm" component="aside" miw={0}>

@@ -58,6 +58,11 @@ func TestActionsByState(t *testing.T) {
 	r.SessionID = nil
 	store.UpdateRun(s.DB, r)
 	check(base)
+	// an active run that is no longer the latest keeps its attach icon
+	r.Status, r.SessionID = "running", &sess
+	store.UpdateRun(s.DB, r)
+	store.CreateRun(s.DB, store.Run{TaskID: tk.ID, Kind: "interactive", Mode: "fresh", Status: "finished"})
+	check(base + ",attach:sess1:a")
 	if _, err := os.Stat(filepath.Join(s.Home, "claude-settings.json")); err != nil {
 		t.Fatal("settings not written")
 	}

@@ -51,7 +51,7 @@ func (a *App) TermStart(key, kind, repo string) (TermInfo, error) {
 		title = "resume"
 	case kind == "fresh":
 		title = "new session"
-	case kind == "attach":
+	case kind == "attach" || strings.HasPrefix(kind, "attach:"):
 		title = "attach"
 	}
 	id, err := term.Start(act.Cwd, act.Cmd)
