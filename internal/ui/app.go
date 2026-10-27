@@ -338,6 +338,11 @@ func (a *App) AddRepo(path, name string) error {
 	return err
 }
 
+// SetRepoSetupScript sets the script run in each new worktree of the repo.
+func (a *App) SetRepoSetupScript(name, script string) error {
+	return store.SetRepoSetupScript(a.svc.DB, name, script)
+}
+
 // GetSettings returns every setting with defaults applied.
 func (a *App) GetSettings() (map[string]string, error) { return store.ListSettings(a.svc.DB), nil }
 

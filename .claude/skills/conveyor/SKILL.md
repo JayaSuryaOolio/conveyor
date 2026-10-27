@@ -10,7 +10,7 @@ Long-form: `docs/guide.md` (behaviour), `docs/tech-spec.md` (original design, pa
 
 ## Model in one paragraph
 
-A **task** (`CV-12`; sub-tasks `CV-12A`, `CV-12A1`) has repos, a status, a comment thread and **runs**. The **dispatcher** (inside the app, or `conveyor daemon`; one per home via `dispatcher.lock`) ticks every 2s: reap vanished sessions, sync PRs, run automations, launch `todo` tasks (up to `max_parallel`, skipping ones with open `blocks` links). A launch makes `~/.conveyor/workspaces/<KEY>/<repo>` worktrees + `BRIEF.md` and runs `claude --bg ... --permission-mode bypassPermissions --settings <home>/claude-settings.json`. Claude Code **hooks** call `conveyor hook <Event>`; the `Stop` hook parses the `<conveyor>` status block and moves the task to `review`/`needs_you`. A human comment on a finished task requeues it (resume if context < `resume_threshold`, else fresh); on a running task it is queued for the next run. Once a PR of the task is merged, a comment instead starts a follow-up sub-task (`core.followUp`, source `followup`) whose brief carries the parent's context; `--ask` requeues it to answer without code changes, `--note` only comments (the app asks which).
+A **task** (`CV-12`; sub-tasks `CV-12A`, `CV-12A1`) has repos, a status, a comment thread and **runs**. The **dispatcher** (inside the app, or `conveyor daemon`; one per home via `dispatcher.lock`) ticks every 2s: reap vanished sessions, sync PRs, run automations, launch `todo` tasks (up to `max_parallel`, skipping ones with open `blocks` links). A launch makes `~/.conveyor/workspaces/<KEY>/<repo>` worktrees (running the repo's `setup_script`, log `setup-<repo>.log`) + `BRIEF.md` and runs `claude --bg ... --permission-mode bypassPermissions --settings <home>/claude-settings.json`. Claude Code **hooks** call `conveyor hook <Event>`; the `Stop` hook parses the `<conveyor>` status block and moves the task to `review`/`needs_you`. A human comment on a finished task requeues it (resume if context < `resume_threshold`, else fresh); on a running task it is queued for the next run. Once a PR of the task is merged, a comment instead starts a follow-up sub-task (`core.followUp`, source `followup`) whose brief carries the parent's context; `--ask` requeues it to answer without code changes, `--note` only comments (the app asks which).
 
 Statuses: backlog, todo, running, needs_you, review, failed, done, cancelled. Allowed moves: `internal/store/status.go`.
 Model precedence: task `model` > agent file `model:` > `default_model` setting.
@@ -31,6 +31,7 @@ conveyor task set KEY [--branch b] [--pr url] [--model m] [--desc d]   # --desc:
 conveyor task link KEY blocks|relates OTHER     conveyor task unlink KEY kind OTHER
 conveyor task parent KEY PARENT|--none
 conveyor agent list|add|model         conveyor config list|get|set
+conveyor repo add|list|rm|setup <name> [script|-]
 conveyor models [--json]            # model list (API with ANTHROPIC_API_KEY, else built-in); names are not validated, a bad model fails the session -> needs_you
 conveyor state export [FILE] | import FILE [--repo A=name]   # settings/apps/automations/user agents, repos as placeholders
 conveyor hooks status|install|uninstall
@@ -64,7 +65,7 @@ Use a throwaway home for experiments: `conveyor --home $(mktemp -d) ...`. Never 
 | Worktrees | `internal/workspace`; PRs `internal/gh`; terminals `internal/term`, `internal/terminal` |
 | Learnings / automations / Jira | `internal/learning`, `internal/automation`, `internal/jira` |
 | Wails bindings (thin) | `internal/ui/app.go`; app entry `main.go` |
-| UI (React + Mantine) | `frontend/src`: `App.tsx` nav, `views.tsx` board/focus/task page, `workspace.tsx` task sidebar, `relations.tsx`, `forms.tsx` dialogs + settings, `agents.tsx`, `automations.tsx`, `apps.tsx`, `logs.tsx`, `terminals.tsx` |
+| UI (React + Mantine) | `frontend/src`: `App.tsx` nav, `views.tsx` board/focus/task page, `workspace.tsx` task sidebar, `relations.tsx`, `forms.tsx` dialogs + settings (incl. Repos tab), `agents.tsx`, `automations.tsx`, `apps.tsx`, `logs.tsx`, `terminals.tsx` |
 
 ## Troubleshooting recipes
 

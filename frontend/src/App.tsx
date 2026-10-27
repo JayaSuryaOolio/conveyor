@@ -1,13 +1,13 @@
 import {useEffect, useRef, useState} from 'react'
 import {ActionIcon, AppShell, Badge, Box, Button, Group, Kbd, NavLink, Stack, TextInput, Title, Tooltip} from '@mantine/core'
 import {useLocalStorage} from '@mantine/hooks'
-import {IconApps, IconBolt, IconArrowLeft, IconBook2, IconClock, IconFolders, IconLayoutKanban, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconLogs, IconPlus, IconRobot, IconSearch, IconSettings} from '@tabler/icons-react'
+import {IconApps, IconBolt, IconArrowLeft, IconBook2, IconClock, IconLayoutKanban, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconLogs, IconPlus, IconRobot, IconSearch, IconSettings} from '@tabler/icons-react'
 import {AppIcons, DispatcherState, Learnings, ListApps, OpenApp} from '../wailsjs/go/ui/App'
 import {Agents} from './agents'
 import {Apps} from './apps'
 import {Automations} from './automations'
 import {AppIcon, Nav, Toasts, runApp} from './components'
-import {NewTask, Repos, Settings} from './forms'
+import {NewTask, Settings} from './forms'
 import {LearningsPage} from './learnings'
 import {Logs} from './logs'
 import {useData} from './util'
@@ -18,7 +18,6 @@ const NAV: {name: string; key?: string; label: string; icon: typeof IconBolt}[] 
     {name: 'focus', key: 'f', label: 'Focus', icon: IconBolt},
     {name: 'learnings', label: 'Learnings', icon: IconBook2},
     {name: 'automations', label: 'Automations', icon: IconClock},
-    {name: 'repos', label: 'Repos', icon: IconFolders},
     {name: 'apps', label: 'Apps', icon: IconApps},
     {name: 'agents', key: 'a', label: 'Agents', icon: IconRobot},
     {name: 'logs', key: 'l', label: 'Logs', icon: IconLogs},
@@ -126,7 +125,6 @@ export default function App() {
                 {view.name === 'task' && <TaskPage k={view.key!} nav={nav}/>}
                 {view.name === 'learnings' && <LearningsPage nav={nav}/>}
                 {view.name === 'automations' && <Automations/>}
-                {view.name === 'repos' && <Repos/>}
                 {view.name === 'apps' && <Apps/>}
                 {view.name === 'agents' && <Agents/>}
                 {view.name === 'logs' && <Logs/>}

@@ -1,8 +1,8 @@
 import {useState} from 'react'
 import {ActionIcon, Button, Checkbox, Code, Group, Modal, MultiSelect, ScrollArea, SegmentedControl, Select, SelectProps, Stack, Table, Tabs, Text, TextInput, Textarea, Title, Tooltip} from '@mantine/core'
 import {IconAdjustments} from '@tabler/icons-react'
-import {AddRepo, CreateTask, ExportState, GetPromptDefaults, GetTask, GetSettings, ImportState, ListAgents, ListModels, ListRepos, ListTasks, PreviewBrief, SetSetting, SetTaskAgent, SetTaskModel} from '../wailsjs/go/ui/App'
-import {core} from '../wailsjs/go/models'
+import {AddRepo, CreateTask, ExportState, GetPromptDefaults, GetTask, GetSettings, ImportState, ListAgents, ListModels, ListRepos, ListTasks, PreviewBrief, SetRepoSetupScript, SetSetting, SetTaskAgent, SetTaskModel} from '../wailsjs/go/ui/App'
+import {core, store} from '../wailsjs/go/models'
 import {Nav, errMsg} from './components'
 import {Markdown, MarkdownEditor} from './markdown'
 import {useData} from './util'
@@ -95,25 +95,34 @@ export function TaskSettings({k, model, reload}: {k: string; model: string; relo
     </>
 }
 
-export function Repos() {
+function Repos() {
     const {data, error, reload} = useData(ListRepos, [])
     const [path, setPath] = useState('')
     const [name, setName] = useState('')
     return (
-        <Stack maw={900}>
-            <Title order={3}>Repos</Title>
+        <Stack>
+            <Text size="xs" c="dimmed">Each repo's setup script runs with bash in every new worktree before the agent starts (stdin closed, 10 min limit), e.g. to build a nix-direnv dev shell. A failure fails the launch and the script reruns on the next one. Log: workspaces/&lt;KEY&gt;/setup-&lt;repo&gt;.log.</Text>
             {error && <Text c="red">{error}</Text>}
-            <Table>
-                <Table.Tbody>
-                    {data?.map(r => <Table.Tr key={r.id}><Table.Td fw={600}>{r.name}</Table.Td><Table.Td>{r.default_branch}</Table.Td><Table.Td c="dimmed">{r.path}</Table.Td></Table.Tr>)}
-                </Table.Tbody>
-            </Table>
+            {data?.map(r => <RepoRow key={r.id} r={r} reload={reload}/>)}
             <Group align="flex-start" wrap="nowrap">
                 <TextInput style={{flex: 2}} placeholder="/path/to/clone" value={path} onChange={e => setPath(e.target.value)}/>
                 <TextInput style={{flex: 1}} placeholder="name (optional)" value={name} onChange={e => setName(e.target.value)}/>
                 <Button onClick={() => AddRepo(path, name).then(() => { setPath(''); setName(''); reload() }, errMsg)}>Add</Button>
             </Group>
         </Stack>
+    )
+}
+
+function RepoRow({r, reload}: {r: store.Repo; reload: () => void}) {
+    const [val, setVal] = useState(r.setup_script)
+    return (
+        <Group wrap="nowrap" align="flex-end">
+            <Textarea style={{flex: 1}} autosize minRows={2} maxRows={10} value={val} onChange={e => setVal(e.target.value)}
+                      styles={{input: {fontFamily: 'var(--mantine-font-family-monospace)'}}}
+                      label={<>{r.name} <Text span c="dimmed" size="xs">{r.default_branch} · {r.path}</Text></>}
+                      placeholder="direnv allow . && direnv exec . true"/>
+            <Button disabled={val === r.setup_script} onClick={() => SetRepoSetupScript(r.name, val).then(reload, errMsg)}>Save</Button>
+        </Group>
     )
 }
 
@@ -153,7 +162,7 @@ export function Settings() {
             {error && <Text c="red">{error}</Text>}
             {data && (
                 <Tabs defaultValue="General" keepMounted={false}>
-                    <Tabs.List mb="md">{TABS.map(t => <Tabs.Tab key={t.name} value={t.name}>{t.name}</Tabs.Tab>)}</Tabs.List>
+                    <Tabs.List mb="md">{TABS.map(t => <Tabs.Tab key={t.name} value={t.name}>{t.name}</Tabs.Tab>)}<Tabs.Tab value="Repos">Repos</Tabs.Tab></Tabs.List>
                     {TABS.map(t => (
                         <Tabs.Panel key={t.name} value={t.name}>
                             <Stack>
@@ -163,6 +172,7 @@ export function Settings() {
                             </Stack>
                         </Tabs.Panel>
                     ))}
+                    <Tabs.Panel value="Repos"><Repos/></Tabs.Panel>
                 </Tabs>
             )}
         </Stack>

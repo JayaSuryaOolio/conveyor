@@ -8,7 +8,7 @@ This guide covers day-to-day use. For setup see the [README](../README.md); for 
 
 - **Task.** A card with a key (`CV-12`, the prefix is the `key_prefix` setting), a title, a description, one or more repos, a status, a priority, an optional model and agent, and a comment thread.
 - **Run.** One launch of Claude for a task. A run has its own status (`launching`, `running`, `finished`, `failed`), a Claude session id, token counts, and the summary the agent wrote. A task usually has several runs. Runs started by the dispatcher are `auto`; sessions you start yourself in a task worktree are `interactive`.
-- **Workspace and worktree.** Each task gets a folder `~/.conveyor/workspaces/<KEY>/` with one git worktree per repo, `<KEY>/<repo>`, on a branch named after the task title. The folder also holds `BRIEF.md`, which the agent reads first. A worktree branches from `origin/<default branch>` after a fetch, or reuses the branch if it already exists.
+- **Workspace and worktree.** Each task gets a folder `~/.conveyor/workspaces/<KEY>/` with one git worktree per repo, `<KEY>/<repo>`, on a branch named after the task title. The folder also holds `BRIEF.md`, which the agent reads first. A worktree branches from `origin/<default branch>` after a fetch, or reuses the branch if it already exists. A repo's **setup script** (Settings → Repos, or `conveyor repo setup <name> [script|-]`) runs with bash in each new worktree before the agent starts: stdin closed, 10 minute limit, output in `<KEY>/setup-<repo>.log`, `CONVEYOR_REPO`/`CONVEYOR_REPO_PATH` set. Use it to warm per-worktree caches, e.g. `direnv allow . && direnv exec . true </dev/null` so a nix-direnv dev shell is built before the agent needs it. A failing script fails the launch (the error carries the log tail) and runs again on the next launch.
 - **Agent.** Optional. A named Claude Code agent (a prompt, optionally limited to one repo) that a task can run as. Its `model:` frontmatter line is the agent's default model: a task's own model wins, then the agent's, then `default_model`. `conveyor agent list|add|model`, or the Agents page.
 - **Models.** The model pickers list the Anthropic Models API result when `ANTHROPIC_API_KEY` is set (`ANTHROPIC_BASE_URL` honoured), else a built-in list (`builtinModels` in `internal/core/models.go`; refresh it when models ship). A tier alias (`opus`, `sonnet`, `haiku`, `fable`) resolves to the newest id of that tier; `conveyor models` shows the list. Model names are not validated when set. If one is wrong, the Claude session fails at startup and the dispatcher moves the task to `needs_you` with a comment saying so (fix the model on the task, its agent or `default_model`, then comment to retry). A blank model means the default: the agent's, else `default_model`, else Claude Code's. `agent list` shows what an alias resolves to and `(default: X)` for a blank.
 - **Learning.** A lesson an agent proposes at the end of a run. You accept or reject it; accepted ones go to Conveyor's own `repos/<repo>/LEARNINGS.md`, which every task on that repo loads, or, if you choose, into the repo's `CLAUDE.md` by a follow-up task.
@@ -17,7 +17,7 @@ This guide covers day-to-day use. For setup see the [README](../README.md); for 
 
 ## The board and the task page
 
-The sidebar has Board, Focus, Learnings, Automations, Repos, Apps, Agents, Logs and Settings. Board, Focus, Agents and Logs have the shortcuts `b`, `f`, `a` and `l`.
+The sidebar has Board, Focus, Learnings, Automations, Apps, Agents, Logs and Settings (repos are a Settings tab). Board, Focus, Agents and Logs have the shortcuts `b`, `f`, `a` and `l`.
 
 The board has a column per status: Backlog, Todo, Running, Needs you, Review, Failed (only shown when something has failed), Done and Cancelled. Done and Cancelled are collapsed and show the last 7 days. Focus is a single list of what wants your attention, in this order: needs_you, review, failed, running, todo.
 
@@ -211,6 +211,7 @@ Settings are in the app (Settings page) or `conveyor config list|get|set`.
 - **Dispatch**: `max_parallel` (3), `resume_threshold` (60000), `comment_debounce_secs` (20), `max_consecutive_failures` (3).
 - **External terminal**: `terminal_template`, the command for external terminals (`{cwd}` and `{cmd}` are substituted; default uses macOS Terminal).
 - **Prompts**: `pr_comment_prefix`, `brief_extra_rules`, and `prompt_fresh` / `prompt_resume` to replace the launch prompts (placeholders `{key}`, `{title}`, `{brief}`, `{comments}`). Empty means the built-in prompt. The page also shows the status block protocol the agent is given.
+- **Repos**: registered repos and their setup scripts (see Workspace and worktree).
 - **Moving to a fresh install**: `conveyor state export [file]` / `import <file> [--repo A=name]` (or the Export state / Import state buttons on Settings → General, which import without repo mapping) carries settings, apps, automations and user agents as JSON; repos are never exported (automations get placeholders `A`, `B`, ...), import only adds what's missing, and `scripts/uninstall.sh` saves it to `<home>/state.json` for the next `install.sh` to pick up.
 
 ## CLI cheat-sheet
@@ -218,7 +219,7 @@ Settings are in the app (Settings page) or `conveyor config list|get|set`.
 Global flag: `conveyor [--home dir] <command>`. Running a command with no arguments prints its usage. List and show commands take `--json`.
 
 ```
-conveyor repo add <path> [--name n]       conveyor repo list | rm <name>
+conveyor repo add <path> [--name n]       conveyor repo list | rm <name> | setup <name> [script|-]
 
 conveyor task new "<title>" --repo a[,b] [--primary r] [--desc t | --desc-file f]
                   [--todo] [--model m] [--agent a] [--parent KEY] [--priority n]

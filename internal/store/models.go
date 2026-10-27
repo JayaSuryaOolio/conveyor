@@ -16,6 +16,7 @@ type Repo struct {
 	Path          string `json:"path"`
 	DefaultBranch string `json:"default_branch"`
 	CreatedAt     string `json:"created_at"`
+	SetupScript   string `json:"setup_script"` // run in each new worktree of this repo
 }
 
 // Task is a kanban task. Repos is filled by GetTask, GetTaskByKey and ListTasks.

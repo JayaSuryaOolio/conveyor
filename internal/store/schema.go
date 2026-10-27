@@ -11,7 +11,8 @@ CREATE TABLE IF NOT EXISTS repos (
   name TEXT NOT NULL UNIQUE,
   path TEXT NOT NULL UNIQUE,
   default_branch TEXT NOT NULL,
-  created_at TEXT NOT NULL
+  created_at TEXT NOT NULL,
+  setup_script TEXT NOT NULL DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS tasks (
@@ -142,7 +143,24 @@ func Migrate(db *sql.DB) error {
 	if err := migrateAddAppGlobal(db); err != nil {
 		return err
 	}
-	return migrateAddTaskCreatedBy(db)
+	if err := migrateAddTaskCreatedBy(db); err != nil {
+		return err
+	}
+	return migrateAddRepoSetupScript(db)
+}
+
+// migrateAddRepoSetupScript adds repos.setup_script; existing repos get no script.
+func migrateAddRepoSetupScript(db *sql.DB) error {
+	var n int
+	if err := db.QueryRow(`SELECT count(*) FROM pragma_table_info('repos') WHERE name='setup_script'`).Scan(&n); err != nil {
+		return fmt.Errorf("check repos.setup_script: %w", err)
+	}
+	if n == 0 {
+		if _, err := db.Exec(`ALTER TABLE repos ADD COLUMN setup_script TEXT NOT NULL DEFAULT ''`); err != nil {
+			return fmt.Errorf("add repos.setup_script: %w", err)
+		}
+	}
+	return nil
 }
 
 // migrateAddTaskCreatedBy adds tasks.created_by; existing rows stay NULL.

@@ -2,6 +2,7 @@
 package workspace
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -10,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 )
@@ -50,8 +52,9 @@ func realPath(p string) string {
 }
 
 // Ensure creates <home>/workspaces/<KEY>/ and, for every task repo without a worktree_path,
-// adds a worktree <ws>/<repo.name> on the task branch (see docs/tasks/003-workspace.md).
-// Idempotent. Persists worktree_path via store.UpdateTaskRepo.
+// adds a worktree <ws>/<repo.name> on the task branch (see docs/tasks/003-workspace.md)
+// and runs the repo's setup script in it. Idempotent. Persists worktree_path via
+// store.UpdateTaskRepo only after setup succeeds, so a failed setup reruns next time.
 func Ensure(db *sql.DB, home string, task store.Task) (store.Task, error) {
 	ws := Dir(home, task.Key)
 	if err := os.MkdirAll(ws, 0o755); err != nil {
@@ -75,12 +78,46 @@ func Ensure(db *sql.DB, home string, task store.Task) (store.Task, error) {
 		} else if err := addWorktree(repo, tr.Branch, path); err != nil {
 			return task, err
 		}
+		if err := runSetup(ws, repo, path); err != nil {
+			return task, err
+		}
 		tr.WorktreePath = &path
 		if err := store.UpdateTaskRepo(db, *tr); err != nil {
 			return task, err
 		}
 	}
 	return task, nil
+}
+
+// SetupTimeout bounds a repo setup script.
+var SetupTimeout = 10 * time.Minute
+
+// runSetup runs repo.SetupScript with bash in the worktree, stdin closed, output to
+// <ws>/setup-<repo>.log. A failure returns the log's tail.
+// ponytail: runs inside the dispatcher tick, so a slow script delays other launches; launch async if that bites.
+func runSetup(ws string, repo store.Repo, path string) error {
+	if strings.TrimSpace(repo.SetupScript) == "" {
+		return nil
+	}
+	logPath := filepath.Join(ws, "setup-"+repo.Name+".log")
+	ctx, cancel := context.WithTimeout(context.Background(), SetupTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "bash", "-c", repo.SetupScript)
+	cmd.Dir = path
+	cmd.Env = append(os.Environ(), "CONVEYOR_REPO="+repo.Name, "CONVEYOR_REPO_PATH="+repo.Path)
+	out, err := cmd.CombinedOutput()
+	os.WriteFile(logPath, out, 0o644)
+	if err == nil {
+		return nil
+	}
+	if ctx.Err() != nil {
+		err = fmt.Errorf("timed out after %s", SetupTimeout)
+	}
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	if len(lines) > 20 {
+		lines = lines[len(lines)-20:]
+	}
+	return fmt.Errorf("setup script for %s failed: %v (log %s):\n%s", repo.Name, err, logPath, strings.Join(lines, "\n"))
 }
 
 func checkAdoptable(repo store.Repo, branch, path string) error {
