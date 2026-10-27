@@ -42,7 +42,16 @@ func Handle(db *sql.DB, home, event string, raw []byte) error {
 		return fmt.Errorf("hook %s: %w", event, err)
 	}
 	if event == "Notification" {
-		return store.RecordEvent(db, task.ID, "notification", strings.TrimSpace(p.NotificationType+" "+p.Message))
+		if err := store.RecordEvent(db, task.ID, "notification", strings.TrimSpace(p.NotificationType+" "+p.Message)); err != nil {
+			return err
+		}
+		// The session is blocked on the human (a question or a permission prompt). The answer fires no
+		// hook, so the task stays here until the next Stop (which resumes it) or prompt.
+		if task.Status == store.StatusRunning && (p.NotificationType == "permission_prompt" || p.NotificationType == "elicitation_dialog") {
+			_, err := store.UpdateTaskStatus(db, task.ID, store.StatusNeedsYou, store.ActorSystem)
+			return err
+		}
+		return nil
 	}
 	if event != "UserPromptSubmit" && event != "Stop" {
 		return nil
@@ -187,6 +196,12 @@ func onStop(db *sql.DB, task store.Task, run store.Run, p payload) error {
 		store.RecordEvent(db, task.ID, "spawn_failed", err.Error())
 	}
 
+	if task.Status == store.StatusNeedsYou { // parked by a question Notification; the answer let the run continue
+		if _, err := store.UpdateTaskStatus(db, task.ID, store.StatusRunning, store.ActorSystem); err != nil {
+			return err
+		}
+		task.Status = store.StatusRunning
+	}
 	if task.Status != store.StatusRunning {
 		return nil // e.g. already moved by a human; nothing to transition
 	}
