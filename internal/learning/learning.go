@@ -4,31 +4,68 @@ package learning
 import (
 	"database/sql"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/JayaSuryaOolio/conveyor/internal/core"
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
+	"github.com/JayaSuryaOolio/conveyor/internal/workspace"
 )
 
-// DefaultTarget is the file an accepted learning goes to unless the human picks another.
+// DefaultTarget is the file an accepted repo-file learning goes to when Apply runs.
 const DefaultTarget = "CLAUDE.md"
+
+// Local is the target that keeps a repo's learning in Conveyor's data folder (workspace.LearningsFile) instead of
+// the repo: committing to the repo is a team decision, so it is the default for repo learnings.
+const Local = "local"
 
 // List returns learnings, optionally filtered by status.
 func List(db *sql.DB, status ...string) ([]store.Learning, error) {
 	return store.ListLearnings(db, status...)
 }
 
-// Accept marks a learning accepted for target (default CLAUDE.md).
-func Accept(db *sql.DB, id int64, target string) error {
-	if target = strings.TrimSpace(target); target == "" {
-		target = DefaultTarget
-	}
+// Accept accepts a learning for target. A repo learning with target "" or Local is appended to the repo's
+// LEARNINGS.md under home and marked applied; any other target (or a personal learning, default CLAUDE.md) waits
+// for Apply.
+func Accept(db *sql.DB, home string, id int64, target string) error {
+	target = strings.TrimSpace(target)
 	l, err := store.GetLearning(db, id)
 	if err != nil {
 		return err
 	}
+	if l.RepoID != nil && (target == "" || target == Local) {
+		var repo string
+		if err := db.QueryRow(`SELECT name FROM repos WHERE id=?`, *l.RepoID).Scan(&repo); err != nil {
+			return fmt.Errorf("learning %d repo: %w", id, err)
+		}
+		target = Local
+		l.Status, l.Target = store.LearningApplied, &target
+		if err := store.UpdateLearning(db, l); err != nil { // first, so an applied learning is never appended twice
+			return err
+		}
+		return appendLine(workspace.LearningsFile(home, repo), "- "+l.Body+"\n")
+	}
+	if target == "" || target == Local {
+		target = DefaultTarget
+	}
 	l.Status, l.Target = store.LearningAccepted, &target
 	return store.UpdateLearning(db, l)
+}
+
+func appendLine(path, line string) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		return err
+	}
+	if _, err := f.WriteString(line); err != nil {
+		f.Close()
+		return err
+	}
+	return f.Close()
 }
 
 // Reject marks a learning rejected.

@@ -488,9 +488,9 @@ func (a *App) Learnings() ([]LearningRow, error) {
 	return out, nil
 }
 
-// AcceptLearning accepts a learning for target (default CLAUDE.md).
+// AcceptLearning accepts a learning for target (default: Conveyor's local LEARNINGS.md for the repo).
 func (a *App) AcceptLearning(id int64, target string) error {
-	return learning.Accept(a.svc.DB, id, target)
+	return learning.Accept(a.svc.DB, a.svc.Home, id, target)
 }
 
 // RejectLearning rejects a learning.

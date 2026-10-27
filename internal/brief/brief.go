@@ -27,7 +27,7 @@ next: what remains
 criteria:
 - [x] AC1 - evidence
 - [ ] AC2 - why not
-learning: a lesson (repeatable line)
+learning: a non-obvious fact about this repo that would save a future task real time; not a recap of this task or a one-off workaround; usually none (repeatable line)
 spawn: child task title | description with everything its agent needs (repeatable line)
 </conveyor>
 ` + "```" + `
@@ -106,7 +106,32 @@ func Render(db *sql.DB, home string, task store.Task) (string, error) {
 	if err := os.WriteFile(path, []byte(text), 0o644); err != nil {
 		return "", fmt.Errorf("write brief: %w", err)
 	}
+	if err := writeLearnings(home, task); err != nil {
+		return "", err
+	}
 	return path, nil
+}
+
+// writeLearnings writes <ws>/CLAUDE.md from each task repo's LEARNINGS.md, or removes it when there are none.
+// The workspace folder is an ancestor of the session's cwd, so Claude Code loads it without being told to.
+func writeLearnings(home string, task store.Task) error {
+	var b strings.Builder
+	for _, r := range task.Repos {
+		if l, err := os.ReadFile(workspace.LearningsFile(home, r.RepoName)); err == nil && len(strings.TrimSpace(string(l))) > 0 {
+			fmt.Fprintf(&b, "# %s learnings\n\n%s\n\n", r.RepoName, strings.TrimSpace(string(l)))
+		}
+	}
+	path := filepath.Join(workspace.Dir(home, task.Key), "CLAUDE.md")
+	if b.Len() == 0 {
+		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("remove learnings: %w", err)
+		}
+		return nil
+	}
+	if err := os.WriteFile(path, []byte(b.String()), 0o644); err != nil {
+		return fmt.Errorf("write learnings: %w", err)
+	}
+	return nil
 }
 
 // Path is where Render writes the task's brief.

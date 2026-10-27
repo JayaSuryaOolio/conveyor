@@ -31,13 +31,13 @@ export function LearningsPage({nav}: {nav: Nav}) {
 
 function LearningItem({l, reload}: {l: ui.LearningRow; reload: () => void}) {
     const [body, setBody] = useState(l.body)
-    const [target, setTarget] = useState(l.target ?? 'CLAUDE.md')
+    const [target, setTarget] = useState(l.target ?? (l.repo ? 'local' : 'CLAUDE.md'))
     const done = () => reload()
     return (
         <Group wrap="nowrap" gap="xs">
             <TextInput style={{flex: 1}} value={body} onChange={e => setBody(e.target.value)}/>
             <Button variant="default" disabled={body === l.body} onClick={() => EditLearning(l.id, body).then(done, errMsg)}>Save</Button>
-            <TextInput w={140} title="target file" value={target} onChange={e => setTarget(e.target.value)}/>
+            <TextInput w={140} title="local = Conveyor's LEARNINGS.md for this repo, loaded into its tasks; a repo file (CLAUDE.md) = PR via Apply" value={target} onChange={e => setTarget(e.target.value)}/>
             <Button color={l.status === 'accepted' ? 'green' : undefined} disabled={l.status === 'accepted' && target === l.target} onClick={() => AcceptLearning(l.id, target).then(done, errMsg)}>
                 {l.status === 'accepted' ? 'Accepted' : 'Accept'}
             </Button>

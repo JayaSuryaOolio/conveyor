@@ -22,7 +22,7 @@ func runLearning(home string, args []string) error {
 	}
 	fs := flag.NewFlagSet("learning "+args[0], flag.ContinueOnError)
 	status := fs.String("status", "", "list: filter by status")
-	target := fs.String("target", "", "accept: target file (default CLAUDE.md)")
+	target := fs.String("target", "", "accept: local (default; Conveyor's LEARNINGS.md for the repo) or a repo file such as CLAUDE.md")
 	repo := fs.String("repo", "", "apply: only this repo")
 	pos, err := parseArgs(fs, args[1:])
 	if err != nil {
@@ -66,7 +66,7 @@ func runLearning(home string, args []string) error {
 				return err
 			}
 			if args[0] == "accept" {
-				err = learning.Accept(s.DB, n, *target)
+				err = learning.Accept(s.DB, s.Home, n, *target)
 			} else {
 				err = learning.Reject(s.DB, n)
 			}
