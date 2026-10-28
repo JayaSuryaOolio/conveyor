@@ -128,7 +128,7 @@ export function Board({nav, q, setQ, search, link}: {nav: Nav; q: string; setQ: 
                             <Text size="sm" fw={600}>{label}</Text>
                             <Text size="xs" c="dimmed">{list.length}</Text>
                         </Group>
-                        <Stack gap="xs">{list.map(c => <Card key={c.key} c={c} nav={nav}/>)}</Stack>
+                        <Stack gap="xs">{list.map(c => <Card key={c.key} c={c} nav={nav} onLabel={l => !selL.includes(l) && setPickedLabels([...selL, l])}/>)}</Stack>
                     </Paper>
                 )
             })}
