@@ -23,6 +23,8 @@ GOBIN="$BIN_DIR" go install ./cmd/conveyor
 echo "==> App"
 wails build -clean
 git checkout -- frontend/dist/.gitkeep 2>/dev/null || true
+# wails rewrites these on every build with nothing worth committing (models.ts is real, so it stays).
+git checkout -- frontend/package.json.md5 frontend/wailsjs/runtime 2>/dev/null || true
 rm -rf "$APP_DIR/Conveyor.app"
 cp -R build/bin/Conveyor.app "$APP_DIR/"
 
