@@ -230,7 +230,7 @@ func TestResumeVsFresh(t *testing.T) {
 		e.tick(t)
 		a := strings.Join(launches(t, e.fake)[0], " ")
 		if tc.resume {
-			if !strings.Contains(a, "--bg --resume sess-1 New comments on "+tk.Key) || strings.Contains(a, "--permission-mode") {
+			if !strings.Contains(a, "--bg --resume sess-1 --settings "+filepath.Join(e.d.Home, "claude-settings.json")+" New comments on "+tk.Key) || strings.Contains(a, "--permission-mode") {
 				t.Errorf("peak %d: not a bare resume: %q", tc.peak, a)
 			}
 		} else if strings.Contains(a, "--resume") || !strings.Contains(a, "You are working on") {

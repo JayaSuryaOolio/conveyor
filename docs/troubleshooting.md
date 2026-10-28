@@ -40,7 +40,9 @@ EOF
 conveyor task show KEY --runs                  # run finished with its summary
 ```
 
-Conveyor does not detect this on its own: it is a Claude Code resume bug, and checking every session each tick costs more than the rare case is worth. The `conveyor-doctor` skill finds and fixes it on demand (see the top of this page).
+**Prevented since CV-47.** Conveyor now passes `--settings <home>/claude-settings.json` on resume too. If a resumed run still never ends and `hook.log` has no `UserPromptSubmit`/`Stop` for its session (seen on CV-46 run 148, where the resume started "a copy as" a new session id), check that `<home>/claude-settings.json` exists and replay the Stop hook as above.
+
+Before that, Conveyor did not detect this on its own: it is a Claude Code resume bug, and checking every session each tick costs more than the rare case is worth. The `conveyor-doctor` skill finds and fixes it on demand (see the top of this page).
 
 ## A task has a second PR that Conveyor doesn't track
 

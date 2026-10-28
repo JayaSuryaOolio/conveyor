@@ -103,20 +103,20 @@ func TestNotFound(t *testing.T) {
 
 func TestResume(t *testing.T) {
 	log := fakeClaude(t, map[string]string{"resume": "backgrounded · same\n"})
-	id, err := Resume(context.Background(), t.TempDir(), "bg1", "sess1", "delta")
+	id, err := Resume(context.Background(), t.TempDir(), "bg1", "sess1", "/s.json", "delta")
 	if err != nil || id != "same" {
 		t.Fatalf("id=%q err=%v", id, err)
 	}
 	cs := readLog(t, log)
 	if len(cs) != 2 || !reflect.DeepEqual(cs[0].args, []string{"stop", "bg1"}) ||
-		!reflect.DeepEqual(cs[1].args, []string{"--bg", "--resume", "sess1", "delta"}) {
+		!reflect.DeepEqual(cs[1].args, []string{"--bg", "--resume", "sess1", "--settings", "/s.json", "delta"}) {
 		t.Fatalf("calls %+v", cs)
 	}
 }
 
 func TestResumeCopy(t *testing.T) {
 	fakeClaude(t, map[string]string{"resume": "started a copy as newid.\nbackgrounded · other\n"})
-	id, err := Resume(context.Background(), t.TempDir(), "bg1", "s", "p")
+	id, err := Resume(context.Background(), t.TempDir(), "bg1", "s", "/s.json", "p")
 	if err != nil || id != "newid" {
 		t.Fatalf("id=%q err=%v", id, err)
 	}

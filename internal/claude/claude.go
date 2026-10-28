@@ -99,11 +99,11 @@ func Launch(ctx context.Context, s LaunchSpec) (string, error) {
 	return m[1], nil
 }
 
-// Resume stops bgID (errors ignored) then resumes sessionID with only --bg --resume.
+// Resume stops bgID (errors ignored) then resumes sessionID with --bg --resume and --settings (Claude may not carry the hooks over).
 // It returns the printed bg id, or X if the output says "started a copy as X".
-func Resume(ctx context.Context, cwd, bgID, sessionID, prompt string) (string, error) {
+func Resume(ctx context.Context, cwd, bgID, sessionID, settingsPath, prompt string) (string, error) {
 	_ = Stop(ctx, bgID)
-	out, err := run(ctx, cwd, nil, "--bg", "--resume", sessionID, prompt)
+	out, err := run(ctx, cwd, nil, "--bg", "--resume", sessionID, "--settings", settingsPath, prompt)
 	if err != nil {
 		return "", err
 	}
