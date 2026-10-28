@@ -242,6 +242,19 @@ func TestNotification(t *testing.T) {
 	}
 }
 
+func TestQuestionNotificationParksTask(t *testing.T) {
+	e := setup(t, store.StatusRunning)
+	e.run(t, "auto", "running", "S1", "p")
+	e.fire(t, "Notification", map[string]any{"notification_type": "elicitation_dialog", "message": "q?"})
+	if e.status(t).Status != store.StatusNeedsYou {
+		t.Fatalf("%+v", e.status(t))
+	}
+	e.fire(t, "Stop", map[string]any{"session_id": "S1", "last_assistant_message": doneMsg})
+	if e.status(t).Status != store.StatusReview {
+		t.Fatalf("%+v", e.status(t))
+	}
+}
+
 func TestOutsideWorkspacesIgnored(t *testing.T) {
 	e := setup(t, store.StatusRunning)
 	for _, cwd := range []string{"/somewhere/else", core.WorkspacesDir(e.home), ""} {

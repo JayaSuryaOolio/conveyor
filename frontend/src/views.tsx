@@ -1,8 +1,8 @@
 import {lazy, Ref, Suspense, useEffect, useRef, useState} from 'react'
 import {ActionIcon, Anchor, Badge, Box, Breadcrumbs, Button, CloseButton, Code, Divider, Group, Kbd, Paper, Stack, Text, TextInput, Timeline, Title, Tooltip} from '@mantine/core'
 import {useLocalStorage} from '@mantine/hooks'
-import {IconAbc, IconArrowDown, IconArrowUp, IconClock, IconFlame, IconHash, IconPencil, IconSearch, IconX, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconMessage, IconPlayerPlay} from '@tabler/icons-react'
-import {GetTask, ListTasks, RunLog, SetTaskDescription, TakeQueuedComment} from '../wailsjs/go/ui/App'
+import {IconAbc, IconArrowDown, IconArrowUp, IconClock, IconFlame, IconHash, IconPencil, IconSearch, IconTerminal, IconX, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconMessage, IconPlayerPlay} from '@tabler/icons-react'
+import {Actions, GetTask, ListTasks, RunLog, SetTaskDescription, TakeQueuedComment} from '../wailsjs/go/ui/App'
 import {core, store, ui} from '../wailsjs/go/models'
 import {Card, CommentBox, Message, Nav, StatusBadge, Time, errMsg} from './components'
 import {Markdown, MarkdownEditor, TaskKey} from './markdown'
@@ -258,6 +258,11 @@ export function TaskPage({k, nav}: {k: string; nav: Nav}) {
     const [added, setAdded] = useState<ui.TermInfo>()
     const [restored, setRestored] = useState<{body: string}>()
     const [side, setSide] = useLocalStorage({key: 'task-sidebar', defaultValue: true})
+    // A question is answered in the session itself: needs_you offers a way into the live session's terminal.
+    const needsYou = d?.task.status === 'needs_you'
+    const {data: actions} = useData(() => needsYou ? Actions(k) : Promise.resolve([]), [k, needsYou, d?.runs.length])
+    const attach = actions?.find(a => a.kind === 'attach')
+    const answer = attach && <Button size="compact-sm" leftSection={<IconTerminal size={14}/>} onClick={() => TermStart(k, 'attach', attach.repo).then(setAdded).catch(errMsg)}>Answer in terminal</Button>
     if (error) return <Text c="red">{error}</Text>
     if (!d) return <Text c="dimmed">Loading…</Text>
     const t = d.task
@@ -279,7 +284,7 @@ export function TaskPage({k, nav}: {k: string; nav: Nav}) {
                     <Anchor size="sm" component="button" onClick={() => nav({name: 'board'})}>Board</Anchor>
                     <Text size="sm">{t.key}</Text>
                 </Breadcrumbs>
-                <ScrollBox>
+                <ScrollBox floating={answer}>
                     <Stack>
                         <Title order={3}>{t.title}</Title>
                         <Description t={t} reload={reload}/>
@@ -294,6 +299,7 @@ export function TaskPage({k, nav}: {k: string; nav: Nav}) {
                                         {it.run.api_calls} calls · {fmtK(it.run.ctx_peak)} peak · {fmtDuration(it.run.started_at, it.run.ended_at)} · <Time iso={it.run.started_at}/>
                                     </Text>
                                     <SessionLog run={it.run}/>
+                                    {it.run === latest && answer && <Box mt="xs">{answer}</Box>}
                                 </Timeline.Item>
                             ) : (
                                 <Timeline.Item key={'c' + it.comment!.id} bullet={<IconMessage size={12}/>}>
@@ -323,7 +329,7 @@ export function TaskPage({k, nav}: {k: string; nav: Nav}) {
 }
 
 /** Scrolling column with floating jump-to-top / jump-to-bottom buttons, shown only when there is somewhere to go. */
-function ScrollBox({children}: {children: React.ReactNode}) {
+function ScrollBox({children, floating}: {children: React.ReactNode; floating?: React.ReactNode}) {
     const el = useRef<HTMLDivElement>(null)
     const [pos, setPos] = useState({top: true, bottom: true})
     const update = () => {
@@ -339,7 +345,8 @@ function ScrollBox({children}: {children: React.ReactNode}) {
     return (
         <Box pos="relative" style={{flex: 1, minHeight: 0}}>
             <Box ref={el} onScroll={update} h="100%" pr="xs" style={{overflowY: 'auto'}}>{children}</Box>
-            <Stack gap={4} pos="absolute" right={16} bottom={8}>
+            <Stack gap={4} pos="absolute" right={16} bottom={8} align="flex-end">
+                {floating}
                 {!pos.top && <ActionIcon variant="default" radius="xl" size="lg" aria-label="Scroll to top" onClick={() => go(0)}><IconArrowUp size={16}/></ActionIcon>}
                 {!pos.bottom && <ActionIcon variant="default" radius="xl" size="lg" aria-label="Scroll to bottom" onClick={() => go(el.current!.scrollHeight)}><IconArrowDown size={16}/></ActionIcon>}
             </Stack>
