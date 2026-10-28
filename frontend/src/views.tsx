@@ -301,7 +301,7 @@ export function TaskPage({k, nav}: {k: string; nav: Nav}) {
                                                        <Button variant="default" size="compact-xs" c="dimmed" leftSection={<IconPlayerStop size={12}/>} onClick={stop}>Stop run</Button>}
                                                </Group>}>
                                     <Text size="xs" c="dimmed">
-                                        {it.run.api_calls} calls · {fmtK(it.run.ctx_peak)} peak · {fmtDuration(it.run.started_at, it.run.ended_at)} · <Time iso={it.run.started_at}/>
+                                        {it.run.session_id && <><Tooltip label={it.run.session_id}><Code>{it.run.session_id.slice(0, 8)}</Code></Tooltip> · </>}{it.run.api_calls} calls · {fmtK(it.run.ctx_peak)} peak · {fmtDuration(it.run.started_at, it.run.ended_at)} · <Time iso={it.run.started_at}/>
                                     </Text>
                                     <SessionLog run={it.run}/>
                                     {it.run === latest && answer && <Box mt="xs">{answer}</Box>}
