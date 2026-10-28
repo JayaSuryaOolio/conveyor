@@ -51,6 +51,12 @@ function XTerm({id, active}: {id: string; active: boolean}) {
             ready = true
         }, errMsg)
         t.onData(d => TermWrite(id, d).catch(() => {}))
+        // xterm sends a bare \r for Shift+Enter; send ESC+CR like Claude's /terminal-setup so TUIs insert a newline.
+        t.attachCustomKeyEventHandler(e => {
+            if (e.key !== 'Enter' || !e.shiftKey || e.ctrlKey || e.altKey || e.metaKey) return true
+            if (e.type === 'keydown') TermWrite(id, '\x1b\r').catch(() => {})
+            return false
+        })
         const ro = new ResizeObserver(() => {
             if (!el.current?.offsetWidth) return // hidden tab
             fit.fit()
