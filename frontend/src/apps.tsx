@@ -1,7 +1,7 @@
-import {useEffect, useState} from 'react'
-import {ActionIcon, Badge, Button, Code, FileButton, Group, Modal, Paper, Stack, Switch, Table, Text, TextInput, Textarea, Title} from '@mantine/core'
+import {useEffect, useRef, useState} from 'react'
+import {ActionIcon, Badge, Button, Code, FileButton, Group, Modal, MultiSelect, Paper, Stack, Switch, Table, Text, TextInput, Textarea, Title} from '@mantine/core'
 import {IconPencil, IconPlayerPlay, IconPlus, IconPuzzle, IconTransform, IconTrash, IconUpload} from '@tabler/icons-react'
-import {AddApp, AppIcons, AppPresets, Confirm, ConvertApp, DeleteApp, Home, InstallManifest, InstallPreset, ListApps, RenderApp, TestApp, UpdateApp, UserHooks} from '../wailsjs/go/ui/App'
+import {AddApp, AppIcons, AppPresets, Confirm, ConvertApp, DeleteApp, Home, InstallManifest, InstallPreset, ListApps, ManifestSchema, RenderApp, TestApp, UpdateApp, UserHooks, ValidateManifest} from '../wailsjs/go/ui/App'
 import {store} from '../wailsjs/go/models'
 import {AppIcon, errMsg, runApp} from './components'
 import {useData} from './util'
@@ -48,24 +48,52 @@ const MANIFEST_EXAMPLE = `{
   ]
 }`
 
-/** Install an app from manifest JSON: paste it or load a file. */
+/** Build and install a manifest: JSON editor with insertable placeholders, place-aware "Add action", live validation. */
 function ManifestForm({onClose}: {onClose: (saved: boolean) => void}) {
     const [text, setText] = useState('')
+    const [places, setPlaces] = useState<string[]>(['task_sidebar'])
+    const [problem, setProblem] = useState('')
+    const ref = useRef<HTMLTextAreaElement>(null)
+    const {data: schema} = useData(ManifestSchema, [])
+    useEffect(() => {
+        if (!text.trim()) { setProblem(''); return }
+        const t = setTimeout(() => ValidateManifest(text).then(setProblem, errMsg), 250)
+        return () => clearTimeout(t)
+    }, [text])
+    const insert = (s: string) => {
+        const el = ref.current, [a, b] = el ? [el.selectionStart, el.selectionEnd] : [text.length, text.length]
+        setText(text.slice(0, a) + s + text.slice(b))
+        setTimeout(() => { el?.focus(); el?.setSelectionRange(a + s.length, a + s.length) })
+    }
+    const addAction = () => {
+        let m: any
+        try { m = text.trim() ? JSON.parse(text) : {version: Number(schema?.version?.[0] ?? 1), name: 'My app'} } catch { errMsg('Fix the JSON first: ' + problem); return }
+        const n = (m.actions?.length ?? 0) + 1
+        m.actions = [...(m.actions ?? []), {id: `action-${n}`, label: `Action ${n}`, places, run: 'echo hello'}]
+        setText(JSON.stringify(m, null, 2))
+    }
     return (
         <Stack gap="sm">
             <Text size="sm" c="dimmed">
-                A manifest declares actions and where they appear (<Code>global_nav</Code>, <Code>task_sidebar</Code>, <Code>board_card</Code>),
-                and can ship <Code>agents</Code> and <Code>automations</Code> (created disabled-by-default on install, removed on delete).
-                Scripts use <Code>{'${{ var }}'}</Code> placeholders, shell-quoted: <Code>app.name</Code> <Code>task.key</Code> <Code>task.title</Code> <Code>task.status</Code> <Code>repo.name</Code> <Code>worktree.path</Code>.
+                A manifest (version {schema?.version?.[0]}) declares actions and where they appear, and can ship <Code>agents</Code> and <Code>automations</Code>.
+                Click a placeholder to insert it at the cursor; scripts get its value shell-quoted.
             </Text>
-            <Textarea autosize minRows={8} maxRows={20} ff="monospace" placeholder={MANIFEST_EXAMPLE} value={text} onChange={e => setText(e.target.value)}/>
+            <Group gap={6}>
+                {(schema?.vars ?? []).map(v => <Button key={v} size="compact-xs" variant="light" ff="monospace" onClick={() => insert(`\${{ ${v} }}`)}>{v}</Button>)}
+            </Group>
+            <Group align="flex-end" gap="xs">
+                <MultiSelect label="Places" size="xs" data={schema?.places ?? []} value={places} onChange={setPlaces} style={{flex: 1}}/>
+                <Button size="xs" variant="default" leftSection={<IconPlus size={14}/>} disabled={!places.length} onClick={addAction}>Add action</Button>
+            </Group>
+            <Textarea ref={ref} autosize minRows={10} maxRows={20} ff="monospace" placeholder={MANIFEST_EXAMPLE} value={text} onChange={e => setText(e.target.value)}
+                      error={problem || undefined}/>
             <Group justify="space-between">
                 <FileButton accept="application/json,.json" onChange={f => f?.text().then(setText)}>
                     {p => <Button {...p} variant="default" leftSection={<IconUpload size={16}/>}>Load file</Button>}
                 </FileButton>
                 <Group>
                     <Button variant="default" onClick={() => onClose(false)}>Cancel</Button>
-                    <Button disabled={!text.trim()} onClick={() => InstallManifest(text).then(() => onClose(true), errMsg)}>Install</Button>
+                    <Button disabled={!text.trim() || !!problem} onClick={() => InstallManifest(text).then(() => onClose(true), errMsg)}>Install</Button>
                 </Group>
             </Group>
         </Stack>

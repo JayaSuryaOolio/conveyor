@@ -163,6 +163,10 @@ export function UserHooks(arg1:string):Promise<string>;
 
 export function InstallManifest(arg1:string):Promise<void>;
 
+export function ManifestSchema():Promise<Record<string, Array<string>>>;
+
+export function ValidateManifest(arg1:string):Promise<string>;
+
 export function InstallPreset(arg1:store.App):Promise<void>;
 
 export function ConvertApp(arg1:string):Promise<void>;
