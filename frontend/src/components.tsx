@@ -4,7 +4,7 @@ import {IconAppWindow, IconDots, IconPencil} from '@tabler/icons-react'
 import {AddComment, MergedPR, Move, ShowError, TakeQueuedComment} from '../wailsjs/go/ui/App'
 import {store, ui} from '../wailsjs/go/models'
 import {Markdown, MarkdownEditor} from './markdown'
-import {ALL_STATUSES, STATUS_COLOR, STATUS_LABEL, ago, fmtK, fmtTime} from './util'
+import {ALL_STATUSES, STATUS_COLOR, STATUS_LABEL, ago, fmtK, fmtTime, useDraft} from './util'
 
 export type Nav = (v: {name: string; key?: string}) => void
 
@@ -94,7 +94,7 @@ export function Card({c, nav}: {c: ui.TaskCard; nav: Nav}) {
 
 /** `restored` (a fresh object per request) appends a pulled-back queued message to the editor. */
 export function CommentBox({k, placeholder = 'Comment…', onDone, restored}: {k: string; placeholder?: string; onDone?: () => void; restored?: {body: string}}) {
-    const [text, setText] = useState('')
+    const [text, setText] = useDraft('comment:' + k)
     useEffect(() => { if (restored) setText(t => t ? t + '\n\n' + restored.body : restored.body) }, [restored])
     const [busy, setBusy] = useState(false)
     const [merged, setMerged] = useState('')
