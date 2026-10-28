@@ -197,6 +197,7 @@ type TaskCard struct {
 	Priority    int      `json:"priority"`
 	Parent      string   `json:"parent"` // parent task key, "" for top-level
 	Repos       []string `json:"repos"`
+	Labels      []string `json:"labels"`
 	LastSummary string   `json:"lastSummary"`
 	CtxPeak     int64    `json:"ctxPeak"`
 	UpdatedAt   string   `json:"updatedAt"`
@@ -222,7 +223,7 @@ func (a *App) ListTasks() ([]TaskCard, error) {
 		keys[t.ID] = t.Key
 	}
 	for _, t := range tasks {
-		c := TaskCard{Key: t.Key, Title: t.Title, Status: string(t.Status), Priority: t.Priority, Repos: []string{}, UpdatedAt: t.UpdatedAt}
+		c := TaskCard{Key: t.Key, Title: t.Title, Status: string(t.Status), Priority: t.Priority, Repos: []string{}, Labels: t.Labels, UpdatedAt: t.UpdatedAt}
 		if t.ParentID != nil {
 			c.Parent = keys[*t.ParentID]
 		}
@@ -275,6 +276,15 @@ func (a *App) Link(from, kind, to string) error { return a.svc.Link(from, kind, 
 
 // Unlink removes "from <kind> to".
 func (a *App) Unlink(from, kind, to string) error { return a.svc.Unlink(from, kind, to) }
+
+// AddLabel puts a label (created if new) on a task.
+func (a *App) AddLabel(key, name string) error { return a.svc.AddLabel(key, name) }
+
+// RemoveLabel takes a label off a task.
+func (a *App) RemoveLabel(key, name string) error { return a.svc.RemoveLabel(key, name) }
+
+// ListLabels returns every known label name.
+func (a *App) ListLabels() ([]string, error) { return store.ListLabels(a.svc.DB) }
 
 // AdoptChild makes child a sub-task of parent; errors if child already has another parent.
 func (a *App) AdoptChild(parent, child string) error { return a.svc.AdoptChild(parent, child) }

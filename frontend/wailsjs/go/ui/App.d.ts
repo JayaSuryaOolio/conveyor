@@ -18,6 +18,12 @@ export function AddComment(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function AddRepo(arg1:string,arg2:string):Promise<void>;
 
+export function AddLabel(arg1:string,arg2:string):Promise<void>;
+
+export function ListLabels():Promise<Array<string>>;
+
+export function RemoveLabel(arg1:string,arg2:string):Promise<void>;
+
 export function AdoptChild(arg1:string,arg2:string):Promise<void>;
 
 export function AppIcons():Promise<Record<string, string>>;

@@ -93,6 +93,8 @@ Tasks can be related, as in Jira. Conveyor only stores the relations; an agent (
 
 ```
 conveyor task link CV-1A blocks CV-1B
+conveyor task label CV-1A add bug        # labels: shown on cards, filterable on the Board; `rm` removes
+
 conveyor task unlink CV-1A blocks CV-1B
 ```
 

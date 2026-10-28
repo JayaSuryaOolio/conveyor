@@ -31,6 +31,7 @@ export function Board({nav, q, setQ, search}: {nav: Nav; q: string; setQ: (q: st
     const [open, setOpen] = useState<string[]>([])
     const [sort, setSort] = useLocalStorage({key: 'board-sort', defaultValue: {by: 'priority', desc: true}})
     const [picked, setPicked] = useLocalStorage<string[]>({key: 'board-repos', defaultValue: []})
+    const [pickedLabels, setPickedLabels] = useLocalStorage<string[]>({key: 'board-labels', defaultValue: []})
     if (error) return <Text c="red">{error}</Text>
     const shut = (s: string) => ARCHIVE.includes(s) && !open.includes(s)
     const toggle = (s: string) => setOpen(o => o.includes(s) ? o.filter(x => x !== s) : [...o, s])
@@ -41,13 +42,18 @@ export function Board({nav, q, setQ, search}: {nav: Nav; q: string; setQ: (q: st
     const repoColor = (r: string) => REPO_COLORS[repos.indexOf(r) % REPO_COLORS.length] // by sorted position: distinct up to 10 repos
     const sel = picked.filter(r => repoCount.has(r)) // a remembered repo that no longer has tasks must not hide everything
     const flip = (r: string) => setPicked(sel.includes(r) ? sel.filter(x => x !== r) : [...sel, r])
+    const labelCount = new Map<string, number>()
+    all.forEach(c => c.labels.forEach(l => labelCount.set(l, (labelCount.get(l) ?? 0) + 1)))
+    const labels = [...labelCount.keys()].sort()
+    const selL = pickedLabels.filter(l => labelCount.has(l))
+    const flipL = (l: string) => setPickedLabels(selL.includes(l) ? selL.filter(x => x !== l) : [...selL, l])
     const s = SORTS.find(x => x.by === sort.by) ?? SORTS[0]
     const needle = q.toLowerCase()
     // Array.sort is stable, so ties keep the server order (priority desc, created asc).
     const cards = all
-        .filter(c => (!needle || (c.key + ' ' + c.title).toLowerCase().includes(needle)) && (!sel.length || c.repos.some(r => sel.includes(r))))
+        .filter(c => (!needle || (c.key + ' ' + c.title).toLowerCase().includes(needle)) && (!sel.length || c.repos.some(r => sel.includes(r))) && (!selL.length || c.labels.some(l => selL.includes(l))))
         .sort((a, b) => sort.desc ? s.cmp(b, a) : s.cmp(a, b))
-    const filtered = !!needle || sel.length > 0
+    const filtered = !!needle || sel.length > 0 || selL.length > 0
     const cols = [...COLUMNS]
     if (cards.some(c => c.status === 'failed')) cols.splice(5, 0, ['failed', 'Failed'])
     return (<Stack gap="sm">
@@ -85,9 +91,22 @@ export function Board({nav, q, setQ, search}: {nav: Nav; q: string; setQ: (q: st
                         })}
                     </Group>
                 </>}
+                {labels.length > 0 && <>
+                    <Divider orientation="vertical"/>
+                    <Group gap={6} wrap="wrap" role="group" aria-label="Labels">
+                        {labels.map(l => {
+                            const on = selL.includes(l)
+                            return (
+                                <Badge key={l} component="button" size="lg" radius="md" color="gray" variant={on ? 'filled' : 'outline'} aria-pressed={on}
+                                       title={on ? 'Hide ' + l + ' filter' : 'Only label ' + l + ' (click more to combine)'}
+                                       style={{cursor: 'pointer', textTransform: 'none'}} onClick={() => flipL(l)}>{l} · {labelCount.get(l)}</Badge>
+                            )
+                        })}
+                    </Group>
+                </>}
                 {filtered && <Group gap={6} wrap="nowrap" ml="auto">
                     <Text size="xs" c="dimmed">{cards.length} of {all.length}</Text>
-                    <Button size="compact-xs" variant="subtle" color="gray" leftSection={<IconX size={12}/>} onClick={() => { setQ(''); setPicked([]) }}>Clear</Button>
+                    <Button size="compact-xs" variant="subtle" color="gray" leftSection={<IconX size={12}/>} onClick={() => { setQ(''); setPicked([]); setPickedLabels([]) }}>Clear</Button>
                 </Group>}
             </Group>
         </Paper>
