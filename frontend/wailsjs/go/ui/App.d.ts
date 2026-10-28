@@ -130,6 +130,10 @@ export function SpotlightRoot(arg1:string):Promise<string>;
 
 export function SpotlightStop(arg1:string):Promise<void>;
 
+export function AppServiceRunning(arg1:string,arg2:string,arg3:string):Promise<boolean>;
+
+export function StopAppService(arg1:string,arg2:string,arg3:string):Promise<void>;
+
 export function TakeQueuedComment(arg1:string,arg2:number):Promise<string>;
 
 export function TermBuffer(arg1:string):Promise<ui.TermBuf>;

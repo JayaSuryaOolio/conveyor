@@ -1,11 +1,14 @@
 package core
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 )
@@ -30,6 +33,16 @@ type ManifestAction struct {
 	Run    string   `json:"run"`
 	Places []string `json:"places"`
 	Output bool     `json:"output,omitempty"`
+	// Service marks a long-running action: Status (exit 0 = running) lights the icon's dot and
+	// a click then runs Stop instead of Run. Task places only; excludes Output.
+	Service *ManifestService `json:"service,omitempty"`
+}
+
+// ManifestService tells Conveyor how to detect and stop a service action; both are
+// ${{ var }} scripts like Run.
+type ManifestService struct {
+	Status string `json:"status"`
+	Stop   string `json:"stop"`
 }
 
 type ManifestAgent struct {
@@ -104,7 +117,17 @@ func ParseManifest(raw string) (Manifest, error) {
 				return m, fmt.Errorf("manifest: action %q: unknown place %q (have global_nav, task_sidebar, board_card)", a.ID, p)
 			}
 		}
-		for _, v := range varRe.FindAllStringSubmatch(a.Run, -1) {
+		scripts := a.Run
+		if a.Service != nil {
+			if a.Output || strings.TrimSpace(a.Service.Status) == "" || strings.TrimSpace(a.Service.Stop) == "" {
+				return m, fmt.Errorf("manifest: action %q: service needs status and stop, and cannot be output", a.ID)
+			}
+			if len(a.Places) != 1 || a.Places[0] != "task_sidebar" {
+				return m, fmt.Errorf("manifest: action %q: service actions only go in task_sidebar", a.ID)
+			}
+			scripts += "\n" + a.Service.Status + "\n" + a.Service.Stop
+		}
+		for _, v := range varRe.FindAllStringSubmatch(scripts, -1) {
 			if !contains(ManifestVars, v[1]) {
 				return m, fmt.Errorf("manifest: action %q: unknown variable %q (have %s)", a.ID, v[1], strings.Join(ManifestVars, ", "))
 			}
@@ -185,10 +208,11 @@ func (s *Service) UninstallApp(name string) error {
 
 // Placed is one manifest action ready to show in a UI slot.
 type Placed struct {
-	App    string `json:"app"`
-	ID     string `json:"id"`
-	Label  string `json:"label"`
-	Output bool   `json:"output"`
+	App     string `json:"app"`
+	ID      string `json:"id"`
+	Label   string `json:"label"`
+	Output  bool   `json:"output"`
+	Service bool   `json:"service"`
 }
 
 // PlacedActions lists the manifest actions that asked for place.
@@ -208,7 +232,7 @@ func (s *Service) PlacedActions(place string) ([]Placed, error) {
 		}
 		for _, x := range m.Actions {
 			if contains(x.Places, place) {
-				out = append(out, Placed{a.Name, x.ID, x.Label, x.Output})
+				out = append(out, Placed{a.Name, x.ID, x.Label, x.Output, x.Service != nil})
 			}
 		}
 	}
@@ -218,13 +242,47 @@ func (s *Service) PlacedActions(place string) ([]Placed, error) {
 // RunAppAction runs one manifest action. key "" is only valid for global_nav actions
 // (worktree.path is then the home directory). Returns an output action's output.
 func (s *Service) RunAppAction(app, id, key string) (string, error) {
-	a, err := store.GetApp(s.DB, app)
+	act, vars, cwd, err := s.resolveAction(app, id, key)
 	if err != nil {
 		return "", err
 	}
+	return RunApp(store.App{Name: act.Label, Command: RenderManifest(act.Run, vars), Output: act.Output}, cwd, key)
+}
+
+// AppServiceRunning reports whether a service action's status script exits 0 for the task.
+func (s *Service) AppServiceRunning(app, id, key string) (bool, error) {
+	act, vars, cwd, err := s.resolveAction(app, id, key)
+	if err != nil || act.Service == nil {
+		return false, err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	c := exec.CommandContext(ctx, "sh", "-c", RenderManifest(act.Service.Status, vars))
+	c.Dir = cwd
+	return c.Run() == nil, nil
+}
+
+// StopAppService runs a service action's stop script for the task.
+func (s *Service) StopAppService(app, id, key string) error {
+	act, vars, _, err := s.resolveAction(app, id, key)
+	if err != nil {
+		return err
+	}
+	if act.Service == nil {
+		return fmt.Errorf("action %q is not a service", id)
+	}
+	return runShell("stop "+act.Label, RenderManifest(act.Service.Stop, vars))
+}
+
+// resolveAction finds the action and the variables and directory its scripts run with.
+func (s *Service) resolveAction(app, id, key string) (*ManifestAction, map[string]string, string, error) {
+	a, err := store.GetApp(s.DB, app)
+	if err != nil {
+		return nil, nil, "", err
+	}
 	m, err := ParseManifest(a.Manifest)
 	if err != nil {
-		return "", err
+		return nil, nil, "", err
 	}
 	var act *ManifestAction
 	for i := range m.Actions {
@@ -233,21 +291,21 @@ func (s *Service) RunAppAction(app, id, key string) (string, error) {
 		}
 	}
 	if act == nil {
-		return "", fmt.Errorf("app %q has no action %q", app, id)
+		return nil, nil, "", fmt.Errorf("app %q has no action %q", app, id)
 	}
 	vars := map[string]string{"app.name": m.Name}
 	cwd := ""
 	if key == "" {
 		if cwd, err = os.UserHomeDir(); err != nil {
-			return "", err
+			return nil, nil, "", err
 		}
 	} else {
 		t, err := store.GetTaskByKey(s.DB, key)
 		if err != nil {
-			return "", err
+			return nil, nil, "", err
 		}
 		if cwd, err = s.WorktreePath(key, ""); err != nil {
-			return "", err
+			return nil, nil, "", err
 		}
 		vars["task.key"], vars["task.title"], vars["task.status"] = t.Key, t.Title, string(t.Status)
 		for _, r := range t.Repos {
@@ -257,7 +315,15 @@ func (s *Service) RunAppAction(app, id, key string) (string, error) {
 		}
 	}
 	vars["worktree.path"] = cwd
-	return RunApp(store.App{Name: act.Label, Command: RenderManifest(act.Run, vars), Output: act.Output}, cwd, key)
+	return act, vars, cwd, nil
+}
+
+// spotlightService detects and stops the spotlight instance mirroring ${{ worktree.path }}:
+// `spotlight list` prints "ROOT  <-  WORKTREE  (pid N)" and stop takes the root.
+func spotlightService() *ManifestService {
+	bin := shq(spotlightBin())
+	root := bin + ` list | awk -v w=${{ worktree.path }} -F '  <-  ' '{sub(/  \(pid [0-9]+\)$/, "", $2); if ($2 == w) print $1}'`
+	return &ManifestService{Status: root + " | grep -q .", Stop: `r=$(` + root + `); [ -n "$r" ] && ` + bin + ` stop "$r"`}
 }
 
 // LegacyManifest expresses a plain command app (the old {cwd}/{key} template) as a manifest:
@@ -269,9 +335,11 @@ func LegacyManifest(a store.App) (string, error) {
 		place = "global_nav"
 	}
 	run := strings.NewReplacer("{cwd}", "${{ worktree.path }}", "{key}", "${{ task.key }}").Replace(a.Command)
-	b, err := json.MarshalIndent(Manifest{Version: ManifestVersion, Name: a.Name, Actions: []ManifestAction{
-		{ID: "open", Label: a.Name, Run: run, Places: []string{place}, Output: a.Output},
-	}}, "", "  ")
+	act := ManifestAction{ID: "open", Label: a.Name, Run: run, Places: []string{place}, Output: a.Output}
+	if a.Name == "Spotlight" && !a.Global && !a.Output {
+		act.Service = spotlightService()
+	}
+	b, err := json.MarshalIndent(Manifest{Version: ManifestVersion, Name: a.Name, Actions: []ManifestAction{act}}, "", "  ")
 	return string(b), err
 }
 

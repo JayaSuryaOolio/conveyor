@@ -5,7 +5,8 @@ export namespace core {
 	    id: string;
 	    label: string;
 	    output: boolean;
-	
+	    service: boolean;
+
 	    static createFrom(source: any = {}) {
 	        return new Placed(source);
 	    }
@@ -16,9 +17,10 @@ export namespace core {
 	        this.id = source["id"];
 	        this.label = source["label"];
 	        this.output = source["output"];
+	        this.service = source["service"];
 	    }
 	}
-	
+
 	export class Action {
 	    label: string;
 	    repo: string;

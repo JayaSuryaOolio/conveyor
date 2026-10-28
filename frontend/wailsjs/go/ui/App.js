@@ -254,6 +254,14 @@ export function SpotlightStop(arg1) {
   return window['go']['ui']['App']['SpotlightStop'](arg1);
 }
 
+export function AppServiceRunning(arg1, arg2, arg3) {
+  return window['go']['ui']['App']['AppServiceRunning'](arg1, arg2, arg3);
+}
+
+export function StopAppService(arg1, arg2, arg3) {
+  return window['go']['ui']['App']['StopAppService'](arg1, arg2, arg3);
+}
+
 export function TakeQueuedComment(arg1, arg2) {
   return window['go']['ui']['App']['TakeQueuedComment'](arg1, arg2);
 }

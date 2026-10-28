@@ -1,6 +1,7 @@
 package core
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -200,5 +201,36 @@ func TestConvertApp(t *testing.T) {
 	}
 	if _, err := ParseManifest(`{"version":99,"name":"x","actions":[{"id":"a","label":"A","run":"x","places":["global_nav"]}]}`); err == nil {
 		t.Fatal("accepted future version")
+	}
+}
+
+func TestServiceManifest(t *testing.T) {
+	bad := `{"name":"X","actions":[{"id":"a","label":"A","run":"true","places":["%s"],%s}]}`
+	svc := `"service":{"status":"true","stop":"true"}`
+	if _, err := ParseManifest(fmt.Sprintf(bad, "task_sidebar", svc)); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range [][2]string{{"board_card", svc}, {"task_sidebar", `"service":{"status":"true"}`}, {"task_sidebar", `"output":true,` + svc}} {
+		if _, err := ParseManifest(fmt.Sprintf(bad, c[0], c[1])); err == nil {
+			t.Fatalf("accepted %v", c)
+		}
+	}
+	// a fake spotlight CLI listing one instance: status and stop must find the root by worktree
+	dir := t.TempDir()
+	log := filepath.Join(dir, "stopped")
+	os.WriteFile(filepath.Join(dir, "spotlight"), []byte("#!/bin/sh\nif [ \"$1\" = list ]; then echo '/r/a  <-  /w/one two  (pid 12)'; else echo \"$2\" > "+log+"; fi\n"), 0o755)
+	t.Setenv("PATH", dir+":"+os.Getenv("PATH"))
+	sv := spotlightService()
+	run := func(script, wt string) error {
+		return exec.Command("sh", "-c", RenderManifest(script, map[string]string{"worktree.path": wt})).Run()
+	}
+	if run(sv.Status, "/w/one two") != nil || run(sv.Status, "/w/other") == nil {
+		t.Fatal("status")
+	}
+	if run(sv.Stop, "/w/one two") != nil {
+		t.Fatal("stop")
+	}
+	if b, _ := os.ReadFile(log); strings.TrimSpace(string(b)) != "/r/a" {
+		t.Fatalf("stopped %q", b)
 	}
 }

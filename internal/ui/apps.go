@@ -70,6 +70,20 @@ func (a *App) RunAppAction(app, id, key string) (string, error) {
 	return out, err
 }
 
+// AppServiceRunning reports whether a service action is running for the task.
+func (a *App) AppServiceRunning(app, id, key string) (bool, error) {
+	return a.svc.AppServiceRunning(app, id, key)
+}
+
+// StopAppService stops a running service action.
+func (a *App) StopAppService(app, id, key string) error {
+	err := a.svc.StopAppService(app, id, key)
+	if err != nil {
+		log.Printf("app %s/%s stop %s: %v", app, id, key, err)
+	}
+	return err
+}
+
 // RenderApp previews command for cwd and task key.
 func (a *App) RenderApp(command, cwd, key string) string { return core.RenderApp(command, cwd, key) }
 

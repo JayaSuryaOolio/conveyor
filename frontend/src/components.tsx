@@ -1,7 +1,7 @@
 import {useEffect, useState} from 'react'
-import {ActionIcon, Badge, Box, Button, Card as MCard, Group, Menu, Modal, Notification, Paper, Select, Stack, Text, Tooltip} from '@mantine/core'
-import {IconAppWindow, IconDots, IconPencil} from '@tabler/icons-react'
-import {AddComment, MergedPR, Move, PlacedActions, RunAppAction, ShowError, TakeQueuedComment} from '../wailsjs/go/ui/App'
+import {ActionIcon, Badge, Box, Button, Card as MCard, Group, Indicator, Menu, Modal, Notification, Paper, Select, Stack, Text, Tooltip} from '@mantine/core'
+import {IconAppWindow, IconCheck, IconDots, IconPencil, IconX} from '@tabler/icons-react'
+import {AddComment, AppServiceRunning, MergedPR, Move, PlacedActions, RunAppAction, ShowError, StopAppService, TakeQueuedComment} from '../wailsjs/go/ui/App'
 import {store, ui} from '../wailsjs/go/models'
 import {Markdown, MarkdownEditor} from './markdown'
 import {ALL_STATUSES, STATUS_COLOR, STATUS_LABEL, ago, fmtK, fmtTime, useData, useDraft} from './util'
@@ -51,8 +51,29 @@ export function PlacedButtons({place, k = '', size = 'xs'}: {place: string; k?: 
     }
     return (
         <Group gap={4} onClick={e => e.stopPropagation()}>
-            {data.map(a => <Button key={a.app + a.id} size={size} variant="default" loading={busy === a.app + a.id} title={a.app} onClick={() => run(a)}>{a.label}</Button>)}
+            {data.map(a => a.service
+                ? <ServiceButton key={a.app + a.id} a={a} k={k} size={size}/>
+                : <Button key={a.app + a.id} size={size} variant="default" loading={busy === a.app + a.id} title={a.app} onClick={() => run(a)}>{a.label}</Button>)}
         </Group>
+    )
+}
+
+/** A service action: a green pulsing dot while its status script succeeds, a click then stops it; otherwise a click starts it and flashes a check/cross. */
+function ServiceButton({a, k, size}: {a: {app: string; id: string; label: string}; k: string; size: string}) {
+    const [running, setRunning] = useState(false)
+    const [res, setRes] = useState<boolean | null>(null)
+    const check = () => AppServiceRunning(a.app, a.id, k).then(setRunning, () => setRunning(false))
+    useEffect(() => { check() }, [a.app, a.id, k]) // eslint-disable-line react-hooks/exhaustive-deps
+    const click = () => (running ? StopAppService(a.app, a.id, k) : RunAppAction(a.app, a.id, k).then(() => {}))
+        .then(() => setRes(true), e => { setRes(false); appErr(e) })
+        .finally(() => { setTimeout(() => setRes(null), 1500); check() })
+    return (
+        <Tooltip label={running ? `${a.label} running – click to stop` : a.label}>
+            <Indicator disabled={!running} color="green" size={8} processing>
+                <Button size={size} variant="default" title={a.app} onClick={click}
+                        leftSection={res === null ? undefined : res ? <IconCheck size={14} color="var(--mantine-color-green-6)"/> : <IconX size={14} color="var(--mantine-color-red-6)"/>}>{a.label}</Button>
+            </Indicator>
+        </Tooltip>
     )
 }
 
