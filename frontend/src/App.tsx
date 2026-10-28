@@ -93,8 +93,8 @@ export default function App() {
                         </Tooltip>
                     ) : <>
                         <Button leftSection={<IconPlus size={16}/>} rightSection={<Kbd size="xs">n</Kbd>} onClick={() => setShowNew(true)}>New task</Button>
-                        <TextInput ref={search} placeholder="Search" leftSection={<IconSearch size={16}/>} rightSection={<Kbd size="xs">/</Kbd>}
-                                   value={q} onChange={e => setQ(e.target.value)}/>
+                        {view.name !== 'board' && <TextInput ref={search} placeholder="Search" leftSection={<IconSearch size={16}/>} rightSection={<Kbd size="xs">/</Kbd>}
+                                   value={q} onChange={e => setQ(e.target.value)}/>}
                     </>}
                     <Stack gap={2} mt="xs">
                         {NAV.map(({name, key, label, icon: Icon}) => (
@@ -120,7 +120,7 @@ export default function App() {
                 </Stack>
             </AppShell.Navbar>
             <AppShell.Main key={view.name + (view.key ?? '')} h="100vh" style={{overflow: view.name === 'task' ? 'hidden' : 'auto'}}>
-                {view.name === 'board' && <Board nav={nav} q={q}/>}
+                {view.name === 'board' && <Board nav={nav} q={q} setQ={setQ} search={search}/>}
                 {view.name === 'focus' && <Focus nav={nav} q={q}/>}
                 {view.name === 'task' && <TaskPage k={view.key!} nav={nav}/>}
                 {view.name === 'learnings' && <LearningsPage nav={nav}/>}
