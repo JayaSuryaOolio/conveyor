@@ -90,7 +90,6 @@ export function Card({c, nav}: {c: ui.TaskCard; nav: Nav}) {
                 {c.labels.map(l => <Badge key={'l:' + l} variant="outline" color="gray" size="xs" style={{textTransform: 'none'}}>{l}</Badge>)}
             </Group>}
             {c.lastSummary && <Box mt="xs" mah={40} style={{overflow: 'hidden'}}><Markdown c="dimmed">{c.lastSummary}</Markdown></Box>}
-            <Group mt="xs"><StatusBadge status={c.status}/></Group>
         </MCard>
     )
 }
