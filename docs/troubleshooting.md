@@ -57,15 +57,22 @@ claude agents --json --all               # that bg_id's sessionId is the NEW one
 grep KEY ~/.conveyor/logs/hook.log       # UserPromptSubmit/Stop for the new session id
 ```
 
-**Fix.** Only once the session is idle (a live session fires its own `Stop`, and replaying one mid-turn ends the task early). Replay the Stop with the *original* run in mind: the replay lands on the run whose `session_id` matches, which is the interactive one, so it finishes that run and moves the task, but the resumed run stays `running` until the reaper fails it when the session is gone.
+**Fix.** Replay the Stop under the **resumed run's** session id (the old one, from `conveyor task show KEY --runs --json`), with the **new** session's transcript and last message. That makes the hook resolve the auto run, which finishes it and moves the task (to todo if a comment is queued, so the dispatcher answers it). Replaying under the new session id does not work: it resolves the interactive run, and interactive runs never move the task.
 
 ```sh
-# same replay script as the recipe above, with SID = the NEW session id
+SID=<session_id of the stuck resume run>        # e.g. 106b7dbf-...
+NEW=<sessionId of its bg agent>                 # claude agents --json --all, e.g. 4417568e-...
+CWD=~/.conveyor/workspaces/KEY/<primary repo>
+T=$(ls ~/.claude/projects/*/$NEW.jsonl)
+python3 - "$SID" "$CWD" "$T" <<'EOF2' | conveyor hook Stop
+# same script as the first recipe: print the JSON payload with session_id=$SID, transcript_path=$T,
+# last_assistant_message = the last assistant text in $T
+EOF2
 conveyor task sync KEY
-conveyor task show KEY --runs --json     # task moved; interactive run finished
+conveyor task show KEY --runs --json     # resume run finished, task moved
 ```
 
-Do not edit the DB to re-point `session_id`. If the resumed run is still `running` after its session has gone, the reaper fails it ("session vanished"): read the interactive run's summary for the real outcome.
+Run it when the session is idle if you can; a live session's own Stop only touches the interactive run, so replaying mid-turn is safe but moves the task before the turn ends. The interactive run stays `running` until its session leaves the agents list (the reaper finishes it).
 
 **Not yet prevented.** The proposed fix (update `session_id` from the agents list in the reaper, never create an interactive run for a known `bg_id`) is in [session-identity.md](session-identity.md#prevention-proposed-not-implemented).
 
