@@ -51,7 +51,7 @@ export function CommandPalette({nav}: {nav: Nav}) {
 
     return (
         <Spotlight.Root query={query} onQueryChange={setQuery} shortcut="mod + K" scrollable maxHeight={420} onSpotlightClose={() => setQuery('')}>
-            <Spotlight.Search placeholder="Search tasks, agents and settings" leftSection={<IconSearch size={18}/>}
+            <Spotlight.Search placeholder="Search tasks, agents and settings" leftSection={<IconSearch size={18}/>} rightSectionPointerEvents="all"
                               rightSection={<Tooltip label="Reload (ignore cache)"><ActionIcon variant="subtle" color="gray" aria-label="Reload" loading={busy} onClick={() => refresh(true)}><IconRefresh size={16}/></ActionIcon></Tooltip>}/>
             <Spotlight.ActionsList>
                 {shown.length ? shown.map(i => {

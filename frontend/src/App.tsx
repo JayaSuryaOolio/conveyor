@@ -57,6 +57,7 @@ export default function App() {
         let g = false
         const onKey = (e: KeyboardEvent) => {
             const el = e.target as HTMLElement
+            if (e.key === 'Escape' && !e.defaultPrevented && el.matches('input,textarea,select')) { e.preventDefault(); el.blur(); return } // de-focus instead of macOS leaving fullscreen
             if (e.metaKey && e.key === '[') { e.preventDefault(); back(); return }
             if (el.matches('input,textarea,select') || e.metaKey || e.ctrlKey) return
             if (g) {
