@@ -10,6 +10,7 @@ import (
 
 	"github.com/JayaSuryaOolio/conveyor/internal/core"
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // ListApps returns the configured apps.
@@ -51,8 +52,18 @@ func (a *App) InstallManifest(raw string, replace bool) error {
 	return err
 }
 
-// ExportApp returns the manifest JSON of a manifest app.
-func (a *App) ExportApp(name string) (string, error) { return a.svc.ExportApp(name) }
+// ExportApp saves the manifest JSON of a manifest app to a file the user picks and returns its path ("" if cancelled).
+func (a *App) ExportApp(name string) (string, error) {
+	raw, err := a.svc.ExportApp(name)
+	if err != nil {
+		return "", err
+	}
+	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{Title: "Export manifest", DefaultFilename: strings.Join(strings.Fields(name), "-") + ".json"})
+	if err != nil || path == "" {
+		return "", err
+	}
+	return path, os.WriteFile(path, []byte(raw+"\n"), 0o600)
+}
 
 // ValidateManifest returns why raw is not an installable manifest, "" when it is (live check in the builder).
 func (a *App) ValidateManifest(raw string) string {
