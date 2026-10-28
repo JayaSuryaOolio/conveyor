@@ -43,7 +43,10 @@ function XTerm({id, active}: {id: string; active: boolean}) {
             }),
             EventsOn('term-exit:' + id, () => t.write('\r\n\x1b[2m[process exited]\x1b[0m\r\n')),
         ]
-        TermBuffer(id).then(buf => {
+        // Replay only after the first visible fit: a hidden xterm is 80 cols, and the
+        // scrollback was drawn at the PTY's real width, so replaying early garbles it.
+        let replayed = false
+        const replay = () => TermBuffer(id).then(buf => {
             const b = bytes(buf.data)
             t.write(b)
             base = buf.end
@@ -61,6 +64,7 @@ function XTerm({id, active}: {id: string; active: boolean}) {
             if (!el.current?.offsetWidth) return // hidden tab
             fit.fit()
             TermResize(id, t.cols, t.rows).catch(() => {})
+            if (!replayed) { replayed = true; replay() }
         })
         ro.observe(el.current!)
         return () => { ro.disconnect(); off.forEach(f => f()); t.dispose() }
