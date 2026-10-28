@@ -14,6 +14,8 @@ import (
 // automations installed with it. Action `run` scripts may use ${{ var }} placeholders
 // (like GitHub Actions), filled with shell-quoted values from the Vars table.
 type Manifest struct {
+	// Version is the manifest schema version; absent means 1. See migrateManifest.
+	Version     int              `json:"version,omitempty"`
 	Name        string           `json:"name"`
 	Description string           `json:"description,omitempty"`
 	Actions     []ManifestAction `json:"actions,omitempty"`
@@ -45,6 +47,21 @@ type ManifestAuto struct {
 	ActionArg  string `json:"action_arg"`
 }
 
+// ManifestVersion is the schema version this build writes and understands.
+const ManifestVersion = 1
+
+// migrateManifest upgrades m to ManifestVersion in place. When the schema changes, bump
+// ManifestVersion and add a `case N:` that converts vN to vN+1; installed apps then keep working.
+func migrateManifest(m *Manifest) error {
+	if m.Version == 0 {
+		m.Version = 1
+	}
+	if m.Version > ManifestVersion {
+		return fmt.Errorf("manifest: version %d is newer than this Conveyor supports (%d)", m.Version, ManifestVersion)
+	}
+	return nil
+}
+
 // Placements are the UI slots an action can ask for; the first needs no task.
 var Placements = map[string]bool{"global_nav": false, "task_sidebar": true, "board_card": true}
 
@@ -63,6 +80,9 @@ func ParseManifest(raw string) (Manifest, error) {
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&m); err != nil {
 		return m, fmt.Errorf("manifest: %w", err)
+	}
+	if err := migrateManifest(&m); err != nil {
+		return m, err
 	}
 	if strings.TrimSpace(m.Name) == "" {
 		return m, fmt.Errorf("manifest: name is required")
@@ -238,4 +258,47 @@ func (s *Service) RunAppAction(app, id, key string) (string, error) {
 	}
 	vars["worktree.path"] = cwd
 	return RunApp(store.App{Name: act.Label, Command: RenderManifest(act.Run, vars), Output: act.Output}, cwd, key)
+}
+
+// LegacyManifest expresses a plain command app (the old {cwd}/{key} template) as a manifest:
+// one action in the nav bar (global) or task sidebar. Unlike the legacy sidebar icons, the
+// action runs in the task's primary worktree only.
+func LegacyManifest(a store.App) (string, error) {
+	place := "task_sidebar"
+	if a.Global {
+		place = "global_nav"
+	}
+	run := strings.NewReplacer("{cwd}", "${{ worktree.path }}", "{key}", "${{ task.key }}").Replace(a.Command)
+	b, err := json.MarshalIndent(Manifest{Version: ManifestVersion, Name: a.Name, Actions: []ManifestAction{
+		{ID: "open", Label: a.Name, Run: run, Places: []string{place}, Output: a.Output},
+	}}, "", "  ")
+	return string(b), err
+}
+
+// ConvertApp turns the plain command app into a manifest app in place.
+func (s *Service) ConvertApp(name string) error {
+	a, err := store.GetApp(s.DB, name)
+	if err != nil {
+		return err
+	}
+	if a.Manifest != "" {
+		return fmt.Errorf("app %q is already a manifest app", name)
+	}
+	raw, err := LegacyManifest(a)
+	if err != nil {
+		return err
+	}
+	if _, err := ParseManifest(raw); err != nil {
+		return err
+	}
+	return store.UpdateApp(s.DB, store.App{ID: a.ID, Name: a.Name, Manifest: raw})
+}
+
+// InstallLegacy installs a plain command app (e.g. a detected preset) as a manifest app.
+func (s *Service) InstallLegacy(a store.App) (store.App, error) {
+	raw, err := LegacyManifest(a)
+	if err != nil {
+		return store.App{}, err
+	}
+	return s.InstallManifest(raw)
 }

@@ -183,3 +183,22 @@ func TestInstallManifest(t *testing.T) {
 		t.Fatal("automation left behind")
 	}
 }
+
+func TestConvertApp(t *testing.T) {
+	s := newSvc(t)
+	if _, err := store.CreateApp(s.DB, store.App{Name: "Zed", Command: "open -a Zed {cwd}"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ConvertApp("Zed"); err != nil {
+		t.Fatal(err)
+	}
+	if p, _ := s.PlacedActions("task_sidebar"); len(p) != 1 || p[0].App != "Zed" {
+		t.Fatal(p)
+	}
+	if err := s.ConvertApp("Zed"); err == nil {
+		t.Fatal("converted twice")
+	}
+	if _, err := ParseManifest(`{"version":99,"name":"x","actions":[{"id":"a","label":"A","run":"x","places":["global_nav"]}]}`); err == nil {
+		t.Fatal("accepted future version")
+	}
+}

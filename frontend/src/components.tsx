@@ -33,9 +33,12 @@ export function Toasts() {
     )
 }
 
+/** An app command failed: the backend already logged it, so only toast. */
+const appErr = (e: unknown) => toast(String(e))
+
 /** Runs an app; an output app's result (or "done") is toasted. */
 export const runApp = (a: store.App, p: Promise<string>) =>
-    p.then(out => { if (a.output) toast(out || `${a.name}: done`) }, errMsg)
+    p.then(out => { if (a.output) toast(out || `${a.name}: done`) }, appErr)
 
 /** Buttons for the manifest app actions that asked for `place` (global_nav, task_sidebar, board_card); `k` is the task key ("" for global_nav). */
 export function PlacedButtons({place, k = '', size = 'xs'}: {place: string; k?: string; size?: string}) {
@@ -44,7 +47,7 @@ export function PlacedButtons({place, k = '', size = 'xs'}: {place: string; k?: 
     if (!data?.length) return null
     const run = (a: {app: string; id: string; label: string; output: boolean}) => {
         setBusy(a.app + a.id)
-        RunAppAction(a.app, a.id, k).then(out => { if (a.output) toast(out || `${a.label}: done`) }, errMsg).finally(() => setBusy(''))
+        RunAppAction(a.app, a.id, k).then(out => { if (a.output) toast(out || `${a.label}: done`) }, appErr).finally(() => setBusy(''))
     }
     return (
         <Group gap={4} onClick={e => e.stopPropagation()}>

@@ -1,7 +1,7 @@
 import {useEffect, useState} from 'react'
 import {ActionIcon, Badge, Button, Code, FileButton, Group, Modal, Paper, Stack, Switch, Table, Text, TextInput, Textarea, Title} from '@mantine/core'
-import {IconPencil, IconPlayerPlay, IconPlus, IconPuzzle, IconTrash, IconUpload} from '@tabler/icons-react'
-import {AddApp, AppIcons, AppPresets, Confirm, DeleteApp, Home, InstallManifest, ListApps, RenderApp, TestApp, UpdateApp, UserHooks} from '../wailsjs/go/ui/App'
+import {IconPencil, IconPlayerPlay, IconPlus, IconPuzzle, IconTransform, IconTrash, IconUpload} from '@tabler/icons-react'
+import {AddApp, AppIcons, AppPresets, Confirm, ConvertApp, DeleteApp, Home, InstallManifest, InstallPreset, ListApps, RenderApp, TestApp, UpdateApp, UserHooks} from '../wailsjs/go/ui/App'
 import {store} from '../wailsjs/go/models'
 import {AppIcon, errMsg, runApp} from './components'
 import {useData} from './util'
@@ -39,6 +39,7 @@ function AppForm({initial, onClose}: {initial: store.App; onClose: (saved: boole
 }
 
 const MANIFEST_EXAMPLE = `{
+  "version": 1,
   "name": "Lint",
   "description": "Lint the task's worktree",
   "actions": [
@@ -141,6 +142,7 @@ export function Apps() {
                                     <Group gap="xs" wrap="nowrap" justify="flex-end">
                                         {!a.manifest && <>
                                             <ActionIcon variant="subtle" color="gray" aria-label="Test" title="Test on home folder" onClick={() => runApp(a, TestApp(a))}><IconPlayerPlay size={16}/></ActionIcon>
+                                            <ActionIcon variant="subtle" color="gray" aria-label="Convert" title="Convert to manifest app" onClick={() => ConvertApp(a.name).then(reload, errMsg)}><IconTransform size={16}/></ActionIcon>
                                             <ActionIcon variant="subtle" color="gray" aria-label="Edit" onClick={() => setForm(a)}><IconPencil size={16}/></ActionIcon>
                                         </>}
                                         <ActionIcon variant="subtle" color="red" aria-label="Delete" onClick={() => Confirm(`Delete app ${a.name}?`).then(ok => { if (ok) return DeleteApp(a.name).then(reload) }).catch(errMsg)}><IconTrash size={16}/></ActionIcon>
@@ -156,7 +158,7 @@ export function Apps() {
                 <Group gap="xs">
                     {missing.map(p => (
                         <Button key={p.name} size="xs" variant="light" leftSection={<IconPlus size={14}/>} title={p.command}
-                                onClick={() => AddApp(p).then(reload, errMsg)}>{p.name}</Button>
+                                onClick={() => InstallPreset(p).then(reload, errMsg)}>{p.name}</Button>
                     ))}
                 </Group>
             </>}

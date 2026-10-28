@@ -156,6 +156,10 @@ export function UserHooks(arg1:string):Promise<string>;
 
 export function InstallManifest(arg1:string):Promise<void>;
 
+export function InstallPreset(arg1:store.App):Promise<void>;
+
+export function ConvertApp(arg1:string):Promise<void>;
+
 export function PlacedActions(arg1:string):Promise<Array<core.Placed>>;
 
 export function RunAppAction(arg1:string,arg2:string,arg3:string):Promise<string>;

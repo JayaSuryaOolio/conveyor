@@ -306,6 +306,14 @@ export function InstallManifest(arg1) {
   return window['go']['ui']['App']['InstallManifest'](arg1);
 }
 
+export function InstallPreset(arg1) {
+  return window['go']['ui']['App']['InstallPreset'](arg1);
+}
+
+export function ConvertApp(arg1) {
+  return window['go']['ui']['App']['ConvertApp'](arg1);
+}
+
 export function PlacedActions(arg1) {
   return window['go']['ui']['App']['PlacedActions'](arg1);
 }

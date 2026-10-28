@@ -15,12 +15,12 @@ import (
 )
 
 func init() {
-	register("app", runApp, "open worktrees in external apps, run quick actions (list|presets|add|install|run|global|output|rm|open)")
+	register("app", runApp, "open worktrees in external apps, run quick actions (list|presets|add|install|convert|run|global|output|rm|open)")
 	register("hooks", runHooks, "Claude Code hooks in ~/.claude/settings.json (status|install|uninstall)")
 }
 
 const appUsage = `usage: conveyor app list [--json] | presets [--json] | add NAME [--command CMD] [--global] [--output]
-       conveyor app install FILE|- (manifest JSON; - reads stdin) | run APP ACTION [KEY]
+       conveyor app install FILE|- (manifest JSON; - reads stdin) | convert NAME | run APP ACTION [KEY]
        conveyor app global|output NAME on|off | rm NAME
        conveyor app open NAME [KEY|DIR] [--repo r] [--print]
 CMD is a shell command; {cwd} becomes the quoted worktree path and {key} the task key ('' without one).
@@ -103,6 +103,11 @@ func runApp(home string, args []string) error {
 				return errors.New(appUsage)
 			}
 			return s.UninstallApp(pos[0])
+		case "convert": // plain command app -> manifest app
+			if len(pos) != 1 {
+				return errors.New(appUsage)
+			}
+			return s.ConvertApp(pos[0])
 		case "install":
 			if len(pos) != 1 {
 				return errors.New(appUsage)
