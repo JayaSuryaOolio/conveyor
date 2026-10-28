@@ -62,7 +62,11 @@ func (a *App) ExportApp(name string) (string, error) {
 	if err != nil || path == "" {
 		return "", err
 	}
-	return path, os.WriteFile(path, []byte(raw+"\n"), 0o600)
+	if err := os.WriteFile(path, []byte(raw+"\n"), 0o600); err != nil {
+		return "", err
+	}
+	log.Printf("exported manifest of app %q to %s", name, path)
+	return path, nil
 }
 
 // ValidateManifest returns why raw is not an installable manifest, "" when it is (live check in the builder).
