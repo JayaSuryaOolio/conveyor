@@ -90,3 +90,26 @@ conveyor task sync KEY
 If that PR is already merged, the task can simply be closed: `conveyor task move KEY done`.
 
 **Prevented since #95.** A comment on a task with a merged PR now starts a follow-up sub-task (`KEY` → `KEYA`) with its own branch, instead of reopening the task.
+
+## A resume run stays "running" next to a second, finished run
+
+Seen on CV-55 (runs 190/191 and 193/194). A task with a finished run gets a comment, so Conveyor starts an `auto/resume` run. Claude Code starts the resumed session under a **new session id** (the run's `bg_id`, not the `session_id` Conveyor stored). The hooks then report the new id, which matches no run, so Conveyor opens a second `interactive/fresh` run for it. That run gets the Stop hook and finishes, with the summary and status block. The resume run never hears anything, stays `running` with no activity, and holds the task `running`. The human sees the agent's answer under the other run, or not as a message at all.
+
+Run 190 (`bg_id` 972c6af9) kept the old session `464739a3` while the work happened in `972c6af9`. Run 193 (`bg_id` 7c3e0439) kept `847bd280` while the work happened in `7c3e0439`.
+
+**Confirm**
+
+```sh
+conveyor task show KEY --runs --json   # an auto/resume run: status running, calls=0, session_id != bg_id;
+                                       # right after it, an interactive/fresh run: finished, same task, started 1-2s later
+grep KEY ~/.conveyor/logs/hook.log     # UserPromptSubmit and Stop for the bg_id session, none for the stored session_id
+claude agents --json --all             # the bg_id session: "state": "done"
+```
+
+This differs from the recipe above: there the Stop hook never fired. Here it fired, but finished the wrong run, so replaying it only finishes the interactive run again.
+
+**Fix.** The work is already recorded on the interactive run. End the empty resume run with `conveyor task cancel KEY` (it moves the task to `cancelled`, stops its sessions and fails the run; the run turns `failed` a few seconds later). `cancelled -> review` is refused by `conveyor task move`, so reopen the task from the UI if it is not finished.
+
+Last resort for a lost run, not a fix: leave it and move on. Moving the task to `review` does not end the run.
+
+**Open.** Not prevented yet. A permanent fix is to attach the hook's session id to the open run whose `bg_id` is that session (or the newest `running` auto run of the task) instead of creating an interactive run, and to have `conveyor task move KEY review|done` fail leftover `running` runs without cancelling the task. Run 8 of CV-55 (194) showed its output only as a summary on the wrong run.

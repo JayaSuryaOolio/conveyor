@@ -1,10 +1,10 @@
 import {useEffect, useState} from 'react'
-import {ActionIcon, Badge, Box, Button, Card as MCard, Group, Menu, Modal, Notification, Paper, Select, Stack, Text, Tooltip} from '@mantine/core'
-import {IconAppWindow, IconDots, IconPencil} from '@tabler/icons-react'
-import {AddComment, MergedPR, Move, ShowError, TakeQueuedComment} from '../wailsjs/go/ui/App'
+import {ActionIcon, Badge, Box, Button, Card as MCard, Group, Indicator, Menu, Modal, Notification, Paper, Select, Stack, Text, Tooltip} from '@mantine/core'
+import {IconAppWindow, IconCheck, IconDots, IconPencil, IconX} from '@tabler/icons-react'
+import {AddComment, AppServiceRunning, MergedPR, Move, PlacedActions, RunAppAction, ShowError, StopAppService, TakeQueuedComment} from '../wailsjs/go/ui/App'
 import {store, ui} from '../wailsjs/go/models'
 import {Markdown, MarkdownEditor} from './markdown'
-import {ALL_STATUSES, STATUS_COLOR, STATUS_LABEL, ago, fmtK, fmtTime, useDraft} from './util'
+import {ALL_STATUSES, STATUS_COLOR, STATUS_LABEL, ago, fmtK, fmtTime, useData, useDraft} from './util'
 
 /** A screen to show; board views may carry a label or repo filter to apply (deep link). */
 export type View = {name: string; key?: string; label?: string; repo?: string}
@@ -35,9 +35,49 @@ export function Toasts() {
     )
 }
 
+/** An app command failed: the backend already logged it, so only toast. */
+const appErr = (e: unknown) => toast(String(e))
+
 /** Runs an app; an output app's result (or "done") is toasted. */
 export const runApp = (a: store.App, p: Promise<string>) =>
-    p.then(out => { if (a.output) toast(out || `${a.name}: done`) }, errMsg)
+    p.then(out => { if (a.output) toast(out || `${a.name}: done`) }, appErr)
+
+/** Buttons for the manifest app actions that asked for `place` (global_nav, task_sidebar, board_card); `k` is the task key ("" for global_nav). */
+export function PlacedButtons({place, k = '', size = 'xs'}: {place: string; k?: string; size?: string}) {
+    const {data} = useData(() => PlacedActions(place), [place])
+    const [busy, setBusy] = useState('')
+    if (!data?.length) return null
+    const run = (a: {app: string; id: string; label: string; output: boolean}) => {
+        setBusy(a.app + a.id)
+        RunAppAction(a.app, a.id, k).then(out => { if (a.output) toast(out || `${a.label}: done`) }, appErr).finally(() => setBusy(''))
+    }
+    return (
+        <Group gap={4} onClick={e => e.stopPropagation()}>
+            {data.map(a => a.service
+                ? <ServiceButton key={a.app + a.id} a={a} k={k} size={size}/>
+                : <Button key={a.app + a.id} size={size} variant="default" loading={busy === a.app + a.id} title={a.app} onClick={() => run(a)}>{a.label}</Button>)}
+        </Group>
+    )
+}
+
+/** A service action: a green pulsing dot while its status script succeeds, a click then stops it; otherwise a click starts it and flashes a check/cross. */
+function ServiceButton({a, k, size}: {a: {app: string; id: string; label: string}; k: string; size: string}) {
+    const [running, setRunning] = useState(false)
+    const [res, setRes] = useState<boolean | null>(null)
+    const check = () => AppServiceRunning(a.app, a.id, k).then(setRunning, () => setRunning(false))
+    useEffect(() => { check() }, [a.app, a.id, k]) // eslint-disable-line react-hooks/exhaustive-deps
+    const click = () => (running ? StopAppService(a.app, a.id, k) : RunAppAction(a.app, a.id, k).then(() => {}))
+        .then(() => setRes(true), e => { setRes(false); appErr(e) })
+        .finally(() => { setTimeout(() => setRes(null), 1500); check() })
+    return (
+        <Tooltip label={running ? `${a.label} running – click to stop` : a.label}>
+            <Indicator disabled={!running} color="green" size={8} processing>
+                <Button size={size} variant="default" title={a.app} onClick={click}
+                        leftSection={res === null ? undefined : res ? <IconCheck size={14} color="var(--mantine-color-green-6)"/> : <IconX size={14} color="var(--mantine-color-red-6)"/>}>{a.label}</Button>
+            </Indicator>
+        </Tooltip>
+    )
+}
 
 /** The app's macOS icon (from AppIcons), else a generic window glyph. */
 export const AppIcon = ({name, icons, size = 18}: {name: string; icons?: Record<string, string>; size?: number}) =>
@@ -94,6 +134,7 @@ export function Card({c, nav, onLabel}: {c: ui.TaskCard; nav: Nav; onLabel: (l: 
                                           style={{textTransform: 'none', cursor: 'pointer'}} onClick={e => { e.stopPropagation(); onLabel(l) }}>{l}</Badge>)}
             </Group>}
             {c.lastSummary && <Box mt="xs" mah={40} style={{overflow: 'hidden'}}><Markdown c="dimmed">{c.lastSummary}</Markdown></Box>}
+            {c.repos.length > 0 && <Box mt="xs"><PlacedButtons place="board_card" k={c.key} size="compact-xs"/></Box>}
         </MCard>
     )
 }

@@ -2,6 +2,7 @@ package ui
 
 import (
 	"errors"
+	"log"
 	"os"
 	"strings"
 
@@ -40,7 +41,48 @@ func (a *App) UpdateApp(x store.App) error {
 }
 
 // DeleteApp removes an app.
-func (a *App) DeleteApp(name string) error { return store.DeleteApp(a.svc.DB, name) }
+func (a *App) DeleteApp(name string) error { return a.svc.UninstallApp(name) }
+
+// InstallManifest installs an app from manifest JSON (text box or uploaded file).
+func (a *App) InstallManifest(raw string) error {
+	_, err := a.svc.InstallManifest(raw)
+	return err
+}
+
+// ConvertApp turns a plain command app into a manifest app.
+func (a *App) ConvertApp(name string) error { return a.svc.ConvertApp(name) }
+
+// InstallPreset adds a detected app as a manifest app.
+func (a *App) InstallPreset(x store.App) error {
+	_, err := a.svc.InstallLegacy(x)
+	return err
+}
+
+// PlacedActions lists manifest actions wanting a UI slot (global_nav, task_sidebar, board_card).
+func (a *App) PlacedActions(place string) ([]core.Placed, error) { return a.svc.PlacedActions(place) }
+
+// RunAppAction runs a manifest action; key "" for global_nav ones.
+func (a *App) RunAppAction(app, id, key string) (string, error) {
+	out, err := a.svc.RunAppAction(app, id, key)
+	if err != nil {
+		log.Printf("app %s/%s %s: %v", app, id, key, err)
+	}
+	return out, err
+}
+
+// AppServiceRunning reports whether a service action is running for the task.
+func (a *App) AppServiceRunning(app, id, key string) (bool, error) {
+	return a.svc.AppServiceRunning(app, id, key)
+}
+
+// StopAppService stops a running service action.
+func (a *App) StopAppService(app, id, key string) error {
+	err := a.svc.StopAppService(app, id, key)
+	if err != nil {
+		log.Printf("app %s/%s stop %s: %v", app, id, key, err)
+	}
+	return err
+}
 
 // RenderApp previews command for cwd and task key.
 func (a *App) RenderApp(command, cwd, key string) string { return core.RenderApp(command, cwd, key) }
@@ -55,7 +97,13 @@ func (a *App) TestApp(x store.App) (string, error) {
 }
 
 // OpenApp runs the named app in the task repo's worktree ("" repo = primary); an output app returns its output.
-func (a *App) OpenApp(name, key, repo string) (string, error) { return a.svc.OpenApp(name, key, repo) }
+func (a *App) OpenApp(name, key, repo string) (string, error) {
+	out, err := a.svc.OpenApp(name, key, repo)
+	if err != nil {
+		log.Printf("app %s %s: %v", name, key, err)
+	}
+	return out, err
+}
 
 // AppIcons maps configured app names to PNG data: URLs of their macOS icons.
 func (a *App) AppIcons() (map[string]string, error) {

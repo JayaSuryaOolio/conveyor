@@ -254,6 +254,14 @@ export function SpotlightStop(arg1) {
   return window['go']['ui']['App']['SpotlightStop'](arg1);
 }
 
+export function AppServiceRunning(arg1, arg2, arg3) {
+  return window['go']['ui']['App']['AppServiceRunning'](arg1, arg2, arg3);
+}
+
+export function StopAppService(arg1, arg2, arg3) {
+  return window['go']['ui']['App']['StopAppService'](arg1, arg2, arg3);
+}
+
 export function Stop(arg1) {
   return window['go']['ui']['App']['Stop'](arg1);
 }
@@ -304,4 +312,24 @@ export function UpdateAutomation(arg1) {
 
 export function UserHooks(arg1) {
   return window['go']['ui']['App']['UserHooks'](arg1);
+}
+
+export function InstallManifest(arg1) {
+  return window['go']['ui']['App']['InstallManifest'](arg1);
+}
+
+export function InstallPreset(arg1) {
+  return window['go']['ui']['App']['InstallPreset'](arg1);
+}
+
+export function ConvertApp(arg1) {
+  return window['go']['ui']['App']['ConvertApp'](arg1);
+}
+
+export function PlacedActions(arg1) {
+  return window['go']['ui']['App']['PlacedActions'](arg1);
+}
+
+export function RunAppAction(arg1, arg2, arg3) {
+  return window['go']['ui']['App']['RunAppAction'](arg1, arg2, arg3);
 }
