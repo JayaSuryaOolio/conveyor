@@ -322,6 +322,9 @@ func (a *App) TakeQueuedComment(key string, id int64) (string, error) {
 	return body, err
 }
 
+// Stop stops the task's running session and moves the task to needs_you.
+func (a *App) Stop(key string) error { return a.svc.Stop(key) }
+
 // MergedPR is the merged PR a comment on the task would trip over, or "".
 func (a *App) MergedPR(key string) (string, error) { return a.svc.MergedPR(key) }
 

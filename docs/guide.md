@@ -101,7 +101,9 @@ conveyor task label CV-1A add bug        # labels: shown on cards, filterable on
 
 ## Comments, resume and fresh sessions
 
-A comment from you, or a system note, on a task in needs_you, review, failed or done puts it back in todo, and the dispatcher launches it again. A comment on a running task is queued (marked "queued" in the thread) and sent with the next run: when the run stops or its session vanishes, the task goes to todo instead of review or needs_you. A comment on a backlog or todo task just waits.
+A comment from you, or a system note, on a task in needs_you, review, failed or done puts it back in todo, and the dispatcher launches it again. A comment on a running task is queued (marked "queued" in the thread) and sent with the next run: when the run stops or its session vanishes, the task goes to todo instead of review or needs_you. A comment on a backlog or todo task just waits. Until a run receives it, your comment shows an edit icon that moves it back into the editor.
+
+**Stop run** (link beside the running timer, asks to confirm; or `conveyor task stop KEY`) marks the run failed ("stopped"), moves the task to needs_you (todo if comments are queued) and stops and removes the background Claude session. Comment to resume.
 
 Once one of a task's PRs is merged, a comment on it no longer simply reopens it: a task keeps one branch and at most one PR per repo. The app asks what the comment is for:
 
@@ -227,6 +229,7 @@ conveyor task new "<title>" --repo a[,b] [--primary r] [--desc t | --desc-file f
 conveyor task list [--status a,b]         conveyor task show KEY [--thread] [--runs]
 conveyor task comment KEY <text|-> [--ask|--note]   conveyor task move KEY <status>
 conveyor task done KEY                    conveyor task cancel KEY
+conveyor task stop KEY
 conveyor task set KEY [--repo r] [--branch b] [--pr url] [--model m] [--desc d | --desc-file f]
 conveyor task link KEY blocks|relates OTHER    conveyor task unlink KEY kind OTHER
 conveyor task parent KEY PARENT|--none
@@ -269,7 +272,7 @@ Outside it, Conveyor reads `~/.claude/projects` (session transcripts), `~/.claud
 
 ## Troubleshooting
 
-Recipes for specific failures (a run stuck after its session finished, an untracked PR) are in [troubleshooting.md](troubleshooting.md).
+Recipes for specific failures (a run stuck after its session finished, an untracked PR) are in [troubleshooting.md](troubleshooting.md) (run/session identity: [session-identity.md](session-identity.md)).
 
 - **Logs.** The Logs page in the app has a switch: App (`~/.conveyor/conveyor.log`), Dispatcher (`logs/dispatcher.log`, written by whichever process holds the dispatcher lock: the app or `conveyor daemon`) and Hooks (`logs/hook.log`, a line per hook event of a Conveyor session except PreToolUse, and every error). A log that has not been written yet shows an empty message. From a terminal use `tail -f ~/.conveyor/<file>`. Each log rotates to `<file>.1` when opened past 5 MB; `.1` is only readable from a terminal.
 - **Nothing starts.** Check that a dispatcher is running (the app, or `conveyor daemon`), the task is in todo, and fewer than `max_parallel` runs are active. A task you just commented on waits `comment_debounce_secs`.
