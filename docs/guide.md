@@ -101,7 +101,9 @@ conveyor task label CV-1A add bug        # labels: shown on cards, filterable on
 
 ## Comments, resume and fresh sessions
 
-A comment from you, or a system note, on a task in needs_you, review, failed or done puts it back in todo, and the dispatcher launches it again. A comment on a running task is queued (marked "queued" in the thread) and sent with the next run: when the run stops or its session vanishes, the task goes to todo instead of review or needs_you. A comment on a backlog or todo task just waits.
+A comment from you, or a system note, on a task in needs_you, review, failed or done puts it back in todo, and the dispatcher launches it again. A comment on a running task is queued (marked "queued" in the thread) and sent with the next run: when the run stops or its session vanishes, the task goes to todo instead of review or needs_you. A comment on a backlog or todo task just waits. Until a run receives it, your comment shows a delete icon (`conveyor task uncomment KEY ID`); deleting the last queued comment of a requeued todo task moves it to backlog so no empty run starts.
+
+**Stop run** (grey button beside the running run's title, or `conveyor task stop KEY`) marks the run failed ("stopped"), moves the task to needs_you (todo if comments are queued) and stops and removes the background Claude session. Comment to resume.
 
 Once one of a task's PRs is merged, a comment on it no longer simply reopens it: a task keeps one branch and at most one PR per repo. The app asks what the comment is for:
 
@@ -227,6 +229,7 @@ conveyor task new "<title>" --repo a[,b] [--primary r] [--desc t | --desc-file f
 conveyor task list [--status a,b]         conveyor task show KEY [--thread] [--runs]
 conveyor task comment KEY <text|-> [--ask|--note]   conveyor task move KEY <status>
 conveyor task done KEY                    conveyor task cancel KEY
+conveyor task stop KEY                    conveyor task uncomment KEY COMMENT_ID
 conveyor task set KEY [--repo r] [--branch b] [--pr url] [--model m] [--desc d | --desc-file f]
 conveyor task link KEY blocks|relates OTHER    conveyor task unlink KEY kind OTHER
 conveyor task parent KEY PARENT|--none

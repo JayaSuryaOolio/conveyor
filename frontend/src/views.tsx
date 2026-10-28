@@ -1,8 +1,8 @@
 import {lazy, Ref, Suspense, useEffect, useRef, useState} from 'react'
 import {ActionIcon, Anchor, Badge, Box, Breadcrumbs, Button, CloseButton, Code, Divider, Group, Kbd, Paper, Stack, Text, TextInput, Timeline, Title, Tooltip} from '@mantine/core'
 import {useLocalStorage} from '@mantine/hooks'
-import {IconAbc, IconArrowDown, IconArrowUp, IconClock, IconFlame, IconHash, IconPencil, IconSearch, IconTerminal, IconX, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconMessage, IconPlayerPlay} from '@tabler/icons-react'
-import {Actions, GetTask, ListTasks, RunLog, SetTaskDescription, TakeQueuedComment, TermStart} from '../wailsjs/go/ui/App'
+import {IconAbc, IconArrowDown, IconArrowUp, IconClock, IconFlame, IconHash, IconPencil, IconSearch, IconTerminal, IconX, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconMessage, IconPlayerPlay, IconPlayerStop} from '@tabler/icons-react'
+import {Actions, DeleteQueuedComment, GetTask, ListTasks, RunLog, SetTaskDescription, Stop, TakeQueuedComment, TermStart} from '../wailsjs/go/ui/App'
 import {core, store, ui} from '../wailsjs/go/models'
 import {Card, CommentBox, Message, Nav, StatusBadge, Time, errMsg} from './components'
 import {Markdown, MarkdownEditor, TaskKey} from './markdown'
@@ -268,6 +268,8 @@ export function TaskPage({k, nav}: {k: string; nav: Nav}) {
     const t = d.task
     // Takes the queued message out of the thread and drops its text into the editor.
     const edit = (id: number) => TakeQueuedComment(k, id).then(body => setRestored({body}), errMsg).finally(reload)
+    const del = (id: number) => DeleteQueuedComment(k, id).catch(errMsg).finally(reload)
+    const stop = () => Stop(k).catch(errMsg).finally(reload)
     const items: Item[] = [
         ...d.runs.map((run): Item => ({t: run.started_at, run})),
         ...d.comments.map((comment): Item => ({t: comment.created_at, comment})),
@@ -294,7 +296,11 @@ export function TaskPage({k, nav}: {k: string; nav: Nav}) {
                         <Timeline bulletSize={24} lineWidth={2}>
                             {items.map(it => it.run ? (
                                 <Timeline.Item key={'r' + it.run.id} id={'run-' + it.run.id} bullet={<IconPlayerPlay size={12}/>}
-                                               title={`Run ${runNo.get(it.run.id)} · ${it.run.mode}`}>
+                                               title={<Group gap="xs">
+                                                   {`Run ${runNo.get(it.run.id)} · ${it.run.mode}`}
+                                                   {it.run.kind !== 'interactive' && (it.run.status === 'launching' || it.run.status === 'running') &&
+                                                       <Button variant="default" size="compact-xs" leftSection={<IconPlayerStop size={12}/>} onClick={stop}>Stop run</Button>}
+                                               </Group>}>
                                     <Text size="xs" c="dimmed">
                                         {it.run.api_calls} calls · {fmtK(it.run.ctx_peak)} peak · {fmtDuration(it.run.started_at, it.run.ended_at)} · <Time iso={it.run.started_at}/>
                                     </Text>
@@ -303,7 +309,10 @@ export function TaskPage({k, nav}: {k: string; nav: Nav}) {
                                 </Timeline.Item>
                             ) : (
                                 <Timeline.Item key={'c' + it.comment!.id} bullet={<IconMessage size={12}/>}>
-                                    <Message m={it.comment!} onEdit={t.status === 'running' && it.comment!.author === 'human' && !it.comment!.consumed_by_run_id ? () => edit(it.comment!.id) : undefined}/>
+                                    <Message m={it.comment!} {...(it.comment!.author === 'human' && !it.comment!.consumed_by_run_id && {
+                                        onEdit: t.status === 'running' ? () => edit(it.comment!.id) : undefined,
+                                        onDelete: () => del(it.comment!.id),
+                                    })}/>
                                 </Timeline.Item>
                             ))}
                         </Timeline>

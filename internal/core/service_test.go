@@ -295,3 +295,46 @@ func TestAdoptChildRefusesReparent(t *testing.T) {
 		t.Fatalf("explicit re-parent must work: %v", err)
 	}
 }
+
+func TestStopRun(t *testing.T) {
+	s := newSvc(t)
+	tk, _ := s.CreateTask(NewTaskInput{Title: "t", Repos: []string{"a"}})
+	if err := s.Stop(tk.Key); err == nil {
+		t.Fatal("stop with no run must fail")
+	}
+	s.DB.Exec(`UPDATE tasks SET status=? WHERE id=?`, store.StatusRunning, tk.ID)
+	// No bg id, so no `claude` call.
+	r, _ := store.CreateRun(s.DB, store.Run{TaskID: tk.ID, Kind: "auto", Mode: "fresh", Status: "launching"})
+	if err := s.Stop(tk.Key); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := store.GetTask(s.DB, tk.ID)
+	run, _ := store.GetRun(s.DB, r.ID)
+	if got.Status != store.StatusNeedsYou || run.Status != "failed" || run.EndedAt == nil {
+		t.Fatalf("task %s run %s", got.Status, run.Status)
+	}
+}
+
+func TestDeleteQueuedComment(t *testing.T) {
+	s := newSvc(t)
+	tk, _ := s.CreateTask(NewTaskInput{Title: "t", Repos: []string{"a"}})
+	store.CreateRun(s.DB, store.Run{TaskID: tk.ID, Kind: "auto", Mode: "fresh", Status: "finished"})
+	s.DB.Exec(`UPDATE tasks SET status=? WHERE id=?`, store.StatusReview, tk.ID)
+	c1, _ := s.AddComment(tk.Key, store.AuthorHuman, "one", FollowUp) // requeues to todo
+	c2, _ := s.AddComment(tk.Key, store.AuthorHuman, "two", FollowUp)
+	if err := s.DeleteQueuedComment(tk.Key, c1.ID); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := store.GetTask(s.DB, tk.ID); got.Status != store.StatusTodo {
+		t.Fatalf("one message still queued, got %s", got.Status)
+	}
+	if err := s.DeleteQueuedComment(tk.Key, c2.ID); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := store.GetTask(s.DB, tk.ID); got.Status != store.StatusBacklog {
+		t.Fatalf("nothing queued: want backlog, got %s", got.Status)
+	}
+	if err := s.DeleteQueuedComment(tk.Key, c2.ID); err == nil {
+		t.Fatal("deleting twice must fail")
+	}
+}

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/JayaSuryaOolio/conveyor/internal/claude"
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
@@ -273,7 +274,9 @@ func (s *Service) CleanupSessions(taskID int64) {
 	}
 }
 
-// Stop stops the task's background Claude sessions.
+// Stop ends the task's active background runs as a human: marks them failed
+// ("stopped"), moves a running task to needs_you, then stops and removes their
+// Claude sessions (best effort). Manual (interactive) sessions are left alone.
 func (s *Service) Stop(key string) error {
 	t, err := store.GetTaskByKey(s.DB, key)
 	if err != nil {
@@ -283,14 +286,67 @@ func (s *Service) Stop(key string) error {
 	if err != nil {
 		return err
 	}
+	ended := time.Now().UTC().Format(time.RFC3339)
+	stopped, bgs := 0, []string{}
 	for _, r := range runs {
-		if r.TaskID == t.ID && r.BgID != nil {
-			if err := claude.Stop(context.Background(), *r.BgID); err != nil {
-				return err
-			}
+		if r.TaskID != t.ID || r.Kind == "interactive" {
+			continue
+		}
+		// Store first, so the reaper never sees a vanished session of a still-active run.
+		r.Status, r.Error, r.EndedAt = "failed", &stoppedReason, &ended
+		if err := store.UpdateRun(s.DB, r); err != nil {
+			return err
+		}
+		stopped++
+		if r.BgID != nil {
+			bgs = append(bgs, *r.BgID)
 		}
 	}
+	if stopped == 0 {
+		return fmt.Errorf("%s has no running session to stop", key)
+	}
+	if t.Status == store.StatusRunning {
+		if _, err := store.AddComment(s.DB, store.Comment{TaskID: t.ID, Author: store.AuthorSystem, Body: "A human stopped the run."}); err != nil {
+			return err
+		}
+		if _, err := store.UpdateTaskStatus(s.DB, t.ID, store.StatusNeedsYou, store.ActorSystem); err != nil {
+			return err
+		}
+	}
+	for _, id := range bgs {
+		claude.Stop(context.Background(), id)
+		claude.Remove(context.Background(), id)
+	}
 	return nil
+}
+
+var stoppedReason = "stopped"
+
+// DeleteQueuedComment deletes a human comment no run has received yet. If that
+// leaves a requeued todo task with nothing queued, it goes back to backlog so
+// the dispatcher doesn't start a run with nothing new to do.
+func (s *Service) DeleteQueuedComment(key string, id int64) error {
+	t, err := store.GetTaskByKey(s.DB, key)
+	if err != nil {
+		return err
+	}
+	if _, ok, err := store.TakeQueuedComment(s.DB, t.ID, id); err != nil {
+		return err
+	} else if !ok {
+		return fmt.Errorf("the agent already received this message")
+	}
+	if t.Status != store.StatusTodo {
+		return nil
+	}
+	left, err := store.UnconsumedComments(s.DB, t.ID)
+	if err != nil {
+		return err
+	}
+	if runs, err := store.ListRuns(s.DB, t.ID); err != nil || len(runs) == 0 || len(left) > 0 {
+		return err
+	}
+	_, err = store.UpdateTaskStatus(s.DB, t.ID, store.StatusBacklog, store.ActorHuman)
+	return err
 }
 
 // MarkDone moves a task to done.

@@ -16,13 +16,9 @@ export function AddAutomation(arg1:store.Automation):Promise<void>;
 
 export function AddComment(arg1:string,arg2:string,arg3:string):Promise<void>;
 
-export function AddRepo(arg1:string,arg2:string):Promise<void>;
-
 export function AddLabel(arg1:string,arg2:string):Promise<void>;
 
-export function ListLabels():Promise<Array<string>>;
-
-export function RemoveLabel(arg1:string,arg2:string):Promise<void>;
+export function AddRepo(arg1:string,arg2:string):Promise<void>;
 
 export function AdoptChild(arg1:string,arg2:string):Promise<void>;
 
@@ -43,6 +39,8 @@ export function CreateTask(arg1:core.NewTaskInput):Promise<string>;
 export function DeleteApp(arg1:string):Promise<void>;
 
 export function DeleteAutomation(arg1:string):Promise<void>;
+
+export function DeleteQueuedComment(arg1:string,arg2:number):Promise<void>;
 
 export function DescribeSchedule(arg1:string):Promise<ui.ScheduleInfo>;
 
@@ -76,6 +74,8 @@ export function ListApps():Promise<Array<store.App>>;
 
 export function ListAutomations():Promise<Array<store.Automation>>;
 
+export function ListLabels():Promise<Array<string>>;
+
 export function ListModels():Promise<core.ModelList>;
 
 export function ListRepos():Promise<Array<store.Repo>>;
@@ -93,6 +93,8 @@ export function OpenFile(arg1:string,arg2:string,arg3:string):Promise<void>;
 export function PreviewBrief(arg1:string):Promise<ui.BriefPreview>;
 
 export function RejectLearning(arg1:number):Promise<void>;
+
+export function RemoveLabel(arg1:string,arg2:string):Promise<void>;
 
 export function RenderApp(arg1:string,arg2:string,arg3:string):Promise<string>;
 
@@ -129,6 +131,8 @@ export function ShowError(arg1:string):Promise<void>;
 export function SpotlightRoot(arg1:string):Promise<string>;
 
 export function SpotlightStop(arg1:string):Promise<void>;
+
+export function Stop(arg1:string):Promise<void>;
 
 export function TakeQueuedComment(arg1:string,arg2:number):Promise<string>;
 
