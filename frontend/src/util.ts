@@ -1,4 +1,4 @@
-import {useCallback, useEffect, useState} from 'react'
+import {useCallback, useEffect, useRef, useState} from 'react'
 import {EventsOn} from '../wailsjs/runtime/runtime'
 
 /** Loads data with fn and reloads when the DB changes or deps change. */
@@ -13,14 +13,17 @@ export function useData<T>(fn: () => Promise<T>, deps: unknown[]): {data?: T; er
     return {data, error, reload}
 }
 
-/** useState backed by localStorage under `draft:<key>`, so half-typed text survives navigating away. Empty clears it. */
-export function useDraft(key: string): [string, (v: string) => void] {
+/** useState backed by localStorage under `draft:<key>`, so half-typed text survives navigating away. Empty clears it. The setter also takes an updater, like useState's. */
+export function useDraft(key: string): [string, (v: string | ((prev: string) => string)) => void] {
     const read = () => { try { return localStorage.getItem('draft:' + key) ?? '' } catch { return '' } }
     const [val, setVal] = useState(read)
-    useEffect(() => setVal(read()), [key]) // eslint-disable-line react-hooks/exhaustive-deps
-    const set = (v: string) => {
-        setVal(v)
-        try { v ? localStorage.setItem('draft:' + key, v) : localStorage.removeItem('draft:' + key) } catch { /* private mode */ }
+    const latest = useRef(val) // so updaters see the newest value even when calls are batched
+    useEffect(() => { latest.current = read(); setVal(latest.current) }, [key]) // eslint-disable-line react-hooks/exhaustive-deps
+    const set = (v: string | ((prev: string) => string)) => {
+        const next = typeof v === 'function' ? v(latest.current) : v
+        latest.current = next
+        setVal(next)
+        try { next ? localStorage.setItem('draft:' + key, next) : localStorage.removeItem('draft:' + key) } catch { /* private mode */ }
     }
     return [val, set]
 }
