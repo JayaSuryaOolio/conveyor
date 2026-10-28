@@ -103,7 +103,7 @@ conveyor task label CV-1A add bug        # labels: shown on cards, filterable on
 
 A comment from you, or a system note, on a task in needs_you, review, failed or done puts it back in todo, and the dispatcher launches it again. A comment on a running task is queued (marked "queued" in the thread) and sent with the next run: when the run stops or its session vanishes, the task goes to todo instead of review or needs_you. A comment on a backlog or todo task just waits. Until a run receives it, your comment shows an edit icon that moves it back into the editor.
 
-**Stop run** (grey button beside the running run's title, or `conveyor task stop KEY`) marks the run failed ("stopped"), moves the task to needs_you (todo if comments are queued) and stops and removes the background Claude session. Comment to resume.
+**Stop run** (link beside the running timer, asks to confirm; or `conveyor task stop KEY`) marks the run failed ("stopped"), moves the task to needs_you (todo if comments are queued) and stops and removes the background Claude session. Comment to resume.
 
 Once one of a task's PRs is merged, a comment on it no longer simply reopens it: a task keeps one branch and at most one PR per repo. The app asks what the comment is for:
 
