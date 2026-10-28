@@ -322,11 +322,6 @@ func (a *App) TakeQueuedComment(key string, id int64) (string, error) {
 	return body, err
 }
 
-// DeleteQueuedComment deletes a human comment the agent hasn't received yet.
-func (a *App) DeleteQueuedComment(key string, id int64) error {
-	return a.svc.DeleteQueuedComment(key, id)
-}
-
 // Stop stops the task's running session and moves the task to needs_you.
 func (a *App) Stop(key string) error { return a.svc.Stop(key) }
 

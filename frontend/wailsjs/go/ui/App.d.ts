@@ -40,7 +40,6 @@ export function DeleteApp(arg1:string):Promise<void>;
 
 export function DeleteAutomation(arg1:string):Promise<void>;
 
-export function DeleteQueuedComment(arg1:string,arg2:number):Promise<void>;
 
 export function DescribeSchedule(arg1:string):Promise<ui.ScheduleInfo>;
 

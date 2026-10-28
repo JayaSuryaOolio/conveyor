@@ -1,6 +1,6 @@
 import {useEffect, useState} from 'react'
 import {ActionIcon, Badge, Box, Button, Card as MCard, Group, Menu, Modal, Notification, Paper, Select, Stack, Text, Tooltip} from '@mantine/core'
-import {IconAppWindow, IconDots, IconPencil, IconTrash} from '@tabler/icons-react'
+import {IconAppWindow, IconDots, IconPencil} from '@tabler/icons-react'
 import {AddComment, MergedPR, Move, ShowError, TakeQueuedComment} from '../wailsjs/go/ui/App'
 import {store, ui} from '../wailsjs/go/models'
 import {Markdown, MarkdownEditor} from './markdown'
@@ -124,15 +124,14 @@ export function CommentBox({k, placeholder = 'Comment…', onDone, restored}: {k
 }
 
 /** One comment in the thread. */
-export function Message({m, onEdit, onDelete}: {m: store.Comment; onEdit?: () => void; onDelete?: () => void}) {
+export function Message({m, onEdit}: {m: store.Comment; onEdit?: () => void}) {
     return (
         <Paper withBorder p="sm" radius="md" bg={m.author === 'human' ? 'var(--mantine-color-default-hover)' : undefined}>
             <Group gap="xs" mb={4}>
                 <Text size="xs" fw={600}>{m.author}</Text>
                 <Time iso={m.created_at}/>
-                {onDelete && <Tooltip label="Sent to the agent when the next run starts"><Badge size="xs" variant="light" color="gray">queued</Badge></Tooltip>}
+                {onEdit && <Tooltip label="Sent to the agent when the next run starts"><Badge size="xs" variant="light" color="gray">queued</Badge></Tooltip>}
                 {onEdit && <Tooltip label="Move back to the editor"><ActionIcon variant="subtle" color="gray" size="xs" aria-label="Edit queued message" onClick={onEdit}><IconPencil size={12}/></ActionIcon></Tooltip>}
-                {onDelete && <Tooltip label="Delete before the agent gets it"><ActionIcon variant="subtle" color="gray" size="xs" aria-label="Delete queued message" onClick={onDelete}><IconTrash size={12}/></ActionIcon></Tooltip>}
             </Group>
             <Markdown>{m.body}</Markdown>
         </Paper>

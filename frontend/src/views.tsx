@@ -2,7 +2,7 @@ import {lazy, Ref, Suspense, useEffect, useRef, useState} from 'react'
 import {ActionIcon, Anchor, Badge, Box, Breadcrumbs, Button, CloseButton, Code, Divider, Group, Kbd, Paper, Stack, Text, TextInput, Timeline, Title, Tooltip} from '@mantine/core'
 import {useLocalStorage} from '@mantine/hooks'
 import {IconAbc, IconArrowDown, IconArrowUp, IconClock, IconFlame, IconHash, IconPencil, IconSearch, IconTerminal, IconX, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconMessage, IconPlayerPlay, IconPlayerStop} from '@tabler/icons-react'
-import {Actions, DeleteQueuedComment, GetTask, ListTasks, RunLog, SetTaskDescription, Stop, TakeQueuedComment, TermStart} from '../wailsjs/go/ui/App'
+import {Actions, GetTask, ListTasks, RunLog, SetTaskDescription, Stop, TakeQueuedComment, TermStart} from '../wailsjs/go/ui/App'
 import {core, store, ui} from '../wailsjs/go/models'
 import {Card, CommentBox, Message, Nav, StatusBadge, Time, errMsg} from './components'
 import {Markdown, MarkdownEditor, TaskKey} from './markdown'
@@ -268,7 +268,6 @@ export function TaskPage({k, nav}: {k: string; nav: Nav}) {
     const t = d.task
     // Takes the queued message out of the thread and drops its text into the editor.
     const edit = (id: number) => TakeQueuedComment(k, id).then(body => setRestored({body}), errMsg).finally(reload)
-    const del = (id: number) => DeleteQueuedComment(k, id).catch(errMsg).finally(reload)
     const stop = () => Stop(k).catch(errMsg).finally(reload)
     const items: Item[] = [
         ...d.runs.map((run): Item => ({t: run.started_at, run})),
@@ -309,10 +308,7 @@ export function TaskPage({k, nav}: {k: string; nav: Nav}) {
                                 </Timeline.Item>
                             ) : (
                                 <Timeline.Item key={'c' + it.comment!.id} bullet={<IconMessage size={12}/>}>
-                                    <Message m={it.comment!} {...(it.comment!.author === 'human' && !it.comment!.consumed_by_run_id && {
-                                        onEdit: t.status === 'running' ? () => edit(it.comment!.id) : undefined,
-                                        onDelete: () => del(it.comment!.id),
-                                    })}/>
+                                    <Message m={it.comment!} onEdit={it.comment!.author === 'human' && !it.comment!.consumed_by_run_id ? () => edit(it.comment!.id) : undefined}/>
                                 </Timeline.Item>
                             ))}
                         </Timeline>

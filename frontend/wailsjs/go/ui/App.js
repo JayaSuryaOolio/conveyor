@@ -74,10 +74,6 @@ export function DeleteAutomation(arg1) {
   return window['go']['ui']['App']['DeleteAutomation'](arg1);
 }
 
-export function DeleteQueuedComment(arg1, arg2) {
-  return window['go']['ui']['App']['DeleteQueuedComment'](arg1, arg2);
-}
-
 export function DescribeSchedule(arg1) {
   return window['go']['ui']['App']['DescribeSchedule'](arg1);
 }

@@ -322,33 +322,6 @@ func (s *Service) Stop(key string) error {
 
 var stoppedReason = "stopped"
 
-// DeleteQueuedComment deletes a human comment no run has received yet. If that
-// leaves a requeued todo task with nothing queued, it goes back to backlog so
-// the dispatcher doesn't start a run with nothing new to do.
-func (s *Service) DeleteQueuedComment(key string, id int64) error {
-	t, err := store.GetTaskByKey(s.DB, key)
-	if err != nil {
-		return err
-	}
-	if _, ok, err := store.TakeQueuedComment(s.DB, t.ID, id); err != nil {
-		return err
-	} else if !ok {
-		return fmt.Errorf("the agent already received this message")
-	}
-	if t.Status != store.StatusTodo {
-		return nil
-	}
-	left, err := store.UnconsumedComments(s.DB, t.ID)
-	if err != nil {
-		return err
-	}
-	if runs, err := store.ListRuns(s.DB, t.ID); err != nil || len(runs) == 0 || len(left) > 0 {
-		return err
-	}
-	_, err = store.UpdateTaskStatus(s.DB, t.ID, store.StatusBacklog, store.ActorHuman)
-	return err
-}
-
 // MarkDone moves a task to done.
 func (s *Service) MarkDone(key string) error { return s.Move(key, store.StatusDone) }
 
