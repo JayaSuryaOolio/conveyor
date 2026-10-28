@@ -44,6 +44,38 @@ conveyor task show KEY --runs                  # run finished with its summary
 
 Before that, Conveyor did not detect this on its own: it is a Claude Code resume bug, and checking every session each tick costs more than the rare case is worth. The `conveyor-doctor` skill finds and fixes it on demand (see the top of this page).
 
+## A resumed run is adopted by a new session id
+
+Seen on CV-46 run 148 and CV-56 run 183; the architecture is in [session-identity.md](session-identity.md). `claude --bg --resume` started the work as a copy under a new session id. Hooks fire, but they name an id the resumed run does not have, so Conveyor creates an `interactive` run for them and the resumed run never gets its `Stop`: the task stays `running` after the agent finished.
+
+**Confirm**
+
+```sh
+conveyor task show KEY --runs --json     # last auto/resume run: running, bg_id != first 8 chars of session_id
+                                         # plus an interactive run whose session_id starts with that bg_id
+claude agents --json --all               # that bg_id's sessionId is the NEW one; state done / status idle
+grep KEY ~/.conveyor/logs/hook.log       # UserPromptSubmit/Stop for the new session id
+```
+
+**Fix.** Replay the Stop under the **resumed run's** session id (the old one, from `conveyor task show KEY --runs --json`), with the **new** session's transcript and last message. That makes the hook resolve the auto run, which finishes it and moves the task (to todo if a comment is queued, so the dispatcher answers it). Replaying under the new session id does not work: it resolves the interactive run, and interactive runs never move the task.
+
+```sh
+SID=<session_id of the stuck resume run>        # e.g. 106b7dbf-...
+NEW=<sessionId of its bg agent>                 # claude agents --json --all, e.g. 4417568e-...
+CWD=~/.conveyor/workspaces/KEY/<primary repo>
+T=$(ls ~/.claude/projects/*/$NEW.jsonl)
+python3 - "$SID" "$CWD" "$T" <<'EOF2' | conveyor hook Stop
+# same script as the first recipe: print the JSON payload with session_id=$SID, transcript_path=$T,
+# last_assistant_message = the last assistant text in $T
+EOF2
+conveyor task sync KEY
+conveyor task show KEY --runs --json     # resume run finished, task moved
+```
+
+Run it when the session is idle if you can; a live session's own Stop only touches the interactive run, so replaying mid-turn is safe but moves the task before the turn ends. The interactive run stays `running` until its session leaves the agents list (the reaper finishes it).
+
+**Not yet prevented.** The proposed fix (update `session_id` from the agents list in the reaper, never create an interactive run for a known `bg_id`) is in [session-identity.md](session-identity.md#prevention-proposed-not-implemented).
+
 ## A task has a second PR that Conveyor doesn't track
 
 Also seen on CV-9. After PR #90 merged, a comment reopened the task, and the agent opened #92 from a new branch (`cv/CV-9-readme-tone`). Conveyor follows one branch per repo (`cv/<KEY>-<slug>`), so it never saw #92 and the task won't finish when #92 merges.

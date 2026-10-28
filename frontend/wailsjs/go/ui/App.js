@@ -26,20 +26,12 @@ export function AddComment(arg1, arg2, arg3) {
   return window['go']['ui']['App']['AddComment'](arg1, arg2, arg3);
 }
 
+export function AddLabel(arg1, arg2) {
+  return window['go']['ui']['App']['AddLabel'](arg1, arg2);
+}
+
 export function AddRepo(arg1, arg2) {
   return window['go']['ui']['App']['AddRepo'](arg1, arg2);
-}
-
-export function AddLabel(arg1, arg2) {
-return window['go']['ui']['App']['AddLabel'](arg1, arg2);
-}
-
-export function ListLabels() {
-return window['go']['ui']['App']['ListLabels']();
-}
-
-export function RemoveLabel(arg1, arg2) {
-return window['go']['ui']['App']['RemoveLabel'](arg1, arg2);
 }
 
 export function AdoptChild(arg1, arg2) {
@@ -146,6 +138,10 @@ export function ListAutomations() {
   return window['go']['ui']['App']['ListAutomations']();
 }
 
+export function ListLabels() {
+  return window['go']['ui']['App']['ListLabels']();
+}
+
 export function ListModels() {
   return window['go']['ui']['App']['ListModels']();
 }
@@ -180,6 +176,10 @@ export function PreviewBrief(arg1) {
 
 export function RejectLearning(arg1) {
   return window['go']['ui']['App']['RejectLearning'](arg1);
+}
+
+export function RemoveLabel(arg1, arg2) {
+  return window['go']['ui']['App']['RemoveLabel'](arg1, arg2);
 }
 
 export function RenderApp(arg1, arg2, arg3) {
@@ -260,6 +260,10 @@ export function AppServiceRunning(arg1, arg2, arg3) {
 
 export function StopAppService(arg1, arg2, arg3) {
   return window['go']['ui']['App']['StopAppService'](arg1, arg2, arg3);
+}
+
+export function Stop(arg1) {
+  return window['go']['ui']['App']['Stop'](arg1);
 }
 
 export function TakeQueuedComment(arg1, arg2) {

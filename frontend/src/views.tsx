@@ -1,10 +1,10 @@
 import {lazy, Ref, Suspense, useEffect, useRef, useState} from 'react'
-import {ActionIcon, Anchor, Badge, Box, Breadcrumbs, Button, CloseButton, Code, Divider, Group, Kbd, Paper, Stack, Text, TextInput, Timeline, Title, Tooltip} from '@mantine/core'
+import {ActionIcon, Anchor, Badge, Box, Breadcrumbs, Button, CloseButton, Code, Divider, Group, Kbd, Paper, Popover, Stack, Text, TextInput, Timeline, Title, Tooltip} from '@mantine/core'
 import {useLocalStorage} from '@mantine/hooks'
 import {IconAbc, IconArrowDown, IconArrowUp, IconClock, IconFlame, IconHash, IconPencil, IconSearch, IconTerminal, IconX, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconMessage, IconPlayerPlay} from '@tabler/icons-react'
-import {Actions, GetTask, ListTasks, RunLog, SetTaskDescription, TakeQueuedComment, TermStart} from '../wailsjs/go/ui/App'
+import {Actions, GetTask, ListTasks, RunLog, SetTaskDescription, Stop, TakeQueuedComment, TermStart} from '../wailsjs/go/ui/App'
 import {core, store, ui} from '../wailsjs/go/models'
-import {Card, CommentBox, Message, Nav, StatusBadge, Time, errMsg} from './components'
+import {Card, CommentBox, Message, Nav, StatusBadge, Time, View, errMsg} from './components'
 import {Markdown, MarkdownEditor, TaskKey} from './markdown'
 import {Relations} from './relations'
 import {TaskSidebar} from './workspace'
@@ -26,12 +26,16 @@ const SORTS: {by: string; label: string; icon: typeof IconClock; desc: boolean; 
 ]
 const REPO_COLORS = ['blue', 'grape', 'teal', 'orange', 'pink', 'cyan', 'lime', 'violet', 'red', 'indigo']
 
-export function Board({nav, q, setQ, search}: {nav: Nav; q: string; setQ: (q: string) => void; search: Ref<HTMLInputElement>}) {
+export function Board({nav, q, setQ, search, link}: {nav: Nav; q: string; setQ: (q: string) => void; search: Ref<HTMLInputElement>; link: View}) {
     const {data, error} = useData(ListTasks, [])
     const [open, setOpen] = useState<string[]>([])
     const [sort, setSort] = useLocalStorage({key: 'board-sort', defaultValue: {by: 'priority', desc: true}})
     const [picked, setPicked] = useLocalStorage<string[]>({key: 'board-repos', defaultValue: []})
     const [pickedLabels, setPickedLabels] = useLocalStorage<string[]>({key: 'board-labels', defaultValue: []})
+    useEffect(() => { // deep link from the palette: show only that label or repo
+        if (!link.label && !link.repo) return
+        setQ(''); setPickedLabels(link.label ? [link.label] : []); setPicked(link.repo ? [link.repo] : [])
+    }, [link]) // a new view object per palette pick, so re-picking the same label re-applies it
     if (error) return <Text c="red">{error}</Text>
     const shut = (s: string) => ARCHIVE.includes(s) && !open.includes(s)
     const toggle = (s: string) => setOpen(o => o.includes(s) ? o.filter(x => x !== s) : [...o, s])
@@ -44,7 +48,6 @@ export function Board({nav, q, setQ, search}: {nav: Nav; q: string; setQ: (q: st
     const flip = (r: string) => setPicked(sel.includes(r) ? sel.filter(x => x !== r) : [...sel, r])
     const labelCount = new Map<string, number>()
     all.forEach(c => c.labels.forEach(l => labelCount.set(l, (labelCount.get(l) ?? 0) + 1)))
-    const labels = [...labelCount.keys()].sort()
     const selL = pickedLabels.filter(l => labelCount.has(l))
     const flipL = (l: string) => setPickedLabels(selL.includes(l) ? selL.filter(x => x !== l) : [...selL, l])
     const s = SORTS.find(x => x.by === sort.by) ?? SORTS[0]
@@ -82,26 +85,23 @@ export function Board({nav, q, setQ, search}: {nav: Nav; q: string; setQ: (q: st
                         {repos.map(r => {
                             const on = sel.includes(r)
                             return (
-                                <Badge key={r} component="button" size="lg" radius="md" color={repoColor(r)} variant={on ? 'filled' : sel.length ? 'outline' : 'light'}
+                                <Badge key={r} component="button" size="lg" radius="md" color={repoColor(r)} variant={on ? 'filled' : 'outline'}
                                        aria-pressed={on} title={on ? 'Hide ' + r + ' filter' : 'Only ' + r + ' (click more to combine)'}
-                                       style={{cursor: 'pointer', textTransform: 'none', opacity: sel.length && !on ? 0.6 : 1}}
+                                       style={{cursor: 'pointer', textTransform: 'none'}}
                                        leftSection={<Box w={6} h={6} style={{borderRadius: '50%', background: on ? 'currentColor' : `var(--mantine-color-${repoColor(r)}-6)`}}/>}
                                        onClick={() => flip(r)}>{r} · {repoCount.get(r)}</Badge>
                             )
                         })}
                     </Group>
                 </>}
-                {labels.length > 0 && <>
+                {selL.length > 0 && <>
                     <Divider orientation="vertical"/>
                     <Group gap={6} wrap="wrap" role="group" aria-label="Labels">
-                        {labels.map(l => {
-                            const on = selL.includes(l)
-                            return (
-                                <Badge key={l} component="button" size="lg" radius="md" color="gray" variant={on ? 'filled' : 'outline'} aria-pressed={on}
-                                       title={on ? 'Hide ' + l + ' filter' : 'Only label ' + l + ' (click more to combine)'}
-                                       style={{cursor: 'pointer', textTransform: 'none'}} onClick={() => flipL(l)}>{l} · {labelCount.get(l)}</Badge>
-                            )
-                        })}
+                        {selL.map(l => (
+                            <Badge key={l} component="button" size="lg" radius="md" color="gray" variant="filled" aria-pressed
+                                   title={'Hide ' + l + ' filter'} rightSection={<IconX size={12}/>}
+                                   style={{cursor: 'pointer', textTransform: 'none'}} onClick={() => flipL(l)}>{l} · {labelCount.get(l)}</Badge>
+                        ))}
                     </Group>
                 </>}
                 {filtered && <Group gap={6} wrap="nowrap" ml="auto">
@@ -128,7 +128,7 @@ export function Board({nav, q, setQ, search}: {nav: Nav; q: string; setQ: (q: st
                             <Text size="sm" fw={600}>{label}</Text>
                             <Text size="xs" c="dimmed">{list.length}</Text>
                         </Group>
-                        <Stack gap="xs">{list.map(c => <Card key={c.key} c={c} nav={nav}/>)}</Stack>
+                        <Stack gap="xs">{list.map(c => <Card key={c.key} c={c} nav={nav} onLabel={l => !selL.includes(l) && setPickedLabels([...selL, l])}/>)}</Stack>
                     </Paper>
                 )
             })}
@@ -171,8 +171,8 @@ const Criteria = ({text}: {text: string}) => <Markdown>{text}</Markdown>
 
 const secs = (n: number) => (n < 60 ? n + 's' : Math.floor(n / 60) + 'm ' + (n % 60) + 's')
 
-/** Chat log of a run's Claude session: polls while the run is active, once on demand after. */
-function SessionLog({run}: {run: store.Run}) {
+/** Chat log of a run's Claude session: polls while the run is active, once on demand after. onStop, when given, offers a confirmed "Stop run" link beside the timer. */
+function SessionLog({run, onStop}: {run: store.Run; onStop?: () => void}) {
     const active = run.status === 'launching' || run.status === 'running'
     const [open, setOpen] = useState(false)
     const [entries, setEntries] = useState<core.RunLog['entries']>([])
@@ -203,6 +203,15 @@ function SessionLog({run}: {run: store.Run}) {
                 <Group gap="xs" wrap="nowrap">
                     <span className="pulse"/>
                     <Text size="sm">Working · {secs(Math.max(0, Math.round((now - Date.parse(run.started_at)) / 1000)))}</Text>
+                    {onStop && (
+                        <Popover withArrow shadow="md" position="bottom-start">
+                            <Popover.Target><Anchor component="button" size="sm">Stop run</Anchor></Popover.Target>
+                            <Popover.Dropdown>
+                                <Text size="sm" mb="xs">End this session? The agent stops now.</Text>
+                                <Button size="compact-xs" color="red" onClick={onStop}>Stop run</Button>
+                            </Popover.Dropdown>
+                        </Popover>
+                    )}
                     {lastTool && <Text size="xs" c="dimmed" lineClamp={1}>· {lastTool.text}</Text>}
                 </Group>
             ) : (
@@ -268,6 +277,7 @@ export function TaskPage({k, nav}: {k: string; nav: Nav}) {
     const t = d.task
     // Takes the queued message out of the thread and drops its text into the editor.
     const edit = (id: number) => TakeQueuedComment(k, id).then(body => setRestored({body}), errMsg).finally(reload)
+    const stop = () => Stop(k).catch(errMsg).finally(reload)
     const items: Item[] = [
         ...d.runs.map((run): Item => ({t: run.started_at, run})),
         ...d.comments.map((comment): Item => ({t: comment.created_at, comment})),
@@ -296,14 +306,14 @@ export function TaskPage({k, nav}: {k: string; nav: Nav}) {
                                 <Timeline.Item key={'r' + it.run.id} id={'run-' + it.run.id} bullet={<IconPlayerPlay size={12}/>}
                                                title={`Run ${runNo.get(it.run.id)} · ${it.run.mode}`}>
                                     <Text size="xs" c="dimmed">
-                                        {it.run.api_calls} calls · {fmtK(it.run.ctx_peak)} peak · {fmtDuration(it.run.started_at, it.run.ended_at)} · <Time iso={it.run.started_at}/>
+                                        {it.run.session_id && <><Tooltip label={it.run.session_id}><Code>{it.run.session_id.slice(0, 8)}</Code></Tooltip> · </>}{it.run.api_calls} calls · {fmtK(it.run.ctx_peak)} peak · {fmtDuration(it.run.started_at, it.run.ended_at)} · <Time iso={it.run.started_at}/>
                                     </Text>
-                                    <SessionLog run={it.run}/>
+                                    <SessionLog run={it.run} onStop={it.run.kind !== 'interactive' ? stop : undefined}/>
                                     {it.run === latest && answer && <Box mt="xs">{answer}</Box>}
                                 </Timeline.Item>
                             ) : (
                                 <Timeline.Item key={'c' + it.comment!.id} bullet={<IconMessage size={12}/>}>
-                                    <Message m={it.comment!} onEdit={t.status === 'running' && it.comment!.author === 'human' && !it.comment!.consumed_by_run_id ? () => edit(it.comment!.id) : undefined}/>
+                                    <Message m={it.comment!} onEdit={it.comment!.author === 'human' && !it.comment!.consumed_by_run_id ? () => edit(it.comment!.id) : undefined}/>
                                 </Timeline.Item>
                             ))}
                         </Timeline>

@@ -6,7 +6,9 @@ import {store, ui} from '../wailsjs/go/models'
 import {Markdown, MarkdownEditor} from './markdown'
 import {ALL_STATUSES, STATUS_COLOR, STATUS_LABEL, ago, fmtK, fmtTime, useData, useDraft} from './util'
 
-export type Nav = (v: {name: string; key?: string}) => void
+/** A screen to show; board views may carry a label or repo filter to apply (deep link). */
+export type View = {name: string; key?: string; label?: string; repo?: string}
+export type Nav = (v: View) => void
 
 export const errMsg = (e: unknown) => ShowError(String(e))
 
@@ -114,7 +116,8 @@ function StatusMenu({k, status}: {k: string; status: string}) {
     )
 }
 
-export function Card({c, nav}: {c: ui.TaskCard; nav: Nav}) {
+/** `onLabel` adds a clicked label to the board's filters. */
+export function Card({c, nav, onLabel}: {c: ui.TaskCard; nav: Nav; onLabel: (l: string) => void}) {
     return (
         <MCard withBorder padding="sm" radius="md" style={{cursor: 'pointer'}} onClick={() => nav({name: 'task', key: c.key})}>
             <Group justify="space-between" wrap="nowrap" gap="xs">
@@ -127,7 +130,8 @@ export function Card({c, nav}: {c: ui.TaskCard; nav: Nav}) {
             <Text size="sm" fw={500} mt={2}>{c.title}</Text>
             {(c.repos.length > 0 || c.labels.length > 0) && <Group gap={4} mt="xs">
                 {c.repos.map(r => <Badge key={r} variant="light" size="xs">{r}</Badge>)}
-                {c.labels.map(l => <Badge key={'l:' + l} variant="outline" color="gray" size="xs" style={{textTransform: 'none'}}>{l}</Badge>)}
+                {c.labels.map(l => <Badge key={'l:' + l} component="button" variant="outline" color="gray" size="xs" title={'Filter by ' + l}
+                                          style={{textTransform: 'none', cursor: 'pointer'}} onClick={e => { e.stopPropagation(); onLabel(l) }}>{l}</Badge>)}
             </Group>}
             {c.lastSummary && <Box mt="xs" mah={40} style={{overflow: 'hidden'}}><Markdown c="dimmed">{c.lastSummary}</Markdown></Box>}
             {c.repos.length > 0 && <Box mt="xs"><PlacedButtons place="board_card" k={c.key} size="compact-xs"/></Box>}
@@ -171,10 +175,8 @@ export function Message({m, onEdit}: {m: store.Comment; onEdit?: () => void}) {
             <Group gap="xs" mb={4}>
                 <Text size="xs" fw={600}>{m.author}</Text>
                 <Time iso={m.created_at}/>
-                {onEdit && <>
-                    <Tooltip label="Sent to the agent when the current run stops"><Badge size="xs" variant="light" color="gray">queued</Badge></Tooltip>
-                    <Tooltip label="Move back to the editor"><ActionIcon variant="subtle" color="gray" size="xs" aria-label="Edit queued message" onClick={onEdit}><IconPencil size={12}/></ActionIcon></Tooltip>
-                </>}
+                {onEdit && <Tooltip label="Sent to the agent when the next run starts"><Badge size="xs" variant="light" color="gray">queued</Badge></Tooltip>}
+                {onEdit && <Tooltip label="Move back to the editor"><ActionIcon variant="subtle" color="gray" size="xs" aria-label="Edit queued message" onClick={onEdit}><IconPencil size={12}/></ActionIcon></Tooltip>}
             </Group>
             <Markdown>{m.body}</Markdown>
         </Paper>

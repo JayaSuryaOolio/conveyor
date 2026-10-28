@@ -17,10 +17,10 @@ import (
 )
 
 func init() {
-	register("task", runTask, "manage tasks (new|list|show|comment|move|set|link|unlink|parent|sessions|cancel|done|sync|brief|log|attach|open)")
+	register("task", runTask, "manage tasks (new|list|show|comment|move|set|link|unlink|parent|sessions|stop|cancel|done|sync|brief|log|attach|open)")
 }
 
-const taskUsage = "usage: conveyor task new|list|show|comment|move|set|link|unlink|parent|sessions|cancel|done|sync|brief|log|attach|open ..."
+const taskUsage = "usage: conveyor task new|list|show|comment|move|set|link|unlink|parent|sessions|stop|cancel|done|sync|brief|log|attach|open ..."
 
 func runTask(home string, args []string) error {
 	if len(args) == 0 {
@@ -106,12 +106,15 @@ func runTask(home string, args []string) error {
 				fmt.Fprintln(out, id)
 			}
 			return nil
-		case "cancel", "done":
+		case "cancel", "done", "stop":
 			if len(rest) != 1 {
 				return fmt.Errorf("usage: conveyor task %s KEY", cmd)
 			}
 			if cmd == "done" {
 				return s.MarkDone(rest[0])
+			}
+			if cmd == "stop" {
+				return s.Stop(rest[0])
 			}
 			return s.Cancel(rest[0])
 		}

@@ -6,7 +6,7 @@ import {AppIcons, DispatcherState, Learnings, ListApps, OpenApp} from '../wailsj
 import {Agents} from './agents'
 import {Apps} from './apps'
 import {Automations} from './automations'
-import {AppIcon, Nav, PlacedButtons, Toasts, runApp} from './components'
+import {AppIcon, Nav, PlacedButtons, Toasts, View, runApp} from './components'
 import {NewTask, Settings} from './forms'
 import {LearningsPage} from './learnings'
 import {Logs} from './logs'
@@ -25,14 +25,12 @@ const NAV: {name: string; key?: string; label: string; icon: typeof IconBolt}[] 
     {name: 'settings', label: 'Settings', icon: IconSettings},
 ]
 
-type View = {name: string; key?: string}
-
 const HISTORY_MAX = 50 // ponytail: in-memory only; persist to localStorage if history should survive reloads
 
 export default function App() {
     // refactor: view + history could move into a small useHistory hook / router if more screens need deep links
     const [{view, past}, hist] = useState<{view: View; past: View[]}>({view: {name: 'board'}, past: []})
-    const setView = (v: View) => hist(s => s.view.name === v.name && s.view.key === v.key ? s : {view: v, past: [...s.past, s.view].slice(-HISTORY_MAX)})
+    const setView = (v: View) => hist(s => !v.label && !v.repo && s.view.name === v.name && s.view.key === v.key ? s : {view: v, past: [...s.past, s.view].slice(-HISTORY_MAX)})
     const back = () => hist(s => s.past.length ? {view: s.past[s.past.length - 1], past: s.past.slice(0, -1)} : s)
     const [showNew, setShowNew] = useState(false)
     const [q, setQ] = useState('')
@@ -123,7 +121,7 @@ export default function App() {
                 </Stack>
             </AppShell.Navbar>
             <AppShell.Main key={view.name + (view.key ?? '')} h="100vh" style={{overflow: view.name === 'task' ? 'hidden' : 'auto'}}>
-                {view.name === 'board' && <Board nav={nav} q={q} setQ={setQ} search={search}/>}
+                {view.name === 'board' && <Board nav={nav} q={q} setQ={setQ} search={search} link={view}/>}
                 {view.name === 'focus' && <Focus nav={nav} q={q}/>}
                 {view.name === 'task' && <TaskPage k={view.key!} nav={nav}/>}
                 {view.name === 'learnings' && <LearningsPage nav={nav}/>}
