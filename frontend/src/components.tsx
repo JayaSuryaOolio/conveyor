@@ -1,10 +1,10 @@
 import {useEffect, useState} from 'react'
 import {ActionIcon, Badge, Box, Button, Card as MCard, Group, Menu, Modal, Notification, Paper, Select, Stack, Text, Tooltip} from '@mantine/core'
 import {IconAppWindow, IconDots, IconPencil} from '@tabler/icons-react'
-import {AddComment, MergedPR, Move, ShowError, TakeQueuedComment} from '../wailsjs/go/ui/App'
+import {AddComment, MergedPR, Move, PlacedActions, RunAppAction, ShowError, TakeQueuedComment} from '../wailsjs/go/ui/App'
 import {store, ui} from '../wailsjs/go/models'
 import {Markdown, MarkdownEditor} from './markdown'
-import {ALL_STATUSES, STATUS_COLOR, STATUS_LABEL, ago, fmtK, fmtTime, useDraft} from './util'
+import {ALL_STATUSES, STATUS_COLOR, STATUS_LABEL, ago, fmtK, fmtTime, useData, useDraft} from './util'
 
 export type Nav = (v: {name: string; key?: string}) => void
 
@@ -36,6 +36,22 @@ export function Toasts() {
 /** Runs an app; an output app's result (or "done") is toasted. */
 export const runApp = (a: store.App, p: Promise<string>) =>
     p.then(out => { if (a.output) toast(out || `${a.name}: done`) }, errMsg)
+
+/** Buttons for the manifest app actions that asked for `place` (global_nav, task_sidebar, board_card); `k` is the task key ("" for global_nav). */
+export function PlacedButtons({place, k = '', size = 'xs'}: {place: string; k?: string; size?: string}) {
+    const {data} = useData(() => PlacedActions(place), [place])
+    const [busy, setBusy] = useState('')
+    if (!data?.length) return null
+    const run = (a: {app: string; id: string; label: string; output: boolean}) => {
+        setBusy(a.app + a.id)
+        RunAppAction(a.app, a.id, k).then(out => { if (a.output) toast(out || `${a.label}: done`) }, errMsg).finally(() => setBusy(''))
+    }
+    return (
+        <Group gap={4} onClick={e => e.stopPropagation()}>
+            {data.map(a => <Button key={a.app + a.id} size={size} variant="default" loading={busy === a.app + a.id} title={a.app} onClick={() => run(a)}>{a.label}</Button>)}
+        </Group>
+    )
+}
 
 /** The app's macOS icon (from AppIcons), else a generic window glyph. */
 export const AppIcon = ({name, icons, size = 18}: {name: string; icons?: Record<string, string>; size?: number}) =>
@@ -90,6 +106,7 @@ export function Card({c, nav}: {c: ui.TaskCard; nav: Nav}) {
                 {c.labels.map(l => <Badge key={'l:' + l} variant="outline" color="gray" size="xs" style={{textTransform: 'none'}}>{l}</Badge>)}
             </Group>}
             {c.lastSummary && <Box mt="xs" mah={40} style={{overflow: 'hidden'}}><Markdown c="dimmed">{c.lastSummary}</Markdown></Box>}
+            {c.repos.length > 0 && <Box mt="xs"><PlacedButtons place="board_card" k={c.key} size="compact-xs"/></Box>}
         </MCard>
     )
 }

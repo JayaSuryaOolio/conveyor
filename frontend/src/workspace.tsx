@@ -5,7 +5,7 @@ import {IconCheck, IconCopy, IconPencil, IconStar, IconTerminal, IconTerminal2, 
 import {Actions, AddLabel, AppIcons, EnsureWorkspace, GetSettings, ListApps, ListLabels, RemoveLabel, OpenApp, RunAction, Sessions, SetTaskRepo, SpotlightRoot, SpotlightStop, TermStart} from '../wailsjs/go/ui/App'
 import {core, store, ui} from '../wailsjs/go/models'
 import {BrowserOpenURL} from '../wailsjs/runtime/runtime'
-import {AppIcon, StatusSelect, Time, errMsg, runApp} from './components'
+import {AppIcon, PlacedButtons, StatusSelect, Time, errMsg, runApp} from './components'
 import {TaskAgent, TaskSettings} from './forms'
 import {useData} from './util'
 
@@ -216,10 +216,11 @@ export function TaskSidebar({t, runs, reload, onTerm}: {t: store.Task; runs: sto
             {repos.filter(r => r.worktree_path).map(r => (
                 <Stack key={r.repo_id} gap={2}>
                     {repos.length > 1 && <Text size="xs" c="dimmed">{r.repo_name}</Text>}
-                    <OpenIn k={k} repo={r.repo_name} wt={r.worktree_path!} apps={(apps ?? []).filter(a => !a.global && !a.output)} icons={icons}/>
+                    <OpenIn k={k} repo={r.repo_name} wt={r.worktree_path!} apps={(apps ?? []).filter(a => !a.manifest && !a.global && !a.output)} icons={icons}/>
                 </Stack>
             ))}
-            {hasWorktree && <QuickActions k={k} apps={(apps ?? []).filter(a => !a.global && a.output)} icons={icons}/>}
+            {hasWorktree && <QuickActions k={k} apps={(apps ?? []).filter(a => !a.manifest && !a.global && a.output)} icons={icons}/>}
+            {hasWorktree && <PlacedButtons place="task_sidebar" k={k}/>}
             <Divider/>
             <Title order={6}>Sessions</Title>
             {sessionsError && <Text size="xs" c="red">Failed to load sessions: {sessionsError}</Text>}

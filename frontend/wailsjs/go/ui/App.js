@@ -301,3 +301,15 @@ export function UpdateAutomation(arg1) {
 export function UserHooks(arg1) {
   return window['go']['ui']['App']['UserHooks'](arg1);
 }
+
+export function InstallManifest(arg1) {
+  return window['go']['ui']['App']['InstallManifest'](arg1);
+}
+
+export function PlacedActions(arg1) {
+  return window['go']['ui']['App']['PlacedActions'](arg1);
+}
+
+export function RunAppAction(arg1, arg2, arg3) {
+  return window['go']['ui']['App']['RunAppAction'](arg1, arg2, arg3);
+}

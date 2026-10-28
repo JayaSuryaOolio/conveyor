@@ -40,7 +40,21 @@ func (a *App) UpdateApp(x store.App) error {
 }
 
 // DeleteApp removes an app.
-func (a *App) DeleteApp(name string) error { return store.DeleteApp(a.svc.DB, name) }
+func (a *App) DeleteApp(name string) error { return a.svc.UninstallApp(name) }
+
+// InstallManifest installs an app from manifest JSON (text box or uploaded file).
+func (a *App) InstallManifest(raw string) error {
+	_, err := a.svc.InstallManifest(raw)
+	return err
+}
+
+// PlacedActions lists manifest actions wanting a UI slot (global_nav, task_sidebar, board_card).
+func (a *App) PlacedActions(place string) ([]core.Placed, error) { return a.svc.PlacedActions(place) }
+
+// RunAppAction runs a manifest action; key "" for global_nav ones.
+func (a *App) RunAppAction(app, id, key string) (string, error) {
+	return a.svc.RunAppAction(app, id, key)
+}
 
 // RenderApp previews command for cwd and task key.
 func (a *App) RenderApp(command, cwd, key string) string { return core.RenderApp(command, cwd, key) }

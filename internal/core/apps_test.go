@@ -138,3 +138,48 @@ func TestSessionIDs(t *testing.T) {
 		t.Fatal(ids, err)
 	}
 }
+
+func TestManifest(t *testing.T) {
+	raw := `{"name":"Demo","actions":[{"id":"hi","label":"Hi","run":"echo ${{ task.key }} ${{ worktree.path }}","places":["board_card"],"output":true}]}`
+	if _, err := ParseManifest(raw); err != nil {
+		t.Fatal(err)
+	}
+	for _, bad := range []string{
+		`{"name":"x"}`,
+		`{"name":"x","actions":[{"id":"a","label":"A","run":"${{ nope }}","places":["global_nav"]}]}`,
+		`{"name":"x","actions":[{"id":"a","label":"A","run":"x","places":["moon"]}]}`,
+		`{"name":"x","bogus":1,"actions":[{"id":"a","label":"A","run":"x","places":["global_nav"]}]}`,
+	} {
+		if _, err := ParseManifest(bad); err == nil {
+			t.Errorf("accepted %s", bad)
+		}
+	}
+	if got := RenderManifest("echo ${{task.key}}", map[string]string{"task.key": "it's"}); got != `echo 'it'\''s'` {
+		t.Errorf("render: %s", got)
+	}
+}
+
+func TestInstallManifest(t *testing.T) {
+	s := newSvc(t)
+	t.Setenv("HOME", t.TempDir())
+	raw := `{"name":"Demo","actions":[{"id":"hi","label":"Hi","run":"echo ${{ app.name }} in ${{ worktree.path }}","places":["global_nav"],"output":true}],
+	 "automations":[{"name":"demo-auto","schedule":"every 1h","action_kind":"comment","action_arg":"{}"}]}`
+	if _, err := s.InstallManifest(raw); err != nil {
+		t.Fatal(err)
+	}
+	if p, _ := s.PlacedActions("global_nav"); len(p) != 1 || p[0].ID != "hi" {
+		t.Fatal(p)
+	}
+	if p, _ := s.PlacedActions("board_card"); len(p) != 0 {
+		t.Fatal(p)
+	}
+	if out, err := s.RunAppAction("Demo", "hi", ""); err != nil || !strings.HasPrefix(out, "Demo in ") {
+		t.Fatal(out, err)
+	}
+	if err := s.UninstallApp("Demo"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.GetAutomation(s.DB, "demo-auto"); err == nil {
+		t.Fatal("automation left behind")
+	}
+}

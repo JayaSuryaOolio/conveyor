@@ -4,8 +4,10 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/JayaSuryaOolio/conveyor/internal/core"
@@ -13,11 +15,12 @@ import (
 )
 
 func init() {
-	register("app", runApp, "open worktrees in external apps, run quick actions (list|presets|add|global|output|rm|open)")
+	register("app", runApp, "open worktrees in external apps, run quick actions (list|presets|add|install|run|global|output|rm|open)")
 	register("hooks", runHooks, "Claude Code hooks in ~/.claude/settings.json (status|install|uninstall)")
 }
 
 const appUsage = `usage: conveyor app list [--json] | presets [--json] | add NAME [--command CMD] [--global] [--output]
+       conveyor app install FILE|- (manifest JSON; - reads stdin) | run APP ACTION [KEY]
        conveyor app global|output NAME on|off | rm NAME
        conveyor app open NAME [KEY|DIR] [--repo r] [--print]
 CMD is a shell command; {cwd} becomes the quoted worktree path and {key} the task key ('' without one).
@@ -99,7 +102,35 @@ func runApp(home string, args []string) error {
 			if len(pos) != 1 {
 				return errors.New(appUsage)
 			}
-			return store.DeleteApp(s.DB, pos[0])
+			return s.UninstallApp(pos[0])
+		case "install":
+			if len(pos) != 1 {
+				return errors.New(appUsage)
+			}
+			var b []byte
+			var err error
+			if pos[0] == "-" {
+				b, err = io.ReadAll(os.Stdin)
+			} else {
+				b, err = os.ReadFile(pos[0])
+			}
+			if err != nil {
+				return err
+			}
+			a, err := s.InstallManifest(string(b))
+			if err == nil {
+				fmt.Fprintf(out, "installed %s\n", a.Name)
+			}
+			return err
+		case "run":
+			if len(pos) < 2 || len(pos) > 3 {
+				return errors.New(appUsage)
+			}
+			res, err := s.RunAppAction(pos[0], pos[1], strings.Join(pos[2:], ""))
+			if res != "" {
+				fmt.Fprintln(out, res)
+			}
+			return err
 		case "open":
 			if len(pos) < 1 || len(pos) > 2 {
 				return errors.New(appUsage)
@@ -148,6 +179,9 @@ func printApps(as []store.App) error {
 	tw := tabwriter.NewWriter(out, 0, 4, 2, ' ', 0)
 	fmt.Fprintln(tw, "NAME\tGLOBAL\tOUTPUT\tCOMMAND")
 	for _, a := range as {
+		if a.Manifest != "" {
+			a.Command = "(manifest)"
+		}
 		fmt.Fprintf(tw, "%s\t%v\t%v\t%s\n", a.Name, a.Global, a.Output, a.Command)
 	}
 	return tw.Flush()

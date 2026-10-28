@@ -6,7 +6,7 @@ import {AppIcons, DispatcherState, Learnings, ListApps, OpenApp} from '../wailsj
 import {Agents} from './agents'
 import {Apps} from './apps'
 import {Automations} from './automations'
-import {AppIcon, Nav, Toasts, runApp} from './components'
+import {AppIcon, Nav, PlacedButtons, Toasts, runApp} from './components'
 import {NewTask, Settings} from './forms'
 import {LearningsPage} from './learnings'
 import {Logs} from './logs'
@@ -43,7 +43,7 @@ export default function App() {
     const proposed = learnings?.filter(l => l.status === 'proposed').length ?? 0
     const {data: apps} = useData(ListApps, [])
     const {data: icons} = useData(AppIcons, [])
-    const globalApps = (apps ?? []).filter(a => a.global)
+    const globalApps = (apps ?? []).filter(a => a.global && !a.manifest)
     const nav: Nav = v => setView(v)
 
     useEffect(() => {
@@ -116,6 +116,7 @@ export default function App() {
                             </Tooltip>
                         ))}
                     </Group>
+                    {!mini && <PlacedButtons place="global_nav" size="compact-xs"/>}
                     <Tooltip label={dispatcher === 'dispatching' ? 'Dispatcher running in this app' : 'UI only: another process dispatches'} position="right">
                         <Box mx={mini ? 'auto' : 0} w={8} h={8} style={{borderRadius: '50%', background: `var(--mantine-color-${dispatcher === 'dispatching' ? 'green' : 'gray'}-6)`}}/>
                     </Tooltip>

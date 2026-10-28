@@ -1,5 +1,24 @@
 export namespace core {
 	
+	export class Placed {
+	    app: string;
+	    id: string;
+	    label: string;
+	    output: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new Placed(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.app = source["app"];
+	        this.id = source["id"];
+	        this.label = source["label"];
+	        this.output = source["output"];
+	    }
+	}
+	
 	export class Action {
 	    label: string;
 	    repo: string;
@@ -244,6 +263,7 @@ export namespace store {
 	    command: string;
 	    global: boolean;
 	    output: boolean;
+	    manifest: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new App(source);
@@ -256,6 +276,7 @@ export namespace store {
 	        this.command = source["command"];
 	        this.global = source["global"];
 	        this.output = source["output"];
+	        this.manifest = source["manifest"];
 	    }
 	}
 	export class Automation {

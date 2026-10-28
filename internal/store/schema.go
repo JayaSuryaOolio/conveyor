@@ -136,7 +136,8 @@ CREATE TABLE IF NOT EXISTS apps (
   name TEXT NOT NULL UNIQUE,
   command TEXT NOT NULL,
   global INTEGER NOT NULL DEFAULT 0,
-  output INTEGER NOT NULL DEFAULT 0
+  output INTEGER NOT NULL DEFAULT 0,
+  manifest TEXT NOT NULL DEFAULT ''
 );
 `
 
@@ -153,6 +154,9 @@ func Migrate(db *sql.DB) error {
 		return fmt.Errorf("drop duplicates links: %w", err)
 	}
 	if err := migrateAddAppGlobal(db); err != nil {
+		return err
+	}
+	if err := migrateAddAppManifest(db); err != nil {
 		return err
 	}
 	if err := migrateAddTaskCreatedBy(db); err != nil {
@@ -200,6 +204,20 @@ func migrateAddAppGlobal(db *sql.DB) error {
 			if _, err := db.Exec(`ALTER TABLE apps ADD COLUMN ` + col + ` INTEGER NOT NULL DEFAULT 0`); err != nil {
 				return fmt.Errorf("add apps.%s: %w", col, err)
 			}
+		}
+	}
+	return nil
+}
+
+// migrateAddAppManifest adds apps.manifest (the plugin manifest JSON, "" for a plain app).
+func migrateAddAppManifest(db *sql.DB) error {
+	var n int
+	if err := db.QueryRow(`SELECT count(*) FROM pragma_table_info('apps') WHERE name='manifest'`).Scan(&n); err != nil {
+		return fmt.Errorf("check apps.manifest: %w", err)
+	}
+	if n == 0 {
+		if _, err := db.Exec(`ALTER TABLE apps ADD COLUMN manifest TEXT NOT NULL DEFAULT ''`); err != nil {
+			return fmt.Errorf("add apps.manifest: %w", err)
 		}
 	}
 	return nil
