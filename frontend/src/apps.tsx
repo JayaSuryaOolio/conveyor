@@ -3,7 +3,7 @@ import {ActionIcon, Badge, Button, Checkbox, Code, FileButton, Group, Modal, Mul
 import {IconDownload, IconPencil, IconPlayerPlay, IconPlus, IconPuzzle, IconTransform, IconTrash, IconUpload} from '@tabler/icons-react'
 import {AddApp, AppIcons, AppPresets, Confirm, ConvertApp, DeleteApp, ExportApp, Home, InstallManifest, InstallPreset, ListApps, ManifestSchema, RenderApp, TestApp, UpdateApp, UserHooks, ValidateManifest} from '../wailsjs/go/ui/App'
 import {store} from '../wailsjs/go/models'
-import {AppIcon, errMsg, runApp} from './components'
+import {AppIcon, errMsg, runApp, toast} from './components'
 import {useData} from './util'
 
 function AppForm({initial, onClose}: {initial: store.App; onClose: (saved: boolean) => void}) {
@@ -102,14 +102,6 @@ function ManifestForm({onClose}: {onClose: (saved: boolean) => void}) {
     )
 }
 
-function downloadManifest(name: string, json: string) {
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(new Blob([json + '\n'], {type: 'application/json'}))
-    a.download = name.replace(/[^\w.-]+/g, '-') + '.json'
-    a.click()
-    URL.revokeObjectURL(a.href)
-}
-
 function manifestSummary(a: store.App) {
     try {
         const m = JSON.parse(a.manifest)
@@ -178,7 +170,7 @@ export function Apps() {
                                 </Table.Td>
                                 <Table.Td>
                                     <Group gap="xs" wrap="nowrap" justify="flex-end">
-                                        {a.manifest && <ActionIcon variant="subtle" color="gray" aria-label="Export" title="Export manifest as .json" onClick={() => ExportApp(a.name).then(j => downloadManifest(a.name, j), errMsg)}><IconDownload size={16}/></ActionIcon>}
+                                        {a.manifest && <ActionIcon variant="subtle" color="gray" aria-label="Export" title="Export manifest as .json" onClick={() => ExportApp(a.name).then(p => p && toast(`Exported to ${p}`), errMsg)}><IconDownload size={16}/></ActionIcon>}
                                         {!a.manifest && <>
                                             <ActionIcon variant="subtle" color="gray" aria-label="Test" title="Test on home folder" onClick={() => runApp(a, TestApp(a))}><IconPlayerPlay size={16}/></ActionIcon>
                                             <ActionIcon variant="subtle" color="gray" aria-label="Convert" title="Convert to manifest app" onClick={() => ConvertApp(a.name).then(reload, errMsg)}><IconTransform size={16}/></ActionIcon>
