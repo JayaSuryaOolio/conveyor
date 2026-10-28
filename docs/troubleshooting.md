@@ -110,6 +110,6 @@ This differs from the recipe above: there the Stop hook never fired. Here it fir
 
 **Fix.** The work is already recorded on the interactive run. End the empty resume run with `conveyor task cancel KEY` (it moves the task to `cancelled`, stops its sessions and fails the run; the run turns `failed` a few seconds later). `cancelled -> review` is refused by `conveyor task move`, so reopen the task from the UI if it is not finished.
 
-Last resort for a lost run, not a fix: leave it and move on. Moving the task to `review` does not end the run.
+Last resort for a lost run, not a fix: move the task to `review` or `done` and confirm; that ends its leftover auto runs.
 
-**Prevented since CV-58**, same fix as the recipe above. Still open: `conveyor task move KEY review|done` does not fail leftover `running` runs.
+**Prevented since CV-58**, same fix as the recipe above. Moving a task to `review` or `done` with active auto runs asks first (UI modal, CLI `--stop`), then marks them failed ("stopped") and stops their sessions. Manual sessions are left alone.

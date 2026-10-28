@@ -328,8 +328,17 @@ func (a *App) Stop(key string) error { return a.svc.Stop(key) }
 // MergedPR is the merged PR a comment on the task would trip over, or "".
 func (a *App) MergedPR(key string) (string, error) { return a.svc.MergedPR(key) }
 
-// Move changes a task's status as a human.
-func (a *App) Move(key, status string) error { return a.svc.Move(key, store.Status(status)) }
+// Move changes a task's status as a human. When the move would end the task's
+// running runs and stop is false, nothing moves and it returns how many, so the
+// UI can confirm and call again with stop.
+func (a *App) Move(key, status string, stop bool) (int, error) {
+	err := a.svc.Move(key, store.Status(status), stop)
+	var ar *core.ActiveRunsError
+	if errors.As(err, &ar) {
+		return ar.N, nil
+	}
+	return 0, err
+}
 
 // SetTaskRepo sets a task repo's branch (before the worktree exists) and PR URL.
 func (a *App) SetTaskRepo(key, repo, branch, prURL string) error {

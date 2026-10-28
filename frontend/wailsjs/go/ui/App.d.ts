@@ -83,7 +83,7 @@ export function ListTasks():Promise<Array<ui.TaskCard>>;
 
 export function MergedPR(arg1:string):Promise<string>;
 
-export function Move(arg1:string,arg2:string):Promise<void>;
+export function Move(arg1:string,arg2:string,arg3:boolean):Promise<number>;
 
 export function OpenApp(arg1:string,arg2:string,arg3:string):Promise<string>;
 

@@ -92,15 +92,35 @@ export const StatusBadge = ({status}: {status: string}) => (
     <Badge variant="light" color={STATUS_COLOR[status]} size="sm">{STATUS_LABEL[status] ?? status}</Badge>
 )
 
-export function StatusSelect({k, status}: {k: string; status: string}) {
-    return (
-        <Select size="xs" w={130} allowDeselect={false} value={status} data={ALL_STATUSES.map(s => ({value: s, label: STATUS_LABEL[s]}))}
-                onChange={s => s && Move(k, s).catch(errMsg)}/>
+/** Moves a task; a move that would end running runs (to review or done) asks first. Render the returned modal. */
+function useMove(k: string) {
+    const [pending, setPending] = useState<{to: string; n: number}>()
+    const move = (to: string) => Move(k, to, false).then(n => n && setPending({to, n}), errMsg)
+    const confirm = () => { Move(k, pending!.to, true).catch(errMsg); setPending(undefined) }
+    const modal = (
+        <Modal opened={!!pending} onClose={() => setPending(undefined)} title={`Move ${k} to ${STATUS_LABEL[pending?.to ?? '']}?`}>
+            <Text size="sm" mb="sm">{k} has {pending?.n} running run(s). Moving it ends them; the agent stops now.</Text>
+            <Group justify="flex-end">
+                <Button variant="default" onClick={() => setPending(undefined)}>Cancel</Button>
+                <Button data-autofocus color="red" onClick={confirm}>Stop and move</Button>
+            </Group>
+        </Modal>
     )
+    return [move, modal] as const
+}
+
+export function StatusSelect({k, status}: {k: string; status: string}) {
+    const [move, modal] = useMove(k)
+    return <>
+        <Select size="xs" w={130} allowDeselect={false} value={status} data={ALL_STATUSES.map(s => ({value: s, label: STATUS_LABEL[s]}))}
+                onChange={s => s && move(s)}/>
+        {modal}
+    </>
 }
 
 /** Lightweight status mover for cards. */
 function StatusMenu({k, status}: {k: string; status: string}) {
+    const [move, modal] = useMove(k)
     return (
         <div onClick={e => e.stopPropagation()}>
             <Menu position="bottom-end" withinPortal>
@@ -108,10 +128,11 @@ function StatusMenu({k, status}: {k: string; status: string}) {
                 <Menu.Dropdown>
                     <Menu.Label>Move to</Menu.Label>
                     {ALL_STATUSES.filter(s => s !== status).map(s => (
-                        <Menu.Item key={s} onClick={() => Move(k, s).catch(errMsg)}>{STATUS_LABEL[s]}</Menu.Item>
+                        <Menu.Item key={s} onClick={() => move(s)}>{STATUS_LABEL[s]}</Menu.Item>
                     ))}
                 </Menu.Dropdown>
             </Menu>
+            {modal}
         </div>
     )
 }
