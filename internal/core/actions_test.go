@@ -3,6 +3,7 @@ package core
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -54,7 +55,7 @@ func TestActionsByState(t *testing.T) {
 	check("attach:a," + base)
 	r.Status, r.SessionID = "finished", &sess
 	store.UpdateRun(s.DB, r)
-	check("resume:a," + base + ",resume:sess1:a")
+	check("resume:a," + base + ",resume:" + strconv.FormatInt(r.ID, 10) + ":a")
 	r.SessionID = nil
 	store.UpdateRun(s.DB, r)
 	check(base)
@@ -62,7 +63,7 @@ func TestActionsByState(t *testing.T) {
 	r.Status, r.SessionID = "running", &sess
 	store.UpdateRun(s.DB, r)
 	store.CreateRun(s.DB, store.Run{TaskID: tk.ID, Kind: "interactive", Mode: "fresh", Status: "finished"})
-	check(base + ",attach:sess1:a")
+	check(base + ",attach:" + strconv.FormatInt(r.ID, 10) + ":a")
 	if _, err := os.Stat(filepath.Join(s.Home, "claude-settings.json")); err != nil {
 		t.Fatal("settings not written")
 	}

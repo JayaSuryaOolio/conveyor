@@ -44,14 +44,13 @@ func (a *App) TermStart(key, kind, repo string) (TermInfo, error) {
 	}
 	title := act.Repo + " · shell"
 	switch {
-	case strings.HasPrefix(kind, "resume:"):
-		id := []rune(strings.TrimPrefix(kind, "resume:"))
-		title = "resume " + string(id[:min(4, len(id))]) + "…"
+	case strings.HasPrefix(kind, "resume:") || strings.HasPrefix(kind, "attach:"):
+		title = strings.ToLower(act.Label) // "resume run #2", "attach to run #3", "resume 1a2b3c4d"
 	case kind == "resume":
 		title = "resume"
 	case kind == "fresh":
 		title = "new session"
-	case kind == "attach" || strings.HasPrefix(kind, "attach:"):
+	case kind == "attach":
 		title = "attach"
 	}
 	id, err := term.Start(act.Cwd, act.Cmd)

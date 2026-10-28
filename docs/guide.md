@@ -227,8 +227,8 @@ conveyor repo add <path> [--name n]       conveyor repo list | rm <name> | setup
 conveyor task new "<title>" --repo a[,b] [--primary r] [--desc t | --desc-file f]
                   [--todo] [--model m] [--agent a] [--parent KEY] [--priority n]
 conveyor task list [--status a,b]         conveyor task show KEY [--thread] [--runs]
-conveyor task comment KEY <text|-> [--ask|--note]   conveyor task move KEY <status>
-conveyor task done KEY                    conveyor task cancel KEY
+conveyor task comment KEY <text|-> [--ask|--note]   conveyor task move KEY <status> [--stop]
+conveyor task done KEY [--stop]           conveyor task cancel KEY
 conveyor task stop KEY
 conveyor task set KEY [--repo r] [--branch b] [--pr url] [--model m] [--desc d | --desc-file f]
 conveyor task link KEY blocks|relates OTHER    conveyor task unlink KEY kind OTHER

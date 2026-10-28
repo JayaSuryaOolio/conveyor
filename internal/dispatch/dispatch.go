@@ -170,12 +170,10 @@ func (d *Dispatcher) reap(ctx context.Context) error {
 		ok = ok && r.BgID != nil
 		// A session that errored at startup (e.g. an unknown model) stays listed as failed and never ends.
 		failed := ok && a.State == "failed"
-		// Adopt sessions whose hooks never fired: the agents list knows the session id.
-		if ok && !failed && r.Status == "launching" && a.SessionID != "" {
-			if r.SessionID == nil {
-				r.SessionID = &a.SessionID
-			}
-			r.Status = "running"
+		// The agents list knows the bg session's real id: adopt it when no hook fired yet, and follow it when
+		// a resume ran as a copy under a new id, so the run's later hooks (its Stop) still find it.
+		if ok && !failed && a.SessionID != "" && (r.Status == "launching" || deref(r.SessionID) != a.SessionID) {
+			r.SessionID, r.Status = &a.SessionID, "running"
 			if err := store.UpdateRun(d.DB, r); err != nil {
 				return err
 			}

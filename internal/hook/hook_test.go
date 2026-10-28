@@ -305,3 +305,17 @@ func TestStopWithPendingBackgroundJobStaysRunning(t *testing.T) {
 		})
 	}
 }
+
+// A resume that Claude runs as a copy reports a new session id; it must land on the resume run, not a new interactive one.
+func TestResumeAsCopyAdoptsLaunchingRun(t *testing.T) {
+	e := setup(t, store.StatusRunning)
+	e.run(t, "auto", "finished", "S1", "first")
+	r2 := e.run(t, "auto", "launching", "S1", "second") // dispatcher pre-fills the resumed id
+	e.fire(t, "UserPromptSubmit", map[string]any{"session_id": "S2"})
+	e.fire(t, "Stop", map[string]any{"session_id": "S2", "last_assistant_message": doneMsg})
+	runs, _ := store.ListRuns(e.db, e.task.ID)
+	got, _ := store.GetRun(e.db, r2.ID)
+	if len(runs) != 2 || got.Status != "finished" || *got.SessionID != "S2" || e.status(t).Status != store.StatusReview {
+		t.Fatalf("%d runs, %+v", len(runs), got)
+	}
+}

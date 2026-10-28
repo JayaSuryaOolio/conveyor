@@ -231,7 +231,7 @@ export function TaskSidebar({t, runs, reload, onTerm}: {t: store.Task; runs: sto
                             onClick={() => document.getElementById('run-' + r.id)?.scrollIntoView({behavior: 'smooth', block: 'start'})}>
                         #{i + 1} {r.kind} · {r.status}{r.block_status ? ' · ' + r.block_status : ''}
                     </Anchor>
-                    {resume.get(r.session_id ?? '') && <ActionIcons k={k} a={resume.get(r.session_id!)!} onTerm={onTerm}/>}
+                    {resume.get(String(r.id)) && <ActionIcons k={k} a={resume.get(String(r.id))!} onTerm={onTerm}/>}
                 </Group>
             ))}
             {sessions?.map(s => (

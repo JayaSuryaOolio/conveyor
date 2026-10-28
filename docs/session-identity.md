@@ -40,7 +40,7 @@ Consequences:
 - The task cannot be marked done by the run that did the work, and the UI shows a second, unexplained session.
 - A reply to the human can still be correct; only Conveyor's bookkeeping is wrong. The agent is not at fault.
 
-The reaper (`dispatch.reap`) does not repair this. It only adopts a session id for runs that are `launching` with no id; a resumed run is already `running` with the old id, so it is skipped. The bug stays latent until the session goes away, at which point run 183 is failed as "session vanished" and 184 is finished, which hides the real outcome.
+Before CV-58 the reaper (`dispatch.reap`) did not repair this. It only adopted a session id for runs that are `launching` with no id; a resumed run was already `running` with the old id, so it was skipped. The bug stayed latent until the session goes away, at which point run 183 is failed as "session vanished" and 184 is finished, which hides the real outcome.
 
 An earlier variant of the same family (CV-9 run 13) was a resume woken without `--settings`, so no hook fired at all. That is prevented since CV-47. This page covers the case where hooks fire but name an id we do not know.
 
@@ -51,13 +51,13 @@ An earlier variant of the same family (CV-9 run 13) was a resume woken without `
 3. **Resolve by the strongest identity first:** `session_id`, then `bg_id` (the agents list maps `bg_id` to its current `sessionId`), then adoption, then interactive.
 4. **Never fix this by hand-editing `conveyor.db`.** Use the recipe, which replays the hook through the same code path a live one takes.
 
-## Prevention (proposed, not implemented)
+## Prevention (since CV-58)
 
-Preferred, because it works even when no hook has fired yet: in `dispatch.reap`, which already reads `claude.Agents` every tick, for each active non-interactive run whose `alive[bg_id].SessionID` differs from `run.session_id`, update the run's `session_id`. Hooks that arrive afterwards then match in step 1.
+- `hook.resolveRun` adopts the newest `launching` run even when its `session_id` is already set. A resume run starts with the old id as a guess; the first hook (`UserPromptSubmit`, fired while `claude --bg --resume` is still starting) replaces it with the id Claude really uses.
+- `dispatch.reap` sets `session_id` from the agents list (`alive[bg_id].SessionID`) for every active non-interactive run whose id differs, so a hook that arrives after the run left `launching` still matches in step 1.
+- The task sidebar keys each run's attach/resume action by run id (`attach:<run id>`, `resume:<run id>`), not by session id, which resumed runs share. Before, every run of one session got the newest run's action, so "attach" on an older run opened the latest one.
 
-Defence in depth in `resolveRun`: before step 3, look for an active non-interactive run whose `bg_id` is a prefix of the hook's session id (agent ids are the first 8 characters of the session id). If found, adopt the session id on that run instead of creating an interactive one.
-
-Either change needs a test that replays a `Stop` for a new session id against a resumed run and asserts that no interactive run appears and the original run finishes.
+Tests: `TestResumeAsCopyAdoptsLaunchingRun` (hook), `TestReapFollowsResumedSessionID` (dispatch).
 
 ## Detecting it
 

@@ -26,7 +26,7 @@ conveyor task log KEY [--follow]      # live session output
 conveyor task sessions KEY [--json]   # Claude session ids (runs + manual)
 conveyor app open NAME KEY            # opener, or quick action (--output) printing its output
 conveyor task new "t" --repo r [--desc ..] [--todo] [--parent KEY] (--repo/--agent optional with --parent: default to the parent's) [--model m] [--agent a]
-conveyor task comment KEY "text" [--ask|--note]   conveyor task move KEY <status>
+conveyor task comment KEY "text" [--ask|--note]   conveyor task move KEY <status> [--stop]   # --stop: confirm ending running runs (review|done)
 conveyor task stop KEY                # end the running bg session -> needs_you
 conveyor task set KEY [--branch b] [--pr url] [--model m] [--desc d]   # --desc: backlog only
 conveyor task link KEY blocks|relates OTHER     conveyor task unlink KEY kind OTHER

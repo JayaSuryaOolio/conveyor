@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -38,14 +39,15 @@ func runTask(home string, args []string) error {
 		case "comment":
 			return taskComment(s, rest)
 		case "move":
-			if len(rest) != 2 {
-				return fmt.Errorf("usage: conveyor task move KEY <status>")
+			stop := len(rest) == 3 && rest[2] == "--stop"
+			if len(rest) != 2 && !stop {
+				return fmt.Errorf("usage: conveyor task move KEY <status> [--stop]")
 			}
 			to := store.Status(rest[1])
 			if !to.Valid() {
 				return fmt.Errorf("unknown status %q", rest[1])
 			}
-			return s.Move(rest[0], to)
+			return withStopHint(s.Move(rest[0], to, stop))
 		case "set":
 			return taskSet(s, rest)
 		case "link", "unlink":
@@ -107,11 +109,12 @@ func runTask(home string, args []string) error {
 			}
 			return nil
 		case "cancel", "done", "stop":
-			if len(rest) != 1 {
+			stop := cmd == "done" && len(rest) == 2 && rest[1] == "--stop"
+			if len(rest) != 1 && !stop {
 				return fmt.Errorf("usage: conveyor task %s KEY", cmd)
 			}
 			if cmd == "done" {
-				return s.MarkDone(rest[0])
+				return withStopHint(s.MarkDone(rest[0], stop))
 			}
 			if cmd == "stop" {
 				return s.Stop(rest[0])
@@ -492,4 +495,13 @@ func createdBy(parent string) string {
 		return "agent:" + parent
 	}
 	return "human"
+}
+
+// withStopHint tells the CLI user how to confirm a move that ends running runs.
+func withStopHint(err error) error {
+	var a *core.ActiveRunsError
+	if errors.As(err, &a) {
+		return fmt.Errorf("%w; re-run with --stop to confirm", err)
+	}
+	return err
 }

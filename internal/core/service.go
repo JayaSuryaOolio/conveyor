@@ -236,18 +236,80 @@ func (s *Service) followUp(t store.Task, pr, body string, actor store.Actor) err
 	return nil
 }
 
-// Move changes a task's status as a human. Moving to done or cancelled also stops
-// and removes the task's background sessions (best effort).
-func (s *Service) Move(key string, to store.Status) error {
+// ActiveRunsError refuses a move to review or done while the task still has
+// active background runs; the caller confirms, then moves again with stop.
+type ActiveRunsError struct {
+	Key string
+	N   int
+}
+
+func (e *ActiveRunsError) Error() string {
+	return fmt.Sprintf("%s has %d running run(s); moving it ends them", e.Key, e.N)
+}
+
+// Move changes a task's status as a human. Moving to review or done with active
+// background runs returns *ActiveRunsError unless stop is set, which ends those
+// runs first. Moving to done or cancelled also stops and removes the task's
+// background sessions (best effort).
+func (s *Service) Move(key string, to store.Status, stop bool) error {
 	t, err := store.GetTaskByKey(s.DB, key)
 	if err != nil {
 		return err
+	}
+	if err := store.ValidateTransition(t.Status, to, store.ActorHuman); err != nil {
+		return err
+	}
+	if to == store.StatusReview || to == store.StatusDone {
+		runs, err := s.autoRuns(t.ID)
+		if err != nil {
+			return err
+		}
+		if len(runs) > 0 && !stop {
+			return &ActiveRunsError{Key: key, N: len(runs)}
+		}
+		// End runs before the move, so a late hook of a killed session can't move the task back.
+		if err := s.endRuns(runs); err != nil {
+			return err
+		}
 	}
 	if _, err = store.UpdateTaskStatus(s.DB, t.ID, to, store.ActorHuman); err != nil {
 		return err
 	}
 	if to == store.StatusDone || to == store.StatusCancelled {
 		s.CleanupSessions(t.ID)
+	}
+	return nil
+}
+
+// autoRuns returns the task's active runs Conveyor launched; manual
+// (interactive) sessions are the human's and are left alone.
+func (s *Service) autoRuns(taskID int64) ([]store.Run, error) {
+	runs, err := store.ActiveRuns(s.DB)
+	var out []store.Run
+	for _, r := range runs {
+		if r.TaskID == taskID && r.Kind != "interactive" {
+			out = append(out, r)
+		}
+	}
+	return out, err
+}
+
+// endRuns marks runs failed ("stopped") then stops and removes their Claude
+// sessions (best effort). Store first, so the reaper never sees a vanished
+// session of a still-active run.
+func (s *Service) endRuns(runs []store.Run) error {
+	ended := time.Now().UTC().Format(time.RFC3339)
+	for _, r := range runs {
+		r.Status, r.Error, r.EndedAt = "failed", &stoppedReason, &ended
+		if err := store.UpdateRun(s.DB, r); err != nil {
+			return err
+		}
+	}
+	for _, r := range runs {
+		if r.BgID != nil {
+			claude.Stop(context.Background(), *r.BgID)
+			claude.Remove(context.Background(), *r.BgID)
+		}
 	}
 	return nil
 }
@@ -282,28 +344,15 @@ func (s *Service) Stop(key string) error {
 	if err != nil {
 		return err
 	}
-	runs, err := store.ActiveRuns(s.DB)
+	runs, err := s.autoRuns(t.ID)
 	if err != nil {
 		return err
 	}
-	ended := time.Now().UTC().Format(time.RFC3339)
-	stopped, bgs := 0, []string{}
-	for _, r := range runs {
-		if r.TaskID != t.ID || r.Kind == "interactive" {
-			continue
-		}
-		// Store first, so the reaper never sees a vanished session of a still-active run.
-		r.Status, r.Error, r.EndedAt = "failed", &stoppedReason, &ended
-		if err := store.UpdateRun(s.DB, r); err != nil {
-			return err
-		}
-		stopped++
-		if r.BgID != nil {
-			bgs = append(bgs, *r.BgID)
-		}
-	}
-	if stopped == 0 {
+	if len(runs) == 0 {
 		return fmt.Errorf("%s has no running session to stop", key)
+	}
+	if err := s.endRuns(runs); err != nil {
+		return err
 	}
 	if t.Status == store.StatusRunning {
 		if _, err := store.AddComment(s.DB, store.Comment{TaskID: t.ID, Author: store.AuthorSystem, Body: "A human stopped the run."}); err != nil {
@@ -313,20 +362,16 @@ func (s *Service) Stop(key string) error {
 			return err
 		}
 	}
-	for _, id := range bgs {
-		claude.Stop(context.Background(), id)
-		claude.Remove(context.Background(), id)
-	}
 	return nil
 }
 
 var stoppedReason = "stopped"
 
-// MarkDone moves a task to done.
-func (s *Service) MarkDone(key string) error { return s.Move(key, store.StatusDone) }
+// MarkDone moves a task to done; stop ends its active runs (see Move).
+func (s *Service) MarkDone(key string, stop bool) error { return s.Move(key, store.StatusDone, stop) }
 
 // Cancel moves a task to cancelled and stops its sessions.
-func (s *Service) Cancel(key string) error { return s.Move(key, store.StatusCancelled) }
+func (s *Service) Cancel(key string) error { return s.Move(key, store.StatusCancelled, false) }
 
 // SetTaskRepo sets the branch and PR URL of the task's link to repo. The branch
 // can only change before the worktree exists; an empty prURL clears the PR.

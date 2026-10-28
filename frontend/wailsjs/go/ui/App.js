@@ -158,8 +158,8 @@ export function MergedPR(arg1) {
   return window['go']['ui']['App']['MergedPR'](arg1);
 }
 
-export function Move(arg1, arg2) {
-  return window['go']['ui']['App']['Move'](arg1, arg2);
+export function Move(arg1, arg2, arg3) {
+  return window['go']['ui']['App']['Move'](arg1, arg2, arg3);
 }
 
 export function OpenApp(arg1, arg2, arg3) {

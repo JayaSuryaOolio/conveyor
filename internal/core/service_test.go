@@ -1,6 +1,7 @@
 package core
 
 import (
+	"errors"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -137,10 +138,10 @@ func TestCommentAfterMergeAskOrNote(t *testing.T) {
 func TestMoveCancelDone(t *testing.T) {
 	s := newSvc(t)
 	tk, _ := s.CreateTask(NewTaskInput{Title: "t", Repos: []string{"a"}})
-	if err := s.MarkDone(tk.Key); err == nil {
+	if err := s.MarkDone(tk.Key, false); err == nil {
 		t.Fatal("backlog->done must fail")
 	}
-	if err := s.Move(tk.Key, store.StatusTodo); err != nil {
+	if err := s.Move(tk.Key, store.StatusTodo, false); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.Cancel(tk.Key); err != nil {
@@ -204,7 +205,7 @@ func TestSetTaskRepo(t *testing.T) {
 func TestHumanRequeueResetsFailures(t *testing.T) {
 	s := newSvc(t)
 	for name, requeue := range map[string]func(key string) error{
-		"move":    func(k string) error { return s.Move(k, store.StatusTodo) },
+		"move":    func(k string) error { return s.Move(k, store.StatusTodo, false) },
 		"comment": func(k string) error { _, err := s.AddComment(k, store.AuthorHuman, "retry", FollowUp); return err },
 	} {
 		tk, _ := s.CreateTask(NewTaskInput{Title: "t", Repos: []string{"a"}})
@@ -312,5 +313,33 @@ func TestStopRun(t *testing.T) {
 	run, _ := store.GetRun(s.DB, r.ID)
 	if got.Status != store.StatusNeedsYou || run.Status != "failed" || run.EndedAt == nil {
 		t.Fatalf("task %s run %s", got.Status, run.Status)
+	}
+}
+
+func TestMoveToReviewEndsRunsOnConfirm(t *testing.T) {
+	s := newSvc(t)
+	tk, _ := s.CreateTask(NewTaskInput{Title: "t", Repos: []string{"a"}})
+	s.DB.Exec(`UPDATE tasks SET status=? WHERE id=?`, store.StatusRunning, tk.ID)
+	r, _ := store.CreateRun(s.DB, store.Run{TaskID: tk.ID, Kind: "auto", Mode: "fresh", Status: "running"})
+	manual, _ := store.CreateRun(s.DB, store.Run{TaskID: tk.ID, Kind: "interactive", Mode: "fresh", Status: "running"})
+	var ar *ActiveRunsError
+	if err := s.Move(tk.Key, store.StatusReview, false); !errors.As(err, &ar) || ar.N != 1 {
+		t.Fatalf("want ActiveRunsError{N:1}, got %v", err)
+	}
+	if got, _ := store.GetTask(s.DB, tk.ID); got.Status != store.StatusRunning {
+		t.Fatalf("unconfirmed move moved the task to %s", got.Status)
+	}
+	if err := s.Move(tk.Key, store.StatusReview, true); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := store.GetTask(s.DB, tk.ID)
+	run, _ := store.GetRun(s.DB, r.ID)
+	m, _ := store.GetRun(s.DB, manual.ID)
+	if got.Status != store.StatusReview || run.Status != "failed" || run.EndedAt == nil || m.Status != "running" {
+		t.Fatalf("task %s run %s manual %s", got.Status, run.Status, m.Status)
+	}
+	// nothing left running: no confirmation needed
+	if err := s.Move(tk.Key, store.StatusDone, false); err != nil {
+		t.Fatal(err)
 	}
 }
