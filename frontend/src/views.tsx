@@ -51,7 +51,7 @@ export function Board({nav, q, setQ, search}: {nav: Nav; q: string; setQ: (q: st
     const cols = [...COLUMNS]
     if (cards.some(c => c.status === 'failed')) cols.splice(5, 0, ['failed', 'Failed'])
     return (<Stack gap="sm">
-        <Paper withBorder radius="xl" px="sm" py={6}>
+        <Paper withBorder radius="md" px="sm" py={6}>
             <Group gap="sm" wrap="wrap">
                 <TextInput ref={search} variant="unstyled" size="sm" placeholder="Find a task…" w={200} leftSection={<IconSearch size={16}/>}
                            rightSection={q ? <CloseButton size="sm" aria-label="Clear search" onClick={() => setQ('')}/> : <Kbd size="xs">/</Kbd>}
@@ -63,7 +63,7 @@ export function Board({nav, q, setQ, search}: {nav: Nav; q: string; setQ: (q: st
                         const Arrow = sort.desc ? IconArrowDown : IconArrowUp
                         return (
                             <Tooltip key={by} label={on ? 'Click to reverse' : 'Sort by ' + label.toLowerCase()}>
-                                <Button size="compact-sm" radius="xl" variant={on ? 'light' : 'subtle'} color={on ? undefined : 'gray'} aria-pressed={on}
+                                <Button size="compact-sm" variant={on ? 'light' : 'subtle'} color={on ? undefined : 'gray'} aria-pressed={on}
                                         leftSection={<Icon size={14}/>} rightSection={on ? <Arrow size={12}/> : undefined}
                                         onClick={() => setSort(on ? {by, desc: !sort.desc} : {by, desc})}>{label}</Button>
                             </Tooltip>
@@ -76,7 +76,7 @@ export function Board({nav, q, setQ, search}: {nav: Nav; q: string; setQ: (q: st
                         {repos.map(r => {
                             const on = sel.includes(r)
                             return (
-                                <Badge key={r} component="button" size="lg" radius="xl" color={repoColor(r)} variant={on ? 'filled' : sel.length ? 'outline' : 'light'}
+                                <Badge key={r} component="button" size="lg" color={repoColor(r)} variant={on ? 'filled' : sel.length ? 'outline' : 'light'}
                                        aria-pressed={on} title={on ? 'Hide ' + r + ' filter' : 'Only ' + r + ' (click more to combine)'}
                                        style={{cursor: 'pointer', textTransform: 'none', opacity: sel.length && !on ? 0.6 : 1}}
                                        leftSection={<Box w={6} h={6} style={{borderRadius: '50%', background: on ? 'currentColor' : `var(--mantine-color-${repoColor(r)}-6)`}}/>}
