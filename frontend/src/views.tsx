@@ -299,7 +299,7 @@ export function TaskPage({k, nav}: {k: string; nav: Nav}) {
                                                title={<Group gap="xs">
                                                    {`Run ${runNo.get(it.run.id)} · ${it.run.mode}`}
                                                    {it.run.kind !== 'interactive' && (it.run.status === 'launching' || it.run.status === 'running') &&
-                                                       <Button variant="default" size="compact-xs" leftSection={<IconPlayerStop size={12}/>} onClick={stop}>Stop run</Button>}
+                                                       <Button variant="default" size="compact-xs" c="dimmed" leftSection={<IconPlayerStop size={12}/>} onClick={stop}>Stop run</Button>}
                                                </Group>}>
                                     <Text size="xs" c="dimmed">
                                         {it.run.api_calls} calls · {fmtK(it.run.ctx_peak)} peak · {fmtDuration(it.run.started_at, it.run.ended_at)} · <Time iso={it.run.started_at}/>
