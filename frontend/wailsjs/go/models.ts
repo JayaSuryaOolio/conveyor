@@ -526,6 +526,7 @@ export namespace store {
 	    updated_at: string;
 	    created_by?: string;
 	    repos?: TaskRepo[];
+	    labels: string[];
 	
 	    static createFrom(source: any = {}) {
 	        return new Task(source);
@@ -550,6 +551,7 @@ export namespace store {
 	        this.updated_at = source["updated_at"];
 	        this.created_by = source["created_by"];
 	        this.repos = this.convertValues(source["repos"], TaskRepo);
+	        this.labels = source["labels"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -682,6 +684,7 @@ export namespace ui {
 	    priority: number;
 	    parent: string;
 	    repos: string[];
+	    labels: string[];
 	    lastSummary: string;
 	    ctxPeak: number;
 	    updatedAt: string;
@@ -698,6 +701,7 @@ export namespace ui {
 	        this.priority = source["priority"];
 	        this.parent = source["parent"];
 	        this.repos = source["repos"];
+	        this.labels = source["labels"];
 	        this.lastSummary = source["lastSummary"];
 	        this.ctxPeak = source["ctxPeak"];
 	        this.updatedAt = source["updatedAt"];

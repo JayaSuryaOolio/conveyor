@@ -1,8 +1,8 @@
 import {useEffect, useState} from 'react'
-import {ActionIcon, Anchor, Badge, Button, Code, Divider, Group, Indicator, Paper, Stack, Text, TextInput, Title, Tooltip} from '@mantine/core'
+import {ActionIcon, Anchor, Badge, Button, Code, Divider, Group, Indicator, Paper, Stack, TagsInput, Text, TextInput, Title, Tooltip} from '@mantine/core'
 import {useClipboard} from '@mantine/hooks'
 import {IconCheck, IconCopy, IconPencil, IconStar, IconTerminal, IconTerminal2, IconX} from '@tabler/icons-react'
-import {Actions, AppIcons, EnsureWorkspace, GetSettings, ListApps, OpenApp, RunAction, Sessions, SetTaskRepo, SpotlightRoot, SpotlightStop, TermStart} from '../wailsjs/go/ui/App'
+import {Actions, AddLabel, AppIcons, EnsureWorkspace, GetSettings, ListApps, ListLabels, RemoveLabel, OpenApp, RunAction, Sessions, SetTaskRepo, SpotlightRoot, SpotlightStop, TermStart} from '../wailsjs/go/ui/App'
 import {core, store, ui} from '../wailsjs/go/models'
 import {BrowserOpenURL} from '../wailsjs/runtime/runtime'
 import {AppIcon, StatusSelect, Time, errMsg, runApp} from './components'
@@ -164,6 +164,18 @@ function creator(key: string, source: string, user: string | undefined, createdB
     return user || 'human'
 }
 
+/** Label picker: choose existing labels from the dropdown or type a new one and press Enter. */
+function Labels({k, labels, reload}: {k: string; labels: string[]; reload: () => void}) {
+    const {data: all, reload: reloadAll} = useData(ListLabels, [])
+    const change = (next: string[]) => {
+        const lower = (xs: string[]) => xs.map(x => x.toLowerCase())
+        const adds = next.filter(n => !lower(labels).includes(n.toLowerCase()))
+        const drops = labels.filter(l => !lower(next).includes(l.toLowerCase()))
+        Promise.all([...adds.map(n => AddLabel(k, n)), ...drops.map(n => RemoveLabel(k, n))]).then(() => { reload(); reloadAll() }).catch(errMsg)
+    }
+    return <TagsInput size="xs" label="Labels" placeholder="Add label…" value={labels} data={all ?? []} onChange={change} clearable={false} splitChars={[',']}/>
+}
+
 export function TaskSidebar({t, runs, reload, onTerm}: {t: store.Task; runs: store.Run[]; reload: () => void; onTerm: (t: ui.TermInfo) => void}) {
     const k = t.key
     const repos = t.repos ?? []
@@ -189,6 +201,7 @@ export function TaskSidebar({t, runs, reload, onTerm}: {t: store.Task; runs: sto
             </Group>
             <Group justify="space-between"><Text size="xs" c="dimmed">Created</Text><Group gap={4} wrap="nowrap"><Text size="xs">{by} ·</Text><Time iso={t.created_at}/></Group></Group>
             <Group justify="space-between"><Text size="xs" c="dimmed">Updated</Text><Time iso={t.updated_at}/></Group>
+            <Labels k={k} labels={t.labels ?? []} reload={reload}/>
             <Divider/>
             <Title order={6}>Repos</Title>
             {actionsError && <Text size="xs" c="red">Failed to load actions: {actionsError}</Text>}

@@ -85,9 +85,11 @@ export function Card({c, nav}: {c: ui.TaskCard; nav: Nav}) {
                 </Group>
             </Group>
             <Text size="sm" fw={500} mt={2}>{c.title}</Text>
-            {c.repos.length > 0 && <Group gap={4} mt="xs">{c.repos.map(r => <Badge key={r} variant="light" size="xs">{r}</Badge>)}</Group>}
+            {(c.repos.length > 0 || c.labels.length > 0) && <Group gap={4} mt="xs">
+                {c.repos.map(r => <Badge key={r} variant="light" size="xs">{r}</Badge>)}
+                {c.labels.map(l => <Badge key={'l:' + l} variant="outline" color="gray" size="xs" style={{textTransform: 'none'}}>{l}</Badge>)}
+            </Group>}
             {c.lastSummary && <Box mt="xs" mah={40} style={{overflow: 'hidden'}}><Markdown c="dimmed">{c.lastSummary}</Markdown></Box>}
-            <Group mt="xs"><StatusBadge status={c.status}/></Group>
         </MCard>
     )
 }

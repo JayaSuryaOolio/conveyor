@@ -21,24 +21,25 @@ type Repo struct {
 
 // Task is a kanban task. Repos is filled by GetTask, GetTaskByKey and ListTasks.
 type Task struct {
-	ID                  int64      `json:"id"`
-	Key                 string     `json:"key"`
-	Title               string     `json:"title"`
-	Description         string     `json:"description"`
-	Status              Status     `json:"status"`
-	Priority            int        `json:"priority"`
-	Model               *string    `json:"model"`
-	Agent               *string    `json:"agent"`
-	Source              string     `json:"source"`
-	ExternalKey         *string    `json:"external_key"`
-	ExternalURL         *string    `json:"external_url"`
-	ParentID            *int64     `json:"parent_id"`
-	ConsecutiveFailures int        `json:"consecutive_failures"`
-	CreatedAt           string     `json:"created_at"`
-	UpdatedAt           string     `json:"updated_at"`
+	ID                  int64   `json:"id"`
+	Key                 string  `json:"key"`
+	Title               string  `json:"title"`
+	Description         string  `json:"description"`
+	Status              Status  `json:"status"`
+	Priority            int     `json:"priority"`
+	Model               *string `json:"model"`
+	Agent               *string `json:"agent"`
+	Source              string  `json:"source"`
+	ExternalKey         *string `json:"external_key"`
+	ExternalURL         *string `json:"external_url"`
+	ParentID            *int64  `json:"parent_id"`
+	ConsecutiveFailures int     `json:"consecutive_failures"`
+	CreatedAt           string  `json:"created_at"`
+	UpdatedAt           string  `json:"updated_at"`
 	// CreatedBy is "human", "agent:<KEY>", "automation:<name>", "jira", "learning" or "followup:<KEY>"; nil on rows from before the column.
-	CreatedBy           *string    `json:"created_by"`
-	Repos               []TaskRepo `json:"repos,omitempty"`
+	CreatedBy *string    `json:"created_by"`
+	Repos     []TaskRepo `json:"repos,omitempty"`
+	Labels    []string   `json:"labels"`
 }
 
 // TaskRepo links a task to a repo. On input to CreateTask, Branch is the
