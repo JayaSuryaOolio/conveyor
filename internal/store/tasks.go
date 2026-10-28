@@ -43,6 +43,9 @@ func getTask(db dbtx, where string, arg any, what string) (Task, error) {
 	if t.Repos, err = loadRepos(db, t.ID); err != nil {
 		return Task{}, err
 	}
+	if t.Labels, err = TaskLabels(db, t.ID); err != nil {
+		return Task{}, err
+	}
 	return t, nil
 }
 
@@ -147,9 +150,16 @@ func ListTasks(db *sql.DB, statuses ...Status) ([]Task, error) {
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
+	labels, err := allTaskLabels(db)
+	if err != nil {
+		return nil, err
+	}
 	for i := range out {
 		if out[i].Repos, err = loadRepos(db, out[i].ID); err != nil {
 			return nil, err
+		}
+		if out[i].Labels = labels[out[i].ID]; out[i].Labels == nil {
+			out[i].Labels = []string{}
 		}
 	}
 	return out, nil

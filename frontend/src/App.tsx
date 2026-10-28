@@ -10,6 +10,7 @@ import {AppIcon, Nav, Toasts, runApp} from './components'
 import {NewTask, Settings} from './forms'
 import {LearningsPage} from './learnings'
 import {Logs} from './logs'
+import {CommandPalette} from './palette'
 import {useData} from './util'
 import {Board, Focus, TaskPage} from './views'
 
@@ -56,6 +57,7 @@ export default function App() {
         let g = false
         const onKey = (e: KeyboardEvent) => {
             const el = e.target as HTMLElement
+            if (e.key === 'Escape' && !e.defaultPrevented && el.matches('input,textarea,select')) { e.preventDefault(); el.blur(); return } // de-focus instead of macOS leaving fullscreen
             if (e.metaKey && e.key === '[') { e.preventDefault(); back(); return }
             if (el.matches('input,textarea,select') || e.metaKey || e.ctrlKey) return
             if (g) {
@@ -93,8 +95,8 @@ export default function App() {
                         </Tooltip>
                     ) : <>
                         <Button leftSection={<IconPlus size={16}/>} rightSection={<Kbd size="xs">n</Kbd>} onClick={() => setShowNew(true)}>New task</Button>
-                        <TextInput ref={search} placeholder="Search" leftSection={<IconSearch size={16}/>} rightSection={<Kbd size="xs">/</Kbd>}
-                                   value={q} onChange={e => setQ(e.target.value)}/>
+                        {view.name !== 'board' && <TextInput ref={search} placeholder="Search" leftSection={<IconSearch size={16}/>} rightSection={<Kbd size="xs">/</Kbd>}
+                                   value={q} onChange={e => setQ(e.target.value)}/>}
                     </>}
                     <Stack gap={2} mt="xs">
                         {NAV.map(({name, key, label, icon: Icon}) => (
@@ -120,7 +122,7 @@ export default function App() {
                 </Stack>
             </AppShell.Navbar>
             <AppShell.Main key={view.name + (view.key ?? '')} h="100vh" style={{overflow: view.name === 'task' ? 'hidden' : 'auto'}}>
-                {view.name === 'board' && <Board nav={nav} q={q}/>}
+                {view.name === 'board' && <Board nav={nav} q={q} setQ={setQ} search={search}/>}
                 {view.name === 'focus' && <Focus nav={nav} q={q}/>}
                 {view.name === 'task' && <TaskPage k={view.key!} nav={nav}/>}
                 {view.name === 'learnings' && <LearningsPage nav={nav}/>}
@@ -131,6 +133,7 @@ export default function App() {
                 {view.name === 'settings' && <Settings/>}
             </AppShell.Main>
             {showNew && <NewTask nav={nav} close={() => setShowNew(false)}/>}
+            <CommandPalette nav={nav}/>
             <Toasts/>
         </AppShell>
     )

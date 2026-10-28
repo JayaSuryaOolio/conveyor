@@ -114,4 +114,3 @@ Integrations (terminal templates, external apps, global hooks, automations, Jira
 
 - A wrapped UI component layer so Mantine can be swapped in one place.
 - A remote backend: dispatcher, DB and workspaces on a server, driven over an API.
-- A ⌘K command palette for tasks, views and actions.

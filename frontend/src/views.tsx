@@ -1,8 +1,8 @@
-import {lazy, Suspense, useEffect, useRef, useState} from 'react'
-import {ActionIcon, Anchor, Box, Breadcrumbs, Button, Code, Group, Paper, Stack, Text, Timeline, Title} from '@mantine/core'
+import {lazy, Ref, Suspense, useEffect, useRef, useState} from 'react'
+import {ActionIcon, Anchor, Badge, Box, Breadcrumbs, Button, CloseButton, Code, Divider, Group, Kbd, Paper, Stack, Text, TextInput, Timeline, Title, Tooltip} from '@mantine/core'
 import {useLocalStorage} from '@mantine/hooks'
-import {IconArrowDown, IconArrowUp, IconPencil, IconTerminal, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconMessage, IconPlayerPlay} from '@tabler/icons-react'
-import {Actions, GetTask, ListTasks, RunLog, SetTaskDescription, TakeQueuedComment, TermStart} from '../wailsjs/go/ui/App'
+import {IconAbc, IconArrowDown, IconArrowUp, IconClock, IconFlame, IconHash, IconPencil, IconSearch, IconTerminal, IconX, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconMessage, IconPlayerPlay} from '@tabler/icons-react'
+import {Actions, GetTask, ListTasks, RunLog, SetTaskDescription, TakeQueuedComment} from '../wailsjs/go/ui/App'
 import {core, store, ui} from '../wailsjs/go/models'
 import {Card, CommentBox, Message, Nav, StatusBadge, Time, errMsg} from './components'
 import {Markdown, MarkdownEditor, TaskKey} from './markdown'
@@ -17,17 +17,99 @@ const FOCUS_ORDER = ['needs_you', 'review', 'failed', 'running', 'todo']
 const WEEK = 7 * 24 * 3600 * 1000
 const ARCHIVE = ['done', 'cancelled'] // collapsed until opened
 
-export function Board({nav, q}: {nav: Nav; q: string}) {
+// Board sorts; `desc` is the direction a fresh pick starts in. Clicking the active sort flips it.
+const SORTS: {by: string; label: string; icon: typeof IconClock; desc: boolean; cmp: (a: ui.TaskCard, b: ui.TaskCard) => number}[] = [
+    {by: 'priority', label: 'Priority', icon: IconFlame, desc: true, cmp: (a, b) => a.priority - b.priority},
+    {by: 'updated', label: 'Updated', icon: IconClock, desc: true, cmp: (a, b) => Date.parse(a.updatedAt) - Date.parse(b.updatedAt)},
+    {by: 'key', label: 'Key', icon: IconHash, desc: false, cmp: (a, b) => a.key.localeCompare(b.key, undefined, {numeric: true})},
+    {by: 'title', label: 'Title', icon: IconAbc, desc: false, cmp: (a, b) => a.title.localeCompare(b.title)},
+]
+const REPO_COLORS = ['blue', 'grape', 'teal', 'orange', 'pink', 'cyan', 'lime', 'violet', 'red', 'indigo']
+
+export function Board({nav, q, setQ, search}: {nav: Nav; q: string; setQ: (q: string) => void; search: Ref<HTMLInputElement>}) {
     const {data, error} = useData(ListTasks, [])
     const [open, setOpen] = useState<string[]>([])
+    const [sort, setSort] = useLocalStorage({key: 'board-sort', defaultValue: {by: 'priority', desc: true}})
+    const [picked, setPicked] = useLocalStorage<string[]>({key: 'board-repos', defaultValue: []})
+    const [pickedLabels, setPickedLabels] = useLocalStorage<string[]>({key: 'board-labels', defaultValue: []})
     if (error) return <Text c="red">{error}</Text>
     const shut = (s: string) => ARCHIVE.includes(s) && !open.includes(s)
     const toggle = (s: string) => setOpen(o => o.includes(s) ? o.filter(x => x !== s) : [...o, s])
+    const all = data ?? []
+    const repoCount = new Map<string, number>()
+    all.forEach(c => c.repos.forEach(r => repoCount.set(r, (repoCount.get(r) ?? 0) + 1)))
+    const repos = [...repoCount.keys()].sort()
+    const repoColor = (r: string) => REPO_COLORS[repos.indexOf(r) % REPO_COLORS.length] // by sorted position: distinct up to 10 repos
+    const sel = picked.filter(r => repoCount.has(r)) // a remembered repo that no longer has tasks must not hide everything
+    const flip = (r: string) => setPicked(sel.includes(r) ? sel.filter(x => x !== r) : [...sel, r])
+    const labelCount = new Map<string, number>()
+    all.forEach(c => c.labels.forEach(l => labelCount.set(l, (labelCount.get(l) ?? 0) + 1)))
+    const labels = [...labelCount.keys()].sort()
+    const selL = pickedLabels.filter(l => labelCount.has(l))
+    const flipL = (l: string) => setPickedLabels(selL.includes(l) ? selL.filter(x => x !== l) : [...selL, l])
+    const s = SORTS.find(x => x.by === sort.by) ?? SORTS[0]
     const needle = q.toLowerCase()
-    const cards = (data ?? []).filter(c => !needle || (c.key + ' ' + c.title).toLowerCase().includes(needle))
+    // Array.sort is stable, so ties keep the server order (priority desc, created asc).
+    const cards = all
+        .filter(c => (!needle || (c.key + ' ' + c.title).toLowerCase().includes(needle)) && (!sel.length || c.repos.some(r => sel.includes(r))) && (!selL.length || c.labels.some(l => selL.includes(l))))
+        .sort((a, b) => sort.desc ? s.cmp(b, a) : s.cmp(a, b))
+    const filtered = !!needle || sel.length > 0 || selL.length > 0
     const cols = [...COLUMNS]
     if (cards.some(c => c.status === 'failed')) cols.splice(5, 0, ['failed', 'Failed'])
-    return (
+    return (<Stack gap="sm">
+        <Paper withBorder radius="md" px="sm" py={6}>
+            <Group gap="sm" wrap="wrap">
+                <TextInput ref={search} variant="unstyled" size="sm" placeholder="Find a task…" w={200} leftSection={<IconSearch size={16}/>}
+                           rightSection={q ? <CloseButton size="sm" aria-label="Clear search" onClick={() => setQ('')}/> : <Kbd size="xs">/</Kbd>}
+                           value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => e.key === 'Escape' && (setQ(''), e.currentTarget.blur())}/>
+                <Divider orientation="vertical"/>
+                <Group gap={2} wrap="nowrap" role="group" aria-label="Sort">
+                    {SORTS.map(({by, label, icon: Icon, desc}) => {
+                        const on = by === s.by
+                        const Arrow = sort.desc ? IconArrowDown : IconArrowUp
+                        return (
+                            <Tooltip key={by} label={on ? 'Click to reverse' : 'Sort by ' + label.toLowerCase()}>
+                                <Button size="compact-sm" variant={on ? 'light' : 'subtle'} color={on ? undefined : 'gray'} aria-pressed={on}
+                                        leftSection={<Icon size={14}/>} rightSection={on ? <Arrow size={12}/> : undefined}
+                                        onClick={() => setSort(on ? {by, desc: !sort.desc} : {by, desc})}>{label}</Button>
+                            </Tooltip>
+                        )
+                    })}
+                </Group>
+                {repos.length > 1 && <>
+                    <Divider orientation="vertical"/>
+                    <Group gap={6} wrap="wrap" role="group" aria-label="Repos" style={{flex: 1}}>
+                        {repos.map(r => {
+                            const on = sel.includes(r)
+                            return (
+                                <Badge key={r} component="button" size="lg" radius="md" color={repoColor(r)} variant={on ? 'filled' : sel.length ? 'outline' : 'light'}
+                                       aria-pressed={on} title={on ? 'Hide ' + r + ' filter' : 'Only ' + r + ' (click more to combine)'}
+                                       style={{cursor: 'pointer', textTransform: 'none', opacity: sel.length && !on ? 0.6 : 1}}
+                                       leftSection={<Box w={6} h={6} style={{borderRadius: '50%', background: on ? 'currentColor' : `var(--mantine-color-${repoColor(r)}-6)`}}/>}
+                                       onClick={() => flip(r)}>{r} · {repoCount.get(r)}</Badge>
+                            )
+                        })}
+                    </Group>
+                </>}
+                {labels.length > 0 && <>
+                    <Divider orientation="vertical"/>
+                    <Group gap={6} wrap="wrap" role="group" aria-label="Labels">
+                        {labels.map(l => {
+                            const on = selL.includes(l)
+                            return (
+                                <Badge key={l} component="button" size="lg" radius="md" color="gray" variant={on ? 'filled' : 'outline'} aria-pressed={on}
+                                       title={on ? 'Hide ' + l + ' filter' : 'Only label ' + l + ' (click more to combine)'}
+                                       style={{cursor: 'pointer', textTransform: 'none'}} onClick={() => flipL(l)}>{l} · {labelCount.get(l)}</Badge>
+                            )
+                        })}
+                    </Group>
+                </>}
+                {filtered && <Group gap={6} wrap="nowrap" ml="auto">
+                    <Text size="xs" c="dimmed">{cards.length} of {all.length}</Text>
+                    <Button size="compact-xs" variant="subtle" color="gray" leftSection={<IconX size={12}/>} onClick={() => { setQ(''); setPicked([]); setPickedLabels([]) }}>Clear</Button>
+                </Group>}
+            </Group>
+        </Paper>
         <Box style={{display: 'grid', gridTemplateColumns: cols.map(([s]) => shut(s) ? '36px' : 'minmax(180px, 1fr)').join(' '), gap: 'var(--mantine-spacing-sm)', alignItems: 'start', overflowX: 'auto'}}>
             {cols.map(([s, label]) => {
                 let list = cards.filter(c => c.status === s)
@@ -51,7 +133,7 @@ export function Board({nav, q}: {nav: Nav; q: string}) {
                 )
             })}
         </Box>
-    )
+    </Stack>)
 }
 
 export function Focus({nav, q}: {nav: Nav; q: string}) {

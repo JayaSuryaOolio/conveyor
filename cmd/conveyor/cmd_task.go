@@ -56,6 +56,14 @@ func runTask(home string, args []string) error {
 				return s.Link(rest[0], rest[1], rest[2])
 			}
 			return s.Unlink(rest[0], rest[1], rest[2])
+		case "label":
+			if len(rest) != 3 || (rest[1] != "add" && rest[1] != "rm") {
+				return fmt.Errorf("usage: conveyor task label KEY add|rm NAME")
+			}
+			if rest[1] == "add" {
+				return s.AddLabel(rest[0], rest[2])
+			}
+			return s.RemoveLabel(rest[0], rest[2])
 		case "parent":
 			if len(rest) != 2 {
 				return fmt.Errorf("usage: conveyor task parent KEY PARENT|--none")
@@ -242,6 +250,9 @@ func taskShow(s *core.Service, args []string) error {
 	}
 	if rel.Parent != nil {
 		fmt.Fprintf(out, "parent: %s  %s (%s)\n", rel.Parent.Key, rel.Parent.Title, rel.Parent.Status)
+	}
+	if len(t.Labels) > 0 {
+		fmt.Fprintf(out, "labels: %s\n", strings.Join(t.Labels, ", "))
 	}
 	for _, c := range rel.Children {
 		fmt.Fprintf(out, "child: %s  %s (%s)\n", c.Key, c.Title, c.Status)

@@ -69,3 +69,21 @@ func (s *Service) AdoptChild(parent, child string) error {
 	}
 	return store.SetParent(s.DB, c.ID, &p.ID)
 }
+
+// AddLabel puts a label (created if new) on the task with key.
+func (s *Service) AddLabel(key, name string) error {
+	t, err := store.GetTaskByKey(s.DB, key)
+	if err != nil {
+		return err
+	}
+	return store.AddLabel(s.DB, t.ID, name)
+}
+
+// RemoveLabel takes a label off the task with key.
+func (s *Service) RemoveLabel(key, name string) error {
+	t, err := store.GetTaskByKey(s.DB, key)
+	if err != nil {
+		return err
+	}
+	return store.RemoveLabel(s.DB, t.ID, name)
+}
