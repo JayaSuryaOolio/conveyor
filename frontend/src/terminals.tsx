@@ -43,7 +43,10 @@ function XTerm({id, active}: {id: string; active: boolean}) {
             }),
             EventsOn('term-exit:' + id, () => t.write('\r\n\x1b[2m[process exited]\x1b[0m\r\n')),
         ]
-        TermBuffer(id).then(buf => {
+        // Replay only after the first visible fit: a hidden xterm is 80 cols, and the
+        // scrollback was drawn at the PTY's real width, so replaying early garbles it.
+        let replayed = false
+        const replay = () => TermBuffer(id).then(buf => {
             const b = bytes(buf.data)
             t.write(b)
             base = buf.end
@@ -51,10 +54,17 @@ function XTerm({id, active}: {id: string; active: boolean}) {
             ready = true
         }, errMsg)
         t.onData(d => TermWrite(id, d).catch(() => {}))
+        // xterm sends a bare \r for Shift+Enter; send ESC+CR like Claude's /terminal-setup so TUIs insert a newline.
+        t.attachCustomKeyEventHandler(e => {
+            if (e.key !== 'Enter' || !e.shiftKey || e.ctrlKey || e.altKey || e.metaKey) return true
+            if (e.type === 'keydown') TermWrite(id, '\x1b\r').catch(() => {})
+            return false
+        })
         const ro = new ResizeObserver(() => {
             if (!el.current?.offsetWidth) return // hidden tab
             fit.fit()
             TermResize(id, t.cols, t.rows).catch(() => {})
+            if (!replayed) { replayed = true; replay() }
         })
         ro.observe(el.current!)
         return () => { ro.disconnect(); off.forEach(f => f()); t.dispose() }
