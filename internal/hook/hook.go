@@ -100,8 +100,10 @@ func resolveRun(db *sql.DB, task store.Task, session string) (store.Run, error) 
 	if session != "" {
 		sp = &session
 	}
+	// A launching run has heard no hook yet, so its session id is at most a guess: a resume run starts
+	// with the old id, but Claude may run the resume as a copy under a new one (docs/session-identity.md).
 	for i := len(runs) - 1; i >= 0; i-- {
-		if r := runs[i]; r.SessionID == nil && r.Status == "launching" {
+		if r := runs[i]; r.Status == "launching" {
 			r.SessionID = sp
 			return r, store.UpdateRun(db, r)
 		}

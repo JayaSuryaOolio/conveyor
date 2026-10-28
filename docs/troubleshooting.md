@@ -74,7 +74,7 @@ conveyor task show KEY --runs --json     # resume run finished, task moved
 
 Run it when the session is idle if you can; a live session's own Stop only touches the interactive run, so replaying mid-turn is safe but moves the task before the turn ends. The interactive run stays `running` until its session leaves the agents list (the reaper finishes it).
 
-**Not yet prevented.** The proposed fix (update `session_id` from the agents list in the reaper, never create an interactive run for a known `bg_id`) is in [session-identity.md](session-identity.md#prevention-proposed-not-implemented).
+**Prevented since CV-58.** The hook adopts the launching resume run and the reaper follows the bg agent's session id; see [session-identity.md](session-identity.md#prevention-since-cv-58). The recipe stays for runs stuck from before.
 
 ## A task has a second PR that Conveyor doesn't track
 
@@ -112,4 +112,4 @@ This differs from the recipe above: there the Stop hook never fired. Here it fir
 
 Last resort for a lost run, not a fix: leave it and move on. Moving the task to `review` does not end the run.
 
-**Open.** Not prevented yet. A permanent fix is to attach the hook's session id to the open run whose `bg_id` is that session (or the newest `running` auto run of the task) instead of creating an interactive run, and to have `conveyor task move KEY review|done` fail leftover `running` runs without cancelling the task. Run 8 of CV-55 (194) showed its output only as a summary on the wrong run.
+**Prevented since CV-58**, same fix as the recipe above. Still open: `conveyor task move KEY review|done` does not fail leftover `running` runs.

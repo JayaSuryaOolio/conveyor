@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -135,13 +136,15 @@ func (s *Service) Actions(key string) ([]Action, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Kinds carry the run id, not the session id: a resume run shares its session id with the run it resumed.
 	for i, r := range runs {
+		id := strconv.FormatInt(r.ID, 10)
 		switch {
 		case r.SessionID == nil:
 		case !isActive(r):
-			out = append(out, Action{fmt.Sprintf("Resume run #%d", i+1), primary, cwd, claude.ResumeCommand(*r.SessionID, settings), "resume:" + *r.SessionID})
+			out = append(out, Action{fmt.Sprintf("Resume run #%d", i+1), primary, cwd, claude.ResumeCommand(*r.SessionID, settings), "resume:" + id})
 		case r.BgID != nil: // a run that is not the latest, e.g. blocked on a question, still needs its attach icon
-			out = append(out, Action{fmt.Sprintf("Attach to run #%d", i+1), primary, cwd, claude.AttachCommand(*r.BgID), "attach:" + *r.SessionID})
+			out = append(out, Action{fmt.Sprintf("Attach to run #%d", i+1), primary, cwd, claude.AttachCommand(*r.BgID), "attach:" + id})
 		}
 	}
 	return out, nil
@@ -268,7 +271,7 @@ func (s *Service) RunLog(runID, after int64) (RunLog, error) {
 }
 
 // FindAction picks an action by kind and repo ("" means the primary repo for shell).
-// Kind "resume:<id>" selects a manual session's resume action.
+// Kind "resume:<id>" selects a manual session's resume action, or a run's ("resume:<run id>").
 func (s *Service) FindAction(key, kind, repo string) (Action, error) {
 	if id, ok := strings.CutPrefix(kind, "resume:"); ok {
 		ss, err := s.Sessions(key)

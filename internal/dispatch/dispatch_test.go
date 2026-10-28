@@ -547,3 +547,18 @@ func TestModelPrecedence(t *testing.T) {
 		}
 	}
 }
+
+// A running resume whose bg agent works under a new session id follows that id, so its Stop hook finds it.
+func TestReapFollowsResumedSessionID(t *testing.T) {
+	e := setup(t)
+	tk := e.task(t, "t", 0)
+	bg, old := "abcd0001", "sess-old"
+	r, _ := store.CreateRun(e.db, store.Run{TaskID: tk.ID, Kind: "auto", Mode: "resume", Status: "running", BgID: &bg, SessionID: &old})
+	os.WriteFile(filepath.Join(e.fake, "agents.json"), []byte(`[{"id":"abcd0001","sessionId":"sess-new","status":"busy"}]`), 0o644)
+	if err := e.d.reap(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := store.GetRun(e.db, r.ID); got.Status != "running" || *got.SessionID != "sess-new" {
+		t.Fatalf("run %+v", got)
+	}
+}
