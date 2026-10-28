@@ -47,7 +47,7 @@ export function NewTask({nav, close}: {nav: Nav; close: () => void}) {
                 <AgentSelect repos={sel} value={agent} onChange={setAgent}/>
                 <Checkbox label="Start now (todo)" checked={start} onChange={e => setStart(e.currentTarget.checked)}/>
                 <Group justify="flex-end">
-                    <Button variant="default" onClick={close}>Cancel</Button>
+                    <Button variant="default" onClick={() => { setTitle(''); setDesc(''); close() }}>Cancel</Button>
                     <Button onClick={submit} disabled={!title.trim() || sel.length === 0}>Create</Button>
                 </Group>
             </Stack>
