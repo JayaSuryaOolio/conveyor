@@ -4,6 +4,8 @@ import (
 	"errors"
 	"log"
 	"os"
+	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/JayaSuryaOolio/conveyor/internal/core"
@@ -47,6 +49,24 @@ func (a *App) DeleteApp(name string) error { return a.svc.UninstallApp(name) }
 func (a *App) InstallManifest(raw string) error {
 	_, err := a.svc.InstallManifest(raw)
 	return err
+}
+
+// ValidateManifest returns why raw is not an installable manifest, "" when it is (live check in the builder).
+func (a *App) ValidateManifest(raw string) string {
+	if _, err := core.ParseManifest(raw); err != nil {
+		return err.Error()
+	}
+	return ""
+}
+
+// ManifestSchema lists what the builder can insert: "vars" (${{ var }} placeholders), "places" and "version".
+func (a *App) ManifestSchema() map[string][]string {
+	places := make([]string, 0, len(core.Placements))
+	for p := range core.Placements {
+		places = append(places, p)
+	}
+	sort.Strings(places)
+	return map[string][]string{"vars": core.ManifestVars, "places": places, "version": {strconv.Itoa(core.ManifestVersion)}}
 }
 
 // ConvertApp turns a plain command app into a manifest app.

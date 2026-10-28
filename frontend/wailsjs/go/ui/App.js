@@ -318,6 +318,14 @@ export function InstallManifest(arg1) {
   return window['go']['ui']['App']['InstallManifest'](arg1);
 }
 
+export function ManifestSchema() {
+  return window['go']['ui']['App']['ManifestSchema']();
+}
+
+export function ValidateManifest(arg1) {
+  return window['go']['ui']['App']['ValidateManifest'](arg1);
+}
+
 export function InstallPreset(arg1) {
   return window['go']['ui']['App']['InstallPreset'](arg1);
 }
