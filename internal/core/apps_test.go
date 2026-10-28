@@ -165,8 +165,17 @@ func TestInstallManifest(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	raw := `{"name":"Demo","actions":[{"id":"hi","label":"Hi","run":"echo ${{ app.name }} in ${{ worktree.path }}","places":["global_nav"],"output":true}],
 	 "automations":[{"name":"demo-auto","schedule":"every 1h","action_kind":"comment","action_arg":"{}"}]}`
-	if _, err := s.InstallManifest(raw); err != nil {
+	if _, err := s.InstallManifest(raw, false); err != nil {
 		t.Fatal(err)
+	}
+	if _, err := s.InstallManifest(raw, false); err == nil {
+		t.Fatal("duplicate name accepted")
+	}
+	if _, err := s.InstallManifest(raw, true); err != nil {
+		t.Fatal("replace:", err)
+	}
+	if exp, err := s.ExportApp("Demo"); err != nil || exp != raw {
+		t.Fatal("export:", exp, err)
 	}
 	if p, _ := s.PlacedActions("global_nav"); len(p) != 1 || p[0].ID != "hi" {
 		t.Fatal(p)

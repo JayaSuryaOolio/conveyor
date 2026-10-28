@@ -15,12 +15,12 @@ import (
 )
 
 func init() {
-	register("app", runApp, "open worktrees in external apps, run quick actions (list|presets|add|install|convert|run|global|output|rm|open)")
+	register("app", runApp, "open worktrees in external apps, run quick actions (list|presets|add|install|export|convert|run|global|output|rm|open)")
 	register("hooks", runHooks, "Claude Code hooks in ~/.claude/settings.json (status|install|uninstall)")
 }
 
 const appUsage = `usage: conveyor app list [--json] | presets [--json] | add NAME [--command CMD] [--global] [--output]
-       conveyor app install FILE|- (manifest JSON; - reads stdin) | convert NAME | run APP ACTION [KEY]
+       conveyor app install FILE|- [--replace] (manifest JSON; - reads stdin) | export NAME [FILE] | convert NAME | run APP ACTION [KEY]
        conveyor app global|output NAME on|off | rm NAME
        conveyor app open NAME [KEY|DIR] [--repo r] [--print]
 CMD is a shell command; {cwd} becomes the quoted worktree path and {key} the task key ('' without one).
@@ -40,6 +40,7 @@ func runApp(home string, args []string) error {
 	command := fs.String("command", "", "shell command; {cwd} is the worktree path")
 	global := fs.Bool("global", false, "app is not tied to a worktree")
 	output := fs.Bool("output", false, "run to completion and show the output (a quick action)")
+	replace := fs.Bool("replace", false, "install over an app of the same name")
 	repo := fs.String("repo", "", "repo of the task (default primary)")
 	print := fs.Bool("print", false, "print the command instead of running it")
 	pos, err := parseArgs(fs, rest)
@@ -122,11 +123,24 @@ func runApp(home string, args []string) error {
 			if err != nil {
 				return err
 			}
-			a, err := s.InstallManifest(string(b))
+			a, err := s.InstallManifest(string(b), *replace)
 			if err == nil {
 				fmt.Fprintf(out, "installed %s\n", a.Name)
 			}
 			return err
+		case "export": // manifest app -> JSON on stdout or FILE
+			if len(pos) < 1 || len(pos) > 2 {
+				return errors.New(appUsage)
+			}
+			raw, err := s.ExportApp(pos[0])
+			if err != nil {
+				return err
+			}
+			if len(pos) == 2 {
+				return os.WriteFile(pos[1], []byte(raw+"\n"), 0o644)
+			}
+			fmt.Fprintln(out, raw)
+			return nil
 		case "run":
 			if len(pos) < 2 || len(pos) > 3 {
 				return errors.New(appUsage)

@@ -314,8 +314,12 @@ export function UserHooks(arg1) {
   return window['go']['ui']['App']['UserHooks'](arg1);
 }
 
-export function InstallManifest(arg1) {
-  return window['go']['ui']['App']['InstallManifest'](arg1);
+export function ExportApp(arg1) {
+  return window['go']['ui']['App']['ExportApp'](arg1);
+}
+
+export function InstallManifest(arg1, arg2) {
+  return window['go']['ui']['App']['InstallManifest'](arg1, arg2);
 }
 
 export function ManifestSchema() {
