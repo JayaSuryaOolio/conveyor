@@ -161,7 +161,9 @@ export function UpdateAutomation(arg1:store.Automation):Promise<void>;
 
 export function UserHooks(arg1:string):Promise<string>;
 
-export function InstallManifest(arg1:string):Promise<void>;
+export function InstallManifest(arg1:string,arg2:boolean):Promise<void>;
+
+export function ExportApp(arg1:string):Promise<string>;
 
 export function ManifestSchema():Promise<Record<string, Array<string>>>;
 

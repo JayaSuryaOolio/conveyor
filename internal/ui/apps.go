@@ -45,11 +45,14 @@ func (a *App) UpdateApp(x store.App) error {
 // DeleteApp removes an app.
 func (a *App) DeleteApp(name string) error { return a.svc.UninstallApp(name) }
 
-// InstallManifest installs an app from manifest JSON (text box or uploaded file).
-func (a *App) InstallManifest(raw string) error {
-	_, err := a.svc.InstallManifest(raw)
+// InstallManifest installs an app from manifest JSON (text box or uploaded file); replace overwrites a same-named app.
+func (a *App) InstallManifest(raw string, replace bool) error {
+	_, err := a.svc.InstallManifest(raw, replace)
 	return err
 }
+
+// ExportApp returns the manifest JSON of a manifest app.
+func (a *App) ExportApp(name string) (string, error) { return a.svc.ExportApp(name) }
 
 // ValidateManifest returns why raw is not an installable manifest, "" when it is (live check in the builder).
 func (a *App) ValidateManifest(raw string) string {

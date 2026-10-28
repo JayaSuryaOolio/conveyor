@@ -1,7 +1,7 @@
 import {useEffect, useRef, useState} from 'react'
-import {ActionIcon, Badge, Button, Code, FileButton, Group, Modal, MultiSelect, Paper, Stack, Switch, Table, Text, TextInput, Textarea, Title} from '@mantine/core'
-import {IconPencil, IconPlayerPlay, IconPlus, IconPuzzle, IconTransform, IconTrash, IconUpload} from '@tabler/icons-react'
-import {AddApp, AppIcons, AppPresets, Confirm, ConvertApp, DeleteApp, Home, InstallManifest, InstallPreset, ListApps, ManifestSchema, RenderApp, TestApp, UpdateApp, UserHooks, ValidateManifest} from '../wailsjs/go/ui/App'
+import {ActionIcon, Badge, Button, Checkbox, Code, FileButton, Group, Modal, MultiSelect, Paper, Stack, Switch, Table, Text, TextInput, Textarea, Title} from '@mantine/core'
+import {IconDownload, IconPencil, IconPlayerPlay, IconPlus, IconPuzzle, IconTransform, IconTrash, IconUpload} from '@tabler/icons-react'
+import {AddApp, AppIcons, AppPresets, Confirm, ConvertApp, DeleteApp, ExportApp, Home, InstallManifest, InstallPreset, ListApps, ManifestSchema, RenderApp, TestApp, UpdateApp, UserHooks, ValidateManifest} from '../wailsjs/go/ui/App'
 import {store} from '../wailsjs/go/models'
 import {AppIcon, errMsg, runApp} from './components'
 import {useData} from './util'
@@ -53,6 +53,7 @@ function ManifestForm({onClose}: {onClose: (saved: boolean) => void}) {
     const [text, setText] = useState('')
     const [places, setPlaces] = useState<string[]>(['task_sidebar'])
     const [problem, setProblem] = useState('')
+    const [replace, setReplace] = useState(false)
     const ref = useRef<HTMLTextAreaElement>(null)
     const {data: schema} = useData(ManifestSchema, [])
     useEffect(() => {
@@ -92,12 +93,21 @@ function ManifestForm({onClose}: {onClose: (saved: boolean) => void}) {
                     {p => <Button {...p} variant="default" leftSection={<IconUpload size={16}/>}>Load file</Button>}
                 </FileButton>
                 <Group>
+                    <Checkbox label="Replace app with the same name" checked={replace} onChange={e => setReplace(e.currentTarget.checked)}/>
                     <Button variant="default" onClick={() => onClose(false)}>Cancel</Button>
-                    <Button disabled={!text.trim() || !!problem} onClick={() => InstallManifest(text).then(() => onClose(true), errMsg)}>Install</Button>
+                    <Button disabled={!text.trim() || !!problem} onClick={() => InstallManifest(text, replace).then(() => onClose(true), errMsg)}>Install</Button>
                 </Group>
             </Group>
         </Stack>
     )
+}
+
+function downloadManifest(name: string, json: string) {
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(new Blob([json + '\n'], {type: 'application/json'}))
+    a.download = name.replace(/[^\w.-]+/g, '-') + '.json'
+    a.click()
+    URL.revokeObjectURL(a.href)
 }
 
 function manifestSummary(a: store.App) {
@@ -168,6 +178,7 @@ export function Apps() {
                                 </Table.Td>
                                 <Table.Td>
                                     <Group gap="xs" wrap="nowrap" justify="flex-end">
+                                        {a.manifest && <ActionIcon variant="subtle" color="gray" aria-label="Export" title="Export manifest as .json" onClick={() => ExportApp(a.name).then(j => downloadManifest(a.name, j), errMsg)}><IconDownload size={16}/></ActionIcon>}
                                         {!a.manifest && <>
                                             <ActionIcon variant="subtle" color="gray" aria-label="Test" title="Test on home folder" onClick={() => runApp(a, TestApp(a))}><IconPlayerPlay size={16}/></ActionIcon>
                                             <ActionIcon variant="subtle" color="gray" aria-label="Convert" title="Convert to manifest app" onClick={() => ConvertApp(a.name).then(reload, errMsg)}><IconTransform size={16}/></ActionIcon>

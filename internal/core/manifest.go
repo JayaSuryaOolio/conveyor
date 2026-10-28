@@ -159,10 +159,17 @@ func RenderManifest(run string, vars map[string]string) string {
 
 // InstallManifest validates raw, stores the app and creates its agents (user scope) and
 // automations (disabled until the user enables them). A failure rolls the app back.
-func (s *Service) InstallManifest(raw string) (store.App, error) {
+// An app of the same name is an error unless replace, which uninstalls it first.
+func (s *Service) InstallManifest(raw string, replace bool) (store.App, error) {
 	m, err := ParseManifest(raw)
 	if err != nil {
 		return store.App{}, err
+	}
+	if _, err := store.GetApp(s.DB, m.Name); err == nil && replace {
+		// ponytail: not atomic; a failed install after this leaves the old app gone
+		if err := s.UninstallApp(m.Name); err != nil {
+			return store.App{}, err
+		}
 	}
 	a, err := store.CreateApp(s.DB, store.App{Name: m.Name, Manifest: raw})
 	if err != nil {
@@ -368,5 +375,17 @@ func (s *Service) InstallLegacy(a store.App) (store.App, error) {
 	if err != nil {
 		return store.App{}, err
 	}
-	return s.InstallManifest(raw)
+	return s.InstallManifest(raw, false)
+}
+
+// ExportApp returns the manifest JSON of a manifest app, ready for InstallManifest elsewhere.
+func (s *Service) ExportApp(name string) (string, error) {
+	a, err := store.GetApp(s.DB, name)
+	if err != nil {
+		return "", err
+	}
+	if a.Manifest == "" {
+		return "", fmt.Errorf("app %q is not a manifest app; convert it first", name)
+	}
+	return a.Manifest, nil
 }
