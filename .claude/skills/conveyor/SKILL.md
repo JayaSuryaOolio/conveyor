@@ -71,7 +71,7 @@ Use a throwaway home for experiments: `conveyor --home $(mktemp -d) ...`. Never 
 
 ## Troubleshooting recipes
 
-Known failure modes with confirm/fix steps: `docs/troubleshooting.md` (e.g. a run stuck in running after its session finished, an untracked second PR). Add to it when you fix a new one.
+Known failure modes with confirm/fix steps: `docs/troubleshooting.md` (e.g. a run stuck in running after its session finished, an untracked second PR, a resumed run adopted by a new session id). Run/session id architecture and invariants: `docs/session-identity.md`. Add to it when you fix a new one.
 
 - **Task not launching:** is a dispatcher running (`dispatcher.lock`, app status dot green)? Task in `todo`? Open blockers (`task show KEY --json` -> relations)? `max_parallel` reached? Recent comment still in `comment_debounce_secs`? Then `grep KEY ~/.conveyor/conveyor.log`.
 - **Launch fails:** read the system comment on the thread. "workspace not trusted" = run `claude` once in the main repo.

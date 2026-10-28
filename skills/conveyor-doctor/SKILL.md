@@ -13,7 +13,7 @@ Read-only on everything except: your own task's worktree (the Conveyor repo), ne
 
 When asked to fix (`fix KEY`, or `fix` for every task), skip the review below. For each task, or each task in running, needs_you or review:
 1. Read `docs/troubleshooting.md` in the Conveyor repo and run each recipe's **Confirm** steps.
-2. Apply the **Fix** of every recipe that matches. Fixes go through `conveyor` commands (`conveyor hook ...`, `conveyor task set/sync/move`), never by editing the DB; that is the one exception to the read-only rule above.
+2. Apply the **Fix** of every recipe that matches. Fixes go through `conveyor` commands (`conveyor hook ...`, `conveyor task set/sync/move`), never by editing the DB; that is the one exception to the read-only rule above. A resume run stuck `running` while an extra `interactive` run exists is the session-id drift in `docs/session-identity.md`: replay Stop under the resume run's own session id (see its recipe), not the new one. `conveyor task stop KEY` ends a live background session that will not end on its own; it fails the run and moves the task to needs_you.
 3. Report per task: what was wrong, the commands you ran, and the state afterwards. A stuck state no recipe covers: describe it and propose a recipe; do not improvise a fix.
 
 ## 1. Pick the sample (6-10 runs from the last 7 days)
