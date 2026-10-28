@@ -151,6 +151,9 @@ const TABS: {name: string; fields: Field[]}[] = [
     ]},
 ]
 
+/** Every setting label, for the command palette. */
+export const SETTING_LABELS = TABS.flatMap(t => t.fields.map(f => f.label))
+
 export function Settings() {
     const {data, error, reload} = useData(GetSettings, [])
     const {data: defs} = useData(GetPromptDefaults, [])

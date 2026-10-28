@@ -10,6 +10,7 @@ import {AppIcon, Nav, Toasts, runApp} from './components'
 import {NewTask, Settings} from './forms'
 import {LearningsPage} from './learnings'
 import {Logs} from './logs'
+import {CommandPalette} from './palette'
 import {useData} from './util'
 import {Board, Focus, TaskPage} from './views'
 
@@ -131,6 +132,7 @@ export default function App() {
                 {view.name === 'settings' && <Settings/>}
             </AppShell.Main>
             {showNew && <NewTask nav={nav} close={() => setShowNew(false)}/>}
+            <CommandPalette nav={nav}/>
             <Toasts/>
         </AppShell>
     )
