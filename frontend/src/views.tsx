@@ -4,7 +4,7 @@ import {useLocalStorage} from '@mantine/hooks'
 import {IconAbc, IconArrowDown, IconArrowUp, IconClock, IconFlame, IconHash, IconPencil, IconSearch, IconTerminal, IconX, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconMessage, IconPlayerPlay} from '@tabler/icons-react'
 import {Actions, GetTask, ListTasks, RunLog, SetTaskDescription, TakeQueuedComment, TermStart} from '../wailsjs/go/ui/App'
 import {core, store, ui} from '../wailsjs/go/models'
-import {Card, CommentBox, Message, Nav, StatusBadge, Time, errMsg} from './components'
+import {Card, CommentBox, Message, Nav, StatusBadge, Time, View, errMsg} from './components'
 import {Markdown, MarkdownEditor, TaskKey} from './markdown'
 import {Relations} from './relations'
 import {TaskSidebar} from './workspace'
@@ -26,12 +26,16 @@ const SORTS: {by: string; label: string; icon: typeof IconClock; desc: boolean; 
 ]
 const REPO_COLORS = ['blue', 'grape', 'teal', 'orange', 'pink', 'cyan', 'lime', 'violet', 'red', 'indigo']
 
-export function Board({nav, q, setQ, search}: {nav: Nav; q: string; setQ: (q: string) => void; search: Ref<HTMLInputElement>}) {
+export function Board({nav, q, setQ, search, link}: {nav: Nav; q: string; setQ: (q: string) => void; search: Ref<HTMLInputElement>; link: View}) {
     const {data, error} = useData(ListTasks, [])
     const [open, setOpen] = useState<string[]>([])
     const [sort, setSort] = useLocalStorage({key: 'board-sort', defaultValue: {by: 'priority', desc: true}})
     const [picked, setPicked] = useLocalStorage<string[]>({key: 'board-repos', defaultValue: []})
     const [pickedLabels, setPickedLabels] = useLocalStorage<string[]>({key: 'board-labels', defaultValue: []})
+    useEffect(() => { // deep link from the palette: show only that label or repo
+        if (!link.label && !link.repo) return
+        setQ(''); setPickedLabels(link.label ? [link.label] : []); setPicked(link.repo ? [link.repo] : [])
+    }, [link]) // a new view object per palette pick, so re-picking the same label re-applies it
     if (error) return <Text c="red">{error}</Text>
     const shut = (s: string) => ARCHIVE.includes(s) && !open.includes(s)
     const toggle = (s: string) => setOpen(o => o.includes(s) ? o.filter(x => x !== s) : [...o, s])
@@ -44,7 +48,6 @@ export function Board({nav, q, setQ, search}: {nav: Nav; q: string; setQ: (q: st
     const flip = (r: string) => setPicked(sel.includes(r) ? sel.filter(x => x !== r) : [...sel, r])
     const labelCount = new Map<string, number>()
     all.forEach(c => c.labels.forEach(l => labelCount.set(l, (labelCount.get(l) ?? 0) + 1)))
-    const labels = [...labelCount.keys()].sort()
     const selL = pickedLabels.filter(l => labelCount.has(l))
     const flipL = (l: string) => setPickedLabels(selL.includes(l) ? selL.filter(x => x !== l) : [...selL, l])
     const s = SORTS.find(x => x.by === sort.by) ?? SORTS[0]
@@ -82,26 +85,23 @@ export function Board({nav, q, setQ, search}: {nav: Nav; q: string; setQ: (q: st
                         {repos.map(r => {
                             const on = sel.includes(r)
                             return (
-                                <Badge key={r} component="button" size="lg" radius="md" color={repoColor(r)} variant={on ? 'filled' : sel.length ? 'outline' : 'light'}
+                                <Badge key={r} component="button" size="lg" radius="md" color={repoColor(r)} variant={on ? 'filled' : 'outline'}
                                        aria-pressed={on} title={on ? 'Hide ' + r + ' filter' : 'Only ' + r + ' (click more to combine)'}
-                                       style={{cursor: 'pointer', textTransform: 'none', opacity: sel.length && !on ? 0.6 : 1}}
+                                       style={{cursor: 'pointer', textTransform: 'none'}}
                                        leftSection={<Box w={6} h={6} style={{borderRadius: '50%', background: on ? 'currentColor' : `var(--mantine-color-${repoColor(r)}-6)`}}/>}
                                        onClick={() => flip(r)}>{r} · {repoCount.get(r)}</Badge>
                             )
                         })}
                     </Group>
                 </>}
-                {labels.length > 0 && <>
+                {selL.length > 0 && <>
                     <Divider orientation="vertical"/>
                     <Group gap={6} wrap="wrap" role="group" aria-label="Labels">
-                        {labels.map(l => {
-                            const on = selL.includes(l)
-                            return (
-                                <Badge key={l} component="button" size="lg" radius="md" color="gray" variant={on ? 'filled' : 'outline'} aria-pressed={on}
-                                       title={on ? 'Hide ' + l + ' filter' : 'Only label ' + l + ' (click more to combine)'}
-                                       style={{cursor: 'pointer', textTransform: 'none'}} onClick={() => flipL(l)}>{l} · {labelCount.get(l)}</Badge>
-                            )
-                        })}
+                        {selL.map(l => (
+                            <Badge key={l} component="button" size="lg" radius="md" color="gray" variant="filled" aria-pressed
+                                   title={'Hide ' + l + ' filter'} rightSection={<IconX size={12}/>}
+                                   style={{cursor: 'pointer', textTransform: 'none'}} onClick={() => flipL(l)}>{l} · {labelCount.get(l)}</Badge>
+                        ))}
                     </Group>
                 </>}
                 {filtered && <Group gap={6} wrap="nowrap" ml="auto">

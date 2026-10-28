@@ -6,7 +6,9 @@ import {store, ui} from '../wailsjs/go/models'
 import {Markdown, MarkdownEditor} from './markdown'
 import {ALL_STATUSES, STATUS_COLOR, STATUS_LABEL, ago, fmtK, fmtTime, useDraft} from './util'
 
-export type Nav = (v: {name: string; key?: string}) => void
+/** A screen to show; board views may carry a label or repo filter to apply (deep link). */
+export type View = {name: string; key?: string; label?: string; repo?: string}
+export type Nav = (v: View) => void
 
 export const errMsg = (e: unknown) => ShowError(String(e))
 
