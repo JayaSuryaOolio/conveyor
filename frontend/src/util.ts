@@ -13,6 +13,18 @@ export function useData<T>(fn: () => Promise<T>, deps: unknown[]): {data?: T; er
     return {data, error, reload}
 }
 
+/** useState backed by localStorage under `draft:<key>`, so half-typed text survives navigating away. Empty clears it. */
+export function useDraft(key: string): [string, (v: string) => void] {
+    const read = () => { try { return localStorage.getItem('draft:' + key) ?? '' } catch { return '' } }
+    const [val, setVal] = useState(read)
+    useEffect(() => setVal(read()), [key]) // eslint-disable-line react-hooks/exhaustive-deps
+    const set = (v: string) => {
+        setVal(v)
+        try { v ? localStorage.setItem('draft:' + key, v) : localStorage.removeItem('draft:' + key) } catch { /* private mode */ }
+    }
+    return [val, set]
+}
+
 export const fmtK = (n: number) => (n >= 1000 ? Math.round(n / 1000) + 'K' : String(n))
 
 export function fmtDuration(start: string, end?: string | null): string {

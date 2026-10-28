@@ -5,14 +5,14 @@ import {AddRepo, CreateTask, ExportState, GetPromptDefaults, GetTask, GetSetting
 import {core, store} from '../wailsjs/go/models'
 import {Nav, errMsg} from './components'
 import {Markdown, MarkdownEditor} from './markdown'
-import {useData} from './util'
+import {useData, useDraft} from './util'
 
 export function NewTask({nav, close}: {nav: Nav; close: () => void}) {
     const {data: repos} = useData(ListRepos, [])
     const {data: tasks} = useData(ListTasks, [])
     const [parent, setParent] = useState('')
-    const [title, setTitle] = useState('')
-    const [desc, setDesc] = useState('')
+    const [title, setTitle] = useDraft('new-task:title')
+    const [desc, setDesc] = useDraft('new-task:desc')
     const [sel, setSel] = useState<string[]>([])
     const [primary, setPrimary] = useState('')
     const [model, setModel] = useState('')
@@ -23,7 +23,7 @@ export function NewTask({nav, close}: {nav: Nav; close: () => void}) {
         CreateTask(core.NewTaskInput.createFrom({
             Title: title, Description: desc, Repos: sel, Primary: prim,
             Start: start, Model: model, Agent: agent, ParentKey: parent,
-        })).then(key => { close(); nav({name: 'task', key}) }, errMsg)
+        })).then(key => { setTitle(''); setDesc(''); close(); nav({name: 'task', key}) }, errMsg)
     // Picking a parent prefills repos, primary and agent from it; they stay editable. Clearing leaves them.
     const pickParent = (key: string | null) => {
         setParent(key ?? '')
@@ -47,7 +47,7 @@ export function NewTask({nav, close}: {nav: Nav; close: () => void}) {
                 <AgentSelect repos={sel} value={agent} onChange={setAgent}/>
                 <Checkbox label="Start now (todo)" checked={start} onChange={e => setStart(e.currentTarget.checked)}/>
                 <Group justify="flex-end">
-                    <Button variant="default" onClick={close}>Cancel</Button>
+                    <Button variant="default" onClick={() => { setTitle(''); setDesc(''); close() }}>Cancel</Button>
                     <Button onClick={submit} disabled={!title.trim() || sel.length === 0}>Create</Button>
                 </Group>
             </Stack>
