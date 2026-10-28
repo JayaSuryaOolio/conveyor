@@ -44,6 +44,31 @@ conveyor task show KEY --runs                  # run finished with its summary
 
 Before that, Conveyor did not detect this on its own: it is a Claude Code resume bug, and checking every session each tick costs more than the rare case is worth. The `conveyor-doctor` skill finds and fixes it on demand (see the top of this page).
 
+## A resumed run is adopted by a new session id
+
+Seen on CV-46 run 148 and CV-56 run 183; the architecture is in [session-identity.md](session-identity.md). `claude --bg --resume` started the work as a copy under a new session id. Hooks fire, but they name an id the resumed run does not have, so Conveyor creates an `interactive` run for them and the resumed run never gets its `Stop`: the task stays `running` after the agent finished.
+
+**Confirm**
+
+```sh
+conveyor task show KEY --runs --json     # last auto/resume run: running, bg_id != first 8 chars of session_id
+                                         # plus an interactive run whose session_id starts with that bg_id
+claude agents --json --all               # that bg_id's sessionId is the NEW one; state done / status idle
+grep KEY ~/.conveyor/logs/hook.log       # UserPromptSubmit/Stop for the new session id
+```
+
+**Fix.** Only once the session is idle (a live session fires its own `Stop`, and replaying one mid-turn ends the task early). Replay the Stop with the *original* run in mind: the replay lands on the run whose `session_id` matches, which is the interactive one, so it finishes that run and moves the task, but the resumed run stays `running` until the reaper fails it when the session is gone.
+
+```sh
+# same replay script as the recipe above, with SID = the NEW session id
+conveyor task sync KEY
+conveyor task show KEY --runs --json     # task moved; interactive run finished
+```
+
+Do not edit the DB to re-point `session_id`. If the resumed run is still `running` after its session has gone, the reaper fails it ("session vanished"): read the interactive run's summary for the real outcome.
+
+**Not yet prevented.** The proposed fix (update `session_id` from the agents list in the reaper, never create an interactive run for a known `bg_id`) is in [session-identity.md](session-identity.md#prevention-proposed-not-implemented).
+
 ## A task has a second PR that Conveyor doesn't track
 
 Also seen on CV-9. After PR #90 merged, a comment reopened the task, and the agent opened #92 from a new branch (`cv/CV-9-readme-tone`). Conveyor follows one branch per repo (`cv/<KEY>-<slug>`), so it never saw #92 and the task won't finish when #92 merges.
