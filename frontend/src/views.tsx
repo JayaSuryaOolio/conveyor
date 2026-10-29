@@ -233,12 +233,11 @@ function SessionLog({run, onStop}: {run: store.Run; onStop?: () => void}) {
     )
 }
 
-/** The task description; editable (pencil) only while the task is in backlog. */
+/** The task description; the pencil edits it in any status (an edit after a run posts a system comment quoting the old text). */
 function Description({t, reload}: {t: store.Task; reload: () => void}) {
     const [draft, setDraft] = useState<string | null>(null)
     const [busy, setBusy] = useState(false)
-    const editable = t.status === 'backlog'
-    if (draft !== null && editable) {
+    if (draft !== null) {
         const save = () => {
             setBusy(true)
             SetTaskDescription(t.key, draft).then(() => { setDraft(null); reload() }).catch(errMsg).finally(() => setBusy(false))
@@ -252,11 +251,9 @@ function Description({t, reload}: {t: store.Task; reload: () => void}) {
     }
     return (
         <Paper withBorder p="md" radius="md" pos="relative">
-            {editable && (
-                <ActionIcon variant="subtle" color="gray" size="sm" pos="absolute" top={8} right={8} aria-label="Edit description" onClick={() => setDraft(t.description)}>
-                    <IconPencil size={14}/>
-                </ActionIcon>
-            )}
+            <ActionIcon variant="subtle" color="gray" size="sm" pos="absolute" top={8} right={8} aria-label="Edit description" onClick={() => setDraft(t.description)}>
+                <IconPencil size={14}/>
+            </ActionIcon>
             <Markdown c={t.description ? undefined : 'dimmed'}>{t.description || '(no description)'}</Markdown>
         </Paper>
     )

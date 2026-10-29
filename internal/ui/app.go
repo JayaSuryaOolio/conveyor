@@ -481,7 +481,7 @@ func (a *App) SetTaskAgent(key, agent string) error { return a.svc.SetTaskAgent(
 // SetTaskModel changes the task's model override ("" clears it).
 func (a *App) SetTaskModel(key, model string) error { return a.svc.SetTaskModel(key, model) }
 
-// SetTaskDescription replaces a backlog task's description.
+// SetTaskDescription replaces the task's description (see core.Service.SetTaskDescription).
 func (a *App) SetTaskDescription(key, desc string) error { return a.svc.SetTaskDescription(key, desc) }
 
 // LearningRow is a learning with its repo name ("" = personal).
