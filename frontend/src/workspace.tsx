@@ -227,7 +227,7 @@ export function TaskSidebar({t, runs, reload, onTerm}: {t: store.Task; runs: sto
             {runs.length + (sessions?.length ?? 0) === 0 && <Text size="xs" c="dimmed">None yet.</Text>}
             {runs.map((r, i) => (
                 <Group key={r.id} justify="space-between" wrap="nowrap" gap="xs">
-                    <Anchor size="xs" c="dimmed" component="button" ta="left" title="Show in thread"
+                    <Anchor size="xs" c="dimmed" component="button" ta="left" title={r.session_id ? `Session ${r.session_id}` : 'Show in thread'}
                             onClick={() => document.getElementById('run-' + r.id)?.scrollIntoView({behavior: 'smooth', block: 'start'})}>
                         #{i + 1} {r.kind} · {r.status}{r.block_status ? ' · ' + r.block_status : ''}
                     </Anchor>
@@ -237,7 +237,7 @@ export function TaskSidebar({t, runs, reload, onTerm}: {t: store.Task; runs: sto
             {sessions?.map(s => (
                 <Stack key={s.id} gap={2}>
                     <ActionRow k={k} a={s.action} kind={'resume:' + s.id} onTerm={onTerm}/>
-                    <Text size="xs" c="dimmed" lineClamp={1} title={s.prompt}>{s.prompt || s.id}</Text>
+                    <Text size="xs" c="dimmed" lineClamp={1} title={`Session ${s.id}\n${s.prompt}`}>{s.prompt || s.id}</Text>
                 </Stack>
             ))}
         </Stack>

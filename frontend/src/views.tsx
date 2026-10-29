@@ -202,17 +202,18 @@ function SessionLog({run, onStop}: {run: store.Run; onStop?: () => void}) {
             {active ? (
                 <Group gap="xs" wrap="nowrap">
                     <span className="pulse"/>
-                    <Text size="sm">Working · {secs(Math.max(0, Math.round((now - Date.parse(run.started_at)) / 1000)))}</Text>
+                    {/* Fixed parts never shrink/wrap; only the last-tool text below takes the remaining space and truncates. */}
+                    <Text size="sm" style={{flexShrink: 0, whiteSpace: 'nowrap'}}>Working · {secs(Math.max(0, Math.round((now - Date.parse(run.started_at)) / 1000)))}</Text>
                     {onStop && (
                         <Popover withArrow shadow="md" position="bottom-start">
-                            <Popover.Target><Anchor component="button" size="sm">Stop run</Anchor></Popover.Target>
+                            <Popover.Target><Anchor component="button" size="sm" style={{flexShrink: 0, whiteSpace: 'nowrap'}}>Stop run</Anchor></Popover.Target>
                             <Popover.Dropdown>
                                 <Text size="sm" mb="xs">End this session? The agent stops now.</Text>
                                 <Button size="compact-xs" color="red" onClick={onStop}>Stop run</Button>
                             </Popover.Dropdown>
                         </Popover>
                     )}
-                    {lastTool && <Text size="xs" c="dimmed" lineClamp={1}>· {lastTool.text}</Text>}
+                    {lastTool && <Text size="xs" c="dimmed" truncate style={{flex: 1, minWidth: 0}}>· {lastTool.text}</Text>}
                 </Group>
             ) : (
                 <Button variant="subtle" size="compact-xs" w="fit-content" onClick={() => setOpen(!open)}>{open ? 'Hide session' : 'Show session'}</Button>
