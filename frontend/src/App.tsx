@@ -1,7 +1,7 @@
 import {useEffect, useRef, useState} from 'react'
-import {ActionIcon, AppShell, Badge, Box, Button, Group, Kbd, NavLink, Stack, TextInput, Title, Tooltip} from '@mantine/core'
+import {ActionIcon, AppShell, Badge, Box, Button, Group, Kbd, NavLink, Stack, Title, Tooltip} from '@mantine/core'
 import {useLocalStorage} from '@mantine/hooks'
-import {IconApps, IconBolt, IconArrowLeft, IconBook2, IconClock, IconLayoutKanban, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconLogs, IconPlus, IconRobot, IconSearch, IconSettings} from '@tabler/icons-react'
+import {IconApps, IconBolt, IconArrowLeft, IconBook2, IconClock, IconLayoutKanban, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconLogs, IconPlus, IconRobot, IconSettings} from '@tabler/icons-react'
 import {AppIcons, DispatcherState, Learnings, ListApps, OpenApp} from '../wailsjs/go/ui/App'
 import {Agents} from './agents'
 import {Apps} from './apps'
@@ -65,7 +65,7 @@ export default function App() {
                 return
             }
             if (e.key === 'n') { e.preventDefault(); setShowNew(true) }
-            else if (e.key === '/') { e.preventDefault(); setMini(false); setTimeout(() => search.current?.focus()) }
+            else if (e.key === '/') { e.preventDefault(); search.current?.focus() } // only the board mounts the input; refactor: move q+ref into Board
             else if (e.key === 'g') { g = true; setTimeout(() => (g = false), 1000) }
         }
         window.addEventListener('keydown', onKey)
@@ -93,8 +93,6 @@ export default function App() {
                         </Tooltip>
                     ) : <>
                         <Button leftSection={<IconPlus size={16}/>} rightSection={<Kbd size="xs">n</Kbd>} onClick={() => setShowNew(true)}>New task</Button>
-                        {view.name !== 'board' && <TextInput ref={search} placeholder="Search" leftSection={<IconSearch size={16}/>} rightSection={<Kbd size="xs">/</Kbd>}
-                                   value={q} onChange={e => setQ(e.target.value)}/>}
                     </>}
                     <Stack gap={2} mt="xs">
                         {NAV.map(({name, key, label, icon: Icon}) => (
@@ -122,7 +120,7 @@ export default function App() {
             </AppShell.Navbar>
             <AppShell.Main key={view.name + (view.key ?? '')} h="100vh" style={{overflow: view.name === 'task' ? 'hidden' : 'auto'}}>
                 {view.name === 'board' && <Board nav={nav} q={q} setQ={setQ} search={search} link={view}/>}
-                {view.name === 'focus' && <Focus nav={nav} q={q}/>}
+                {view.name === 'focus' && <Focus nav={nav}/>}
                 {view.name === 'task' && <TaskPage k={view.key!} nav={nav}/>}
                 {view.name === 'learnings' && <LearningsPage nav={nav}/>}
                 {view.name === 'automations' && <Automations/>}

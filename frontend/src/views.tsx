@@ -136,12 +136,11 @@ export function Board({nav, q, setQ, search, link}: {nav: Nav; q: string; setQ: 
     </Stack>)
 }
 
-export function Focus({nav, q}: {nav: Nav; q: string}) {
+export function Focus({nav}: {nav: Nav}) {
     const {data, error, reload} = useData(ListTasks, [])
     if (error) return <Text c="red">{error}</Text>
-    const needle = q.toLowerCase()
     const rows = (data ?? [])
-        .filter(c => FOCUS_ORDER.includes(c.status) && (!needle || (c.key + ' ' + c.title).toLowerCase().includes(needle)))
+        .filter(c => FOCUS_ORDER.includes(c.status))
         .sort((a, b) => FOCUS_ORDER.indexOf(a.status) - FOCUS_ORDER.indexOf(b.status))
     return (
         <Stack maw={800}>
