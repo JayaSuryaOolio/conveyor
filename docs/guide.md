@@ -29,7 +29,7 @@ The task page shows the description, the comment thread (yours, the agent's fina
 
 The diagram does not yet show reviving a cancelled task (cancelled -> backlog / todo); `internal/store/status.go` is the source of truth.
 
-- **backlog**: parked. Nothing runs. The description can be edited only here (pencil on the task page, or `conveyor task set KEY --desc ...`); after that, changes go in comments.
+- **backlog**: parked. Nothing runs.
 - **todo**: waiting for the dispatcher.
 - **running**: a session is working on it.
 - **needs_you**: the agent stopped without a final status block (it asked you something), or its session disappeared.
@@ -102,6 +102,8 @@ conveyor task label CV-1A add bug        # labels: shown on cards, filterable on
 ## Comments, resume and fresh sessions
 
 A comment from you, or a system note, on a task in needs_you, review, failed or done puts it back in todo, and the dispatcher launches it again. A comment on a running task is queued (marked "queued" in the thread) and sent with the next run: when the run stops or its session vanishes, the task goes to todo instead of review or needs_you. A comment on a backlog or todo task just waits. Until a run receives it, your comment shows an edit icon that moves it back into the editor.
+
+The description can be edited in any status (pencil on the task page, or `conveyor task set KEY --desc ...`). Once a run has seen it, an edit also posts a system comment quoting the previous description, so you can see what changed and the next run (or the running one, when it stops) is told to re-read the brief and update its acceptance criteria. An edit alone does not relaunch a finished task; comment to start a run.
 
 **Stop run** (link beside the running timer, asks to confirm; or `conveyor task stop KEY`) marks the run failed ("stopped"), moves the task to needs_you (todo if comments are queued) and stops and removes the background Claude session. Comment to resume.
 

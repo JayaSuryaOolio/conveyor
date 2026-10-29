@@ -28,7 +28,7 @@ conveyor app open NAME KEY            # opener, or quick action (--output) print
 conveyor task new "t" --repo r [--desc ..] [--todo] [--parent KEY] (--repo/--agent optional with --parent: default to the parent's) [--model m] [--agent a]
 conveyor task comment KEY "text" [--ask|--note]   conveyor task move KEY <status> [--stop]   # --stop: confirm ending running runs (review|done)
 conveyor task stop KEY                # end the running bg session -> needs_you
-conveyor task set KEY [--branch b] [--pr url] [--model m] [--desc d]   # --desc: backlog only
+conveyor task set KEY [--branch b] [--pr url] [--model m] [--desc d]   # --desc: any status; after a run, a system comment quotes the old one
 conveyor task link KEY blocks|relates OTHER     conveyor task unlink KEY kind OTHER
 conveyor task parent KEY PARENT|--none
 conveyor task label KEY add|rm NAME     # labels: many per task (labels + task_labels tables), filter chips on the Board

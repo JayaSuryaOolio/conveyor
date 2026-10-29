@@ -326,8 +326,8 @@ func taskSet(s *core.Service, args []string) error {
 	branch := fs.String("branch", "", "worktree branch (only before the worktree exists)")
 	pr := fs.String("pr", "", "PR URL (empty clears it)")
 	model := fs.String("model", "", "model override (empty clears it); see `conveyor models`")
-	desc := fs.String("desc", "", "description (backlog only)")
-	descFile := fs.String("desc-file", "", "read the description from a file (backlog only)")
+	desc := fs.String("desc", "", "description; once a run saw the old one, a system comment quotes it for the next run")
+	descFile := fs.String("desc-file", "", "read the description from a file")
 	pos, err := parseArgs(fs, args)
 	if err != nil {
 		return err

@@ -257,22 +257,34 @@ func TestSubtaskDefaultsToParentAgent(t *testing.T) {
 	}
 }
 
-func TestSetTaskDescriptionBacklogOnly(t *testing.T) {
+func TestSetTaskDescriptionNotesEditAfterRun(t *testing.T) {
 	s := newSvc(t)
-	if _, err := s.CreateTask(NewTaskInput{Title: "t", Repos: []string{"a"}}); err != nil {
+	tk, err := s.CreateTask(NewTaskInput{Title: "t", Description: "old\nline", Repos: []string{"a"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetTaskDescription("CV-1", "draft"); err != nil {
+		t.Fatal(err)
+	}
+	if cs, _ := store.ListComments(s.DB, tk.ID); len(cs) != 0 {
+		t.Fatalf("noted an edit no run saw: %+v", cs)
+	}
+	if _, err := store.CreateRun(s.DB, store.Run{TaskID: tk.ID, Kind: "auto", Mode: "fresh", Status: "finished"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.UpdateTaskStatus(s.DB, tk.ID, store.StatusTodo, store.ActorHuman); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.SetTaskDescription("CV-1", "new"); err != nil {
 		t.Fatal(err)
 	}
-	if got, _ := store.GetTaskByKey(s.DB, "CV-1"); got.Description != "new" {
-		t.Fatalf("%q", got.Description)
-	}
-	if _, err := s.CreateTask(NewTaskInput{Title: "u", Repos: []string{"a"}, Start: true}); err != nil {
+	if err := s.SetTaskDescription("CV-1", "new"); err != nil { // unchanged: no second note
 		t.Fatal(err)
 	}
-	if err := s.SetTaskDescription("CV-2", "x"); err == nil {
-		t.Fatal("edited a todo task")
+	got, _ := store.GetTaskByKey(s.DB, "CV-1")
+	cs, _ := store.UnconsumedComments(s.DB, tk.ID)
+	if got.Description != "new" || len(cs) != 1 || cs[0].Author != store.AuthorSystem || !strings.Contains(cs[0].Body, "> draft") {
+		t.Fatalf("%q %+v", got.Description, cs)
 	}
 }
 
