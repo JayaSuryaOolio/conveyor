@@ -136,12 +136,11 @@ export function Board({nav, q, setQ, search, link}: {nav: Nav; q: string; setQ: 
     </Stack>)
 }
 
-export function Focus({nav, q}: {nav: Nav; q: string}) {
+export function Focus({nav}: {nav: Nav}) {
     const {data, error, reload} = useData(ListTasks, [])
     if (error) return <Text c="red">{error}</Text>
-    const needle = q.toLowerCase()
     const rows = (data ?? [])
-        .filter(c => FOCUS_ORDER.includes(c.status) && (!needle || (c.key + ' ' + c.title).toLowerCase().includes(needle)))
+        .filter(c => FOCUS_ORDER.includes(c.status))
         .sort((a, b) => FOCUS_ORDER.indexOf(a.status) - FOCUS_ORDER.indexOf(b.status))
     return (
         <Stack maw={800}>
@@ -307,9 +306,9 @@ export function TaskPage({k, nav}: {k: string; nav: Nav}) {
                                 <Timeline.Item key={'r' + it.run.id} id={'run-' + it.run.id} bullet={<IconPlayerPlay size={12}/>}
                                                title={`Run ${runNo.get(it.run.id)} · ${it.run.mode}`}>
                                     <Text size="xs" c="dimmed">
-                                        {it.run.session_id && <><CopyButton value={it.run.session_id}>{({copied, copy}) => (
-                                            <Tooltip label={copied ? 'Copied' : `Click to copy ${it.run.session_id}`}><Code style={{cursor: 'pointer'}} onClick={copy}>{it.run.session_id!.slice(0, 8)}</Code></Tooltip>
-                                        )}</CopyButton> · </>}{it.run.api_calls} calls · {fmtK(it.run.ctx_peak)} peak · {fmtDuration(it.run.started_at, it.run.ended_at)} · <Time iso={it.run.started_at}/>
+                                        {it.run.session_id && (sid => <><CopyButton value={sid}>{({copied, copy}) => (
+                                            <Tooltip label={copied ? 'Copied' : `Click to copy ${sid}`}><Code style={{cursor: 'pointer'}} onClick={copy}>{sid.slice(0, 8)}</Code></Tooltip>
+                                        )}</CopyButton> · </>)(it.run.session_id)}{it.run.api_calls} calls · {fmtK(it.run.ctx_peak)} peak · {fmtDuration(it.run.started_at, it.run.ended_at)} · <Time iso={it.run.started_at}/>
                                     </Text>
                                     <SessionLog run={it.run} onStop={it.run.kind !== 'interactive' ? stop : undefined}/>
                                     {it.run === latest && answer && <Box mt="xs">{answer}</Box>}
