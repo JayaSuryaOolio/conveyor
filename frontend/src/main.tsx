@@ -1,6 +1,6 @@
 import React from 'react'
 import {createRoot} from 'react-dom/client'
-import {MantineProvider, MultiSelect, Select, createTheme} from '@mantine/core'
+import {Anchor, MantineProvider, MultiSelect, Select, createTheme} from '@mantine/core'
 import '@mantine/core/styles.css'
 import './style.css'
 import App from './App'
@@ -10,6 +10,8 @@ const theme = createTheme({
     components: {
         Select: Select.extend({defaultProps: {searchable: true}}),
         MultiSelect: MultiSelect.extend({defaultProps: {searchable: true}}),
+        // Links: muted gray (not blue) so they read as clickable without grabbing attention; underline is the affordance.
+        Anchor: Anchor.extend({defaultProps: {c: 'light-dark(var(--mantine-color-gray-7), var(--mantine-color-gray-4))', underline: 'always'}}),
     },
 })
 

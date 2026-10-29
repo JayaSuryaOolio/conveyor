@@ -1,5 +1,5 @@
 import {lazy, Ref, Suspense, useEffect, useRef, useState} from 'react'
-import {ActionIcon, Anchor, Badge, Box, Breadcrumbs, Button, CloseButton, Code, Divider, Group, Kbd, Paper, Popover, Stack, Text, TextInput, Timeline, Title, Tooltip} from '@mantine/core'
+import {ActionIcon, Anchor, Badge, Box, Breadcrumbs, Button, CloseButton, Code, CopyButton, Divider, Group, Kbd, Paper, Popover, Stack, Text, TextInput, Timeline, Title, Tooltip} from '@mantine/core'
 import {useLocalStorage} from '@mantine/hooks'
 import {IconAbc, IconArrowDown, IconArrowUp, IconClock, IconFlame, IconHash, IconPencil, IconSearch, IconTerminal, IconX, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconMessage, IconPlayerPlay} from '@tabler/icons-react'
 import {Actions, GetTask, ListTasks, RunLog, SetTaskDescription, Stop, TakeQueuedComment, TermStart} from '../wailsjs/go/ui/App'
@@ -202,17 +202,18 @@ function SessionLog({run, onStop}: {run: store.Run; onStop?: () => void}) {
             {active ? (
                 <Group gap="xs" wrap="nowrap">
                     <span className="pulse"/>
-                    <Text size="sm">Working · {secs(Math.max(0, Math.round((now - Date.parse(run.started_at)) / 1000)))}</Text>
+                    {/* Fixed parts never shrink/wrap; only the last-tool text below takes the remaining space and truncates. */}
+                    <Text size="sm" style={{flexShrink: 0, whiteSpace: 'nowrap'}}>Working · {secs(Math.max(0, Math.round((now - Date.parse(run.started_at)) / 1000)))}</Text>
                     {onStop && (
                         <Popover withArrow shadow="md" position="bottom-start">
-                            <Popover.Target><Anchor component="button" size="sm">Stop run</Anchor></Popover.Target>
+                            <Popover.Target><Anchor component="button" size="sm" underline="hover" style={{flexShrink: 0, whiteSpace: 'nowrap'}}>Stop run</Anchor></Popover.Target>
                             <Popover.Dropdown>
                                 <Text size="sm" mb="xs">End this session? The agent stops now.</Text>
                                 <Button size="compact-xs" color="red" onClick={onStop}>Stop run</Button>
                             </Popover.Dropdown>
                         </Popover>
                     )}
-                    {lastTool && <Text size="xs" c="dimmed" lineClamp={1}>· {lastTool.text}</Text>}
+                    {lastTool && <Text size="xs" c="dimmed" truncate style={{flex: 1, minWidth: 0}}>· {lastTool.text}</Text>}
                 </Group>
             ) : (
                 <Button variant="subtle" size="compact-xs" w="fit-content" onClick={() => setOpen(!open)}>{open ? 'Hide session' : 'Show session'}</Button>
@@ -306,7 +307,9 @@ export function TaskPage({k, nav}: {k: string; nav: Nav}) {
                                 <Timeline.Item key={'r' + it.run.id} id={'run-' + it.run.id} bullet={<IconPlayerPlay size={12}/>}
                                                title={`Run ${runNo.get(it.run.id)} · ${it.run.mode}`}>
                                     <Text size="xs" c="dimmed">
-                                        {it.run.session_id && <><Tooltip label={it.run.session_id}><Code>{it.run.session_id.slice(0, 8)}</Code></Tooltip> · </>}{it.run.api_calls} calls · {fmtK(it.run.ctx_peak)} peak · {fmtDuration(it.run.started_at, it.run.ended_at)} · <Time iso={it.run.started_at}/>
+                                        {it.run.session_id && <><CopyButton value={it.run.session_id}>{({copied, copy}) => (
+                                            <Tooltip label={copied ? 'Copied' : `Click to copy ${it.run.session_id}`}><Code style={{cursor: 'pointer'}} onClick={copy}>{it.run.session_id!.slice(0, 8)}</Code></Tooltip>
+                                        )}</CopyButton> · </>}{it.run.api_calls} calls · {fmtK(it.run.ctx_peak)} peak · {fmtDuration(it.run.started_at, it.run.ended_at)} · <Time iso={it.run.started_at}/>
                                     </Text>
                                     <SessionLog run={it.run} onStop={it.run.kind !== 'interactive' ? stop : undefined}/>
                                     {it.run === latest && answer && <Box mt="xs">{answer}</Box>}
