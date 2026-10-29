@@ -6,6 +6,7 @@ export namespace core {
 	    label: string;
 	    output: boolean;
 	    service: boolean;
+	    icon?: string;
 
 	    static createFrom(source: any = {}) {
 	        return new Placed(source);
@@ -18,6 +19,7 @@ export namespace core {
 	        this.label = source["label"];
 	        this.output = source["output"];
 	        this.service = source["service"];
+	        this.icon = source["icon"];
 	    }
 	}
 

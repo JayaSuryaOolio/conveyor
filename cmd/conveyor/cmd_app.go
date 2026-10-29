@@ -20,7 +20,7 @@ func init() {
 }
 
 const appUsage = `usage: conveyor app list [--json] | presets [--json] | add NAME [--command CMD] [--global] [--output]
-       conveyor app install FILE|- [--replace] (manifest JSON; - reads stdin) | export NAME [FILE] | convert NAME | run APP ACTION [KEY]
+       conveyor app install FILE|- [--replace] (manifest JSON; - reads stdin) | export NAME [FILE] | convert NAME | run APP ACTION [KEY] [--place p]
        conveyor app global|output NAME on|off | rm NAME
        conveyor app open NAME [KEY|DIR] [--repo r] [--print]
 CMD is a shell command; {cwd} becomes the quoted worktree path and {key} the task key ('' without one).
@@ -43,6 +43,7 @@ func runApp(home string, args []string) error {
 	replace := fs.Bool("replace", false, "install over an app of the same name")
 	repo := fs.String("repo", "", "repo of the task (default primary)")
 	print := fs.Bool("print", false, "print the command instead of running it")
+	place := fs.String("place", "", "run the action as shown at this place (its service there may override run)")
 	pos, err := parseArgs(fs, rest)
 	if err != nil {
 		return err
@@ -145,7 +146,7 @@ func runApp(home string, args []string) error {
 			if len(pos) < 2 || len(pos) > 3 {
 				return errors.New(appUsage)
 			}
-			res, err := s.RunAppAction(pos[0], pos[1], strings.Join(pos[2:], ""))
+			res, err := s.RunAppAction(pos[0], pos[1], *place, strings.Join(pos[2:], ""))
 			if res != "" {
 				fmt.Fprintln(out, res)
 			}

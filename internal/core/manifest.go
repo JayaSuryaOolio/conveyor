@@ -33,14 +33,21 @@ type ManifestAction struct {
 	Run    string   `json:"run"`
 	Places []string `json:"places"`
 	Output bool     `json:"output,omitempty"`
-	// Service marks a long-running action: Status (exit 0 = running) lights the icon's dot and
-	// a click then runs Stop instead of Run. Task places only; excludes Output.
+	// Icon, a data:image/ URL (e.g. an inline SVG), shows the action as an icon button with
+	// Label as its tooltip.
+	Icon string `json:"icon,omitempty"`
+	// Services (v2), keyed by place, makes the action a long-running service there: Status
+	// (exit 0 = running) lights the button's dot and a click then runs Stop instead of Run.
+	// Each place gets its own service; places without one are plain buttons. Excludes Output.
+	Services map[string]ManifestService `json:"services,omitempty"`
+	// Service is the v1 form (one service, task_sidebar only); migrateManifest moves it to Services.
 	Service *ManifestService `json:"service,omitempty"`
 }
 
-// ManifestService tells Conveyor how to detect and stop a service action; both are
-// ${{ var }} scripts like Run.
+// ManifestService tells Conveyor how to start, detect and stop a service action; all are
+// ${{ var }} scripts like Run. Run, when set, replaces the action's Run at that place.
 type ManifestService struct {
+	Run    string `json:"run,omitempty"`
 	Status string `json:"status"`
 	Stop   string `json:"stop"`
 }
@@ -61,10 +68,11 @@ type ManifestAuto struct {
 }
 
 // ManifestVersion is the schema version this build writes and understands.
-const ManifestVersion = 1
+const ManifestVersion = 2
 
-// migrateManifest upgrades m to ManifestVersion in place. When the schema changes, bump
-// ManifestVersion and add a `case N:` that converts vN to vN+1; installed apps then keep working.
+// migrateManifest upgrades m to ManifestVersion in place, so installed apps keep working.
+// When the schema changes, bump ManifestVersion and convert vN to vN+1 here.
+// v1 -> v2: an action's single `service` becomes `services` at each of its places.
 func migrateManifest(m *Manifest) error {
 	if m.Version == 0 {
 		m.Version = 1
@@ -72,6 +80,22 @@ func migrateManifest(m *Manifest) error {
 	if m.Version > ManifestVersion {
 		return fmt.Errorf("manifest: version %d is newer than this Conveyor supports (%d)", m.Version, ManifestVersion)
 	}
+	for i := range m.Actions {
+		a := &m.Actions[i]
+		switch {
+		case m.Version == 1 && a.Services != nil:
+			return fmt.Errorf("manifest: action %q: services needs \"version\": 2", a.ID)
+		case m.Version >= 2 && a.Service != nil:
+			return fmt.Errorf("manifest: action %q: service is version 1; use services keyed by place", a.ID)
+		case a.Service != nil:
+			a.Services = map[string]ManifestService{}
+			for _, p := range a.Places {
+				a.Services[p] = *a.Service
+			}
+			a.Service = nil
+		}
+	}
+	m.Version = ManifestVersion
 	return nil
 }
 
@@ -117,15 +141,18 @@ func ParseManifest(raw string) (Manifest, error) {
 				return m, fmt.Errorf("manifest: action %q: unknown place %q (have global_nav, task_sidebar, board_card)", a.ID, p)
 			}
 		}
+		if a.Icon != "" && (!strings.HasPrefix(a.Icon, "data:image/") || strings.Contains(a.Icon, "#")) {
+			return m, fmt.Errorf("manifest: action %q: icon must be a data:image/ URL (write # as %%23)", a.ID)
+		}
 		scripts := a.Run
-		if a.Service != nil {
-			if a.Output || strings.TrimSpace(a.Service.Status) == "" || strings.TrimSpace(a.Service.Stop) == "" {
-				return m, fmt.Errorf("manifest: action %q: service needs status and stop, and cannot be output", a.ID)
+		for p, sv := range a.Services {
+			if !contains(a.Places, p) {
+				return m, fmt.Errorf("manifest: action %q: service for %q, which is not in its places", a.ID, p)
 			}
-			if len(a.Places) != 1 || a.Places[0] != "task_sidebar" {
-				return m, fmt.Errorf("manifest: action %q: service actions only go in task_sidebar", a.ID)
+			if a.Output || strings.TrimSpace(sv.Status) == "" || strings.TrimSpace(sv.Stop) == "" {
+				return m, fmt.Errorf("manifest: action %q: service at %s needs status and stop, and cannot be output", a.ID, p)
 			}
-			scripts += "\n" + a.Service.Status + "\n" + a.Service.Stop
+			scripts += "\n" + sv.Run + "\n" + sv.Status + "\n" + sv.Stop
 		}
 		for _, v := range varRe.FindAllStringSubmatch(scripts, -1) {
 			if !contains(ManifestVars, v[1]) {
@@ -220,6 +247,7 @@ type Placed struct {
 	Label   string `json:"label"`
 	Output  bool   `json:"output"`
 	Service bool   `json:"service"`
+	Icon    string `json:"icon,omitempty"`
 }
 
 // PlacedActions lists the manifest actions that asked for place.
@@ -239,46 +267,57 @@ func (s *Service) PlacedActions(place string) ([]Placed, error) {
 		}
 		for _, x := range m.Actions {
 			if contains(x.Places, place) {
-				out = append(out, Placed{a.Name, x.ID, x.Label, x.Output, x.Service != nil})
+				_, svc := x.Services[place]
+				out = append(out, Placed{a.Name, x.ID, x.Label, x.Output, svc, x.Icon})
 			}
 		}
 	}
 	return out, nil
 }
 
-// RunAppAction runs one manifest action. key "" is only valid for global_nav actions
-// (worktree.path is then the home directory). Returns an output action's output.
-func (s *Service) RunAppAction(app, id, key string) (string, error) {
+// RunAppAction runs one manifest action as shown at place (whose service may override Run;
+// "" = the action's own Run). key "" means no task (worktree.path is then the home directory).
+// Returns an output action's output.
+func (s *Service) RunAppAction(app, id, place, key string) (string, error) {
 	act, vars, cwd, err := s.resolveAction(app, id, key)
 	if err != nil {
 		return "", err
 	}
-	return RunApp(store.App{Name: act.Label, Command: RenderManifest(act.Run, vars), Output: act.Output}, cwd, key)
+	run := act.Run
+	if sv := act.Services[place]; sv.Run != "" {
+		run = sv.Run
+	}
+	return RunApp(store.App{Name: act.Label, Command: RenderManifest(run, vars), Output: act.Output}, cwd, key)
 }
 
-// AppServiceRunning reports whether a service action's status script exits 0 for the task.
-func (s *Service) AppServiceRunning(app, id, key string) (bool, error) {
+// AppServiceRunning reports whether the action's service at place has its status script exit 0.
+func (s *Service) AppServiceRunning(app, id, place, key string) (bool, error) {
 	act, vars, cwd, err := s.resolveAction(app, id, key)
-	if err != nil || act.Service == nil {
+	if err != nil {
 		return false, err
+	}
+	sv, ok := act.Services[place]
+	if !ok {
+		return false, nil
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	c := exec.CommandContext(ctx, "sh", "-c", RenderManifest(act.Service.Status, vars))
+	c := exec.CommandContext(ctx, "sh", "-c", RenderManifest(sv.Status, vars))
 	c.Dir = cwd
 	return c.Run() == nil, nil
 }
 
-// StopAppService runs a service action's stop script for the task.
-func (s *Service) StopAppService(app, id, key string) error {
+// StopAppService runs the stop script of the action's service at place.
+func (s *Service) StopAppService(app, id, place, key string) error {
 	act, vars, _, err := s.resolveAction(app, id, key)
 	if err != nil {
 		return err
 	}
-	if act.Service == nil {
-		return fmt.Errorf("action %q is not a service", id)
+	sv, ok := act.Services[place]
+	if !ok {
+		return fmt.Errorf("action %q has no service at %q", id, place)
 	}
-	return runShell("stop "+act.Label, RenderManifest(act.Service.Stop, vars))
+	return runShell("stop "+act.Label, RenderManifest(sv.Stop, vars))
 }
 
 // resolveAction finds the action and the variables and directory its scripts run with.
@@ -327,10 +366,10 @@ func (s *Service) resolveAction(app, id, key string) (*ManifestAction, map[strin
 
 // spotlightService detects and stops the spotlight instance mirroring ${{ worktree.path }}:
 // `spotlight list` prints "ROOT  <-  WORKTREE  (pid N)" and stop takes the root.
-func spotlightService() *ManifestService {
+func spotlightService() ManifestService {
 	bin := shq(spotlightBin())
 	root := bin + ` list | awk -v w=${{ worktree.path }} -F '  <-  ' '{sub(/  \(pid [0-9]+\)$/, "", $2); if ($2 == w) print $1}'`
-	return &ManifestService{Status: root + " | grep -q .", Stop: `r=$(` + root + `); [ -n "$r" ] && ` + bin + ` stop "$r"`}
+	return ManifestService{Status: root + " | grep -q .", Stop: `r=$(` + root + `); [ -n "$r" ] && ` + bin + ` stop "$r"`}
 }
 
 // LegacyManifest expresses a plain command app (the old {cwd}/{key} template) as a manifest:
@@ -344,7 +383,7 @@ func LegacyManifest(a store.App) (string, error) {
 	run := strings.NewReplacer("{cwd}", "${{ worktree.path }}", "{key}", "${{ task.key }}").Replace(a.Command)
 	act := ManifestAction{ID: "open", Label: a.Name, Run: run, Places: []string{place}, Output: a.Output}
 	if a.Name == "Spotlight" && !a.Global && !a.Output {
-		act.Service = spotlightService()
+		act.Services = map[string]ManifestService{place: spotlightService()}
 	}
 	b, err := json.MarshalIndent(Manifest{Version: ManifestVersion, Name: a.Name, Actions: []ManifestAction{act}}, "", "  ")
 	return string(b), err

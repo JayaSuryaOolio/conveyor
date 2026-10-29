@@ -47,33 +47,41 @@ export function PlacedButtons({place, k = '', size = 'xs'}: {place: string; k?: 
     const {data} = useData(() => PlacedActions(place), [place])
     const [busy, setBusy] = useState('')
     if (!data?.length) return null
-    const run = (a: {app: string; id: string; label: string; output: boolean}) => {
+    const run = (a: {app: string; id: string; label: string; output: boolean; icon?: string}) => {
         setBusy(a.app + a.id)
-        RunAppAction(a.app, a.id, k).then(out => { if (a.output) toast(out || `${a.label}: done`) }, appErr).finally(() => setBusy(''))
+        RunAppAction(a.app, a.id, place, k).then(out => { if (a.output) toast(out || `${a.label}: done`) }, appErr).finally(() => setBusy(''))
     }
     return (
         <Group gap={4} onClick={e => e.stopPropagation()}>
             {data.map(a => a.service
-                ? <ServiceButton key={a.app + a.id} a={a} k={k} size={size}/>
-                : <Button key={a.app + a.id} size={size} variant="default" loading={busy === a.app + a.id} title={a.app} onClick={() => run(a)}>{a.label}</Button>)}
+                ? <ServiceButton key={a.app + a.id} a={a} place={place} k={k} size={size}/>
+                : a.icon
+                    ? <Tooltip key={a.app + a.id} label={a.label}><ActionIcon size={iconSize(size)} variant="default" aria-label={a.label} loading={busy === a.app + a.id} onClick={() => run(a)}><ActionImg src={a.icon}/></ActionIcon></Tooltip>
+                    : <Button key={a.app + a.id} size={size} variant="default" loading={busy === a.app + a.id} title={a.app} onClick={() => run(a)}>{a.label}</Button>)}
         </Group>
     )
 }
 
-/** A service action: a green pulsing dot while its status script succeeds, a click then stops it; otherwise a click starts it and flashes a check/cross. */
-function ServiceButton({a, k, size}: {a: {app: string; id: string; label: string}; k: string; size: string}) {
+/** An action's manifest icon (a data:image/ URL); ActionIcon sizes match the Button sizes they replace. */
+const ActionImg = ({src}: {src: string}) => <img src={src} alt="" width={16} height={16}/>
+const iconSize = (size: string) => (size.startsWith('compact') ? 'sm' : 'md')
+
+/** A service action at `place` (each place has its own service): a green pulsing dot while its status script succeeds, a click then stops it; otherwise a click starts it and flashes a check/cross. */
+function ServiceButton({a, place, k, size}: {a: {app: string; id: string; label: string; icon?: string}; place: string; k: string; size: string}) {
     const [running, setRunning] = useState(false)
     const [res, setRes] = useState<boolean | null>(null)
-    const check = () => AppServiceRunning(a.app, a.id, k).then(setRunning, () => setRunning(false))
-    useEffect(() => { check() }, [a.app, a.id, k]) // eslint-disable-line react-hooks/exhaustive-deps
-    const click = () => (running ? StopAppService(a.app, a.id, k) : RunAppAction(a.app, a.id, k).then(() => {}))
+    const check = () => AppServiceRunning(a.app, a.id, place, k).then(setRunning, () => setRunning(false))
+    useEffect(() => { check() }, [a.app, a.id, place, k]) // eslint-disable-line react-hooks/exhaustive-deps
+    const click = () => (running ? StopAppService(a.app, a.id, place, k) : RunAppAction(a.app, a.id, place, k).then(() => {}))
         .then(() => setRes(true), e => { setRes(false); appErr(e) })
         .finally(() => { setTimeout(() => setRes(null), 1500); check() })
+    const flash = res === null ? undefined : res ? <IconCheck size={14} color="var(--mantine-color-green-6)"/> : <IconX size={14} color="var(--mantine-color-red-6)"/>
     return (
         <Tooltip label={running ? `${a.label} running – click to stop` : a.label}>
             <Indicator disabled={!running} color="green" size={8} processing>
-                <Button size={size} variant="default" title={a.app} onClick={click}
-                        leftSection={res === null ? undefined : res ? <IconCheck size={14} color="var(--mantine-color-green-6)"/> : <IconX size={14} color="var(--mantine-color-red-6)"/>}>{a.label}</Button>
+                {a.icon
+                    ? <ActionIcon size={iconSize(size)} variant="default" aria-label={a.label} onClick={click}>{flash ?? <ActionImg src={a.icon}/>}</ActionIcon>
+                    : <Button size={size} variant="default" title={a.app} onClick={click} leftSection={flash}>{a.label}</Button>}
             </Indicator>
         </Tooltip>
     )
