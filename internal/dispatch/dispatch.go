@@ -18,6 +18,7 @@ import (
 	"github.com/JayaSuryaOolio/conveyor/internal/claude"
 	"github.com/JayaSuryaOolio/conveyor/internal/core"
 	"github.com/JayaSuryaOolio/conveyor/internal/gh"
+	"github.com/JayaSuryaOolio/conveyor/internal/slack"
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 	"github.com/JayaSuryaOolio/conveyor/internal/workspace"
 )
@@ -67,6 +68,7 @@ func (d *Dispatcher) intSetting(key string) int {
 
 // Run ticks every 2s until ctx is done.
 func (d *Dispatcher) Run(ctx context.Context) error {
+	go slack.Run(ctx, &core.Service{DB: d.DB, Home: d.Home, Bin: d.ConveyorBin}, d.logf)
 	t := time.NewTicker(tickEvery)
 	defer t.Stop()
 	for {

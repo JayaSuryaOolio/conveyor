@@ -19,6 +19,9 @@ var Defaults = map[string]string{
 	"prompt_fresh":             "",
 	"prompt_resume":            "",
 	"pr_comment_prefix":        "ai agent: ",
+	"slack_bot_token":          "", // xoxb-…: posts DMs (see internal/slack)
+	"slack_app_token":          "", // xapp-…: Socket Mode, scope connections:write
+	"slack_user_id":            "", // your Slack member id: the only user the bridge DMs or obeys
 }
 
 func getSetting(db dbtx, key string) string {
