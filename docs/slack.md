@@ -1,4 +1,20 @@
-# Slack bridge
+# Chat bridge (Slack today)
+
+**Modular:** `internal/chat` is transport-neutral (event cursor, status filter, comment/move/list
+logic, on/off). A transport is ~3 methods (`chat.Transport`: `Ready`, `Send(Msg)`, `Listen`) and is
+registered in `dispatch.go`. Slack is the only one; Teams/Telegram/WhatsApp = a new package that
+implements `Transport`, plus one map entry. Hot path is unchanged (poll a local table, one HTTP post),
+so the abstraction costs nothing at runtime.
+
+**User-configurable** (`conveyor config set …`, re-read every few seconds, no restart):
+- `chat_enabled` `on|off` - turn the bridge off while at the desktop; events during "off" are skipped, not replayed.
+- `chat_transport` - which transport (default `slack`).
+- `chat_statuses` - comma list from `needs_you,review,done,failed` that send a message.
+
+Not configurable yet: destination (always a DM to `slack_user_id`) and per-feature toggles
+(replies/commands are always on) - add when a second transport or a real need appears.
+
+## Slack
 
 Slack is **not** an "app" in the Spotlight/Graft sense. Apps (`internal/core/apps.go`) are *outbound
 launchers*: Conveyor runs a command against a worktree. Slack is a *two-way client of Conveyor*: it
