@@ -254,12 +254,12 @@ export function SpotlightStop(arg1) {
   return window['go']['ui']['App']['SpotlightStop'](arg1);
 }
 
-export function AppServiceRunning(arg1, arg2, arg3) {
-  return window['go']['ui']['App']['AppServiceRunning'](arg1, arg2, arg3);
+export function AppServiceRunning(arg1, arg2, arg3, arg4) {
+  return window['go']['ui']['App']['AppServiceRunning'](arg1, arg2, arg3, arg4);
 }
 
-export function StopAppService(arg1, arg2, arg3) {
-  return window['go']['ui']['App']['StopAppService'](arg1, arg2, arg3);
+export function StopAppService(arg1, arg2, arg3, arg4) {
+  return window['go']['ui']['App']['StopAppService'](arg1, arg2, arg3, arg4);
 }
 
 export function Stop(arg1) {
@@ -342,6 +342,6 @@ export function PlacedActions(arg1) {
   return window['go']['ui']['App']['PlacedActions'](arg1);
 }
 
-export function RunAppAction(arg1, arg2, arg3) {
-  return window['go']['ui']['App']['RunAppAction'](arg1, arg2, arg3);
+export function RunAppAction(arg1, arg2, arg3, arg4) {
+  return window['go']['ui']['App']['RunAppAction'](arg1, arg2, arg3, arg4);
 }

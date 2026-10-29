@@ -185,7 +185,7 @@ func TestInstallManifest(t *testing.T) {
 	if p, _ := s.PlacedActions("board_card"); len(p) != 0 {
 		t.Fatal(p)
 	}
-	if out, err := s.RunAppAction("Demo", "hi", ""); err != nil || !strings.HasPrefix(out, "Demo in ") {
+	if out, err := s.RunAppAction("Demo", "hi", "", ""); err != nil || !strings.HasPrefix(out, "Demo in ") {
 		t.Fatal(out, err)
 	}
 	if err := s.UninstallApp("Demo"); err != nil {
@@ -221,10 +221,43 @@ func TestServiceManifest(t *testing.T) {
 	if _, err := ParseManifest(fmt.Sprintf(bad, "task_sidebar", svc)); err != nil {
 		t.Fatal(err)
 	}
-	for _, c := range [][2]string{{"board_card", svc}, {"task_sidebar", `"service":{"status":"true"}`}, {"task_sidebar", `"output":true,` + svc}} {
+	for _, c := range [][2]string{{"task_sidebar", `"service":{"status":"true"}`}, {"task_sidebar", `"output":true,` + svc}} {
 		if _, err := ParseManifest(fmt.Sprintf(bad, c[0], c[1])); err == nil {
 			t.Fatalf("accepted %v", c)
 		}
+	}
+	// v1 `service` migrates to `services` at each place; v2 rejects it, v1 rejects `services`
+	if m, err := ParseManifest(fmt.Sprintf(bad, "board_card", svc)); err != nil || m.Version != 2 || m.Actions[0].Services["board_card"].Stop != "true" {
+		t.Fatal("migrate:", m, err)
+	}
+	for _, x := range []string{
+		`{"version":2,"name":"X","actions":[{"id":"a","label":"A","run":"x","places":["task_sidebar"],` + svc + `}]}`,
+		`{"name":"X","actions":[{"id":"a","label":"A","run":"x","places":["task_sidebar"],"services":{"task_sidebar":{"status":"true","stop":"true"}}}]}`,
+		`{"version":2,"name":"X","actions":[{"id":"a","label":"A","run":"x","places":["task_sidebar"],"services":{"board_card":{"status":"true","stop":"true"}}}]}`,
+	} {
+		if _, err := ParseManifest(x); err == nil {
+			t.Fatalf("accepted %s", x)
+		}
+	}
+	// v2: each place has its own service (or none)
+	s := newSvc(t)
+	if _, err := s.InstallManifest(`{"version":2,"name":"Multi","actions":[{"id":"a","label":"A","run":"x","places":["global_nav","task_sidebar","board_card"],
+	 "services":{"global_nav":{"run":"y","status":"true","stop":"true"},"task_sidebar":{"status":"false","stop":"true"}}}]}`, false); err != nil {
+		t.Fatal(err)
+	}
+	for place, want := range map[string]bool{"global_nav": true, "task_sidebar": true, "board_card": false} {
+		if p, _ := s.PlacedActions(place); len(p) != 1 || p[0].Service != want {
+			t.Fatal(place, p)
+		}
+	}
+	if on, err := s.AppServiceRunning("Multi", "a", "global_nav", ""); !on || err != nil {
+		t.Fatal("global_nav service not running", err)
+	}
+	if on, _ := s.AppServiceRunning("Multi", "a", "board_card", ""); on {
+		t.Fatal("board_card has no service")
+	}
+	if err := s.StopAppService("Multi", "a", "board_card", ""); err == nil {
+		t.Fatal("stopped a missing service")
 	}
 	// a fake spotlight CLI listing one instance: status and stop must find the root by worktree
 	dir := t.TempDir()

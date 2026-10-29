@@ -202,6 +202,22 @@ A global app (Slack, a dashboard, anything not tied to a worktree) is switched o
 conveyor app add Usage --output --command 'ids=$(conveyor task sessions {key} --json) && npx -y ccusage session --json --offline | jq -r --argjson ids "$ids" '"'"'[.session[] | select(.period as $p | $ids | index($p))] | "Claude usage: $\((map(.totalCost) | add // 0) * 100 | round / 100) across \(length) of \($ids | length) sessions"'"'"
 ```
 
+**Manifest apps.** A manifest (`conveyor app install FILE`, or the Apps page) declares actions placed in UI slots (`global_nav`, `task_sidebar`, `board_card`), plus agents and automations installed with the app. Run scripts use `${{ var }}` placeholders (`task.key`, `worktree.path`, ...). An action can carry an `icon` (a `data:image/` URL) to show as an icon button.
+
+An action is a long-running **service** at a place when `services` has an entry for that place: its `status` script (exit 0 = running) lights a green dot, and a click then runs `stop` instead of `run`. Each place has its own service, so one action can run a different service in the task sidebar than on board cards, and an optional per-place `run` replaces the action's `run` there. Places without an entry are plain buttons.
+
+```json
+{"version": 2, "name": "Preview", "actions": [{"id": "preview", "label": "Preview", "places": ["task_sidebar", "board_card"],
+  "run": "cd ${{ worktree.path }} && make serve &",
+  "services": {
+    "task_sidebar": {"status": "lsof -ti :3000", "stop": "kill $(lsof -ti :3000)"},
+    "board_card":   {"run": "cd ${{ worktree.path }} && make storybook &", "status": "lsof -ti :6006", "stop": "kill $(lsof -ti :6006)"}}}]}
+```
+
+`conveyor app run APP ACTION [KEY] --place p` runs an action as shown at a place. Manifests carry a `version` (current: 2; absent means 1). Older versions keep working: a version 1 action's single `service` becomes the service at each of its places.
+
+Not yet: app hooks (an app reacting to task events). Later, Claude itself could be an app: the agent that works a task would come from a manifest, with other agents (Codex, Gemini CLI, ...) installed as alternative apps instead of being built in.
+
 ## Pull requests
 
 For tasks in review, every 60 seconds Conveyor runs `gh pr list --head <branch>` in each repo and stores the PR URL and state. If every PR is merged or closed and at least one merged, the task moves to done. If every PR was closed without merging, a system comment is added and the task goes to needs_you. `conveyor task sync KEY` does this once, on demand. You can also attach a PR by hand: `conveyor task set KEY --repo r --pr URL`.

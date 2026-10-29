@@ -39,7 +39,7 @@ function AppForm({initial, onClose}: {initial: store.App; onClose: (saved: boole
 }
 
 const MANIFEST_EXAMPLE = `{
-  "version": 1,
+  "version": 2,
   "name": "Lint",
   "description": "Lint the task's worktree",
   "actions": [

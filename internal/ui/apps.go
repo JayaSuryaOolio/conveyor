@@ -100,8 +100,8 @@ func (a *App) InstallPreset(x store.App) error {
 func (a *App) PlacedActions(place string) ([]core.Placed, error) { return a.svc.PlacedActions(place) }
 
 // RunAppAction runs a manifest action; key "" for global_nav ones.
-func (a *App) RunAppAction(app, id, key string) (string, error) {
-	out, err := a.svc.RunAppAction(app, id, key)
+func (a *App) RunAppAction(app, id, place, key string) (string, error) {
+	out, err := a.svc.RunAppAction(app, id, place, key)
 	if err != nil {
 		log.Printf("app %s/%s %s: %v", app, id, key, err)
 	}
@@ -109,13 +109,13 @@ func (a *App) RunAppAction(app, id, key string) (string, error) {
 }
 
 // AppServiceRunning reports whether a service action is running for the task.
-func (a *App) AppServiceRunning(app, id, key string) (bool, error) {
-	return a.svc.AppServiceRunning(app, id, key)
+func (a *App) AppServiceRunning(app, id, place, key string) (bool, error) {
+	return a.svc.AppServiceRunning(app, id, place, key)
 }
 
 // StopAppService stops a running service action.
-func (a *App) StopAppService(app, id, key string) error {
-	err := a.svc.StopAppService(app, id, key)
+func (a *App) StopAppService(app, id, place, key string) error {
+	err := a.svc.StopAppService(app, id, place, key)
 	if err != nil {
 		log.Printf("app %s/%s stop %s: %v", app, id, key, err)
 	}

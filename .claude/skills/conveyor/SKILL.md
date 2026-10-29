@@ -92,4 +92,5 @@ Known failure modes with confirm/fix steps: `docs/troubleshooting.md` (e.g. a ru
 - Bot review comments (cubic, coderabbit) start with HTML comments and tags; strip them before showing a comment in a toast.
 - Sub-tasks: always set `--desc`/`--desc-file` at creation, or the agent has no context. A `spawn:` line in the status block only gives the sub-task the parent's summary/state/next; when it needs real context use `conveyor task new --parent KEY --desc ...`.
 - Keep every major action reachable from the CLI; the UI calls the same `core.Service`.
+- Manifest schema changes: bump `core.ManifestVersion` and convert the old shape in `migrateManifest` (installed manifests are stored raw and migrated on every parse).
 - Update `docs/guide.md` (and this file) when behaviour or commands change.
