@@ -33,6 +33,9 @@ type ManifestAction struct {
 	Run    string   `json:"run"`
 	Places []string `json:"places"`
 	Output bool     `json:"output,omitempty"`
+	// Icon, a data:image/ URL (e.g. an inline SVG), shows the action as an icon button with
+	// Label as its tooltip.
+	Icon string `json:"icon,omitempty"`
 	// Service marks a long-running action: Status (exit 0 = running) lights the icon's dot and
 	// a click then runs Stop instead of Run. Task places only; excludes Output.
 	Service *ManifestService `json:"service,omitempty"`
@@ -116,6 +119,9 @@ func ParseManifest(raw string) (Manifest, error) {
 			if _, ok := Placements[p]; !ok {
 				return m, fmt.Errorf("manifest: action %q: unknown place %q (have global_nav, task_sidebar, board_card)", a.ID, p)
 			}
+		}
+		if a.Icon != "" && (!strings.HasPrefix(a.Icon, "data:image/") || strings.Contains(a.Icon, "#")) {
+			return m, fmt.Errorf("manifest: action %q: icon must be a data:image/ URL (write # as %%23)", a.ID)
 		}
 		scripts := a.Run
 		if a.Service != nil {
@@ -220,6 +226,7 @@ type Placed struct {
 	Label   string `json:"label"`
 	Output  bool   `json:"output"`
 	Service bool   `json:"service"`
+	Icon    string `json:"icon,omitempty"`
 }
 
 // PlacedActions lists the manifest actions that asked for place.
@@ -239,7 +246,7 @@ func (s *Service) PlacedActions(place string) ([]Placed, error) {
 		}
 		for _, x := range m.Actions {
 			if contains(x.Places, place) {
-				out = append(out, Placed{a.Name, x.ID, x.Label, x.Output, x.Service != nil})
+				out = append(out, Placed{a.Name, x.ID, x.Label, x.Output, x.Service != nil, x.Icon})
 			}
 		}
 	}

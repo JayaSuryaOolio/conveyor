@@ -141,7 +141,7 @@ func TestSessionIDs(t *testing.T) {
 }
 
 func TestManifest(t *testing.T) {
-	raw := `{"name":"Demo","actions":[{"id":"hi","label":"Hi","run":"echo ${{ task.key }} ${{ worktree.path }}","places":["board_card"],"output":true}]}`
+	raw := `{"name":"Demo","actions":[{"id":"hi","label":"Hi","run":"echo ${{ task.key }} ${{ worktree.path }}","places":["board_card"],"output":true,"icon":"data:image/svg+xml,<svg/>"}]}`
 	if _, err := ParseManifest(raw); err != nil {
 		t.Fatal(err)
 	}
@@ -150,6 +150,8 @@ func TestManifest(t *testing.T) {
 		`{"name":"x","actions":[{"id":"a","label":"A","run":"${{ nope }}","places":["global_nav"]}]}`,
 		`{"name":"x","actions":[{"id":"a","label":"A","run":"x","places":["moon"]}]}`,
 		`{"name":"x","bogus":1,"actions":[{"id":"a","label":"A","run":"x","places":["global_nav"]}]}`,
+		`{"name":"x","actions":[{"id":"a","label":"A","run":"x","places":["global_nav"],"icon":"https://evil/x.png"}]}`,
+		`{"name":"x","actions":[{"id":"a","label":"A","run":"x","places":["global_nav"],"icon":"data:image/svg+xml,<svg fill='#000'/>"}]}`,
 	} {
 		if _, err := ParseManifest(bad); err == nil {
 			t.Errorf("accepted %s", bad)
