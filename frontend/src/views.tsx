@@ -306,9 +306,9 @@ export function TaskPage({k, nav}: {k: string; nav: Nav}) {
                                 <Timeline.Item key={'r' + it.run.id} id={'run-' + it.run.id} bullet={<IconPlayerPlay size={12}/>}
                                                title={`Run ${runNo.get(it.run.id)} · ${it.run.mode}`}>
                                     <Text size="xs" c="dimmed">
-                                        {it.run.session_id && <><CopyButton value={it.run.session_id}>{({copied, copy}) => (
-                                            <Tooltip label={copied ? 'Copied' : `Click to copy ${it.run.session_id}`}><Code style={{cursor: 'pointer'}} onClick={copy}>{it.run.session_id!.slice(0, 8)}</Code></Tooltip>
-                                        )}</CopyButton> · </>}{it.run.api_calls} calls · {fmtK(it.run.ctx_peak)} peak · {fmtDuration(it.run.started_at, it.run.ended_at)} · <Time iso={it.run.started_at}/>
+                                        {it.run.session_id && (sid => <><CopyButton value={sid}>{({copied, copy}) => (
+                                            <Tooltip label={copied ? 'Copied' : `Click to copy ${sid}`}><Code style={{cursor: 'pointer'}} onClick={copy}>{sid.slice(0, 8)}</Code></Tooltip>
+                                        )}</CopyButton> · </>)(it.run.session_id)}{it.run.api_calls} calls · {fmtK(it.run.ctx_peak)} peak · {fmtDuration(it.run.started_at, it.run.ended_at)} · <Time iso={it.run.started_at}/>
                                     </Text>
                                     <SessionLog run={it.run} onStop={it.run.kind !== 'interactive' ? stop : undefined}/>
                                     {it.run === latest && answer && <Box mt="xs">{answer}</Box>}
