@@ -54,6 +54,7 @@ features:
 oauth_config: {scopes: {bot: [chat:write, im:history, reactions:write]}}
 settings:
   event_subscriptions: {bot_events: [message.im]}
+  interactivity: {is_enabled: true}
   socket_mode_enabled: true
 ```
 2. **Basic Information → App-Level Tokens**: create one with `connections:write` (`xapp-…`).
@@ -80,11 +81,13 @@ Open the Conveyor DM. Type a plain message, no slash needed:
 - Reply in a notification's thread - comments on that task.
 
 Notifications (needs_you, review, done, failed; pick which in settings) carry the agent's last
-message (rendered as Markdown via a Block Kit `markdown` block) and PR links. Each task gets one
+message (rendered as Markdown via a Block Kit `markdown` block) and PR links, plus buttons: **Done** / **Requeue** (while it needs you, is in review or failed)
+and **Open PR**. Buttons need *Interactivity* on: in the manifest add `settings.interactivity: {is_enabled: true}`
+(Socket Mode needs no request URL). Each task gets one
 thread: later notifications for it, and the agent's answers to your thread replies, post into it.
 Thread roots are kept in memory, so after a restart a task's next update starts a new thread.
 
 ## Not done (add when needed)
-- Block Kit buttons/modals (needs interactive payload handling), channel mode, retry/dedupe
+- Block Kit modals, channel mode, retry/dedupe
   beyond the event cursor (`slack_cursor`), token storage in
   Keychain (tokens sit in the local settings table like other settings).

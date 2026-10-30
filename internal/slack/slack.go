@@ -5,6 +5,7 @@
 // Settings: slack_bot_token (xoxb-) or slack_user_token (xoxp-, used only while
 // slack_impersonate is on: the app then acts as you instead of as a bot), slack_app_token (xapp-, scope connections:write) and
 // slack_user_id (your member id: the only user the bridge talks to or listens to).
+// Buttons need Interactivity enabled in the app (Socket Mode delivers the clicks).
 package slack
 
 import (
@@ -114,6 +115,22 @@ func message(m chat.Msg) string {
 	return s
 }
 
+// buttons are the action buttons under a DM: Done and Requeue while a task waits on you
+// (action_id is the command, value the key), and one link button per PR.
+func buttons(m chat.Msg) []any {
+	var els []any
+	btn := func(text, id string) any {
+		return map[string]any{"type": "button", "text": map[string]any{"type": "plain_text", "text": text}, "action_id": id, "value": m.Key}
+	}
+	if m.Status == "needs_you" || m.Status == "review" || m.Status == "failed" {
+		els = append(els, btn("Done", "move_done"), btn("Requeue", "move_todo"))
+	}
+	for _, r := range m.PRs {
+		els = append(els, map[string]any{"type": "button", "text": map[string]any{"type": "plain_text", "text": "Open " + r.Name + " PR"}, "action_id": "open_pr", "url": r.URL})
+	}
+	return els
+}
+
 // blocks renders m for display: Slack mrkdwn for the header and links, and a markdown block
 // for the agent's text, which is standard Markdown that mrkdwn would show raw.
 func blocks(m chat.Msg) []any {
@@ -136,6 +153,9 @@ func blocks(m chat.Msg) []any {
 	}
 	if len(foot) > 0 {
 		b = append(b, sec(strings.Join(foot, "\n")))
+	}
+	if els := buttons(m); len(els) > 0 {
+		b = append(b, map[string]any{"type": "actions", "elements": els})
 	}
 	return b
 }
@@ -270,4 +290,27 @@ func (s *Slack) event(payload []byte, handle func(chat.In) string) {
 	threads.LoadOrStore(key, e.ThreadTS) // the agent's answer comes back into this thread
 	reply := ":speech_balloon: " + handle(chat.In{Key: key, Text: e.Text})
 	s.post(map[string]any{"channel": e.Channel, "thread_ts": e.ThreadTS, "text": reply})
+}
+
+// interactive runs a button click (block_actions) as the matching command and answers in the
+// message's thread. Link buttons (open_pr) also arrive here and are ignored.
+func (s *Slack) interactive(payload []byte, handle func(chat.In) string) {
+	var p struct {
+		Type    string `json:"type"`
+		User    struct{ ID string }
+		Channel struct{ ID string }
+		Message struct{ TS string }
+		Actions []struct {
+			ActionID string `json:"action_id"`
+			Value    string
+		}
+	}
+	if json.Unmarshal(payload, &p) != nil || p.Type != "block_actions" || p.User.ID != s.get("slack_user_id") {
+		return
+	}
+	for _, a := range p.Actions {
+		if status, ok := strings.CutPrefix(a.ActionID, "move_"); ok && a.Value != "" {
+			s.post(map[string]any{"channel": p.Channel.ID, "thread_ts": p.Message.TS, "text": handle(chat.In{Text: "move " + a.Value + " " + status})})
+		}
+	}
 }
