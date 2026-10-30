@@ -3,6 +3,7 @@ package chat
 import (
 	"context"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/JayaSuryaOolio/conveyor/internal/core"
@@ -54,6 +55,22 @@ func TestHelpCommand(t *testing.T) {
 	for _, in := range []string{"help", "?", "bogus"} {
 		if b.command(in) != Help {
 			t.Fatalf("%q did not return help", in)
+		}
+	}
+}
+
+func TestShowCommand(t *testing.T) {
+	db, err := store.Open(filepath.Join(t.TempDir(), "c.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	repo, _ := store.AddRepo(db, store.Repo{Name: "a", Path: "/x/a", DefaultBranch: "main"})
+	tk, _ := store.CreateTask(db, store.Task{Title: "hello", Status: store.StatusTodo}, []store.TaskRepo{{RepoID: repo.ID, IsPrimary: true, Branch: "t"}})
+	b := &bridge{&core.Service{DB: db}, t.Logf}
+	for _, in := range []string{"show " + tk.Key, tk.Key} {
+		if got := b.command(in); !strings.Contains(got, "hello") || !strings.Contains(got, "a (") {
+			t.Fatalf("%q: %s", in, got)
 		}
 	}
 }

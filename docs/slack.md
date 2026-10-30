@@ -73,6 +73,7 @@ Only `slack_user_id` is DMed and obeyed; everyone else is ignored.
 Open the Conveyor DM. Type a plain message, no slash needed:
 - `help` - the guide (also on the app's Home tab)
 - `list` - tasks waiting on you
+- `show CV-12` (or just `CV-12`) - status, repos, PRs, last agent message
 - `CV-12 use the v2 API` - comment on CV-12 (requeues it)
 - `move CV-12 done` - todo | done | cancelled
 - Reply in a notification's thread - comments on that task.

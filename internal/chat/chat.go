@@ -196,11 +196,41 @@ func (b *bridge) comment(key, body string) string {
 const Help = `*Conveyor commands* (send as a DM, or /conveyor …)
 • list — tasks waiting on you
 • KEY your comment — comment on a task (e.g. CV-12 use the v2 API)
+• show KEY (or just KEY) — status, repos, PRs and the last agent message
 • move KEY todo|done|cancelled — change status
 • help — this guide
 Replying in a task's thread also comments on it.`
 
-// command runs "help", "" or "list", "move KEY STATUS", or "KEY text".
+var keyArg = regexp.MustCompile(`^[A-Za-z0-9]+-[A-Za-z0-9]+$`)
+
+// show summarizes one task: status, repos with PRs, and the agent's last comment.
+func (b *bridge) show(key string) string {
+	t, err := store.GetTaskByKey(b.svc.DB, key)
+	if err != nil {
+		return err.Error()
+	}
+	s := fmt.Sprintf("%s %s — %s", t.Key, t.Title, t.Status)
+	for _, r := range t.Repos {
+		s += "\n" + r.RepoName + " (" + r.Branch + ")"
+		if r.PRURL != nil {
+			s += " " + *r.PRURL
+		}
+	}
+	cs, _ := store.ListComments(b.svc.DB, t.ID)
+	for i := len(cs) - 1; i >= 0; i-- {
+		if cs[i].Author == store.AuthorAgent {
+			last := strings.TrimSpace(cs[i].Body)
+			if len(last) > 1000 {
+				last = last[:1000] + "…"
+			}
+			s += "\n> " + strings.ReplaceAll(last, "\n", "\n> ")
+			break
+		}
+	}
+	return s
+}
+
+// command runs "help", "" or "list", "show KEY" (or bare KEY), "move KEY STATUS", or "KEY text".
 func (b *bridge) command(text string) string {
 	f := strings.Fields(text)
 	switch {
@@ -219,6 +249,10 @@ func (b *bridge) command(text string) string {
 			s = append(s, fmt.Sprintf("%s %s — %s", t.Key, t.Title, t.Status))
 		}
 		return strings.Join(s, "\n")
+	case f[0] == "show" && len(f) == 2:
+		return b.show(f[1])
+	case len(f) == 1 && keyArg.MatchString(f[0]):
+		return b.show(f[0])
 	case f[0] == "move" && len(f) == 3:
 		t, err := store.GetTaskByKey(b.svc.DB, f[1])
 		if err != nil {
