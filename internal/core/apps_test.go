@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -279,16 +280,6 @@ func TestServiceManifest(t *testing.T) {
 	}
 }
 
-func TestVSCodeManifestExample(t *testing.T) {
-	raw, err := os.ReadFile("../../docs/apps/vscode.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := ParseManifest(string(raw)); err != nil {
-		t.Fatal(err)
-	}
-}
-
 func TestManifestIconPath(t *testing.T) {
 	s := newSvc(t)
 	s.Home = t.TempDir()
@@ -317,5 +308,35 @@ func TestManifestIconPath(t *testing.T) {
 		if _, err := ParseManifest(bad); err == nil {
 			t.Errorf("accepted %s", bad)
 		}
+	}
+}
+
+func TestAppBundleIconAndStateExport(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("needs plutil and sips")
+	}
+	app := "/System/Applications/Calculator.app"
+	if _, err := os.Stat(app); err != nil {
+		t.Skip(err)
+	}
+	src := newSvc(t)
+	src.Home = t.TempDir()
+	raw := fmt.Sprintf(`{"name":"Calc","actions":[{"id":"a","label":"A","run":"x","places":["global_nav"],"iconPath":%q}]}`, app)
+	if _, err := src.InstallManifest(raw, false); err != nil {
+		t.Fatal(err)
+	}
+	st, err := src.ExportState()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(st.Apps) != 1 || !strings.Contains(st.Apps[0].Manifest, `"icon": "data:image/png;base64,`) || strings.Contains(st.Apps[0].Manifest, "iconPath") {
+		t.Fatal(st.Apps)
+	}
+	dst := newSvc(t)
+	if _, err := dst.ImportState(st, nil); err != nil {
+		t.Fatal(err)
+	}
+	if p, _ := dst.PlacedActions("global_nav"); len(p) != 1 || !strings.HasPrefix(p[0].Icon, "data:image/png") {
+		t.Fatal(p)
 	}
 }

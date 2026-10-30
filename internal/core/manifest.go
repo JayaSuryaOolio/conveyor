@@ -38,8 +38,9 @@ type ManifestAction struct {
 	// Icon, a data:image/ URL (e.g. an inline SVG), shows the action as an icon button with
 	// Label as its tooltip.
 	Icon string `json:"icon,omitempty"`
-	// IconPath is an image file (absolute or ~/, png/jpg/gif/webp/svg, <= 1 MB) used instead of
-	// Icon. Install copies it to <home>/app-icons and the stored manifest points at the copy.
+	// IconPath is an image file (absolute or ~/, png/jpg/gif/webp/svg, <= 1 MB) or a macOS .app
+	// bundle (its icon is extracted) used instead of Icon. Install copies it to <home>/app-icons
+	// as an image and the stored manifest points at the copy.
 	IconPath string `json:"iconPath,omitempty"`
 	// Services (v2), keyed by place, makes the action a long-running service there: Status
 	// (exit 0 = running) lights the button's dot and a click then runs Stop instead of Run.
@@ -154,7 +155,7 @@ func ParseManifest(raw string) (Manifest, error) {
 				return m, fmt.Errorf("manifest: action %q: set icon or iconPath, not both", a.ID)
 			}
 			if _, ok := iconTypes[strings.ToLower(filepath.Ext(a.IconPath))]; !ok || !filepath.IsAbs(iconSrc(a.IconPath)) {
-				return m, fmt.Errorf("manifest: action %q: iconPath must be an absolute (or ~/) png, jpg, gif, webp or svg file", a.ID)
+				return m, fmt.Errorf("manifest: action %q: iconPath must be an absolute (or ~/) png, jpg, gif, webp or svg file, or .app bundle", a.ID)
 			}
 		}
 		scripts := a.Run
@@ -181,7 +182,7 @@ func ParseManifest(raw string) (Manifest, error) {
 	return m, nil
 }
 
-var iconTypes = map[string]string{".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp", ".svg": "image/svg+xml"}
+var iconTypes = map[string]string{".app": "", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp", ".svg": "image/svg+xml"}
 
 // iconSrc expands a leading ~/ in an iconPath.
 func iconSrc(p string) string {
@@ -198,6 +199,52 @@ func iconURL(path string) string {
 		return ""
 	}
 	return "data:" + iconTypes[strings.ToLower(filepath.Ext(path))] + ";base64," + base64.StdEncoding.EncodeToString(b)
+}
+
+// iconExt is the extension the installed copy of an iconPath gets: an .app yields a png.
+func iconExt(p string) string {
+	if e := strings.ToLower(filepath.Ext(p)); e != ".app" {
+		return e
+	}
+	return ".png"
+}
+
+// appIconPNG renders the icon of a macOS .app bundle (its CFBundleIconFile .icns) as a 128px png.
+// Bundles whose icon only lives in an asset catalog are not supported.
+func appIconPNG(app string) ([]byte, error) {
+	name, err := exec.Command("plutil", "-extract", "CFBundleIconFile", "raw", "-o", "-", filepath.Join(app, "Contents", "Info.plist")).Output()
+	if err != nil {
+		return nil, fmt.Errorf("no CFBundleIconFile in %s: %w", app, err)
+	}
+	n := strings.TrimSpace(string(name))
+	if filepath.Ext(n) == "" {
+		n += ".icns"
+	}
+	tmp := filepath.Join(os.TempDir(), fmt.Sprintf("conveyor-icon-%d.png", time.Now().UnixNano()))
+	defer os.Remove(tmp)
+	if out, err := exec.Command("sips", "-s", "format", "png", "-Z", "128", filepath.Join(app, "Contents", "Resources", n), "--out", tmp).CombinedOutput(); err != nil {
+		return nil, fmt.Errorf("sips: %v: %s", err, out)
+	}
+	return os.ReadFile(tmp)
+}
+
+// portableManifest inlines iconPath files as icon data URLs, so the manifest works on another machine.
+func portableManifest(raw string) (string, error) {
+	m, err := ParseManifest(raw)
+	if err != nil {
+		return "", err
+	}
+	changed := false
+	for i := range m.Actions {
+		if a := &m.Actions[i]; a.IconPath != "" {
+			a.Icon, a.IconPath, changed = iconURL(a.IconPath), "", true
+		}
+	}
+	if !changed {
+		return raw, nil
+	}
+	b, err := json.MarshalIndent(m, "", "  ")
+	return string(b), err
 }
 
 func (s *Service) iconsDir() string { return filepath.Join(s.Home, "app-icons") }
@@ -232,7 +279,13 @@ func (s *Service) InstallManifest(raw string, replace bool) (store.App, error) {
 		if a.IconPath == "" {
 			continue
 		}
-		b, err := os.ReadFile(iconSrc(a.IconPath))
+		var b []byte
+		var err error
+		if strings.EqualFold(filepath.Ext(a.IconPath), ".app") {
+			b, err = appIconPNG(iconSrc(a.IconPath))
+		} else {
+			b, err = os.ReadFile(iconSrc(a.IconPath))
+		}
 		if err != nil || len(b) > 1<<20 {
 			return store.App{}, fmt.Errorf("manifest: action %q: iconPath must be a readable file of at most 1 MB (%v)", a.ID, err)
 		}
@@ -250,7 +303,7 @@ func (s *Service) InstallManifest(raw string, replace bool) (store.App, error) {
 		}
 		for i, b := range icons {
 			x := &m.Actions[i]
-			p := filepath.Join(s.iconsDir(), nonAlnumPath.ReplaceAllString(m.Name, "-")+"-"+x.ID+strings.ToLower(filepath.Ext(x.IconPath)))
+			p := filepath.Join(s.iconsDir(), nonAlnumPath.ReplaceAllString(m.Name, "-")+"-"+x.ID+iconExt(x.IconPath))
 			if err := os.WriteFile(p, b, 0o644); err != nil {
 				return store.App{}, err
 			}
@@ -499,5 +552,5 @@ func (s *Service) ExportApp(name string) (string, error) {
 	if a.Manifest == "" {
 		return "", fmt.Errorf("app %q is not a manifest app; convert it first", name)
 	}
-	return a.Manifest, nil
+	return portableManifest(a.Manifest)
 }

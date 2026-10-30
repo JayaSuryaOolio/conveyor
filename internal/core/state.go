@@ -29,6 +29,8 @@ type StateApp struct {
 	Command string `json:"command"`
 	Global  bool   `json:"global"`
 	Output  bool   `json:"output"`
+	// Manifest is the app's portable manifest JSON (icons inlined); set for manifest apps.
+	Manifest string `json:"manifest,omitempty"`
 }
 
 type StateAutomation struct {
@@ -97,7 +99,13 @@ func (s *Service) ExportState() (State, error) {
 		return st, err
 	}
 	for _, a := range apps {
-		st.Apps = append(st.Apps, StateApp{a.Name, a.Command, a.Global, a.Output})
+		sa := StateApp{Name: a.Name, Command: a.Command, Global: a.Global, Output: a.Output}
+		if a.Manifest != "" {
+			if sa.Manifest, err = portableManifest(a.Manifest); err != nil {
+				return st, fmt.Errorf("app %q: %w", a.Name, err)
+			}
+		}
+		st.Apps = append(st.Apps, sa)
 	}
 	autos, err := store.ListAutomations(s.DB)
 	if err != nil {
@@ -164,7 +172,14 @@ func (s *Service) ImportState(st State, repoMap map[string]string) ([]string, er
 			out = append(out, "skipped app "+a.Name+": exists")
 			continue
 		}
-		if _, err := store.CreateApp(s.DB, store.App{Name: a.Name, Command: a.Command, Global: a.Global, Output: a.Output}); err != nil {
+		// agents and automations a manifest declares travel in their own state sections
+		if a.Manifest != "" {
+			if _, err := ParseManifest(a.Manifest); err != nil {
+				out = append(out, "skipped app "+a.Name+": "+err.Error())
+				continue
+			}
+		}
+		if _, err := store.CreateApp(s.DB, store.App{Name: a.Name, Command: a.Command, Global: a.Global, Output: a.Output, Manifest: a.Manifest}); err != nil {
 			return out, err
 		}
 		out = append(out, "added app "+a.Name)
