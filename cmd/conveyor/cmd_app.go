@@ -19,7 +19,7 @@ func init() {
 	register("hooks", runHooks, "Claude Code hooks in ~/.claude/settings.json (status|install|uninstall)")
 }
 
-const appUsage = `usage: conveyor app list [--json] | presets [--json] | add NAME [--command CMD] [--global] [--output]
+const appUsage = `usage: conveyor app list [--json] | presets [--json] | add NAME [--command CMD] [--global] [--output] | add --from-app NAME [--replace]
        conveyor app install FILE|- [--replace] (manifest JSON; - reads stdin) | export NAME [FILE] | convert NAME | run APP ACTION [KEY] [--place p]
        conveyor app global|output NAME on|off | rm NAME
        conveyor app open NAME [KEY|DIR] [--repo r] [--print]
@@ -41,6 +41,7 @@ func runApp(home string, args []string) error {
 	global := fs.Bool("global", false, "app is not tied to a worktree")
 	output := fs.Bool("output", false, "run to completion and show the output (a quick action)")
 	replace := fs.Bool("replace", false, "install over an app of the same name")
+	fromApp := fs.String("from-app", "", "add: build a manifest app from an installed .app (e.g. \"Visual Studio Code\")")
 	repo := fs.String("repo", "", "repo of the task (default primary)")
 	print := fs.Bool("print", false, "print the command instead of running it")
 	place := fs.String("place", "", "run the action as shown at this place (its service there may override run)")
@@ -67,8 +68,19 @@ func runApp(home string, args []string) error {
 			}
 			return printApps(as)
 		case "add":
-			if len(pos) != 1 {
+			if len(pos) != 1 && *fromApp == "" {
 				return errors.New(appUsage)
+			}
+			if *fromApp != "" {
+				raw, err := core.ManifestFromApp(*fromApp)
+				if err != nil {
+					return err
+				}
+				a, err := s.InstallManifest(raw, *replace)
+				if err == nil {
+					fmt.Fprintf(out, "installed %s\n", a.Name)
+				}
+				return err
 			}
 			a := store.App{Name: pos[0], Command: *command, Global: *global, Output: *output}
 			if a.Command == "" {

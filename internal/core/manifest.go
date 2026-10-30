@@ -252,6 +252,31 @@ func portableManifest(raw string) (string, error) {
 	return string(b), err
 }
 
+// ManifestFromApp builds a v2 manifest JSON for an installed macOS app: one task_sidebar action
+// that opens the worktree in it, with the bundle as iconPath (InstallManifest extracts the icon).
+func ManifestFromApp(name string) (string, error) {
+	app := ""
+	for _, d := range appDirs() {
+		if p := filepath.Join(d, name+".app"); exists(p) {
+			app = p
+			break
+		}
+	}
+	if app == "" {
+		return "", fmt.Errorf("%s.app not found in %s", name, strings.Join(appDirs(), ", "))
+	}
+	id := strings.Trim(nonAlnumPath.ReplaceAllString(strings.ToLower(name), "-"), "-")
+	b, err := json.MarshalIndent(Manifest{
+		Version: ManifestVersion, Name: name, Description: "Open the task worktree in " + name,
+		Actions: []ManifestAction{{ID: id, Label: name, Run: "open -a " + shq(name) + " ${{ worktree.path }}", Places: []string{"task_sidebar"}, IconPath: app}},
+	}, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	_, err = ParseManifest(string(b))
+	return string(b), err
+}
+
 func (s *Service) iconsDir() string { return filepath.Join(s.Home, "app-icons") }
 
 func contains(l []string, s string) bool {
