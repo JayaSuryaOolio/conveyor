@@ -51,7 +51,7 @@ features:
   bot_user: {display_name: Conveyor}
   slash_commands:
     - {command: /conveyor, url: https://example.com, description: Control Conveyor tasks, usage_hint: help}
-oauth_config: {scopes: {bot: [chat:write, im:history]}}
+oauth_config: {scopes: {bot: [chat:write, im:history, reactions:write]}}
 settings:
   event_subscriptions: {bot_events: [message.im]}
   socket_mode_enabled: true
@@ -63,7 +63,7 @@ settings:
 
 **Bot or you.** By default Conveyor posts as the bot. To act as yourself instead, add the
 `slack_user_token` (`xoxp-…`, Apps → Integrations → User token): in the manifest add
-`oauth_config.scopes.user: [chat:write, im:history, im:write]` and `settings.event_subscriptions.user_events: [message.im]`,
+`oauth_config.scopes.user: [chat:write, im:history, im:write, reactions:write]` and `settings.event_subscriptions.user_events: [message.im]`,
 reinstall, copy the *User OAuth Token*, then switch on **Act as me** (`slack_impersonate on`, default
 off). The token is only used while the switch is on. Caveat: messages then land in your own self-DM
 and Slack does not notify you for messages you post yourself, so you get no push in this mode.

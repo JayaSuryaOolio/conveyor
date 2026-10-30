@@ -233,6 +233,9 @@ func (b *bridge) show(key string) string {
 // command runs "help", "" or "list", "show KEY" (or bare KEY), "move KEY STATUS", or "KEY text".
 func (b *bridge) command(text string) string {
 	f := strings.Fields(text)
+	if len(f) == 4 && f[0] == "move" && f[2] == "to" { // "move KEY to done"
+		f = []string{f[0], f[1], f[3]}
+	}
 	switch {
 	case len(f) > 0 && (f[0] == "help" || f[0] == "?"):
 		return Help
@@ -262,7 +265,7 @@ func (b *bridge) command(text string) string {
 			return "warning: " + err.Error()
 		}
 		return fmt.Sprintf("%s → %s", f[1], f[2])
-	case len(f) >= 2:
+	case len(f) >= 2 && keyArg.MatchString(f[0]):
 		return b.comment(f[0], strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(text), f[0])))
 	}
 	return Help
