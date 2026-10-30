@@ -151,6 +151,12 @@ func (a *App) Confirm(msg string) (bool, error) {
 	return r == "Yes", err
 }
 
+// Version is set at build time by scripts/install.sh (-ldflags -X); "dev" for plain builds.
+var Version = "dev"
+
+// AppVersion returns the build version shown in the sidebar.
+func (a *App) AppVersion() string { return Version }
+
 // DispatcherState says whether this app is dispatching or only showing the UI.
 func (a *App) DispatcherState() string {
 	if a.dispatcher.Load() {
