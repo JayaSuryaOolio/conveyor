@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -276,5 +277,66 @@ func TestServiceManifest(t *testing.T) {
 	}
 	if b, _ := os.ReadFile(log); strings.TrimSpace(string(b)) != "/r/a" {
 		t.Fatalf("stopped %q", b)
+	}
+}
+
+func TestManifestIconPath(t *testing.T) {
+	s := newSvc(t)
+	s.Home = t.TempDir()
+	src := filepath.Join(t.TempDir(), "i.png")
+	os.WriteFile(src, []byte("png"), 0o644)
+	raw := fmt.Sprintf(`{"name":"Ic","actions":[{"id":"a","label":"A","run":"x","places":["global_nav"],"iconPath":%q}]}`, src)
+	if _, err := s.InstallManifest(raw, false); err != nil {
+		t.Fatal(err)
+	}
+	os.Remove(src)
+	p, err := s.PlacedActions("global_nav")
+	if err != nil || len(p) != 1 || p[0].Icon != "data:image/png;base64,cG5n" {
+		t.Fatal(p, err)
+	}
+	if err := s.UninstallApp("Ic"); err != nil {
+		t.Fatal(err)
+	}
+	if m, _ := filepath.Glob(filepath.Join(s.iconsDir(), "*")); len(m) != 0 {
+		t.Fatal("icon copy left behind", m)
+	}
+	for _, bad := range []string{
+		`{"name":"x","actions":[{"id":"a","label":"A","run":"x","places":["global_nav"],"iconPath":"rel.png"}]}`,
+		`{"name":"x","actions":[{"id":"a","label":"A","run":"x","places":["global_nav"],"iconPath":"/a.exe"}]}`,
+		`{"name":"x","actions":[{"id":"a","label":"A","run":"x","places":["global_nav"],"iconPath":"/a.png","icon":"data:image/png,x"}]}`,
+	} {
+		if _, err := ParseManifest(bad); err == nil {
+			t.Errorf("accepted %s", bad)
+		}
+	}
+}
+
+func TestAppBundleIconAndStateExport(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("needs plutil and sips")
+	}
+	app := "/System/Applications/Calculator.app"
+	if _, err := os.Stat(app); err != nil {
+		t.Skip(err)
+	}
+	src := newSvc(t)
+	src.Home = t.TempDir()
+	raw := fmt.Sprintf(`{"name":"Calc","actions":[{"id":"a","label":"A","run":"x","places":["global_nav"],"iconPath":%q}]}`, app)
+	if _, err := src.InstallManifest(raw, false); err != nil {
+		t.Fatal(err)
+	}
+	st, err := src.ExportState()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(st.Apps) != 1 || !strings.Contains(st.Apps[0].Manifest, `"icon": "data:image/png;base64,`) || strings.Contains(st.Apps[0].Manifest, "iconPath") {
+		t.Fatal(st.Apps)
+	}
+	dst := newSvc(t)
+	if _, err := dst.ImportState(st, nil); err != nil {
+		t.Fatal(err)
+	}
+	if p, _ := dst.PlacedActions("global_nav"); len(p) != 1 || !strings.HasPrefix(p[0].Icon, "data:image/png") {
+		t.Fatal(p)
 	}
 }
