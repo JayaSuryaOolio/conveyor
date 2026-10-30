@@ -21,6 +21,7 @@ mkdir -p "$BIN_DIR"
 GOBIN="$BIN_DIR" go install ./cmd/conveyor
 
 echo "==> App"
+git fetch --tags --quiet || echo "warning: could not fetch tags; version may be stale" >&2
 wails build -clean -ldflags "-X github.com/JayaSuryaOolio/conveyor/internal/ui.Version=$(git describe --tags --always --dirty)"
 git checkout -- frontend/dist/.gitkeep 2>/dev/null || true
 # wails rewrites these on every build with nothing worth committing (models.ts is real, so it stays).
