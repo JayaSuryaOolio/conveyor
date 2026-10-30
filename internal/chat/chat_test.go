@@ -74,3 +74,20 @@ func TestShowCommand(t *testing.T) {
 		}
 	}
 }
+
+func TestMoveAcceptsTo(t *testing.T) {
+	db, err := store.Open(filepath.Join(t.TempDir(), "c.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	repo, _ := store.AddRepo(db, store.Repo{Name: "a", Path: "/x/a", DefaultBranch: "main"})
+	tk, _ := store.CreateTask(db, store.Task{Title: "hello", Status: store.StatusReview}, []store.TaskRepo{{RepoID: repo.ID, IsPrimary: true, Branch: "t"}})
+	b := &bridge{&core.Service{DB: db}, t.Logf}
+	if got := b.command("move " + tk.Key + " to done"); strings.Contains(got, "warning") {
+		t.Fatal(got)
+	}
+	if got, _ := store.GetTaskByKey(db, tk.Key); got.Status != store.StatusDone {
+		t.Fatalf("status %s", got.Status)
+	}
+}

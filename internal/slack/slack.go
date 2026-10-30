@@ -247,6 +247,8 @@ func (s *Slack) event(payload []byte, handle func(chat.In) string) {
 	if _, ours := mine.Load(e.TS); ours {
 		return
 	}
+	// acknowledge at once; needs the reactions:write scope, best effort
+	call(bot, "reactions.add", map[string]any{"channel": e.Channel, "timestamp": e.TS, "name": "eyes"})
 	if e.ThreadTS == "" { // a plain DM is a command, so /conveyor is optional
 		s.post(map[string]any{"channel": e.Channel, "text": handle(chat.In{Text: e.Text})})
 		return
