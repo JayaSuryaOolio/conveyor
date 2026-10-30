@@ -278,3 +278,13 @@ func TestServiceManifest(t *testing.T) {
 		t.Fatalf("stopped %q", b)
 	}
 }
+
+func TestVSCodeManifestExample(t *testing.T) {
+	raw, err := os.ReadFile("../../docs/apps/vscode.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ParseManifest(string(raw)); err != nil {
+		t.Fatal(err)
+	}
+}
