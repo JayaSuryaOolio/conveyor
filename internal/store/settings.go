@@ -23,6 +23,7 @@ var Defaults = map[string]string{
 	"chat_transport":           "slack",
 	"chat_statuses":            "needs_you,review,done,failed", // which system status changes send a message
 	"slack_bot_token":          "",                             // xoxb-…: posts DMs (see internal/slack)
+	"slack_user_token":         "",                             // xoxp-…: optional; acts as you instead of a bot (wins over the bot token)
 	"slack_app_token":          "",                             // xapp-…: Socket Mode, scope connections:write
 	"slack_user_id":            "",                             // your Slack member id: the only user the bridge DMs or obeys
 }

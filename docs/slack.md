@@ -23,19 +23,62 @@ dispatcher, so it lives in `internal/slack` and runs inside the dispatcher (daem
 
 Socket Mode is used so Conveyor stays local: no public URL, no tunnel.
 
-## Setup (once)
-1. api.slack.com/apps → new app. Enable **Socket Mode**; create an app token with `connections:write`.
-2. Bot scopes: `chat:write`, `im:history`. Event subscription: `message.im`. App Home → allow messages.
-3. Slash command `/conveyor` (any URL; Socket Mode ignores it). Install to your workspace.
-4. `conveyor config set slack_bot_token xoxb-…`, `slack_app_token xapp-…`, `slack_user_id U…`
-   (your member id). Settings are re-read every few seconds; no restart.
+## Your own app, not the org's (user guide)
+
+A Slack app always lives in *a* workspace, but it is only yours if you keep it that way: create it
+from your own account and never distribute it. Nobody else can see or use it, and Conveyor only
+obeys your `slack_user_id`. Two choices:
+- **Personal workspace** (free, create at slack.com/get-started): fully yours, no org admin needed.
+- **Org workspace, private app**: create it under your account; if the org restricts app creation,
+  ask an admin or use a personal workspace.
+
+**Communication.** Conveyor opens an *outbound* WebSocket to Slack (Socket Mode) and posts via the Web
+API. Nothing listens on your machine, so no public URL or tunnel. Slack on your phone talks to Slack;
+Slack relays to the running Conveyor. Conveyor must be running (desktop app or daemon) to answer.
+
+**Yes, there is an App page.** Slack shows your app's Home tab; Conveyor publishes the command
+guide there once each time it connects (not on every open; Slack keeps it). Slack's website has no
+static editor for Home content, only the API can set it. The **Messages** tab is on too: that is
+the DM where you send commands and receive task updates. The app appears under *Apps* in your
+sidebar; pin it or message it once and it shows in your DMs.
+
+### Setup (once, ~3 min)
+1. api.slack.com/apps → **Create New App → From manifest**, pick the workspace, paste:
+```yaml
+display_information: {name: Conveyor}
+features:
+  app_home: {home_tab_enabled: true, messages_tab_enabled: true, messages_tab_read_only_enabled: false}
+  bot_user: {display_name: Conveyor}
+  slash_commands:
+    - {command: /conveyor, url: https://example.com, description: Control Conveyor tasks, usage_hint: help}
+oauth_config: {scopes: {bot: [chat:write, im:history]}}
+settings:
+  event_subscriptions: {bot_events: [message.im]}
+  socket_mode_enabled: true
+```
+2. **Basic Information → App-Level Tokens**: create one with `connections:write` (`xapp-…`).
+   **Install App** to get the bot token (`xoxb-…`). Your member ID: profile → ⋮ → Copy member ID.
+3. In Conveyor: Apps → Integrations → Slack, paste both tokens and the member ID (or
+   `conveyor config set slack_bot_token|slack_user_token|slack_app_token|slack_user_id …`). No restart.
+
+**Bot or you.** By default Conveyor posts as the bot. To act as yourself instead, add the
+`slack_user_token` (`xoxp-…`, Apps → Integrations → User token): in the manifest add
+`oauth_config.scopes.user: [chat:write, im:history, im:write]` and `settings.event_subscriptions.user_events: [message.im]`,
+reinstall, copy the *User OAuth Token*. When set it wins over the bot token. Caveat: Slack does not
+notify you for messages you post yourself, so on a phone you get no push for task updates in this mode.
 
 Only `slack_user_id` is DMed and obeyed; everyone else is ignored.
 
-## What works
-- Task moves (by the system) to `needs_you`/`review`/`done`/`failed` → DM with the agent's last
-  message and PR links. Replies in that thread become a comment (which requeues the task).
-- `/conveyor` lists tasks needing you · `/conveyor KEY text` comments · `/conveyor move KEY todo|done|cancelled`.
+## Using it from your phone
+Open the Conveyor DM. Type a plain message, no slash needed:
+- `help` - the guide (also on the app's Home tab)
+- `list` - tasks waiting on you
+- `CV-12 use the v2 API` - comment on CV-12 (requeues it)
+- `move CV-12 done` - todo | done | cancelled
+- Reply in a notification's thread - comments on that task.
+
+Notifications (needs_you, review, done, failed; pick which in settings) carry the agent's last
+message and PR links.
 
 ## Not done (add when needed)
 - Block Kit buttons/modals (needs interactive payload handling), channel mode, retry/dedupe

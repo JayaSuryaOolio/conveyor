@@ -48,3 +48,12 @@ func TestNotifyHonoursStatusesAndToggle(t *testing.T) {
 		t.Fatalf("replayed while disabled: %+v", f.got)
 	}
 }
+
+func TestHelpCommand(t *testing.T) {
+	b := &bridge{}
+	for _, in := range []string{"help", "?", "bogus"} {
+		if b.command(in) != Help {
+			t.Fatalf("%q did not return help", in)
+		}
+	}
+}

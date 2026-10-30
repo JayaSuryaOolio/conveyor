@@ -162,7 +162,10 @@ func Migrate(db *sql.DB) error {
 	if err := migrateAddTaskCreatedBy(db); err != nil {
 		return err
 	}
-	return migrateAddRepoSetupScript(db)
+	if err := migrateAddRepoSetupScript(db); err != nil {
+		return err
+	}
+	return migrateAddCommentSource(db)
 }
 
 // migrateAddRepoSetupScript adds repos.setup_script; existing repos get no script.
@@ -174,6 +177,20 @@ func migrateAddRepoSetupScript(db *sql.DB) error {
 	if n == 0 {
 		if _, err := db.Exec(`ALTER TABLE repos ADD COLUMN setup_script TEXT NOT NULL DEFAULT ''`); err != nil {
 			return fmt.Errorf("add repos.setup_script: %w", err)
+		}
+	}
+	return nil
+}
+
+// migrateAddCommentSource adds comments.source (where a comment came from, e.g. "slack"; "" = the app).
+func migrateAddCommentSource(db *sql.DB) error {
+	var n int
+	if err := db.QueryRow(`SELECT count(*) FROM pragma_table_info('comments') WHERE name='source'`).Scan(&n); err != nil {
+		return fmt.Errorf("check comments.source: %w", err)
+	}
+	if n == 0 {
+		if _, err := db.Exec(`ALTER TABLE comments ADD COLUMN source TEXT NOT NULL DEFAULT ''`); err != nil {
+			return fmt.Errorf("add comments.source: %w", err)
 		}
 	}
 	return nil

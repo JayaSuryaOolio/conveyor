@@ -186,16 +186,26 @@ func (b *bridge) handle(in In) string {
 }
 
 func (b *bridge) comment(key, body string) string {
-	if _, err := b.svc.AddComment(key, store.AuthorHuman, strings.TrimSpace(body), core.FollowUp); err != nil {
+	if _, err := b.svc.AddCommentVia(key, store.AuthorHuman, b.setting("chat_transport"), strings.TrimSpace(body), core.FollowUp); err != nil {
 		return "warning: " + err.Error()
 	}
 	return "comment added to " + key
 }
 
-// command runs "" or "list", "move KEY STATUS", or "KEY text".
+// Help is the command guide shown for "help" and unknown commands; transports may reuse it.
+const Help = `*Conveyor commands* (send as a DM, or /conveyor …)
+• list — tasks waiting on you
+• KEY your comment — comment on a task (e.g. CV-12 use the v2 API)
+• move KEY todo|done|cancelled — change status
+• help — this guide
+Replying in a task's thread also comments on it.`
+
+// command runs "help", "" or "list", "move KEY STATUS", or "KEY text".
 func (b *bridge) command(text string) string {
 	f := strings.Fields(text)
 	switch {
+	case len(f) > 0 && (f[0] == "help" || f[0] == "?"):
+		return Help
 	case len(f) == 0 || f[0] == "list":
 		ts, err := store.ListTasks(b.svc.DB, store.StatusNeedsYou, store.StatusReview)
 		if err != nil {
@@ -221,5 +231,5 @@ func (b *bridge) command(text string) string {
 	case len(f) >= 2:
 		return b.comment(f[0], strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(text), f[0])))
 	}
-	return "Usage: list · KEY comment… · move KEY todo|done|cancelled"
+	return Help
 }

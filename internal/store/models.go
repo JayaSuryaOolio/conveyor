@@ -89,6 +89,7 @@ type Comment struct {
 	TaskID          int64  `json:"task_id"`
 	Author          string `json:"author"`
 	Body            string `json:"body"`
+	Source          string `json:"source"` // "" = typed in the app, else the chat transport ("slack")
 	RunID           *int64 `json:"run_id"`
 	ConsumedByRunID *int64 `json:"consumed_by_run_id"`
 	CreatedAt       string `json:"created_at"`

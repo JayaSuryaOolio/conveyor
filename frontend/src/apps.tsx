@@ -206,7 +206,8 @@ function AppList() {
 }
 
 const SLACK: Field[] = [
-    {k: 'slack_bot_token', label: 'Bot token', desc: 'xoxb-... from OAuth & Permissions. Posts the DMs.', kind: 'secret'},
+    {k: 'slack_bot_token', label: 'Bot token', desc: 'xoxb-... from OAuth & Permissions. Posts the DMs as a bot.', kind: 'secret'},
+    {k: 'slack_user_token', label: 'User token (optional)', desc: 'xoxp-... Use instead of the bot token to act as you. Wins when both are set.', kind: 'secret'},
     {k: 'slack_app_token', label: 'App token', desc: 'xapp-... with connections:write. Opens the Socket Mode connection, so no public URL is needed.', kind: 'secret'},
     {k: 'slack_user_id', label: 'Your Slack member ID', desc: 'U... (profile > Copy member ID). Only this user is DMed and obeyed; everyone else is ignored.'},
 ]
@@ -224,8 +225,8 @@ function Integrations() {
                     <Stack gap="sm">
                         <Group justify="space-between">
                             <Group gap="xs"><Title order={5}>Slack</Title>
-                                <Badge variant="light" color={data.chat_enabled === 'on' && data.slack_bot_token && data.slack_app_token && data.slack_user_id ? 'green' : 'gray'}>
-                                    {data.chat_enabled !== 'on' ? 'off' : data.slack_bot_token && data.slack_app_token && data.slack_user_id ? 'on' : 'needs tokens'}
+                                <Badge variant="light" color={data.chat_enabled === 'on' && (data.slack_bot_token || data.slack_user_token) && data.slack_app_token && data.slack_user_id ? 'green' : 'gray'}>
+                                    {data.chat_enabled !== 'on' ? 'off' : (data.slack_bot_token || data.slack_user_token) && data.slack_app_token && data.slack_user_id ? 'on' : 'needs tokens'}
                                 </Badge>
                             </Group>
                             <Switch label="Send and listen" checked={data.chat_enabled === 'on'} onChange={e => set('chat_enabled', e.currentTarget.checked ? 'on' : 'off')}/>
