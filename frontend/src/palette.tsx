@@ -1,6 +1,6 @@
 import {useCallback, useEffect, useState} from 'react'
 import {ActionIcon, Badge, Group, Text, Tooltip} from '@mantine/core'
-import {Spotlight} from '@mantine/spotlight'
+import {Spotlight, spotlight} from '@mantine/spotlight'
 import '@mantine/spotlight/styles.css'
 import {IconFilter, IconLayoutKanban, IconRefresh, IconRobot, IconSearch, IconSettings} from '@tabler/icons-react'
 import {ListAgents, ListRepos, ListTasks} from '../wailsjs/go/ui/App'
@@ -46,6 +46,13 @@ export function CommandPalette({nav}: {nav: Nav}) {
         load(force).then(setRaw, () => {}).finally(() => setBusy(false))
     }, [])
     useEffect(() => refresh(false), [refresh])
+    useEffect(() => { // own listener: Mantine's `shortcut` skips focused inputs; capture so no field swallows it
+        const onKey = (e: KeyboardEvent) => {
+            if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); spotlight.toggle() }
+        }
+        window.addEventListener('keydown', onKey, true)
+        return () => window.removeEventListener('keydown', onKey, true)
+    }, [])
 
     const words = query.toLowerCase().split(/\s+/).filter(Boolean)
     const match = (s: string) => words.every(w => s.toLowerCase().includes(w))
@@ -70,7 +77,7 @@ export function CommandPalette({nav}: {nav: Nav}) {
     ].filter(g => g.items.length)
 
     return (
-        <Spotlight.Root query={query} onQueryChange={setQuery} shortcut="mod + K" scrollable maxHeight={420} onSpotlightClose={() => setQuery('')}>
+        <Spotlight.Root query={query} onQueryChange={setQuery} scrollable maxHeight={420} onSpotlightClose={() => setQuery('')}>
             <Spotlight.Search placeholder="Search tasks, filters, agents and settings" leftSection={<IconSearch size={18}/>} rightSectionPointerEvents="all"
                               rightSection={<Tooltip label="Reload (ignore cache)"><ActionIcon variant="subtle" color="gray" aria-label="Reload" loading={busy} onClick={() => refresh(true)}><IconRefresh size={16}/></ActionIcon></Tooltip>}/>
             <Spotlight.ActionsList>
