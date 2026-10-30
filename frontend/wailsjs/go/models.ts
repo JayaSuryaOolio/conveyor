@@ -316,6 +316,7 @@ export namespace store {
 	    task_id: number;
 	    author: string;
 	    body: string;
+	    source: string;
 	    run_id?: number;
 	    consumed_by_run_id?: number;
 	    created_at: string;
@@ -330,6 +331,7 @@ export namespace store {
 	        this.task_id = source["task_id"];
 	        this.author = source["author"];
 	        this.body = source["body"];
+	        this.source = source["source"];
 	        this.run_id = source["run_id"];
 	        this.consumed_by_run_id = source["consumed_by_run_id"];
 	        this.created_at = source["created_at"];

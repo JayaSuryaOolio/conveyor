@@ -186,7 +186,7 @@ func (b *bridge) handle(in In) string {
 }
 
 func (b *bridge) comment(key, body string) string {
-	if _, err := b.svc.AddComment(key, store.AuthorHuman, strings.TrimSpace(body), core.FollowUp); err != nil {
+	if _, err := b.svc.AddCommentVia(key, store.AuthorHuman, b.setting("chat_transport"), strings.TrimSpace(body), core.FollowUp); err != nil {
 		return "warning: " + err.Error()
 	}
 	return "comment added to " + key

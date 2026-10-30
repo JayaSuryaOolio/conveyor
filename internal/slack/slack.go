@@ -2,7 +2,8 @@
 // thread replies and /conveyor commands back, so the Slack mobile app is Conveyor's mobile
 // client. It uses Socket Mode, so no public URL is needed.
 //
-// Settings: slack_bot_token (xoxb-), slack_app_token (xapp-, scope connections:write) and
+// Settings: slack_bot_token (xoxb-) or slack_user_token (xoxp-, wins when set: the app acts as
+// you instead of as a bot), slack_app_token (xapp-, scope connections:write) and
 // slack_user_id (your member id: the only user the bridge talks to or listens to).
 package slack
 
@@ -14,6 +15,7 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/JayaSuryaOolio/conveyor/internal/chat"
@@ -25,14 +27,37 @@ const cursorKey = "slack_cursor"
 // api is the Slack Web API base (swapped in tests).
 var api = "https://slack.com/api/"
 
+// mine holds the ts of messages we posted. With a user token our own posts come back as
+// message events from slack_user_id, so they must not be handled as commands.
+var mine sync.Map
+
 // Slack is the transport; get reads settings.
 type Slack struct{ get func(string) string }
 
 // New is a chat.Factory.
 func New(get func(string) string) chat.Transport { return &Slack{get} }
 
+// token is the user token when set, else the bot token.
+func (s *Slack) token() string {
+	if t := s.get("slack_user_token"); t != "" {
+		return t
+	}
+	return s.get("slack_bot_token")
+}
+
+// post sends chat.postMessage and remembers its ts (see mine).
+func (s *Slack) post(args map[string]any) error {
+	r, err := call(s.token(), "chat.postMessage", args)
+	if err == nil {
+		if ts, ok := r["ts"].(string); ok {
+			mine.Store(ts, true)
+		}
+	}
+	return err
+}
+
 func (s *Slack) Ready() bool {
-	return s.get("slack_bot_token") != "" && s.get("slack_app_token") != "" && s.get("slack_user_id") != ""
+	return s.token() != "" && s.get("slack_app_token") != "" && s.get("slack_user_id") != ""
 }
 
 // call posts a JSON Web API method with token and returns the decoded response.
@@ -86,8 +111,7 @@ func message(m chat.Msg) string {
 }
 
 func (s *Slack) Send(m chat.Msg) error {
-	_, err := call(s.get("slack_bot_token"), "chat.postMessage", map[string]any{"channel": s.get("slack_user_id"), "text": message(m)})
-	return err
+	return s.post(map[string]any{"channel": s.get("slack_user_id"), "text": message(m)})
 }
 
 // ---- inbound: Socket Mode ----
@@ -111,7 +135,7 @@ func (s *Slack) Listen(ctx context.Context, h func(chat.In) string) error {
 	}
 	defer c.Close()
 	// the Home tab keeps its content, so publishing the guide once per connection is enough
-	call(s.get("slack_bot_token"), "views.publish", map[string]any{"user_id": s.get("slack_user_id"), "view": map[string]any{"type": "home", "blocks": []any{
+	call(s.token(), "views.publish", map[string]any{"user_id": s.get("slack_user_id"), "view": map[string]any{"type": "home", "blocks": []any{
 		map[string]any{"type": "section", "text": map[string]any{"type": "mrkdwn", "text": chat.Help}},
 	}}})
 	go func() { <-ctx.Done(); c.Close() }()
@@ -155,24 +179,27 @@ func keyOf(text string) string {
 func (s *Slack) event(payload []byte, handle func(chat.In) string) {
 	var p struct {
 		Event struct {
-			Type, Subtype, User, Text, Channel string
-			BotID                              string `json:"bot_id"`
-			ThreadTS                           string `json:"thread_ts"`
+			Type, Subtype, User, Text, Channel, TS string
+			BotID                                  string `json:"bot_id"`
+			ThreadTS                               string `json:"thread_ts"`
 		} `json:"event"`
 	}
 	if json.Unmarshal(payload, &p) != nil {
 		return
 	}
 	e := p.Event
-	bot := s.get("slack_bot_token")
+	bot := s.token()
 	if e.User != s.get("slack_user_id") {
 		return
 	}
 	if e.Type != "message" || e.Subtype != "" || e.BotID != "" {
 		return
 	}
+	if _, ours := mine.Load(e.TS); ours {
+		return
+	}
 	if e.ThreadTS == "" { // a plain DM is a command, so /conveyor is optional
-		call(bot, "chat.postMessage", map[string]any{"channel": e.Channel, "text": handle(chat.In{Text: e.Text})})
+		s.post(map[string]any{"channel": e.Channel, "text": handle(chat.In{Text: e.Text})})
 		return
 	}
 	h, err := call(bot, "conversations.history", map[string]any{"channel": e.Channel, "latest": e.ThreadTS, "inclusive": true, "limit": 1})
@@ -190,5 +217,5 @@ func (s *Slack) event(payload []byte, handle func(chat.In) string) {
 		return
 	}
 	reply := ":speech_balloon: " + handle(chat.In{Key: key, Text: e.Text})
-	call(bot, "chat.postMessage", map[string]any{"channel": e.Channel, "thread_ts": e.ThreadTS, "text": reply})
+	s.post(map[string]any{"channel": e.Channel, "thread_ts": e.ThreadTS, "text": reply})
 }

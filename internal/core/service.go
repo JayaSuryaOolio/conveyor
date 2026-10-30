@@ -145,11 +145,16 @@ const (
 // needs_you, review, failed or done requeues it as todo; once one of its
 // PRs is merged, after decides instead (see AfterMerge).
 func (s *Service) AddComment(key, author, body string, after AfterMerge) (store.Comment, error) {
+	return s.AddCommentVia(key, author, "", body, after)
+}
+
+// AddCommentVia is AddComment recording where the comment came from (e.g. "slack").
+func (s *Service) AddCommentVia(key, author, source, body string, after AfterMerge) (store.Comment, error) {
 	t, err := store.GetTaskByKey(s.DB, key)
 	if err != nil {
 		return store.Comment{}, err
 	}
-	c, err := store.AddComment(s.DB, store.Comment{TaskID: t.ID, Author: author, Body: body})
+	c, err := store.AddComment(s.DB, store.Comment{TaskID: t.ID, Author: author, Source: source, Body: body})
 	if err != nil {
 		return store.Comment{}, err
 	}

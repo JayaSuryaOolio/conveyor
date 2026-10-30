@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-const commentCols = `id, task_id, author, body, run_id, consumed_by_run_id, created_at`
+const commentCols = `id, task_id, author, body, source, run_id, consumed_by_run_id, created_at`
 
 func queryComments(db dbtx, where string, args ...any) ([]Comment, error) {
 	rows, err := db.Query(`SELECT `+commentCols+` FROM comments WHERE `+where+` ORDER BY id`, args...)
@@ -16,7 +16,7 @@ func queryComments(db dbtx, where string, args ...any) ([]Comment, error) {
 	var out []Comment
 	for rows.Next() {
 		var c Comment
-		if err := rows.Scan(&c.ID, &c.TaskID, &c.Author, &c.Body, &c.RunID, &c.ConsumedByRunID, &c.CreatedAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.TaskID, &c.Author, &c.Body, &c.Source, &c.RunID, &c.ConsumedByRunID, &c.CreatedAt); err != nil {
 			return nil, fmt.Errorf("scan comment: %w", err)
 		}
 		out = append(out, c)
@@ -27,8 +27,8 @@ func queryComments(db dbtx, where string, args ...any) ([]Comment, error) {
 // AddComment inserts a comment.
 func AddComment(db *sql.DB, c Comment) (Comment, error) {
 	c.CreatedAt = now()
-	res, err := db.Exec(`INSERT INTO comments (task_id, author, body, run_id, created_at) VALUES (?,?,?,?,?)`,
-		c.TaskID, c.Author, c.Body, c.RunID, c.CreatedAt)
+	res, err := db.Exec(`INSERT INTO comments (task_id, author, body, source, run_id, created_at) VALUES (?,?,?,?,?,?)`,
+		c.TaskID, c.Author, c.Body, c.Source, c.RunID, c.CreatedAt)
 	if err != nil {
 		return Comment{}, fmt.Errorf("add comment: %w", err)
 	}
