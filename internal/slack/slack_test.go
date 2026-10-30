@@ -35,3 +35,24 @@ func TestUserTokenWinsAndOwnPostsIgnored(t *testing.T) {
 		return ""
 	})
 }
+
+func TestButtonsAndInteractive(t *testing.T) {
+	if n := len(buttons(chat.Msg{Key: "CV-7", Status: "review", PRs: []chat.Link{{Name: "r", URL: "u"}}})); n != 3 {
+		t.Fatalf("review wants Done, Requeue, PR; got %d", n)
+	}
+	if n := len(buttons(chat.Msg{Key: "CV-7", Status: "done"})); n != 0 {
+		t.Fatalf("done without PR wants no buttons; got %d", n)
+	}
+	s := &Slack{func(k string) string { return map[string]string{"slack_user_id": "U1"}[k] }}
+	got := ""
+	h := func(in chat.In) string { got = in.Text; return "ok" }
+	s.interactive([]byte(`{"type":"block_actions","user":{"id":"U2"},"actions":[{"action_id":"move_done","value":"CV-7"}]}`), h)
+	if got != "" {
+		t.Fatal("click from another user obeyed")
+	}
+	api = "http://127.0.0.1:1/" // post fails fast; only the handled command matters
+	s.interactive([]byte(`{"type":"block_actions","user":{"id":"U1"},"actions":[{"action_id":"move_done","value":"CV-7"}]}`), h)
+	if got != "move CV-7 done" {
+		t.Fatalf("got %q", got)
+	}
+}
