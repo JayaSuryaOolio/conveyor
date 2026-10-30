@@ -147,7 +147,8 @@ func (a *App) ShowError(msg string) {
 
 // Confirm asks a yes/no question in a native dialog (window.confirm always returns false in the macOS webview).
 func (a *App) Confirm(msg string) (bool, error) {
-	r, err := runtime.MessageDialog(a.ctx, runtime.MessageDialogOptions{Type: runtime.QuestionDialog, Title: "Conveyor", Message: msg})
+	r, err := runtime.MessageDialog(a.ctx, runtime.MessageDialogOptions{Type: runtime.QuestionDialog, Title: "Conveyor", Message: msg,
+		Buttons: []string{"Yes", "No"}, DefaultButton: "No", CancelButton: "No"}) // darwin returns "" without explicit Buttons
 	return r == "Yes", err
 }
 
