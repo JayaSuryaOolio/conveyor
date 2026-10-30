@@ -2,10 +2,12 @@ package core
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -36,6 +38,9 @@ type ManifestAction struct {
 	// Icon, a data:image/ URL (e.g. an inline SVG), shows the action as an icon button with
 	// Label as its tooltip.
 	Icon string `json:"icon,omitempty"`
+	// IconPath is an image file (absolute or ~/, png/jpg/gif/webp/svg, <= 1 MB) used instead of
+	// Icon. Install copies it to <home>/app-icons and the stored manifest points at the copy.
+	IconPath string `json:"iconPath,omitempty"`
 	// Services (v2), keyed by place, makes the action a long-running service there: Status
 	// (exit 0 = running) lights the button's dot and a click then runs Stop instead of Run.
 	// Each place gets its own service; places without one are plain buttons. Excludes Output.
@@ -144,6 +149,14 @@ func ParseManifest(raw string) (Manifest, error) {
 		if a.Icon != "" && (!strings.HasPrefix(a.Icon, "data:image/") || strings.Contains(a.Icon, "#")) {
 			return m, fmt.Errorf("manifest: action %q: icon must be a data:image/ URL (write # as %%23)", a.ID)
 		}
+		if a.IconPath != "" {
+			if a.Icon != "" {
+				return m, fmt.Errorf("manifest: action %q: set icon or iconPath, not both", a.ID)
+			}
+			if _, ok := iconTypes[strings.ToLower(filepath.Ext(a.IconPath))]; !ok || !filepath.IsAbs(iconSrc(a.IconPath)) {
+				return m, fmt.Errorf("manifest: action %q: iconPath must be an absolute (or ~/) png, jpg, gif, webp or svg file", a.ID)
+			}
+		}
 		scripts := a.Run
 		for p, sv := range a.Services {
 			if !contains(a.Places, p) {
@@ -167,6 +180,27 @@ func ParseManifest(raw string) (Manifest, error) {
 	}
 	return m, nil
 }
+
+var iconTypes = map[string]string{".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp", ".svg": "image/svg+xml"}
+
+// iconSrc expands a leading ~/ in an iconPath.
+func iconSrc(p string) string {
+	if h, err := os.UserHomeDir(); err == nil && strings.HasPrefix(p, "~/") {
+		return filepath.Join(h, p[2:])
+	}
+	return p
+}
+
+// iconURL returns the image at path as a data: URL, "" if it cannot be read.
+func iconURL(path string) string {
+	b, err := os.ReadFile(iconSrc(path))
+	if err != nil {
+		return ""
+	}
+	return "data:" + iconTypes[strings.ToLower(filepath.Ext(path))] + ";base64," + base64.StdEncoding.EncodeToString(b)
+}
+
+func (s *Service) iconsDir() string { return filepath.Join(s.Home, "app-icons") }
 
 func contains(l []string, s string) bool {
 	for _, x := range l {
@@ -192,11 +226,41 @@ func (s *Service) InstallManifest(raw string, replace bool) (store.App, error) {
 	if err != nil {
 		return store.App{}, err
 	}
+	// read icons before a replace uninstalls the copies an exported manifest points at
+	icons := map[int][]byte{}
+	for i, a := range m.Actions {
+		if a.IconPath == "" {
+			continue
+		}
+		b, err := os.ReadFile(iconSrc(a.IconPath))
+		if err != nil || len(b) > 1<<20 {
+			return store.App{}, fmt.Errorf("manifest: action %q: iconPath must be a readable file of at most 1 MB (%v)", a.ID, err)
+		}
+		icons[i] = b
+	}
 	if _, err := store.GetApp(s.DB, m.Name); err == nil && replace {
 		// ponytail: not atomic; a failed install after this leaves the old app gone
 		if err := s.UninstallApp(m.Name); err != nil {
 			return store.App{}, err
 		}
+	}
+	if len(icons) > 0 {
+		if err := os.MkdirAll(s.iconsDir(), 0o755); err != nil {
+			return store.App{}, err
+		}
+		for i, b := range icons {
+			x := &m.Actions[i]
+			p := filepath.Join(s.iconsDir(), nonAlnumPath.ReplaceAllString(m.Name, "-")+"-"+x.ID+strings.ToLower(filepath.Ext(x.IconPath)))
+			if err := os.WriteFile(p, b, 0o644); err != nil {
+				return store.App{}, err
+			}
+			x.IconPath = p
+		}
+		out, err := json.MarshalIndent(m, "", "  ")
+		if err != nil {
+			return store.App{}, err
+		}
+		raw = string(out)
 	}
 	a, err := store.CreateApp(s.DB, store.App{Name: m.Name, Manifest: raw})
 	if err != nil {
@@ -231,6 +295,11 @@ func (s *Service) UninstallApp(name string) error {
 		if m, err := ParseManifest(a.Manifest); err == nil {
 			for _, x := range m.Automations {
 				_ = store.DeleteAutomation(s.DB, x.Name)
+			}
+			for _, x := range m.Actions {
+				if x.IconPath != "" && filepath.Dir(x.IconPath) == s.iconsDir() {
+					_ = os.Remove(x.IconPath)
+				}
 			}
 			for _, g := range m.Agents {
 				_ = os.Remove(userAgentsDir() + "/" + g.Name + ".md")
@@ -268,7 +337,11 @@ func (s *Service) PlacedActions(place string) ([]Placed, error) {
 		for _, x := range m.Actions {
 			if contains(x.Places, place) {
 				_, svc := x.Services[place]
-				out = append(out, Placed{a.Name, x.ID, x.Label, x.Output, svc, x.Icon})
+				icon := x.Icon
+				if x.IconPath != "" {
+					icon = iconURL(x.IconPath)
+				}
+				out = append(out, Placed{a.Name, x.ID, x.Label, x.Output, svc, icon})
 			}
 		}
 	}

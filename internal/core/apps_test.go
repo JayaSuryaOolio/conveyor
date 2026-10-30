@@ -288,3 +288,34 @@ func TestVSCodeManifestExample(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestManifestIconPath(t *testing.T) {
+	s := newSvc(t)
+	s.Home = t.TempDir()
+	src := filepath.Join(t.TempDir(), "i.png")
+	os.WriteFile(src, []byte("png"), 0o644)
+	raw := fmt.Sprintf(`{"name":"Ic","actions":[{"id":"a","label":"A","run":"x","places":["global_nav"],"iconPath":%q}]}`, src)
+	if _, err := s.InstallManifest(raw, false); err != nil {
+		t.Fatal(err)
+	}
+	os.Remove(src)
+	p, err := s.PlacedActions("global_nav")
+	if err != nil || len(p) != 1 || p[0].Icon != "data:image/png;base64,cG5n" {
+		t.Fatal(p, err)
+	}
+	if err := s.UninstallApp("Ic"); err != nil {
+		t.Fatal(err)
+	}
+	if m, _ := filepath.Glob(filepath.Join(s.iconsDir(), "*")); len(m) != 0 {
+		t.Fatal("icon copy left behind", m)
+	}
+	for _, bad := range []string{
+		`{"name":"x","actions":[{"id":"a","label":"A","run":"x","places":["global_nav"],"iconPath":"rel.png"}]}`,
+		`{"name":"x","actions":[{"id":"a","label":"A","run":"x","places":["global_nav"],"iconPath":"/a.exe"}]}`,
+		`{"name":"x","actions":[{"id":"a","label":"A","run":"x","places":["global_nav"],"iconPath":"/a.png","icon":"data:image/png,x"}]}`,
+	} {
+		if _, err := ParseManifest(bad); err == nil {
+			t.Errorf("accepted %s", bad)
+		}
+	}
+}
