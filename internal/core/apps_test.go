@@ -340,3 +340,23 @@ func TestAppBundleIconAndStateExport(t *testing.T) {
 		t.Fatal(p)
 	}
 }
+
+func TestManifestFromApp(t *testing.T) {
+	dir := t.TempDir()
+	os.Mkdir(filepath.Join(dir, "Visual Studio Code.app"), 0o755)
+	old := appDirs
+	appDirs = func() []string { return []string{dir} }
+	defer func() { appDirs = old }()
+	raw, err := ManifestFromApp("Visual Studio Code")
+	if err != nil {
+		t.Fatal(err)
+	}
+	m, _ := ParseManifest(raw)
+	a := m.Actions[0]
+	if a.ID != "visual-studio-code" || a.Run != "open -a 'Visual Studio Code' ${{ worktree.path }}" || a.Places[0] != "task_sidebar" || !strings.HasSuffix(a.IconPath, ".app") {
+		t.Fatalf("%+v", a)
+	}
+	if _, err := ManifestFromApp("Nope"); err == nil {
+		t.Fatal("want not found")
+	}
+}
