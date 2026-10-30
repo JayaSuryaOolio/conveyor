@@ -36,8 +36,11 @@ obeys your `slack_user_id`. Two choices:
 API. Nothing listens on your machine, so no public URL or tunnel. Slack on your phone talks to Slack;
 Slack relays to the running Conveyor. Conveyor must be running (desktop app or daemon) to answer.
 
-**Yes, there is an App page.** Slack shows your app's Home tab; Conveyor fills it with the command
-guide whenever you open it (Apps → Conveyor → Home).
+**Yes, there is an App page.** Slack shows your app's Home tab; Conveyor publishes the command
+guide there once each time it connects (not on every open; Slack keeps it). Slack's website has no
+static editor for Home content, only the API can set it. The **Messages** tab is on too: that is
+the DM where you send commands and receive task updates. The app appears under *Apps* in your
+sidebar; pin it or message it once and it shows in your DMs.
 
 ### Setup (once, ~3 min)
 1. api.slack.com/apps → **Create New App → From manifest**, pick the workspace, paste:
@@ -50,7 +53,7 @@ features:
     - {command: /conveyor, url: https://example.com, description: Control Conveyor tasks, usage_hint: help}
 oauth_config: {scopes: {bot: [chat:write, im:history]}}
 settings:
-  event_subscriptions: {bot_events: [app_home_opened, message.im]}
+  event_subscriptions: {bot_events: [message.im]}
   socket_mode_enabled: true
 ```
 2. **Basic Information → App-Level Tokens**: create one with `connections:write` (`xapp-…`).
