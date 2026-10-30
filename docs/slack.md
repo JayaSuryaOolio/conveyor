@@ -38,7 +38,7 @@ Slack relays to the running Conveyor. Conveyor must be running (desktop app or d
 
 **Yes, there is an App page.** Slack shows your app's Home tab; Conveyor publishes the command
 guide there once each time it connects (not on every open; Slack keeps it). Slack's website has no
-static editor for Home content, only the API can set it. The **Messages** tab is on too: that is
+static editor for Home content, only the API can set it. It is Block Kit (header, dividers, sections), not HTML. The **Messages** tab is on too: that is
 the DM where you send commands and receive task updates. The app appears under *Apps* in your
 sidebar; pin it or message it once and it shows in your DMs.
 
@@ -64,8 +64,9 @@ settings:
 **Bot or you.** By default Conveyor posts as the bot. To act as yourself instead, add the
 `slack_user_token` (`xoxp-…`, Apps → Integrations → User token): in the manifest add
 `oauth_config.scopes.user: [chat:write, im:history, im:write]` and `settings.event_subscriptions.user_events: [message.im]`,
-reinstall, copy the *User OAuth Token*. When set it wins over the bot token. Caveat: Slack does not
-notify you for messages you post yourself, so on a phone you get no push for task updates in this mode.
+reinstall, copy the *User OAuth Token*, then switch on **Act as me** (`slack_impersonate on`, default
+off). The token is only used while the switch is on. Caveat: messages then land in your own self-DM
+and Slack does not notify you for messages you post yourself, so you get no push in this mode.
 
 Only `slack_user_id` is DMed and obeyed; everyone else is ignored.
 
@@ -78,7 +79,9 @@ Open the Conveyor DM. Type a plain message, no slash needed:
 - Reply in a notification's thread - comments on that task.
 
 Notifications (needs_you, review, done, failed; pick which in settings) carry the agent's last
-message and PR links.
+message (rendered as Markdown via a Block Kit `markdown` block) and PR links. Each task gets one
+thread: later notifications for it, and the agent's answers to your thread replies, post into it.
+Thread roots are kept in memory, so after a restart a task's next update starts a new thread.
 
 ## Not done (add when needed)
 - Block Kit buttons/modals (needs interactive payload handling), channel mode, retry/dedupe
