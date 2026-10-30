@@ -217,7 +217,7 @@ func TestResumeVsFresh(t *testing.T) {
 		peak   int64
 		body   string
 		resume bool
-	}{{1000, "more", true}, {100000, "more", false}, {1000, "/fresh\nstart over", false}, {100000, "/resume please", true}} {
+	}{{1000, "more", true}, {100000, "more", false}, {1000, "#fresh\nstart over", false}, {100000, "#resume please", true}} {
 		e := setup(t)
 		tk := e.task(t, "t", 0)
 		r, _ := store.CreateRun(e.db, store.Run{TaskID: tk.ID, Kind: "auto", Mode: "fresh", Status: "launching"})

@@ -49,7 +49,7 @@ Conveyor is a local kanban that runs tasks through Claude Code background sessio
 
 Most of a run's cost is the context it starts with, so Conveyor chooses that context for each run.
 
-**Resume or start fresh.** If the last session ended under `resume_threshold` (60K tokens), the next comment resumes it and sends only the new comments. Above that, a fresh session starts from the brief, which is roughly 15–20K tokens instead of 78–150K. Start a comment with `/fresh` or `/resume` to choose yourself.
+**Resume or start fresh.** If the last session ended under `resume_threshold` (60K tokens), the next comment resumes it and sends only the new comments. Above that, a fresh session starts from the brief, which is roughly 15–20K tokens instead of 78–150K. Start a comment with `#fresh` or `#resume` to choose yourself.
 
 **A short brief.** `BRIEF.md` is a few KB: the description, the acceptance criteria and their state, the last run's next step, one-line summaries of past runs, and your comments. The full thread is one command away.
 

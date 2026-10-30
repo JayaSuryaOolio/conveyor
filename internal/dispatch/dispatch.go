@@ -425,7 +425,7 @@ func (d *Dispatcher) model(task store.Task) string {
 
 func fileExists(p string) bool { _, err := os.Stat(p); return err == nil }
 
-// sessionDirective returns "fresh" or "resume" when a pending human comment starts with /fresh or /resume
+// sessionDirective returns "fresh" or "resume" when a pending human comment starts with #fresh or #resume
 // (the latest wins), else "" (decide by resume_threshold).
 func sessionDirective(delta []store.Comment) string {
 	mode := ""
@@ -435,9 +435,9 @@ func sessionDirective(delta []store.Comment) string {
 		}
 		switch f := strings.Fields(c.Body); {
 		case len(f) == 0:
-		case f[0] == "/fresh":
+		case f[0] == "#fresh":
 			mode = "fresh"
-		case f[0] == "/resume":
+		case f[0] == "#resume":
 			mode = "resume"
 		}
 	}
