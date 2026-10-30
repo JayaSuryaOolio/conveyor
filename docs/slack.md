@@ -39,5 +39,5 @@ Only `slack_user_id` is DMed and obeyed; everyone else is ignored.
 
 ## Not done (add when needed)
 - Block Kit buttons/modals (needs interactive payload handling), channel mode, retry/dedupe
-  beyond the event cursor (`slack_cursor`), a Settings UI field for the tokens, token storage in
+  beyond the event cursor (`slack_cursor`), token storage in
   Keychain (tokens sit in the local settings table like other settings).

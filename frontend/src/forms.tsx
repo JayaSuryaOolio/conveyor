@@ -1,5 +1,5 @@
 import {useState} from 'react'
-import {ActionIcon, Button, Checkbox, Code, Group, Modal, MultiSelect, ScrollArea, SegmentedControl, Select, SelectProps, Stack, Table, Tabs, Text, TextInput, Textarea, Title, Tooltip} from '@mantine/core'
+import {ActionIcon, Button, Checkbox, Code, Group, Modal, MultiSelect, PasswordInput, ScrollArea, SegmentedControl, Select, SelectProps, Stack, Table, Tabs, Text, TextInput, Textarea, Title, Tooltip} from '@mantine/core'
 import {IconAdjustments} from '@tabler/icons-react'
 import {AddRepo, CreateTask, ExportState, GetPromptDefaults, GetTask, GetSettings, ImportState, ListAgents, ListModels, ListRepos, ListTasks, PreviewBrief, SetRepoSetupScript, SetSetting, SetTaskAgent, SetTaskModel} from '../wailsjs/go/ui/App'
 import {core, store} from '../wailsjs/go/models'
@@ -126,7 +126,7 @@ function RepoRow({r, reload}: {r: store.Repo; reload: () => void}) {
     )
 }
 
-type Field = {k: string; label: string; desc: string; kind?: "area" | "md" | "model"}
+export type Field = {k: string; label: string; desc: string; kind?: "area" | "md" | "model" | "secret"}
 
 const TABS: {name: string; fields: Field[]}[] = [
     {name: "General", fields: [
@@ -198,7 +198,7 @@ function StateButtons({reload}: {reload: () => void}) {
     )
 }
 
-function SettingRow({f, v, ph, reload}: {f: Field; v: string; ph?: string; reload: () => void}) {
+export function SettingRow({f, v, ph, reload}: {f: Field; v: string; ph?: string; reload: () => void}) {
     const [val, setVal] = useState(v)
     const props = {style: {flex: 1}, label: f.label, description: f.desc, placeholder: ph}
     return (
@@ -208,6 +208,7 @@ function SettingRow({f, v, ph, reload}: {f: Field; v: string; ph?: string; reloa
                 <MarkdownEditor minRows={4} value={val} onChange={setVal}/>
             </Stack>
                 : f.kind === "model" ? <ModelSelect {...props} value={val} onChange={setVal}/>
+                : f.kind === "secret" ? <PasswordInput {...props} value={val} onChange={e => setVal(e.target.value)}/>
                 : f.kind === "area" ? <Textarea {...props} autosize minRows={2} maxRows={10} value={val} onChange={e => setVal(e.target.value)}/>
                 : <TextInput {...props} value={val} onChange={e => setVal(e.target.value)}/>}
             <Button disabled={val === v} onClick={() => SetSetting(f.k, val).then(reload, errMsg)}>Save</Button>

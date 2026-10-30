@@ -1,9 +1,10 @@
 import {useEffect, useRef, useState} from 'react'
-import {ActionIcon, Badge, Button, Checkbox, Code, FileButton, Group, Modal, MultiSelect, Paper, Stack, Switch, Table, Text, TextInput, Textarea, Title} from '@mantine/core'
+import {ActionIcon, Badge, Button, Checkbox, Code, FileButton, Group, Modal, MultiSelect, Paper, Stack, Switch, Table, Tabs, Text, TextInput, Textarea, Title} from '@mantine/core'
 import {IconDownload, IconPencil, IconPlayerPlay, IconPlus, IconPuzzle, IconTransform, IconTrash, IconUpload} from '@tabler/icons-react'
-import {AddApp, AppIcons, AppPresets, Confirm, ConvertApp, DeleteApp, ExportApp, Home, InstallManifest, InstallPreset, ListApps, ManifestSchema, RenderApp, TestApp, UpdateApp, UserHooks, ValidateManifest} from '../wailsjs/go/ui/App'
+import {AddApp, GetSettings, SetSetting, AppIcons, AppPresets, Confirm, ConvertApp, DeleteApp, ExportApp, Home, InstallManifest, InstallPreset, ListApps, ManifestSchema, RenderApp, TestApp, UpdateApp, UserHooks, ValidateManifest} from '../wailsjs/go/ui/App'
 import {store} from '../wailsjs/go/models'
 import {AppIcon, errMsg, runApp, toast} from './components'
+import {Field, SettingRow} from './forms'
 import {useData} from './util'
 
 function AppForm({initial, onClose}: {initial: store.App; onClose: (saved: boolean) => void}) {
@@ -135,7 +136,7 @@ function AgentHooks() {
     )
 }
 
-export function Apps() {
+function AppList() {
     const {data, error, reload} = useData(ListApps, [])
     const {data: presets} = useData(AppPresets, [])
     const {data: icons} = useData(AppIcons, [])
@@ -201,5 +202,54 @@ export function Apps() {
                 {form && <AppForm initial={form} onClose={saved => { setForm(undefined); if (saved) reload() }}/>}
             </Modal>
         </Stack>
+    )
+}
+
+const SLACK: Field[] = [
+    {k: 'slack_bot_token', label: 'Bot token', desc: 'xoxb-... from OAuth & Permissions. Posts the DMs.', kind: 'secret'},
+    {k: 'slack_app_token', label: 'App token', desc: 'xapp-... with connections:write. Opens the Socket Mode connection, so no public URL is needed.', kind: 'secret'},
+    {k: 'slack_user_id', label: 'Your Slack member ID', desc: 'U... (profile > Copy member ID). Only this user is DMed and obeyed; everyone else is ignored.'},
+]
+const STATUSES = ['needs_you', 'review', 'done', 'failed']
+
+/** Chat bridge: DMs task status and takes replies, comments and /conveyor commands from a chat app (docs/slack.md). */
+function Integrations() {
+    const {data, error, reload} = useData(GetSettings, [])
+    const set = (k: string, v: string) => SetSetting(k, v).then(reload, errMsg)
+    return (
+        <Stack>
+            {error && <Text c="red">{error}</Text>}
+            {data && (
+                <Paper withBorder p="md" radius="md">
+                    <Stack gap="sm">
+                        <Group justify="space-between">
+                            <Group gap="xs"><Title order={5}>Slack</Title>
+                                <Badge variant="light" color={data.chat_enabled === 'on' && data.slack_bot_token && data.slack_app_token && data.slack_user_id ? 'green' : 'gray'}>
+                                    {data.chat_enabled !== 'on' ? 'off' : data.slack_bot_token && data.slack_app_token && data.slack_user_id ? 'on' : 'needs tokens'}
+                                </Badge>
+                            </Group>
+                            <Switch label="Send and listen" checked={data.chat_enabled === 'on'} onChange={e => set('chat_enabled', e.currentTarget.checked ? 'on' : 'off')}/>
+                        </Group>
+                        <Text size="sm" c="dimmed">
+                            Answer needs_you questions, get PR links and run <Code>/conveyor list|comment|move</Code> from the Slack mobile app.
+                            Create the Slack app as described in <Code>docs/slack.md</Code>. Changes apply without a restart.
+                        </Text>
+                        {SLACK.map(f => <SettingRow key={f.k} f={f} v={data[f.k] ?? ''} reload={reload}/>)}
+                        <MultiSelect label="Notify on" description="Task statuses that send a DM." data={STATUSES} value={(data.chat_statuses ?? '').split(',').filter(Boolean)}
+                                     onChange={v => set('chat_statuses', v.join(','))}/>
+                    </Stack>
+                </Paper>
+            )}
+        </Stack>
+    )
+}
+
+export function Apps() {
+    return (
+        <Tabs defaultValue="apps" keepMounted={false}>
+            <Tabs.List mb="md"><Tabs.Tab value="apps">Apps</Tabs.Tab><Tabs.Tab value="integrations">Integrations</Tabs.Tab></Tabs.List>
+            <Tabs.Panel value="apps"><AppList/></Tabs.Panel>
+            <Tabs.Panel value="integrations"><Stack maw={900}><Title order={3}>Integrations</Title><Integrations/></Stack></Tabs.Panel>
+        </Tabs>
     )
 }
