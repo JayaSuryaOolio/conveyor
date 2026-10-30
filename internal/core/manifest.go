@@ -38,7 +38,7 @@ type ManifestAction struct {
 	// Icon, a data:image/ URL (e.g. an inline SVG), shows the action as an icon button with
 	// Label as its tooltip.
 	Icon string `json:"icon,omitempty"`
-	// IconPath is an image file (absolute or ~/, png/jpg/gif/webp/svg, <= 1 MB) or a macOS .app
+	// IconPath is an image file (absolute or ~/, png/jpg/gif/webp/svg/icns, <= 1 MB) or a macOS .app
 	// bundle (its icon is extracted) used instead of Icon. Install copies it to <home>/app-icons
 	// as an image and the stored manifest points at the copy.
 	IconPath string `json:"iconPath,omitempty"`
@@ -155,7 +155,7 @@ func ParseManifest(raw string) (Manifest, error) {
 				return m, fmt.Errorf("manifest: action %q: set icon or iconPath, not both", a.ID)
 			}
 			if _, ok := iconTypes[strings.ToLower(filepath.Ext(a.IconPath))]; !ok || !filepath.IsAbs(iconSrc(a.IconPath)) {
-				return m, fmt.Errorf("manifest: action %q: iconPath must be an absolute (or ~/) png, jpg, gif, webp or svg file, or .app bundle", a.ID)
+				return m, fmt.Errorf("manifest: action %q: iconPath must be an absolute (or ~/) png, jpg, gif, webp, svg or icns file, or .app bundle", a.ID)
 			}
 		}
 		scripts := a.Run
@@ -182,7 +182,7 @@ func ParseManifest(raw string) (Manifest, error) {
 	return m, nil
 }
 
-var iconTypes = map[string]string{".app": "", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp", ".svg": "image/svg+xml"}
+var iconTypes = map[string]string{".app": "", ".icns": "", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp", ".svg": "image/svg+xml"}
 
 // iconSrc expands a leading ~/ in an iconPath.
 func iconSrc(p string) string {
@@ -203,7 +203,7 @@ func iconURL(path string) string {
 
 // iconExt is the extension the installed copy of an iconPath gets: an .app yields a png.
 func iconExt(p string) string {
-	if e := strings.ToLower(filepath.Ext(p)); e != ".app" {
+	if e := strings.ToLower(filepath.Ext(p)); e != ".app" && e != ".icns" {
 		return e
 	}
 	return ".png"
@@ -220,9 +220,14 @@ func appIconPNG(app string) ([]byte, error) {
 	if filepath.Ext(n) == "" {
 		n += ".icns"
 	}
+	return icnsPNG(filepath.Join(app, "Contents", "Resources", n))
+}
+
+// icnsPNG renders an .icns file as a 128px png.
+func icnsPNG(icns string) ([]byte, error) {
 	tmp := filepath.Join(os.TempDir(), fmt.Sprintf("conveyor-icon-%d.png", time.Now().UnixNano()))
 	defer os.Remove(tmp)
-	if out, err := exec.Command("sips", "-s", "format", "png", "-Z", "128", filepath.Join(app, "Contents", "Resources", n), "--out", tmp).CombinedOutput(); err != nil {
+	if out, err := exec.Command("sips", "-s", "format", "png", "-Z", "128", icns, "--out", tmp).CombinedOutput(); err != nil {
 		return nil, fmt.Errorf("sips: %v: %s", err, out)
 	}
 	return os.ReadFile(tmp)
@@ -281,9 +286,12 @@ func (s *Service) InstallManifest(raw string, replace bool) (store.App, error) {
 		}
 		var b []byte
 		var err error
-		if strings.EqualFold(filepath.Ext(a.IconPath), ".app") {
+		switch strings.ToLower(filepath.Ext(a.IconPath)) {
+		case ".app":
 			b, err = appIconPNG(iconSrc(a.IconPath))
-		} else {
+		case ".icns":
+			b, err = icnsPNG(iconSrc(a.IconPath))
+		default:
 			b, err = os.ReadFile(iconSrc(a.IconPath))
 		}
 		if err != nil || len(b) > 1<<20 {
