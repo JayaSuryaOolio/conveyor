@@ -1,6 +1,10 @@
 package slack
 
 import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -18,11 +22,15 @@ func TestMessageKeyRoundTrip(t *testing.T) {
 	}
 }
 
-func TestUserTokenWinsAndOwnPostsIgnored(t *testing.T) {
+func TestImpersonateToggleAndOwnPostsIgnored(t *testing.T) {
 	cfg := map[string]string{"slack_bot_token": "xoxb", "slack_user_token": "xoxp", "slack_app_token": "xapp", "slack_user_id": "U1"}
 	s := &Slack{func(k string) string { return cfg[k] }}
+	if s.token() != "xoxb" {
+		t.Fatal("user token used while impersonation is off")
+	}
+	cfg["slack_impersonate"] = "on"
 	if s.token() != "xoxp" || !s.Ready() {
-		t.Fatal("user token should win and satisfy Ready")
+		t.Fatal("user token should win when impersonating and satisfy Ready")
 	}
 	delete(cfg, "slack_user_token")
 	delete(cfg, "slack_bot_token")
@@ -54,5 +62,27 @@ func TestButtonsAndInteractive(t *testing.T) {
 	s.interactive([]byte(`{"type":"block_actions","user":{"id":"U1"},"actions":[{"action_id":"move_done","value":"CV-7"}]}`), h)
 	if got != "move CV-7 done" {
 		t.Fatalf("got %q", got)
+	}
+}
+
+func TestSendThreadsPerTask(t *testing.T) {
+	var got []map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var a map[string]any
+		json.NewDecoder(r.Body).Decode(&a)
+		got = append(got, a)
+		fmt.Fprintf(w, `{"ok":true,"ts":"%d.0"}`, len(got))
+	}))
+	defer srv.Close()
+	api = srv.URL + "/"
+	s := &Slack{func(k string) string { return map[string]string{"slack_bot_token": "x", "slack_user_id": "U1"}[k] }}
+	m := chat.Msg{Key: "CV-9", Title: "T", Status: "needs_you", Last: "**bold**"}
+	s.Send(m)
+	s.Send(m)
+	if got[0]["thread_ts"] != nil || got[1]["thread_ts"] != "1.0" {
+		t.Fatalf("second send not threaded under first: %v", got)
+	}
+	if b := got[0]["blocks"].([]any)[1].(map[string]any); b["type"] != "markdown" || b["text"] != "**bold**" {
+		t.Fatalf("agent text not in a markdown block: %v", b)
 	}
 }

@@ -2,8 +2,8 @@
 // thread replies and /conveyor commands back, so the Slack mobile app is Conveyor's mobile
 // client. It uses Socket Mode, so no public URL is needed.
 //
-// Settings: slack_bot_token (xoxb-) or slack_user_token (xoxp-, wins when set: the app acts as
-// you instead of as a bot), slack_app_token (xapp-, scope connections:write) and
+// Settings: slack_bot_token (xoxb-) or slack_user_token (xoxp-, used only while
+// slack_impersonate is on: the app then acts as you instead of as a bot), slack_app_token (xapp-, scope connections:write) and
 // slack_user_id (your member id: the only user the bridge talks to or listens to).
 // Buttons need Interactivity enabled in the app (Socket Mode delivers the clicks).
 package slack
@@ -32,29 +32,33 @@ var api = "https://slack.com/api/"
 // message events from slack_user_id, so they must not be handled as commands.
 var mine sync.Map
 
+// threads maps a task key to the ts of its thread root, so later notifications and replies
+// for that task stay in one thread.
+// ponytail: in memory, so a restart starts a new thread per task; persist if that matters.
+var threads sync.Map
+
 // Slack is the transport; get reads settings.
 type Slack struct{ get func(string) string }
 
 // New is a chat.Factory.
 func New(get func(string) string) chat.Transport { return &Slack{get} }
 
-// token is the user token when set, else the bot token.
+// token is the user token when impersonating, else the bot token.
 func (s *Slack) token() string {
-	if t := s.get("slack_user_token"); t != "" {
+	if t := s.get("slack_user_token"); t != "" && s.get("slack_impersonate") == "on" {
 		return t
 	}
 	return s.get("slack_bot_token")
 }
 
 // post sends chat.postMessage and remembers its ts (see mine).
-func (s *Slack) post(args map[string]any) error {
+func (s *Slack) post(args map[string]any) (string, error) {
 	r, err := call(s.token(), "chat.postMessage", args)
-	if err == nil {
-		if ts, ok := r["ts"].(string); ok {
-			mine.Store(ts, true)
-		}
+	ts, _ := r["ts"].(string)
+	if err == nil && ts != "" {
+		mine.Store(ts, true)
 	}
-	return err
+	return ts, err
 }
 
 func (s *Slack) Ready() bool {
@@ -127,13 +131,48 @@ func buttons(m chat.Msg) []any {
 	return els
 }
 
-func (s *Slack) Send(m chat.Msg) error {
-	text := message(m)
-	blocks := []any{map[string]any{"type": "section", "text": map[string]any{"type": "mrkdwn", "text": text}}}
-	if els := buttons(m); len(els) > 0 {
-		blocks = append(blocks, map[string]any{"type": "actions", "elements": els})
+// blocks renders m for display: Slack mrkdwn for the header and links, and a markdown block
+// for the agent's text, which is standard Markdown that mrkdwn would show raw.
+func blocks(m chat.Msg) []any {
+	sec := func(t string) any {
+		return map[string]any{"type": "section", "text": map[string]any{"type": "mrkdwn", "text": t}}
 	}
-	return s.post(map[string]any{"channel": s.get("slack_user_id"), "text": text, "blocks": blocks})
+	b := []any{sec(fmt.Sprintf("*%s* %s — %s", m.Key, m.Title, headline[m.Status]))}
+	if last := strings.TrimSpace(m.Last); last != "" {
+		if len(last) > 11000 { // markdown blocks cap at 12000 chars
+			last = last[:11000] + "…"
+		}
+		b = append(b, map[string]any{"type": "markdown", "text": last})
+	}
+	var foot []string
+	for _, r := range m.PRs {
+		foot = append(foot, ":link: <"+r.URL+"|"+r.Name+" PR>")
+	}
+	if m.Status == "needs_you" || m.Status == "review" {
+		foot = append(foot, "_Reply in this thread to comment, or send `move "+m.Key+" done`._")
+	}
+	if len(foot) > 0 {
+		b = append(b, sec(strings.Join(foot, "\n")))
+	}
+	if els := buttons(m); len(els) > 0 {
+		b = append(b, map[string]any{"type": "actions", "elements": els})
+	}
+	return b
+}
+
+// Send posts m into the task's thread, or starts one. text (message) is the notification
+// and fallback; keyOf reads it back from the thread root.
+func (s *Slack) Send(m chat.Msg) error {
+	args := map[string]any{"channel": s.get("slack_user_id"), "text": message(m), "blocks": blocks(m)}
+	root, threaded := threads.Load(m.Key)
+	if threaded {
+		args["thread_ts"] = root
+	}
+	ts, err := s.post(args)
+	if err == nil && !threaded {
+		threads.Store(m.Key, ts)
+	}
+	return err
 }
 
 // ---- inbound: Socket Mode ----
@@ -157,9 +196,7 @@ func (s *Slack) Listen(ctx context.Context, h func(chat.In) string) error {
 	}
 	defer c.Close()
 	// the Home tab keeps its content, so publishing the guide once per connection is enough
-	call(s.token(), "views.publish", map[string]any{"user_id": s.get("slack_user_id"), "view": map[string]any{"type": "home", "blocks": []any{
-		map[string]any{"type": "section", "text": map[string]any{"type": "mrkdwn", "text": chat.Help}},
-	}}})
+	call(s.token(), "views.publish", map[string]any{"user_id": s.get("slack_user_id"), "view": map[string]any{"type": "home", "blocks": home}})
 	go func() { <-ctx.Done(); c.Close() }()
 	for {
 		var e envelope
@@ -185,6 +222,16 @@ func (s *Slack) Listen(ctx context.Context, h func(chat.In) string) error {
 			c.WriteJSON(map[string]any{"envelope_id": e.EnvelopeID, "payload": map[string]any{"text": reply}})
 		}
 	}
+}
+
+// home is the App Home tab: Block Kit, the only markup Slack allows there.
+var home = []any{
+	map[string]any{"type": "header", "text": map[string]any{"type": "plain_text", "text": ":rocket: Conveyor"}},
+	map[string]any{"type": "context", "elements": []any{map[string]any{"type": "mrkdwn", "text": "Your Conveyor tasks, from anywhere. Open the *Messages* tab to talk to it."}}},
+	map[string]any{"type": "divider"},
+	map[string]any{"type": "section", "text": map[string]any{"type": "mrkdwn", "text": chat.Help}},
+	map[string]any{"type": "divider"},
+	map[string]any{"type": "context", "elements": []any{map[string]any{"type": "mrkdwn", "text": ":bell: Task updates arrive as DMs, one thread per task. Conveyor must be running to answer."}}},
 }
 
 var keyRe = regexp.MustCompile(`^\*([A-Za-z0-9]+-[A-Za-z0-9]+)\*`)
@@ -220,6 +267,8 @@ func (s *Slack) event(payload []byte, handle func(chat.In) string) {
 	if _, ours := mine.Load(e.TS); ours {
 		return
 	}
+	// acknowledge at once; needs the reactions:write scope, best effort
+	call(bot, "reactions.add", map[string]any{"channel": e.Channel, "timestamp": e.TS, "name": "eyes"})
 	if e.ThreadTS == "" { // a plain DM is a command, so /conveyor is optional
 		s.post(map[string]any{"channel": e.Channel, "text": handle(chat.In{Text: e.Text})})
 		return
@@ -238,6 +287,7 @@ func (s *Slack) event(payload []byte, handle func(chat.In) string) {
 	if key == "" {
 		return
 	}
+	threads.LoadOrStore(key, e.ThreadTS) // the agent's answer comes back into this thread
 	reply := ":speech_balloon: " + handle(chat.In{Key: key, Text: e.Text})
 	s.post(map[string]any{"channel": e.Channel, "thread_ts": e.ThreadTS, "text": reply})
 }

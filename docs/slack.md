@@ -38,7 +38,7 @@ Slack relays to the running Conveyor. Conveyor must be running (desktop app or d
 
 **Yes, there is an App page.** Slack shows your app's Home tab; Conveyor publishes the command
 guide there once each time it connects (not on every open; Slack keeps it). Slack's website has no
-static editor for Home content, only the API can set it. The **Messages** tab is on too: that is
+static editor for Home content, only the API can set it. It is Block Kit (header, dividers, sections), not HTML. The **Messages** tab is on too: that is
 the DM where you send commands and receive task updates. The app appears under *Apps* in your
 sidebar; pin it or message it once and it shows in your DMs.
 
@@ -51,7 +51,7 @@ features:
   bot_user: {display_name: Conveyor}
   slash_commands:
     - {command: /conveyor, url: https://example.com, description: Control Conveyor tasks, usage_hint: help}
-oauth_config: {scopes: {bot: [chat:write, im:history]}}
+oauth_config: {scopes: {bot: [chat:write, im:history, reactions:write]}}
 settings:
   event_subscriptions: {bot_events: [message.im]}
   interactivity: {is_enabled: true}
@@ -64,9 +64,10 @@ settings:
 
 **Bot or you.** By default Conveyor posts as the bot. To act as yourself instead, add the
 `slack_user_token` (`xoxp-…`, Apps → Integrations → User token): in the manifest add
-`oauth_config.scopes.user: [chat:write, im:history, im:write]` and `settings.event_subscriptions.user_events: [message.im]`,
-reinstall, copy the *User OAuth Token*. When set it wins over the bot token. Caveat: Slack does not
-notify you for messages you post yourself, so on a phone you get no push for task updates in this mode.
+`oauth_config.scopes.user: [chat:write, im:history, im:write, reactions:write]` and `settings.event_subscriptions.user_events: [message.im]`,
+reinstall, copy the *User OAuth Token*, then switch on **Act as me** (`slack_impersonate on`, default
+off). The token is only used while the switch is on. Caveat: messages then land in your own self-DM
+and Slack does not notify you for messages you post yourself, so you get no push in this mode.
 
 Only `slack_user_id` is DMed and obeyed; everyone else is ignored.
 
@@ -74,14 +75,17 @@ Only `slack_user_id` is DMed and obeyed; everyone else is ignored.
 Open the Conveyor DM. Type a plain message, no slash needed:
 - `help` - the guide (also on the app's Home tab)
 - `list` - tasks waiting on you
+- `show CV-12` (or just `CV-12`) - status, repos, PRs, last agent message
 - `CV-12 use the v2 API` - comment on CV-12 (requeues it)
 - `move CV-12 done` - todo | done | cancelled
 - Reply in a notification's thread - comments on that task.
 
 Notifications (needs_you, review, done, failed; pick which in settings) carry the agent's last
-message and PR links, plus buttons: **Done** / **Requeue** (while it needs you, is in review or failed)
+message (rendered as Markdown via a Block Kit `markdown` block) and PR links, plus buttons: **Done** / **Requeue** (while it needs you, is in review or failed)
 and **Open PR**. Buttons need *Interactivity* on: in the manifest add `settings.interactivity: {is_enabled: true}`
-(Socket Mode needs no request URL).
+(Socket Mode needs no request URL). Each task gets one
+thread: later notifications for it, and the agent's answers to your thread replies, post into it.
+Thread roots are kept in memory, so after a restart a task's next update starts a new thread.
 
 ## Not done (add when needed)
 - Block Kit modals, channel mode, retry/dedupe
