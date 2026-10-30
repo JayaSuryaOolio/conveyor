@@ -1,11 +1,14 @@
-# Manual release marker: Actions → Tag release → Run workflow. install.sh shows the latest tag in the app.
+# Manual release marker: Actions → Tag release → Run workflow (patch by default; pick minor/major from the dropdown).
+# Bumps the latest tag on main. install.sh shows the latest tag in the app.
 name: Tag release
 on:
   workflow_dispatch:
     inputs:
-      version:
-        description: Tag to create on main, e.g. v0.3.0
-        required: true
+      bump:
+        description: Which part of the latest tag to bump
+        type: choice
+        options: [patch, minor, major]
+        default: patch
 permissions:
   contents: write
 jobs:
@@ -15,6 +18,18 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: main
-      - run: git tag "$VERSION" && git push origin "$VERSION"
+          fetch-depth: 0
+      - run: |
+          latest=$(git tag --list 'v*' --sort=-v:refname | head -n1)
+          IFS=. read -r major minor patch <<<"${latest:-v0.0.0}"
+          major=${major#v}
+          case "$BUMP" in
+            major) major=$((major + 1)); minor=0; patch=0 ;;
+            minor) minor=$((minor + 1)); patch=0 ;;
+            *) patch=$((patch + 1)) ;;
+          esac
+          next="v$major.$minor.$patch"
+          echo "$latest -> $next"
+          git tag "$next" && git push origin "$next"
         env:
-          VERSION: ${{ github.event.inputs.version }}
+          BUMP: ${{ github.event.inputs.bump }}

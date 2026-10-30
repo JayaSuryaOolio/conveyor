@@ -114,10 +114,12 @@ export default function App() {
                         ))}
                     </Group>
                     {!mini && <PlacedButtons place="global_nav" size="compact-xs"/>}
-                    <Tooltip label={dispatcher === 'dispatching' ? 'Dispatcher running in this app' : 'UI only: another process dispatches'} position="right">
-                        <Box mx={mini ? 'auto' : 0} w={8} h={8} style={{borderRadius: '50%', background: `var(--mantine-color-${dispatcher === 'dispatching' ? 'green' : 'gray'}-6)`}}/>
-                    </Tooltip>
-                    {!mini && version && <Text size="xs" c="dimmed" ta="center">{version}</Text>}
+                    <Group gap="xs" justify={mini ? 'center' : 'space-between'} wrap="nowrap">
+                        <Tooltip label={dispatcher === 'dispatching' ? 'Dispatcher running in this app' : 'UI only: another process dispatches'} position="right">
+                            <Box w={8} h={8} style={{borderRadius: '50%', background: `var(--mantine-color-${dispatcher === 'dispatching' ? 'green' : 'gray'}-6)`}}/>
+                        </Tooltip>
+                        {!mini && version && <Text size="xs" c="dimmed">{version}</Text>}
+                    </Group>
                 </Stack>
             </AppShell.Navbar>
             <AppShell.Main key={view.name + (view.key ?? '')} h="100vh" style={{overflow: view.name === 'task' ? 'hidden' : 'auto'}}>
