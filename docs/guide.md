@@ -118,6 +118,8 @@ When the dispatcher launches a task that already has runs, it chooses between:
 - **Resume**: stop the old background session and run `claude --bg --resume <session>` with only the new comments as the prompt. Used when the latest auto run finished, its session is known, and its peak context was below `resume_threshold` (default 60000 tokens).
 - **Fresh**: a new session that reads `BRIEF.md`, which carries the summaries of recent runs and your comments. Used otherwise.
 
+To choose yourself, start a comment with `/fresh` or `/resume` (CLI, app or Slack; the latest pending one wins). `/fresh` always starts a new session; `/resume` resumes regardless of `resume_threshold`, as long as the last auto run finished with a known session.
+
 ## Interactive sessions and terminals
 
 The app has embedded terminals on the task page: a shell in the worktree, or one of the actions below. Output survives switching away (a 256 KB replay buffer), and terminals are closed when the app quits. From the CLI, `conveyor task open KEY` opens an external terminal instead, through the `terminal_template` setting.

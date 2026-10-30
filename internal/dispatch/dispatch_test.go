@@ -215,8 +215,9 @@ func TestDebounce(t *testing.T) {
 func TestResumeVsFresh(t *testing.T) {
 	for _, tc := range []struct {
 		peak   int64
+		body   string
 		resume bool
-	}{{1000, true}, {100000, false}} {
+	}{{1000, "more", true}, {100000, "more", false}, {1000, "/fresh\nstart over", false}, {100000, "/resume please", true}} {
 		e := setup(t)
 		tk := e.task(t, "t", 0)
 		r, _ := store.CreateRun(e.db, store.Run{TaskID: tk.ID, Kind: "auto", Mode: "fresh", Status: "launching"})
@@ -225,7 +226,7 @@ func TestResumeVsFresh(t *testing.T) {
 		if err := store.UpdateRun(e.db, r); err != nil {
 			t.Fatal(err)
 		}
-		store.AddComment(e.db, store.Comment{TaskID: tk.ID, Author: store.AuthorHuman, Body: "more"})
+		store.AddComment(e.db, store.Comment{TaskID: tk.ID, Author: store.AuthorHuman, Body: tc.body})
 		e.now = time.Now().Add(time.Minute)
 		e.tick(t)
 		a := strings.Join(launches(t, e.fake)[0], " ")

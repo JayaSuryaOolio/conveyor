@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -332,7 +333,7 @@ func (d *Dispatcher) start(ctx context.Context, task store.Task, delta []store.C
 	if err != nil {
 		return store.Run{}, err
 	}
-	prev, err := d.resumable(task)
+	prev, err := d.resumable(task, sessionDirective(delta))
 	if err != nil {
 		return store.Run{}, err
 	}
@@ -424,8 +425,31 @@ func (d *Dispatcher) model(task store.Task) string {
 
 func fileExists(p string) bool { _, err := os.Stat(p); return err == nil }
 
-// resumable returns the latest auto run if it can be resumed: finished, with session and bg ids, and a small context.
-func (d *Dispatcher) resumable(task store.Task) (*store.Run, error) {
+// sessionDirective returns "fresh" or "resume" when a pending human comment starts with /fresh or /resume
+// (the latest wins), else "" (decide by resume_threshold).
+func sessionDirective(delta []store.Comment) string {
+	mode := ""
+	for _, c := range delta {
+		if c.Author != store.AuthorHuman {
+			continue
+		}
+		switch f := strings.Fields(c.Body); {
+		case len(f) == 0:
+		case f[0] == "/fresh":
+			mode = "fresh"
+		case f[0] == "/resume":
+			mode = "resume"
+		}
+	}
+	return mode
+}
+
+// resumable returns the latest auto run if it can be resumed: finished, with session and bg ids, and a small
+// context. directive "fresh" never resumes; "resume" ignores resume_threshold.
+func (d *Dispatcher) resumable(task store.Task, directive string) (*store.Run, error) {
+	if directive == "fresh" {
+		return nil, nil
+	}
 	runs, err := store.ListRuns(d.DB, task.ID)
 	if err != nil {
 		return nil, err
@@ -435,7 +459,7 @@ func (d *Dispatcher) resumable(task store.Task) (*store.Run, error) {
 		if r.Kind != "auto" {
 			continue
 		}
-		if r.Status == "finished" && r.SessionID != nil && r.BgID != nil && r.CtxPeak < int64(d.intSetting("resume_threshold")) {
+		if r.Status == "finished" && r.SessionID != nil && r.BgID != nil && (directive == "resume" || r.CtxPeak < int64(d.intSetting("resume_threshold"))) {
 			return &r, nil
 		}
 		break
