@@ -82,7 +82,7 @@ func TestMoveAcceptsTo(t *testing.T) {
 	}
 	defer db.Close()
 	repo, _ := store.AddRepo(db, store.Repo{Name: "a", Path: "/x/a", DefaultBranch: "main"})
-	tk, _ := store.CreateTask(db, store.Task{Title: "hello", Status: store.StatusTodo}, []store.TaskRepo{{RepoID: repo.ID, IsPrimary: true, Branch: "t"}})
+	tk, _ := store.CreateTask(db, store.Task{Title: "hello", Status: store.StatusReview}, []store.TaskRepo{{RepoID: repo.ID, IsPrimary: true, Branch: "t"}})
 	b := &bridge{&core.Service{DB: db}, t.Logf}
 	if got := b.command("move " + tk.Key + " to done"); strings.Contains(got, "warning") {
 		t.Fatal(got)
