@@ -38,6 +38,8 @@ export function CreateTask(arg1:core.NewTaskInput):Promise<string>;
 
 export function DeleteApp(arg1:string):Promise<void>;
 
+export function AppVersion():Promise<string>;
+
 export function DeleteAutomation(arg1:string):Promise<void>;
 
 

@@ -1,8 +1,8 @@
 import {useEffect, useRef, useState} from 'react'
-import {ActionIcon, AppShell, Badge, Box, Button, Group, Kbd, NavLink, Stack, Title, Tooltip} from '@mantine/core'
+import {ActionIcon, AppShell, Badge, Box, Button, Group, Kbd, NavLink, Stack, Text, Title, Tooltip} from '@mantine/core'
 import {useLocalStorage} from '@mantine/hooks'
 import {IconApps, IconBolt, IconArrowLeft, IconBook2, IconClock, IconLayoutKanban, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconLogs, IconPlus, IconRobot, IconSettings} from '@tabler/icons-react'
-import {AppIcons, DispatcherState, Learnings, ListApps, OpenApp} from '../wailsjs/go/ui/App'
+import {AppIcons, AppVersion, DispatcherState, Learnings, ListApps, OpenApp} from '../wailsjs/go/ui/App'
 import {Agents} from './agents'
 import {Apps} from './apps'
 import {Automations} from './automations'
@@ -41,6 +41,7 @@ export default function App() {
     const proposed = learnings?.filter(l => l.status === 'proposed').length ?? 0
     const {data: apps} = useData(ListApps, [])
     const {data: icons} = useData(AppIcons, [])
+    const {data: version} = useData(AppVersion, [])
     const globalApps = (apps ?? []).filter(a => a.global && !a.manifest)
     const nav: Nav = v => setView(v)
 
@@ -116,6 +117,7 @@ export default function App() {
                     <Tooltip label={dispatcher === 'dispatching' ? 'Dispatcher running in this app' : 'UI only: another process dispatches'} position="right">
                         <Box mx={mini ? 'auto' : 0} w={8} h={8} style={{borderRadius: '50%', background: `var(--mantine-color-${dispatcher === 'dispatching' ? 'green' : 'gray'}-6)`}}/>
                     </Tooltip>
+                    {!mini && version && <Text size="xs" c="dimmed" ta="center">{version}</Text>}
                 </Stack>
             </AppShell.Navbar>
             <AppShell.Main key={view.name + (view.key ?? '')} h="100vh" style={{overflow: view.name === 'task' ? 'hidden' : 'auto'}}>

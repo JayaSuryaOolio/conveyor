@@ -1,0 +1,20 @@
+# Manual release marker: Actions → Tag release → Run workflow. install.sh shows the latest tag in the app.
+name: Tag release
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Tag to create on main, e.g. v0.3.0
+        required: true
+permissions:
+  contents: write
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - run: git tag "$VERSION" && git push origin "$VERSION"
+        env:
+          VERSION: ${{ github.event.inputs.version }}

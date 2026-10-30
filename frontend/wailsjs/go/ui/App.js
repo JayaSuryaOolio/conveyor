@@ -70,6 +70,10 @@ export function DeleteApp(arg1) {
   return window['go']['ui']['App']['DeleteApp'](arg1);
 }
 
+export function AppVersion() {
+  return window['go']['ui']['App']['AppVersion']();
+}
+
 export function DeleteAutomation(arg1) {
   return window['go']['ui']['App']['DeleteAutomation'](arg1);
 }
