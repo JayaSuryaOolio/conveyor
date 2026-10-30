@@ -154,16 +154,32 @@ func (s *Slack) event(payload []byte, handle func(chat.In) string) {
 			Type, Subtype, User, Text, Channel string
 			BotID                              string `json:"bot_id"`
 			ThreadTS                           string `json:"thread_ts"`
+			Tab                                string
 		} `json:"event"`
 	}
 	if json.Unmarshal(payload, &p) != nil {
 		return
 	}
 	e := p.Event
-	if e.Type != "message" || e.Subtype != "" || e.BotID != "" || e.ThreadTS == "" || e.User != s.get("slack_user_id") {
+	bot := s.get("slack_bot_token")
+	if e.User != s.get("slack_user_id") {
 		return
 	}
-	bot := s.get("slack_bot_token")
+	if e.Type == "app_home_opened" { // the app's Home tab doubles as the guide
+		if e.Tab == "home" {
+			call(bot, "views.publish", map[string]any{"user_id": e.User, "view": map[string]any{"type": "home", "blocks": []any{
+				map[string]any{"type": "section", "text": map[string]any{"type": "mrkdwn", "text": chat.Help}},
+			}}})
+		}
+		return
+	}
+	if e.Type != "message" || e.Subtype != "" || e.BotID != "" {
+		return
+	}
+	if e.ThreadTS == "" { // a plain DM is a command, so /conveyor is optional
+		call(bot, "chat.postMessage", map[string]any{"channel": e.Channel, "text": handle(chat.In{Text: e.Text})})
+		return
+	}
 	h, err := call(bot, "conversations.history", map[string]any{"channel": e.Channel, "latest": e.ThreadTS, "inclusive": true, "limit": 1})
 	if err != nil {
 		return
