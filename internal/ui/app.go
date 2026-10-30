@@ -149,6 +149,7 @@ func (a *App) ShowError(msg string) {
 func (a *App) Confirm(msg string) (bool, error) {
 	r, err := runtime.MessageDialog(a.ctx, runtime.MessageDialogOptions{Type: runtime.QuestionDialog, Title: "Conveyor", Message: msg,
 		Buttons: []string{"Yes", "No"}, DefaultButton: "No", CancelButton: "No"}) // darwin returns "" without explicit Buttons
+	log.Printf("ui confirm %q: result=%q err=%v", msg, r, err)
 	return r == "Yes", err
 }
 
