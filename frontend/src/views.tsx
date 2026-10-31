@@ -264,6 +264,7 @@ export function TaskPage({k, nav}: {k: string; nav: Nav}) {
     const [added, setAdded] = useState<ui.TermInfo>()
     const [restored, setRestored] = useState<{body: string}>()
     const [side, setSide] = useLocalStorage({key: 'task-sidebar', defaultValue: true})
+    const [titleGone, setTitleGone] = useState(false)
     // A question is answered in the session itself: needs_you offers a way into the live session's terminal.
     const needsYou = d?.task.status === 'needs_you'
     const {data: actions} = useData(() => needsYou ? Actions(k) : Promise.resolve([]), [k, needsYou, d?.runs.length])
@@ -287,13 +288,19 @@ export function TaskPage({k, nav}: {k: string; nav: Nav}) {
         <Box style={{display: 'flex', flexDirection: 'column', height: 'calc(100vh - 2 * var(--mantine-spacing-md))'}}>
         <Box style={{flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: `minmax(0, 1fr) ${side ? '300px' : 'auto'}`, gap: side ? 'var(--mantine-spacing-xl)' : 'var(--mantine-spacing-xs)'}}>
             <Stack gap="sm" mih={0}>
-                <Breadcrumbs style={{flex: 'none'}}>
-                    <Anchor size="sm" component="button" onClick={() => nav({name: 'board'})}>Board</Anchor>
-                    <Text size="sm">{t.key}</Text>
+                <Breadcrumbs style={{flex: 'none', flexWrap: 'nowrap'}}>
+                    {/* A <button> anchor stays keyboard-focusable; only the underline is dropped. */}
+                    <Anchor size="sm" component="button" underline="never" onClick={() => nav({name: 'board'})}>Board</Anchor>
+                    <CopyButton value={t.key}>{({copied, copy}) => (
+                        <Tooltip label={copied ? 'Copied' : 'Click to copy'}>
+                            <Text size="sm" component="button" type="button" onClick={copy} style={{cursor: 'pointer', background: 'none', border: 0, padding: 0, color: 'inherit', flex: 'none'}}>{t.key}</Text>
+                        </Tooltip>
+                    )}</CopyButton>
+                    {titleGone && <Text size="sm" c="dimmed" truncate>{t.title}</Text>}
                 </Breadcrumbs>
                 <ScrollBox floating={answer}>
                     <Stack>
-                        <Title order={3}>{t.title}</Title>
+                        <WatchedTitle onGone={setTitleGone}>{t.title}</WatchedTitle>
                         <Description t={t} reload={reload}/>
                         <Relations k={t.key} status={t.status} rel={d.relations} nav={nav} reload={reload}/>
                         {latest?.criteria && <><Title order={5}>Acceptance criteria</Title><Criteria text={latest.criteria}/></>}
@@ -335,6 +342,17 @@ export function TaskPage({k, nav}: {k: string; nav: Nav}) {
         </Box>
         </TaskKey.Provider>
     )
+}
+
+/** Task title that reports whether it has scrolled out of view (IntersectionObserver accounts for the ScrollBox's overflow clipping). */
+function WatchedTitle({children, onGone}: {children: React.ReactNode; onGone: (gone: boolean) => void}) {
+    const el = useRef<HTMLHeadingElement>(null)
+    useEffect(() => {
+        const io = new IntersectionObserver(([e]) => onGone(!e.isIntersecting))
+        io.observe(el.current!)
+        return () => { io.disconnect(); onGone(false) }
+    }, [onGone])
+    return <Title order={3} ref={el}>{children}</Title>
 }
 
 /** Scrolling column with floating jump-to-top / jump-to-bottom buttons, shown only when there is somewhere to go. */
