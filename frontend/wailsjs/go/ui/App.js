@@ -349,3 +349,11 @@ export function PlacedActions(arg1) {
 export function RunAppAction(arg1, arg2, arg3, arg4) {
   return window['go']['ui']['App']['RunAppAction'](arg1, arg2, arg3, arg4);
 }
+
+export function AddTaskRepo(arg1, arg2) {
+  return window['go']['ui']['App']['AddTaskRepo'](arg1, arg2);
+}
+
+export function RemoveTaskRepo(arg1, arg2) {
+  return window['go']['ui']['App']['RemoveTaskRepo'](arg1, arg2);
+}

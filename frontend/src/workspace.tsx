@@ -1,8 +1,8 @@
 import {useState} from 'react'
-import {ActionIcon, Anchor, Badge, Button, Code, Divider, Group, Paper, Stack, TagsInput, Text, TextInput, Title, Tooltip} from '@mantine/core'
+import {ActionIcon, Anchor, Badge, Button, Code, Divider, Group, Menu, Paper, Stack, TagsInput, Text, TextInput, Title, Tooltip} from '@mantine/core'
 import {useClipboard} from '@mantine/hooks'
-import {IconCopy, IconPencil, IconStar, IconTerminal, IconTerminal2} from '@tabler/icons-react'
-import {Actions, AddLabel, EnsureWorkspace, GetSettings, ListLabels, RemoveLabel, RunAction, Sessions, SetTaskRepo, TermStart} from '../wailsjs/go/ui/App'
+import {IconCopy, IconPencil, IconPlus, IconStar, IconX, IconTerminal, IconTerminal2} from '@tabler/icons-react'
+import {Actions, AddLabel, AddTaskRepo, EnsureWorkspace, GetSettings, ListLabels, ListRepos, RemoveLabel, RemoveTaskRepo, RunAction, Sessions, SetTaskRepo, TermStart} from '../wailsjs/go/ui/App'
 import {core, store, ui} from '../wailsjs/go/models'
 import {BrowserOpenURL} from '../wailsjs/runtime/runtime'
 import {PlacedButtons, StatusSelect, Time, errMsg} from './components'
@@ -57,7 +57,7 @@ function Mono({text}: {text: string}) {
 
 // RepoFields shows one repo's branch, worktree and PR. The branch is editable
 // until the worktree exists; the PR URL via the pencil.
-function RepoFields({k, r, reload, children}: {k: string; r: store.TaskRepo; reload: () => void; children?: React.ReactNode}) {
+function RepoFields({k, r, reload, canRemove, children}: {k: string; r: store.TaskRepo; reload: () => void; canRemove?: boolean; children?: React.ReactNode}) {
     const [branch, setBranch] = useState(r.branch)
     const [pr, setPr] = useState(r.pr_url ?? '')
     const [editPr, setEditPr] = useState(false)
@@ -67,9 +67,17 @@ function RepoFields({k, r, reload, children}: {k: string; r: store.TaskRepo; rel
     return (
         <Paper withBorder p="xs" radius="md">
             <Stack gap="xs">
-                <Group gap={6}>
-                    <Text size="sm" fw={600}>{r.repo_name}</Text>
-                    {r.is_primary && <Badge size="xs" variant="light" leftSection={<IconStar size={10}/>}>primary</Badge>}
+                <Group gap={6} justify="space-between" wrap="nowrap">
+                    <Group gap={6}>
+                        <Text size="sm" fw={600}>{r.repo_name}</Text>
+                        {r.is_primary && <Badge size="xs" variant="light" leftSection={<IconStar size={10}/>}>primary</Badge>}
+                    </Group>
+                    {canRemove && !r.pr_url && (
+                        <Tooltip label="Remove repo">
+                            <ActionIcon variant="subtle" color="gray" size="xs" aria-label={'Remove ' + r.repo_name}
+                                        onClick={() => RemoveTaskRepo(k, r.repo_name).then(reload).catch(errMsg)}><IconX size={12}/></ActionIcon>
+                        </Tooltip>
+                    )}
                 </Group>
                 <div>
                     <Text size="xs" c="dimmed">Branch</Text>
@@ -129,6 +137,23 @@ function Labels({k, labels, reload}: {k: string; labels: string[]; reload: () =>
     return <TagsInput size="xs" label="Labels" placeholder="Add label…" value={labels} data={all ?? []} onChange={change} clearable={false} splitChars={[',']}/>
 }
 
+/** + button: add a registered repo the task does not have yet. */
+function AddRepo({k, have, reload}: {k: string; have: string[]; reload: () => void}) {
+    const {data: all} = useData(ListRepos, [])
+    const rest = (all ?? []).filter(r => !have.includes(r.name))
+    return (
+        <Menu position="bottom-end" withinPortal>
+            <Menu.Target>
+                <Tooltip label="Add repo"><ActionIcon variant="subtle" size="sm" aria-label="Add repo"><IconPlus size={14}/></ActionIcon></Tooltip>
+            </Menu.Target>
+            <Menu.Dropdown>
+                {rest.length === 0 && <Menu.Label>No other repos registered</Menu.Label>}
+                {rest.map(r => <Menu.Item key={r.name} onClick={() => AddTaskRepo(k, r.name).then(reload).catch(errMsg)}>{r.name}</Menu.Item>)}
+            </Menu.Dropdown>
+        </Menu>
+    )
+}
+
 export function TaskSidebar({t, runs, reload, onTerm}: {t: store.Task; runs: store.Run[]; reload: () => void; onTerm: (t: ui.TermInfo) => void}) {
     const k = t.key
     const repos = t.repos ?? []
@@ -154,10 +179,13 @@ export function TaskSidebar({t, runs, reload, onTerm}: {t: store.Task; runs: sto
             <Group justify="space-between"><Text size="xs" c="dimmed">Updated</Text><Time iso={t.updated_at}/></Group>
             <Labels k={k} labels={t.labels ?? []} reload={reload}/>
             <Divider/>
-            <Title order={6}>Repos</Title>
+            <Group justify="space-between">
+                <Title order={6}>Repos</Title>
+                <AddRepo k={k} have={repos.map(r => r.repo_name)} reload={reload}/>
+            </Group>
             {actionsError && <Text size="xs" c="red">Failed to load actions: {actionsError}</Text>}
             {repos.map(r => (
-                <RepoFields key={r.repo_id + '|' + r.branch + '|' + (r.pr_url ?? '')} k={k} r={r} reload={reload}/>
+                <RepoFields key={r.repo_id + '|' + r.branch + '|' + (r.pr_url ?? '')} k={k} r={r} reload={reload} canRemove={repos.length > 1}/>
             ))}
             {!hasWorktree && (
                 <Button loading={busy} onClick={() => { setBusy(true); EnsureWorkspace(k).then(() => { reload(); reloadActions(); reloadSessions() }).catch(errMsg).finally(() => setBusy(false)) }}>Create workspace</Button>

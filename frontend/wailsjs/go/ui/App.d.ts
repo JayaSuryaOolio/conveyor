@@ -178,3 +178,6 @@ export function ConvertApp(arg1:string):Promise<void>;
 export function PlacedActions(arg1:string):Promise<Array<core.Placed>>;
 
 export function RunAppAction(arg1:string,arg2:string,arg3:string,arg4:string):Promise<string>;
+export function AddTaskRepo(arg1:string,arg2:string):Promise<void>;
+
+export function RemoveTaskRepo(arg1:string,arg2:string):Promise<void>;
