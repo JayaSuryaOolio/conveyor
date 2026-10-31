@@ -234,3 +234,54 @@ func (s *Service) SetTaskDescription(key, desc string) error {
 	_, err = store.AddComment(s.DB, store.Comment{TaskID: t.ID, Author: store.AuthorSystem, Body: note})
 	return err
 }
+
+// AddTaskRepo adds a registered repo to an existing task.
+func (s *Service) AddTaskRepo(key, repo string) error {
+	t, err := store.GetTaskByKey(s.DB, key)
+	if err != nil {
+		return err
+	}
+	r, err := store.GetRepoByName(s.DB, repo)
+	if err != nil {
+		return fmt.Errorf("repo %q is not registered: %w", repo, err)
+	}
+	for _, tr := range t.Repos {
+		if tr.RepoID == r.ID {
+			return fmt.Errorf("%s already has repo %q", key, repo)
+		}
+	}
+	return store.AddTaskRepo(s.DB, t.ID, r.ID, "cv/"+t.Key+"-"+slug(t.Title, 40))
+}
+
+// RemoveTaskRepo drops a repo from a task unless it has a PR or is the only repo.
+// An existing worktree is left on disk. A removed primary hands over to the first remaining repo.
+func (s *Service) RemoveTaskRepo(key, repo string) error {
+	t, err := store.GetTaskByKey(s.DB, key)
+	if err != nil {
+		return err
+	}
+	if len(t.Repos) < 2 {
+		return fmt.Errorf("%s needs at least one repo", key)
+	}
+	for _, tr := range t.Repos {
+		if tr.RepoName != repo {
+			continue
+		}
+		if tr.PRURL != nil && *tr.PRURL != "" {
+			return fmt.Errorf("%s has a PR in %q; it cannot be removed", key, repo)
+		}
+		if err := store.RemoveTaskRepo(s.DB, t.ID, tr.RepoID); err != nil {
+			return err
+		}
+		if tr.IsPrimary {
+			for _, o := range t.Repos {
+				if o.RepoID != tr.RepoID {
+					_, err := s.DB.Exec(`UPDATE task_repos SET is_primary=1 WHERE task_id=? AND repo_id=?`, t.ID, o.RepoID)
+					return err
+				}
+			}
+		}
+		return nil
+	}
+	return fmt.Errorf("%s has no repo %q", key, repo)
+}

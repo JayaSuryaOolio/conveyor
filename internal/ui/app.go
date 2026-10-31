@@ -542,3 +542,9 @@ func (a *App) ApplyLearnings(repo string) (string, error) {
 	}
 	return keys[0], nil
 }
+
+// AddTaskRepo adds a registered repo to the task.
+func (a *App) AddTaskRepo(key, repo string) error { return a.svc.AddTaskRepo(key, repo) }
+
+// RemoveTaskRepo removes a repo from the task unless it has a PR.
+func (a *App) RemoveTaskRepo(key, repo string) error { return a.svc.RemoveTaskRepo(key, repo) }

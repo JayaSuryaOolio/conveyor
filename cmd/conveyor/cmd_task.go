@@ -66,6 +66,14 @@ func runTask(home string, args []string) error {
 				return s.AddLabel(rest[0], rest[2])
 			}
 			return s.RemoveLabel(rest[0], rest[2])
+		case "repo":
+			if len(rest) != 3 || (rest[1] != "add" && rest[1] != "rm") {
+				return fmt.Errorf("usage: conveyor task repo KEY add|rm NAME")
+			}
+			if rest[1] == "add" {
+				return s.AddTaskRepo(rest[0], rest[2])
+			}
+			return s.RemoveTaskRepo(rest[0], rest[2])
 		case "parent":
 			if len(rest) != 2 {
 				return fmt.Errorf("usage: conveyor task parent KEY PARENT|--none")

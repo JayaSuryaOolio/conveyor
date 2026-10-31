@@ -355,3 +355,31 @@ func TestMoveToReviewEndsRunsOnConfirm(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestAddRemoveTaskRepo(t *testing.T) {
+	s := newSvc(t)
+	tk, _ := s.CreateTask(NewTaskInput{Title: "Fix it", Repos: []string{"a"}})
+	if s.RemoveTaskRepo(tk.Key, "a") == nil {
+		t.Fatal("last repo must stay")
+	}
+	if err := s.AddTaskRepo(tk.Key, "b"); err != nil {
+		t.Fatal(err)
+	}
+	if s.AddTaskRepo(tk.Key, "b") == nil || s.AddTaskRepo(tk.Key, "nope") == nil {
+		t.Fatal("dup/unknown should fail")
+	}
+	tk, _ = store.GetTaskByKey(s.DB, tk.Key)
+	if len(tk.Repos) != 2 || tk.Repos[1].Branch != "cv/"+tk.Key+"-fix-it" {
+		t.Fatalf("%+v", tk.Repos)
+	}
+	s.SetTaskRepo(tk.Key, "b", tk.Repos[1].Branch, "https://x/pr/1")
+	if s.RemoveTaskRepo(tk.Key, "b") == nil {
+		t.Fatal("PR repo must stay")
+	}
+	if err := s.RemoveTaskRepo(tk.Key, "a"); err != nil { // primary hands over
+		t.Fatal(err)
+	}
+	if tk, _ = store.GetTaskByKey(s.DB, tk.Key); len(tk.Repos) != 1 || !tk.Repos[0].IsPrimary {
+		t.Fatalf("%+v", tk.Repos)
+	}
+}
