@@ -43,6 +43,7 @@ func NewApp() *App { return &App{} }
 // change poller and the dispatcher hook. It matches Wails' OnStartup.
 func (a *App) Startup(ctx context.Context) {
 	a.ctx = ctx
+	loadShellPATH()
 	home, err := core.Home("")
 	if err != nil {
 		runtime.LogFatalf(ctx, "conveyor home: %v", err)

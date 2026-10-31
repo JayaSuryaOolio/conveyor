@@ -113,3 +113,18 @@ This differs from the recipe above: there the Stop hook never fired. Here it fir
 Last resort for a lost run, not a fix: move the task to `review` or `done` and confirm; that ends its leftover auto runs.
 
 **Prevented since CV-58**, same fix as the recipe above. Moving a task to `review` or `done` with active auto runs asks first (UI modal, CLI `--stop`), then marks them failed ("stopped") and stops their sessions. Manual sessions are left alone.
+
+## Every launch fails with "claude CLI not found"
+
+Seen on CV-37B1 runs 316/317. Conveyor.app was opened from the Dock or Finder, which gives it `PATH=/usr/bin:/bin:/usr/sbin:/sbin`. The dispatcher runs a bare `claude` (and the hooks a bare `conveyor`), so no task can start, even though `claude` works in your terminal. The app was fine when started from a terminal.
+
+**Confirm**
+
+```sh
+grep "app start" ~/.conveyor/conveyor.log | tail -1   # PATH entries=4 first=[/usr/bin /bin /usr/sbin /sbin]
+grep -c "claude CLI not found" ~/.conveyor/logs/dispatcher.log
+```
+
+**Fix.** Quit Conveyor and relaunch it from a terminal so it inherits your PATH: `/Applications/Conveyor.app/Contents/MacOS/Conveyor`. Then re-queue the failed tasks with `conveyor task move KEY todo`.
+
+**Prevented since this change.** `Startup` runs `$SHELL -ilc` and adds the login shell's PATH entries when `claude` is not on PATH (`internal/ui/shellenv.go`). If it still fails, check that `claude` is found in a fresh login shell (`zsh -ilc 'which claude'`).
