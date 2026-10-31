@@ -1,14 +1,17 @@
 package slack
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/JayaSuryaOolio/conveyor/internal/chat"
+	"github.com/gorilla/websocket"
 )
 
 func TestMessageKeyRoundTrip(t *testing.T) {
@@ -84,5 +87,50 @@ func TestSendThreadsPerTask(t *testing.T) {
 	}
 	if b := got[0]["blocks"].([]any)[1].(map[string]any); b["type"] != "markdown" || b["text"] != "**bold**" {
 		t.Fatalf("agent text not in a markdown block: %v", b)
+	}
+}
+
+// TestListenRoutesInteractive drives the real Socket Mode loop against a fake Slack: a button
+// click must be acked and run as a command (it was once silently dropped).
+func TestListenRoutesInteractive(t *testing.T) {
+	acked := make(chan string, 1)
+	mux := http.NewServeMux()
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+	mux.HandleFunc("/apps.connections.open", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, `{"ok":true,"url":"ws%s/ws"}`, strings.TrimPrefix(srv.URL, "http"))
+	})
+	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		c, _ := (&websocket.Upgrader{}).Upgrade(w, r, nil)
+		defer c.Close()
+		c.WriteJSON(map[string]any{"type": "interactive", "envelope_id": "E1", "payload": map[string]any{
+			"type": "block_actions", "user": map[string]any{"id": "U1"}, "channel": map[string]any{"id": "D1"},
+			"actions": []any{map[string]any{"action_id": "move_todo", "value": "CV-7"}}}})
+		var ack map[string]any
+		c.ReadJSON(&ack)
+		acked <- fmt.Sprint(ack["envelope_id"])
+	})
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) { fmt.Fprint(w, `{"ok":true,"ts":"1.0"}`) })
+	api = srv.URL + "/"
+	s := &Slack{func(k string) string {
+		return map[string]string{"slack_app_token": "a", "slack_bot_token": "x", "slack_user_id": "U1"}[k]
+	}}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	cmd := make(chan string, 1)
+	go s.Listen(ctx, func(in chat.In) string { cmd <- in.Text; return "ok" })
+	got := map[string]bool{}
+	for range 2 { // the ack and the command, in either order
+		select {
+		case v := <-acked:
+			got[v] = true
+		case v := <-cmd:
+			got[v] = true
+		case <-time.After(3 * time.Second):
+			t.Fatalf("interactive envelope not routed, got %v", got)
+		}
+	}
+	if !got["E1"] || !got["move CV-7 todo"] {
+		t.Fatalf("want ack E1 and command 'move CV-7 todo', got %v", got)
 	}
 }
