@@ -595,41 +595,6 @@ func (s *Service) setManifest(a store.App, raw string) error {
 	return store.UpdateApp(s.DB, store.App{ID: a.ID, Name: a.Name, Manifest: raw})
 }
 
-// BackfillAppIcons gives every manifest action that opens an installed .app (`open -a NAME …`)
-// and has no icon that app's icon. Apps whose bundle is missing are left alone.
-func (s *Service) BackfillAppIcons() error {
-	apps, err := store.ListApps(s.DB)
-	if err != nil {
-		return err
-	}
-	for _, a := range apps {
-		m, err := ParseManifest(a.Manifest)
-		if a.Manifest == "" || err != nil {
-			continue
-		}
-		changed := false
-		for i := range m.Actions {
-			x := &m.Actions[i]
-			if x.Icon == "" && x.IconPath == "" {
-				if x.IconPath = appBundle(strings.NewReplacer("${{ worktree.path }}", "{cwd}").Replace(x.Run)); x.IconPath != "" {
-					changed = true
-				}
-			}
-		}
-		if !changed {
-			continue
-		}
-		b, err := json.MarshalIndent(m, "", "  ")
-		if err == nil {
-			err = s.setManifest(a, string(b))
-		}
-		if err != nil {
-			return fmt.Errorf("backfill icon for %q: %w", a.Name, err)
-		}
-	}
-	return nil
-}
-
 // InstallLegacy installs a plain command app (e.g. a detected preset) as a manifest app.
 func (s *Service) InstallLegacy(a store.App) (store.App, error) {
 	raw, err := LegacyManifest(a)

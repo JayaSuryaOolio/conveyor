@@ -386,15 +386,4 @@ func TestManifestIconFromApp(t *testing.T) {
 	if p, _ := s.PlacedActions("task_sidebar"); len(p) != 1 || !strings.HasPrefix(p[0].Icon, "data:image/png") {
 		t.Fatal(p)
 	}
-	// an existing iconless manifest app is backfilled
-	raw := `{"version":2,"name":"Zed2","actions":[{"id":"open","label":"Zed","run":"open -a Zed ${{ worktree.path }}","places":["global_nav"]}]}`
-	if _, err := store.CreateApp(s.DB, store.App{Name: "Zed2", Manifest: raw}); err != nil {
-		t.Fatal(err)
-	}
-	if err := s.BackfillAppIcons(); err != nil {
-		t.Fatal(err)
-	}
-	if p, _ := s.PlacedActions("global_nav"); len(p) != 1 || p[0].Icon == "" {
-		t.Fatal(p)
-	}
 }
