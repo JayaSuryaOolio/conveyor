@@ -360,3 +360,30 @@ func TestManifestFromApp(t *testing.T) {
 		t.Fatal("want not found")
 	}
 }
+
+func TestManifestIconFromApp(t *testing.T) {
+	finder := "/System/Library/CoreServices/Finder.app"
+	icns := bundleIcns(finder)
+	if icns == "" {
+		t.Skip("no Finder icon")
+	}
+	dir := t.TempDir()
+	res := filepath.Join(dir, "Zed.app", "Contents", "Resources")
+	os.MkdirAll(res, 0o755)
+	b, _ := os.ReadFile(icns)
+	os.WriteFile(filepath.Join(res, "Z.icns"), b, 0o644)
+	os.WriteFile(filepath.Join(dir, "Zed.app", "Contents", "Info.plist"), []byte(`<?xml version="1.0"?><plist version="1.0"><dict><key>CFBundleIconFile</key><string>Z</string></dict></plist>`), 0o644)
+	old := appDirs
+	appDirs = func() []string { return []string{dir} }
+	t.Cleanup(func() { appDirs = old })
+
+	s := newSvc(t)
+	s.Home = t.TempDir()
+	// a preset installs with its icon
+	if _, err := s.InstallLegacy(store.App{Name: "Zed", Command: "open -a Zed {cwd}"}); err != nil {
+		t.Fatal(err)
+	}
+	if p, _ := s.PlacedActions("task_sidebar"); len(p) != 1 || !strings.HasPrefix(p[0].Icon, "data:image/png") {
+		t.Fatal(p)
+	}
+}

@@ -295,15 +295,8 @@ func RenderManifest(run string, vars map[string]string) string {
 	})
 }
 
-// InstallManifest validates raw, stores the app and creates its agents (user scope) and
-// automations (disabled until the user enables them). A failure rolls the app back.
-// An app of the same name is an error unless replace, which uninstalls it first.
-func (s *Service) InstallManifest(raw string, replace bool) (store.App, error) {
-	m, err := ParseManifest(raw)
-	if err != nil {
-		return store.App{}, err
-	}
-	// read icons before a replace uninstalls the copies an exported manifest points at
+// readIcons renders each action's iconPath (by action index) as image bytes.
+func readIcons(m Manifest) (map[int][]byte, error) {
 	icons := map[int][]byte{}
 	for i, a := range m.Actions {
 		if a.IconPath == "" {
@@ -320,9 +313,46 @@ func (s *Service) InstallManifest(raw string, replace bool) (store.App, error) {
 			b, err = os.ReadFile(iconSrc(a.IconPath))
 		}
 		if err != nil || len(b) > 1<<20 {
-			return store.App{}, fmt.Errorf("manifest: action %q: iconPath must be a readable file of at most 1 MB (%v)", a.ID, err)
+			return nil, fmt.Errorf("manifest: action %q: iconPath must be a readable file of at most 1 MB (%v)", a.ID, err)
 		}
 		icons[i] = b
+	}
+	return icons, nil
+}
+
+// writeIcons copies icons into <home>/app-icons, points m's iconPaths at the copies and returns
+// the manifest JSON; with no icons it returns raw unchanged.
+func (s *Service) writeIcons(m *Manifest, icons map[int][]byte, raw string) (string, error) {
+	if len(icons) == 0 {
+		return raw, nil
+	}
+	if err := os.MkdirAll(s.iconsDir(), 0o755); err != nil {
+		return "", err
+	}
+	for i, b := range icons {
+		x := &m.Actions[i]
+		p := filepath.Join(s.iconsDir(), nonAlnumPath.ReplaceAllString(m.Name, "-")+"-"+x.ID+iconExt(x.IconPath))
+		if err := os.WriteFile(p, b, 0o644); err != nil {
+			return "", err
+		}
+		x.IconPath = p
+	}
+	out, err := json.MarshalIndent(m, "", "  ")
+	return string(out), err
+}
+
+// InstallManifest validates raw, stores the app and creates its agents (user scope) and
+// automations (disabled until the user enables them). A failure rolls the app back.
+// An app of the same name is an error unless replace, which uninstalls it first.
+func (s *Service) InstallManifest(raw string, replace bool) (store.App, error) {
+	m, err := ParseManifest(raw)
+	if err != nil {
+		return store.App{}, err
+	}
+	// read icons before a replace uninstalls the copies an exported manifest points at
+	icons, err := readIcons(m)
+	if err != nil {
+		return store.App{}, err
 	}
 	if _, err := store.GetApp(s.DB, m.Name); err == nil && replace {
 		// ponytail: not atomic; a failed install after this leaves the old app gone
@@ -330,23 +360,8 @@ func (s *Service) InstallManifest(raw string, replace bool) (store.App, error) {
 			return store.App{}, err
 		}
 	}
-	if len(icons) > 0 {
-		if err := os.MkdirAll(s.iconsDir(), 0o755); err != nil {
-			return store.App{}, err
-		}
-		for i, b := range icons {
-			x := &m.Actions[i]
-			p := filepath.Join(s.iconsDir(), nonAlnumPath.ReplaceAllString(m.Name, "-")+"-"+x.ID+iconExt(x.IconPath))
-			if err := os.WriteFile(p, b, 0o644); err != nil {
-				return store.App{}, err
-			}
-			x.IconPath = p
-		}
-		out, err := json.MarshalIndent(m, "", "  ")
-		if err != nil {
-			return store.App{}, err
-		}
-		raw = string(out)
+	if raw, err = s.writeIcons(&m, icons, raw); err != nil {
+		return store.App{}, err
 	}
 	a, err := store.CreateApp(s.DB, store.App{Name: m.Name, Manifest: raw})
 	if err != nil {
@@ -532,7 +547,7 @@ func spotlightService() ManifestService {
 }
 
 // LegacyManifest expresses a plain command app (the old {cwd}/{key} template) as a manifest:
-// one action in the nav bar (global) or task sidebar. Unlike the legacy sidebar icons, the
+// one action in the nav bar (global) or task sidebar, with the icon of the .app it opens. Unlike the legacy sidebar icons, the
 // action runs in the task's primary worktree only.
 func LegacyManifest(a store.App) (string, error) {
 	place := "task_sidebar"
@@ -540,7 +555,7 @@ func LegacyManifest(a store.App) (string, error) {
 		place = "global_nav"
 	}
 	run := strings.NewReplacer("{cwd}", "${{ worktree.path }}", "{key}", "${{ task.key }}").Replace(a.Command)
-	act := ManifestAction{ID: "open", Label: a.Name, Run: run, Places: []string{place}, Output: a.Output}
+	act := ManifestAction{ID: "open", Label: a.Name, Run: run, Places: []string{place}, Output: a.Output, IconPath: appBundle(a.Command)}
 	if a.Name == "Spotlight" && !a.Global && !a.Output {
 		act.Services = map[string]ManifestService{place: spotlightService()}
 	}
@@ -561,7 +576,20 @@ func (s *Service) ConvertApp(name string) error {
 	if err != nil {
 		return err
 	}
-	if _, err := ParseManifest(raw); err != nil {
+	return s.setManifest(a, raw)
+}
+
+// setManifest validates raw, extracts its icons and stores it as a's manifest.
+func (s *Service) setManifest(a store.App, raw string) error {
+	m, err := ParseManifest(raw)
+	if err != nil {
+		return err
+	}
+	icons, err := readIcons(m)
+	if err != nil {
+		return err
+	}
+	if raw, err = s.writeIcons(&m, icons, raw); err != nil {
 		return err
 	}
 	return store.UpdateApp(s.DB, store.App{ID: a.ID, Name: a.Name, Manifest: raw})
