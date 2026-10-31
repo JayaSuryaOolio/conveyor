@@ -61,6 +61,9 @@ func (a *App) Startup(ctx context.Context) {
 		return
 	}
 	a.svc = &core.Service{DB: db, Home: home, Bin: conveyorBin()}
+	if err := a.svc.BackfillAppIcons(); err != nil {
+		log.Print(err)
+	}
 	a.startTerms()
 	automation.Bin = conveyorBin() // the cli automation kind runs the CLI, not the app binary
 	ctx, a.cancel = context.WithCancel(ctx)
