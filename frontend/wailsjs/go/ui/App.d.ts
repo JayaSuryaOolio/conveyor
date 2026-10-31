@@ -28,20 +28,23 @@ export function AppLog(arg1:string,arg2:number):Promise<core.AppLog>;
 
 export function AppPresets():Promise<Array<store.App>>;
 
+export function AppServiceRunning(arg1:string,arg2:string,arg3:string,arg4:string):Promise<boolean>;
+
+export function AppVersion():Promise<string>;
+
 export function ApplyLearnings(arg1:string):Promise<string>;
 
 export function Complete(arg1:string,arg2:Array<string>,arg3:string,arg4:string):Promise<Array<core.Suggestion>>;
 
 export function Confirm(arg1:string):Promise<boolean>;
 
+export function ConvertApp(arg1:string):Promise<void>;
+
 export function CreateTask(arg1:core.NewTaskInput):Promise<string>;
 
 export function DeleteApp(arg1:string):Promise<void>;
 
-export function AppVersion():Promise<string>;
-
 export function DeleteAutomation(arg1:string):Promise<void>;
-
 
 export function DescribeSchedule(arg1:string):Promise<ui.ScheduleInfo>;
 
@@ -50,6 +53,8 @@ export function DispatcherState():Promise<string>;
 export function EditLearning(arg1:number,arg2:string):Promise<void>;
 
 export function EnsureWorkspace(arg1:string):Promise<void>;
+
+export function ExportApp(arg1:string):Promise<string>;
 
 export function ExportState():Promise<string>;
 
@@ -64,6 +69,10 @@ export function GetTask(arg1:string):Promise<ui.TaskDetail>;
 export function Home():Promise<string>;
 
 export function ImportState():Promise<Array<string>>;
+
+export function InstallManifest(arg1:string,arg2:boolean):Promise<void>;
+
+export function InstallPreset(arg1:store.App):Promise<void>;
 
 export function Learnings():Promise<Array<ui.LearningRow>>;
 
@@ -83,6 +92,8 @@ export function ListRepos():Promise<Array<store.Repo>>;
 
 export function ListTasks():Promise<Array<ui.TaskCard>>;
 
+export function ManifestSchema():Promise<Record<string, Array<string>>>;
+
 export function MergedPR(arg1:string):Promise<string>;
 
 export function Move(arg1:string,arg2:string,arg3:boolean):Promise<number>;
@@ -90,6 +101,8 @@ export function Move(arg1:string,arg2:string,arg3:boolean):Promise<number>;
 export function OpenApp(arg1:string,arg2:string,arg3:string):Promise<string>;
 
 export function OpenFile(arg1:string,arg2:string,arg3:string):Promise<void>;
+
+export function PlacedActions(arg1:string):Promise<Array<core.Placed>>;
 
 export function PreviewBrief(arg1:string):Promise<ui.BriefPreview>;
 
@@ -100,6 +113,8 @@ export function RemoveLabel(arg1:string,arg2:string):Promise<void>;
 export function RenderApp(arg1:string,arg2:string,arg3:string):Promise<string>;
 
 export function RunAction(arg1:string,arg2:string,arg3:string):Promise<void>;
+
+export function RunAppAction(arg1:string,arg2:string,arg3:string,arg4:string):Promise<string>;
 
 export function RunAutomation(arg1:string):Promise<string>;
 
@@ -133,11 +148,9 @@ export function SpotlightRoot(arg1:string):Promise<string>;
 
 export function SpotlightStop(arg1:string):Promise<void>;
 
-export function AppServiceRunning(arg1:string,arg2:string,arg3:string,arg4:string):Promise<boolean>;
+export function Stop(arg1:string):Promise<void>;
 
 export function StopAppService(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
-
-export function Stop(arg1:string):Promise<void>;
 
 export function TakeQueuedComment(arg1:string,arg2:number):Promise<string>;
 
@@ -163,18 +176,4 @@ export function UpdateAutomation(arg1:store.Automation):Promise<void>;
 
 export function UserHooks(arg1:string):Promise<string>;
 
-export function InstallManifest(arg1:string,arg2:boolean):Promise<void>;
-
-export function ExportApp(arg1:string):Promise<string>;
-
-export function ManifestSchema():Promise<Record<string, Array<string>>>;
-
 export function ValidateManifest(arg1:string):Promise<string>;
-
-export function InstallPreset(arg1:store.App):Promise<void>;
-
-export function ConvertApp(arg1:string):Promise<void>;
-
-export function PlacedActions(arg1:string):Promise<Array<core.Placed>>;
-
-export function RunAppAction(arg1:string,arg2:string,arg3:string,arg4:string):Promise<string>;
