@@ -1,28 +1,5 @@
 export namespace core {
 	
-	export class Placed {
-	    app: string;
-	    id: string;
-	    label: string;
-	    output: boolean;
-	    service: boolean;
-	    icon?: string;
-
-	    static createFrom(source: any = {}) {
-	        return new Placed(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.app = source["app"];
-	        this.id = source["id"];
-	        this.label = source["label"];
-	        this.output = source["output"];
-	        this.service = source["service"];
-	        this.icon = source["icon"];
-	    }
-	}
-
 	export class Action {
 	    label: string;
 	    repo: string;
@@ -49,7 +26,6 @@ export namespace core {
 	    scope: string;
 	    model: string;
 	    resolved?: string;
-	    unknown?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new Agent(source);
@@ -62,7 +38,6 @@ export namespace core {
 	        this.scope = source["scope"];
 	        this.model = source["model"];
 	        this.resolved = source["resolved"];
-	        this.unknown = source["unknown"];
 	    }
 	}
 	export class AppLog {
@@ -98,9 +73,6 @@ export namespace core {
 	export class ModelList {
 	    models: Model[];
 	    source: string;
-	    error?: string;
-	    // Go type: time
-	    at: any;
 	
 	    static createFrom(source: any = {}) {
 	        return new ModelList(source);
@@ -110,8 +82,6 @@ export namespace core {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.models = this.convertValues(source["models"], Model);
 	        this.source = source["source"];
-	        this.error = source["error"];
-	        this.at = this.convertValues(source["at"], null);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -168,6 +138,28 @@ export namespace core {
 	        this.ExternalKey = source["ExternalKey"];
 	        this.ExternalURL = source["ExternalURL"];
 	        this.CreatedBy = source["CreatedBy"];
+	    }
+	}
+	export class Placed {
+	    app: string;
+	    id: string;
+	    label: string;
+	    output: boolean;
+	    service: boolean;
+	    icon?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Placed(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.app = source["app"];
+	        this.id = source["id"];
+	        this.label = source["label"];
+	        this.output = source["output"];
+	        this.service = source["service"];
+	        this.icon = source["icon"];
 	    }
 	}
 	export class RunLog {
