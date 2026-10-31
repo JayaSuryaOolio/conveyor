@@ -1,15 +1,14 @@
-import {useEffect, useState} from 'react'
-import {ActionIcon, Anchor, Badge, Button, Code, Divider, Group, Indicator, Paper, Stack, TagsInput, Text, TextInput, Title, Tooltip} from '@mantine/core'
+import {useState} from 'react'
+import {ActionIcon, Anchor, Badge, Button, Code, Divider, Group, Paper, Stack, TagsInput, Text, TextInput, Title, Tooltip} from '@mantine/core'
 import {useClipboard} from '@mantine/hooks'
-import {IconCheck, IconCopy, IconPencil, IconStar, IconTerminal, IconTerminal2, IconX} from '@tabler/icons-react'
-import {Actions, AddLabel, AppIcons, EnsureWorkspace, GetSettings, ListApps, ListLabels, RemoveLabel, OpenApp, RunAction, Sessions, SetTaskRepo, SpotlightRoot, SpotlightStop, TermStart} from '../wailsjs/go/ui/App'
+import {IconCopy, IconPencil, IconStar, IconTerminal, IconTerminal2} from '@tabler/icons-react'
+import {Actions, AddLabel, EnsureWorkspace, GetSettings, ListLabels, RemoveLabel, RunAction, Sessions, SetTaskRepo, TermStart} from '../wailsjs/go/ui/App'
 import {core, store, ui} from '../wailsjs/go/models'
 import {BrowserOpenURL} from '../wailsjs/runtime/runtime'
-import {AppIcon, PlacedButtons, StatusSelect, Time, errMsg, runApp} from './components'
+import {PlacedButtons, StatusSelect, Time, errMsg} from './components'
 import {TaskAgent, TaskSettings} from './forms'
 import {useData} from './util'
 
-const SPOTLIGHT = 'Spotlight'
 const copy = (s: string) => navigator.clipboard.writeText(s).catch(errMsg)
 const sq = (s: string) => "'" + s.replace(/'/g, "'\\''") + "'"
 const cdCmd = (a: core.Action) => 'cd ' + sq(a.cwd) + (a.cmd ? ' && ' + a.cmd : '')
@@ -41,52 +40,6 @@ function ActionIcons({k, a, kind, onTerm}: {k: string; a: core.Action; kind?: st
                 </Tooltip>
             </Group>
         </>
-    )
-}
-
-/** One icon button per configured app for a repo's worktree; flashes a check/cross after launching. Spotlight shows when it is active here and click stops it. */
-function OpenIn({k, repo, wt, apps, icons}: {k: string; repo: string; wt: string; apps: store.App[]; icons?: Record<string, string>}) {
-    const [root, setRoot] = useState('')
-    const [res, setRes] = useState<Record<string, boolean>>({})
-    const hasSpotlight = apps.some(a => a.name === SPOTLIGHT)
-    const check = () => { if (hasSpotlight) SpotlightRoot(wt).then(setRoot) }
-    useEffect(check, [wt, hasSpotlight]) // eslint-disable-line react-hooks/exhaustive-deps
-    const flash = (n: string, ok: boolean) => {
-        setRes(r => ({...r, [n]: ok}))
-        setTimeout(() => setRes(({[n]: _, ...r}) => r), 1500)
-    }
-    const click = (a: store.App) => (a.name === SPOTLIGHT && root ? SpotlightStop(root) : OpenApp(a.name, k, repo).then(() => {}))
-        .then(() => flash(a.name, true), e => { flash(a.name, false); errMsg(e) }).finally(check)
-    if (apps.length === 0) return <Text size="xs" c="dimmed">No apps yet. Add them on the Apps page.</Text>
-    return (
-        <Group gap={4}>
-            {apps.map(a => {
-                const active = a.name === SPOTLIGHT && !!root
-                return (
-                    <Tooltip key={a.id} label={active ? 'Spotlight active – click to stop' : a.name}>
-                        <Indicator disabled={!active} color="green" size={8} processing>
-                            <ActionIcon variant="default" size="md" aria-label={a.name} onClick={() => click(a)}>
-                                {a.name in res ? (res[a.name] ? <IconCheck size={16} color="var(--mantine-color-green-6)"/> : <IconX size={16} color="var(--mantine-color-red-6)"/>) : <AppIcon name={a.name} icons={icons}/>}
-                            </ActionIcon>
-                        </Indicator>
-                    </Tooltip>
-                )
-            })}
-        </Group>
-    )
-}
-
-/** Output apps run on the task's primary worktree; their output shows as a toast. */
-function QuickActions({k, apps, icons}: {k: string; apps: store.App[]; icons?: Record<string, string>}) {
-    const [busy, setBusy] = useState('')
-    if (apps.length === 0) return null
-    return (
-        <Group gap={4}>
-            {apps.map(a => (
-                <Button key={a.id} size="xs" variant="default" loading={busy === a.name} leftSection={<AppIcon name={a.name} icons={icons} size={14}/>}
-                        onClick={() => { setBusy(a.name); runApp(a, OpenApp(a.name, k, '')).finally(() => setBusy('')) }}>{a.name}</Button>
-            ))}
-        </Group>
     )
 }
 
@@ -181,10 +134,8 @@ export function TaskSidebar({t, runs, reload, onTerm}: {t: store.Task; runs: sto
     const repos = t.repos ?? []
     const {data: actions, error: actionsError, reload: reloadActions} = useData(() => Actions(k), [k])
     const {data: sessions, error: sessionsError, reload: reloadSessions} = useData(() => Sessions(k), [k])
-    const {data: apps} = useData(ListApps, [])
     const {data: settings} = useData(GetSettings, [])
     const by = creator(k, t.source, settings?.user_name, t.created_by)
-    const {data: icons} = useData(AppIcons, [])
     const [busy, setBusy] = useState(false)
     const taskActions = (actions ?? []).filter(a => ['attach', 'fresh', 'shell'].includes(a.kind))
     const resume = new Map((actions ?? []).filter(a => /^(resume|attach):/.test(a.kind)).map(a => [a.kind.split(':')[1], a]))
@@ -211,16 +162,8 @@ export function TaskSidebar({t, runs, reload, onTerm}: {t: store.Task; runs: sto
             {!hasWorktree && (
                 <Button loading={busy} onClick={() => { setBusy(true); EnsureWorkspace(k).then(() => { reload(); reloadActions(); reloadSessions() }).catch(errMsg).finally(() => setBusy(false)) }}>Create workspace</Button>
             )}
-            {taskActions.map(a => <ActionRow key={a.kind + a.repo} k={k} a={a} onTerm={onTerm}/>)}
-            {/* refactor: OpenIn is per worktree, so one labelled row per repo; a task-level app launcher would drop the labels */}
-            {repos.filter(r => r.worktree_path).map(r => (
-                <Stack key={r.repo_id} gap={2}>
-                    {repos.length > 1 && <Text size="xs" c="dimmed">{r.repo_name}</Text>}
-                    <OpenIn k={k} repo={r.repo_name} wt={r.worktree_path!} apps={(apps ?? []).filter(a => !a.manifest && !a.global && !a.output)} icons={icons}/>
-                </Stack>
-            ))}
-            {hasWorktree && <QuickActions k={k} apps={(apps ?? []).filter(a => !a.manifest && !a.global && a.output)} icons={icons}/>}
             {hasWorktree && <PlacedButtons place="task_sidebar" k={k}/>}
+            {taskActions.map(a => <ActionRow key={a.kind + a.repo} k={k} a={a} onTerm={onTerm}/>)}
             <Divider/>
             <Title order={6}>Sessions</Title>
             {sessionsError && <Text size="xs" c="red">Failed to load sessions: {sessionsError}</Text>}

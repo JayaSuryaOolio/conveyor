@@ -54,6 +54,12 @@ func AppIcons(home string, apps []store.App) map[string]string {
 	out := map[string]string{}
 	dir := filepath.Join(home, "icons")
 	for _, a := range apps {
+		if a.Manifest != "" {
+			if u := manifestIcon(a.Manifest); u != "" {
+				out[a.Name] = u
+			}
+			continue
+		}
 		app := appBundle(a.Command)
 		if app == "" {
 			continue
@@ -70,4 +76,22 @@ func AppIcons(home string, apps []store.App) map[string]string {
 		}
 	}
 	return out
+}
+
+// manifestIcon is the icon (data: URL) of a manifest's first action that has one, "" if none.
+func manifestIcon(raw string) string {
+	m, err := ParseManifest(raw)
+	if err != nil {
+		return ""
+	}
+	for _, x := range m.Actions {
+		if x.IconPath != "" {
+			if u := iconURL(x.IconPath); u != "" {
+				return u
+			}
+		} else if x.Icon != "" {
+			return x.Icon
+		}
+	}
+	return ""
 }
