@@ -209,6 +209,9 @@ func (s *Slack) Listen(ctx context.Context, h func(chat.In) string) error {
 		case "events_api":
 			c.WriteJSON(map[string]any{"envelope_id": e.EnvelopeID})
 			s.event(e.Payload, h)
+		case "interactive": // button clicks
+			c.WriteJSON(map[string]any{"envelope_id": e.EnvelopeID})
+			s.interactive(e.Payload, h)
 		case "slash_commands":
 			var p struct {
 				UserID string `json:"user_id"`
