@@ -53,7 +53,8 @@ export function PlacedButtons({place, k = '', size = 'xs'}: {place: string; k?: 
     }
     return (
         <Group gap={4} onClick={e => e.stopPropagation()}>
-            {data.map(a => a.service
+            {/* icon actions first, then text buttons (sort is stable, so manifest order holds within each group) */}
+            {[...data].sort((x, y) => Number(!!y.icon) - Number(!!x.icon)).map(a => a.service
                 ? <ServiceButton key={a.app + a.id} a={a} place={place} k={k} size={size}/>
                 : a.icon
                     ? <Tooltip key={a.app + a.id} label={a.label}><ActionIcon size={iconSize(size)} variant="default" aria-label={a.label} loading={busy === a.app + a.id} onClick={() => run(a)}><ActionImg src={a.icon}/></ActionIcon></Tooltip>
