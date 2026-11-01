@@ -27,7 +27,6 @@ type State struct {
 type StateApp struct {
 	Name    string `json:"name"`
 	Command string `json:"command"`
-	Global  bool   `json:"global"`
 	Output  bool   `json:"output"`
 	// Manifest is the app's portable manifest JSON (icons inlined); set for manifest apps.
 	Manifest string `json:"manifest,omitempty"`
@@ -99,7 +98,7 @@ func (s *Service) ExportState() (State, error) {
 		return st, err
 	}
 	for _, a := range apps {
-		sa := StateApp{Name: a.Name, Command: a.Command, Global: a.Global, Output: a.Output}
+		sa := StateApp{Name: a.Name, Command: a.Command, Output: a.Output}
 		if a.Manifest != "" {
 			if sa.Manifest, err = portableManifest(a.Manifest); err != nil {
 				return st, fmt.Errorf("app %q: %w", a.Name, err)
@@ -179,7 +178,7 @@ func (s *Service) ImportState(st State, repoMap map[string]string) ([]string, er
 				continue
 			}
 		}
-		if _, err := store.CreateApp(s.DB, store.App{Name: a.Name, Command: a.Command, Global: a.Global, Output: a.Output, Manifest: a.Manifest}); err != nil {
+		if _, err := store.CreateApp(s.DB, store.App{Name: a.Name, Command: a.Command, Output: a.Output, Manifest: a.Manifest}); err != nil {
 			return out, err
 		}
 		out = append(out, "added app "+a.Name)

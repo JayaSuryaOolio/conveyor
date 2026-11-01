@@ -135,7 +135,6 @@ CREATE TABLE IF NOT EXISTS apps (
   id INTEGER PRIMARY KEY,
   name TEXT NOT NULL UNIQUE,
   command TEXT NOT NULL,
-  global INTEGER NOT NULL DEFAULT 0,
   output INTEGER NOT NULL DEFAULT 0,
   manifest TEXT NOT NULL DEFAULT ''
 );
@@ -153,7 +152,7 @@ func Migrate(db *sql.DB) error {
 	if _, err := db.Exec(`DELETE FROM task_links WHERE kind='duplicates'`); err != nil {
 		return fmt.Errorf("drop duplicates links: %w", err)
 	}
-	if err := migrateAddAppGlobal(db); err != nil {
+	if err := migrateAppColumns(db); err != nil {
 		return err
 	}
 	if err := migrateAddAppManifest(db); err != nil {
@@ -210,17 +209,24 @@ func migrateAddTaskCreatedBy(db *sql.DB) error {
 	return nil
 }
 
-// migrateAddAppGlobal adds apps.global and apps.output to databases created before they existed.
-func migrateAddAppGlobal(db *sql.DB) error {
-	for _, col := range []string{"global", "output"} {
-		var n int
-		if err := db.QueryRow(`SELECT count(*) FROM pragma_table_info('apps') WHERE name=?`, col).Scan(&n); err != nil {
-			return fmt.Errorf("check apps.%s: %w", col, err)
+// migrateAppColumns adds apps.output and drops the legacy apps.global on older databases.
+func migrateAppColumns(db *sql.DB) error {
+	has := func(col string) (n int, err error) {
+		err = db.QueryRow(`SELECT count(*) FROM pragma_table_info('apps') WHERE name=?`, col).Scan(&n)
+		return n, err
+	}
+	if n, err := has("output"); err != nil {
+		return fmt.Errorf("check apps.output: %w", err)
+	} else if n == 0 {
+		if _, err := db.Exec(`ALTER TABLE apps ADD COLUMN output INTEGER NOT NULL DEFAULT 0`); err != nil {
+			return fmt.Errorf("add apps.output: %w", err)
 		}
-		if n == 0 {
-			if _, err := db.Exec(`ALTER TABLE apps ADD COLUMN ` + col + ` INTEGER NOT NULL DEFAULT 0`); err != nil {
-				return fmt.Errorf("add apps.%s: %w", col, err)
-			}
+	}
+	if n, err := has("global"); err != nil {
+		return fmt.Errorf("check apps.global: %w", err)
+	} else if n > 0 {
+		if _, err := db.Exec(`ALTER TABLE apps DROP COLUMN global`); err != nil {
+			return fmt.Errorf("drop apps.global: %w", err)
 		}
 	}
 	return nil
