@@ -54,6 +54,12 @@ export function EditLearning(arg1:number,arg2:string):Promise<void>;
 
 export function EnsureWorkspace(arg1:string):Promise<void>;
 
+export function EpicApprove(arg1:string):Promise<void>;
+
+export function EpicGraph(arg1:string):Promise<core.Graph>;
+
+export function EpicRestart(arg1:string,arg2:string):Promise<void>;
+
 export function ExportApp(arg1:string):Promise<string>;
 
 export function ExportState():Promise<string>;
@@ -141,6 +147,8 @@ export function SetTaskDescription(arg1:string,arg2:string):Promise<void>;
 export function SetTaskModel(arg1:string,arg2:string):Promise<void>;
 
 export function SetTaskRepo(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
+
+export function SetTaskSkills(arg1:string,arg2:Array<string>):Promise<void>;
 
 export function ShowError(arg1:string):Promise<void>;
 

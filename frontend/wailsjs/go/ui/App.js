@@ -102,6 +102,18 @@ export function EnsureWorkspace(arg1) {
   return window['go']['ui']['App']['EnsureWorkspace'](arg1);
 }
 
+export function EpicApprove(arg1) {
+  return window['go']['ui']['App']['EpicApprove'](arg1);
+}
+
+export function EpicGraph(arg1) {
+  return window['go']['ui']['App']['EpicGraph'](arg1);
+}
+
+export function EpicRestart(arg1, arg2) {
+  return window['go']['ui']['App']['EpicRestart'](arg1, arg2);
+}
+
 export function ExportApp(arg1) {
   return window['go']['ui']['App']['ExportApp'](arg1);
 }
@@ -276,6 +288,10 @@ export function SetTaskModel(arg1, arg2) {
 
 export function SetTaskRepo(arg1, arg2, arg3, arg4) {
   return window['go']['ui']['App']['SetTaskRepo'](arg1, arg2, arg3, arg4);
+}
+
+export function SetTaskSkills(arg1, arg2) {
+  return window['go']['ui']['App']['SetTaskSkills'](arg1, arg2);
 }
 
 export function ShowError(arg1) {

@@ -129,6 +129,28 @@ CREATE TABLE IF NOT EXISTS task_labels (
 );
 CREATE INDEX IF NOT EXISTS idx_task_labels_label ON task_labels(label_id);
 
+CREATE TABLE IF NOT EXISTS epic_flows (
+  id INTEGER PRIMARY KEY,
+  epic_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  attempt INTEGER NOT NULL,
+  status TEXT NOT NULL,
+  reason TEXT NOT NULL DEFAULT '',
+  started_at TEXT NOT NULL, ended_at TEXT,
+  UNIQUE (epic_id, attempt)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_epic_flows_active ON epic_flows(epic_id) WHERE status = 'active';
+
+CREATE TABLE IF NOT EXISTS epic_flow_prs (
+  flow_id INTEGER NOT NULL REFERENCES epic_flows(id) ON DELETE CASCADE,
+  task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  repo_id INTEGER REFERENCES repos(id),
+  pr_url TEXT, head_sha TEXT, review TEXT, checks TEXT,
+  unresolved INTEGER NOT NULL DEFAULT 0,
+  seen_comment_id INTEGER NOT NULL DEFAULT 0,
+  updated_at TEXT NOT NULL,
+  UNIQUE (flow_id, task_id, repo_id)
+);
+
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 
 CREATE TABLE IF NOT EXISTS apps (

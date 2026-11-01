@@ -54,6 +54,73 @@ export namespace core {
 	        this.next = source["next"];
 	    }
 	}
+	export class GraphNode {
+	    key: string;
+	    title: string;
+	    status: string;
+	    kind: string;
+	    agent: string;
+	    repos: string[];
+	    blocked_by: string[];
+	    prs: string[];
+	    labels: string[];
+	    parent: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new GraphNode(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.key = source["key"];
+	        this.title = source["title"];
+	        this.status = source["status"];
+	        this.kind = source["kind"];
+	        this.agent = source["agent"];
+	        this.repos = source["repos"];
+	        this.blocked_by = source["blocked_by"];
+	        this.prs = source["prs"];
+	        this.labels = source["labels"];
+	        this.parent = source["parent"];
+	    }
+	}
+	export class Graph {
+	    root: string;
+	    nodes: GraphNode[];
+	    links: store.Link[];
+	    prs: store.FlowPR[];
+	
+	    static createFrom(source: any = {}) {
+	        return new Graph(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.root = source["root"];
+	        this.nodes = this.convertValues(source["nodes"], GraphNode);
+	        this.links = this.convertValues(source["links"], store.Link);
+	        this.prs = this.convertValues(source["prs"], store.FlowPR);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
 	export class Model {
 	    id: string;
 	    tier: string;
@@ -117,6 +184,8 @@ export namespace core {
 	    ExternalKey: string;
 	    ExternalURL: string;
 	    CreatedBy: string;
+	    Epic: boolean;
+	    EpicName: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new NewTaskInput(source);
@@ -138,6 +207,8 @@ export namespace core {
 	        this.ExternalKey = source["ExternalKey"];
 	        this.ExternalURL = source["ExternalURL"];
 	        this.CreatedBy = source["CreatedBy"];
+	        this.Epic = source["Epic"];
+	        this.EpicName = source["EpicName"];
 	    }
 	}
 	export class Placed {
@@ -327,6 +398,48 @@ export namespace store {
 	        this.run_id = source["run_id"];
 	        this.consumed_by_run_id = source["consumed_by_run_id"];
 	        this.created_at = source["created_at"];
+	    }
+	}
+	export class FlowPR {
+	    flow_id: number;
+	    task: string;
+	    repo: string;
+	    pr_url?: string;
+	    head_sha?: string;
+	    review?: string;
+	    checks?: string;
+	    unresolved: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new FlowPR(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.flow_id = source["flow_id"];
+	        this.task = source["task"];
+	        this.repo = source["repo"];
+	        this.pr_url = source["pr_url"];
+	        this.head_sha = source["head_sha"];
+	        this.review = source["review"];
+	        this.checks = source["checks"];
+	        this.unresolved = source["unresolved"];
+	    }
+	}
+	export class Link {
+	    from: string;
+	    to: string;
+	    kind: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Link(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.from = source["from"];
+	        this.to = source["to"];
+	        this.kind = source["kind"];
 	    }
 	}
 	export class TaskRef {
