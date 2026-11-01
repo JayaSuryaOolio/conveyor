@@ -1,6 +1,11 @@
 # Epic Builder: PRD and tech spec
 
-Status: draft v2 (CV-4). v1 put an `epic_stage` column on tasks. v2 drops it: an epic is described with **labels**, and its order and hierarchy come from **task relations**. Open questions are in §3.
+Status: draft v3 (CV-4).
+- v1 put an `epic_stage` column on tasks. Rejected.
+- v2 used labels and relations only, and planned with wayfinder labels.
+- v3 applies the answers to v2's questions: a default plan gate that `epic_gate:off` turns off, no auto-merge, an internal **epic flow** (one attempt at the epic) that holds PR state, React Flow with editable cards, and `epic:*` labels as an adapter over any planning skill. It also adds the `epic` skill and its checklist, event-driven review checks instead of polling, and audit logs you can query as OTel.
+
+Open questions are in §3.
 
 ---
 
@@ -10,115 +15,154 @@ Status: draft v2 (CV-4). v1 put an `epic_stage` column on tasks. v2 drops it: an
 
 Conveyor runs one task at a time well. A piece of work the size of a Jira epic (several PRs, maybe several repos) still needs a human to:
 
-- work out the requirements and acceptance criteria,
+- work out the requirements and the acceptance criteria (AC),
 - split the work into tasks and put them in order,
+- pick the right agent and skills for each task,
 - watch each task, copy PR review comments back to it, and check that the pieces add up.
 
 That coordination takes the time. It is also hard to see where an epic stands, because the board is a flat list of cards.
 
 ## 2. What we're building
 
-Two things on top of what Conveyor already has:
+1. **An autonomous epic loop.** You describe a large task once. Conveyor plans it and asks you to approve the plan. After that it runs, fixes review comments, and waits for you to merge.
+2. **The Epic view.** A flow chart of the task tree with live status. **On each card you can see and change the agent, model and skills** for that step, and start, stop or answer it.
+3. **The `epic` skill.** It is installed with Conveyor's hooks and keeps every epic run on a checklist (§2.4).
+4. **Audit logs.** Every epic action is a structured log record you can query in Grafana (Loki) or any OTel backend.
 
-1. **An autonomous epic loop.** You describe a large task once. Conveyor plans it, runs it and fixes PR review comments until it is merged. It only asks you something when it has to.
-2. **The Epic view.** A flow chart of the task tree, drawn from relations, with live status on every card.
+The building blocks:
 
-There is no new building block. An epic is an ordinary task:
-
-| Concept | How it's expressed | Already exists? |
+| Concept | How it's expressed | New? |
 |---|---|---|
-| "This task is an epic" | label `epic` on the root task | labels (#131) |
-| Stage of the epic | label `epic_stage:<stage>` on the root, one at a time | labels |
-| Kind of child ticket | label `wayfinder:<type>` (decision tickets) or none (build tickets) | labels |
-| Hierarchy | `parent_id` (sub-tasks) | yes |
-| Order | `blocks` links; the dispatcher already holds blocked tasks back | yes |
-| "Wants you" | status `needs_you` | yes |
+| "This task is an epic" | label `epic` on the root task | no (labels, #131) |
+| Membership | label `epic:<ROOTKEY>` on every task in the epic, plus `parent_id` | label convention |
+| Stage | label `epic_stage:<stage>` on the root, one at a time | label convention |
+| Kind of child | label `epic:<kind>`: `research`, `prototype`, `grilling` or `build` (§2.1) | label convention |
+| Repo | label `repo:<name>`, kept equal to the task's repos | label convention |
+| Skills for a step | labels `skill:<name>`; the brief tells the agent to load them | label convention |
+| Agent and model for a step | `tasks.agent`, `tasks.model` | no |
+| Order | `blocks` links. The dispatcher already holds blocked tasks back. | no |
+| Hierarchy | `parent_id` | no |
+| **Epic flow** | one attempt to finish the epic's tasks. It holds PR state, review checks and the audit trail. Hidden in the UI; you can query it. | **yes**, table `epic_flows` |
 
-The flow chart is these relations drawn as a picture. The board stays the source of truth.
+The board stays the source of truth for tasks. The flow chart is relations drawn as a picture, and it can also edit them.
 
-### 2.1 Planning with wayfinder
+### 2.1 `epic:*` labels as an adapter over planning skills
 
-Planning follows Matt Pocock's [`wayfinder`](https://github.com/mattpocock/skills/blob/main/skills/engineering/wayfinder/SKILL.md) skill ([background](https://latent.space/p/wayfinder-skill)). It fits Conveyor almost one to one:
+Conveyor speaks one vocabulary: `epic:<kind>` for child tickets and `epic_stage:<stage>` for the root. A **planner adapter** maps a planning skill's operations onto it. The default is Matt Pocock's [`wayfinder`](https://github.com/mattpocock/skills/blob/main/skills/engineering/wayfinder/SKILL.md):
 
 | wayfinder | Conveyor |
 |---|---|
-| map issue, label `wayfinder:map` | the epic task (label `epic`); its description holds Destination / Notes / Decisions so far / Not yet specified / Out of scope |
-| ticket = child issue, label `wayfinder:research\|prototype\|grilling\|task` | sub-task with the same label |
+| map issue | the epic root. Its description holds Destination, AC, Decisions so far, Not yet specified, Out of scope. |
+| ticket `wayfinder:research\|prototype\|grilling\|task` | sub-task labelled `epic:research\|prototype\|grilling\|build` |
 | native blocking | `conveyor task link A blocks B` |
-| frontier = open, unblocked, unclaimed children | children in `todo` with no open blockers, which is exactly what the dispatcher launches |
-| claim = assign | the dispatcher starting a run |
+| frontier | children in `todo` with no open blockers. The dispatcher launches exactly these. |
+| claim | the dispatcher starting a run |
 | HITL ticket (grilling, prototype) | the run asks its questions and goes to `needs_you`; your comment resumes it |
-| AFK ticket (research, task) | runs with no human |
-| resolution comment + close + pointer on the map | status block summary, task `done`, the agent appends one line to the epic's "Decisions so far" |
-| "one ticket per session" | one task per run, already how Conveyor works |
+| AFK ticket (research, build) | runs with no human |
+| resolution, close, pointer on the map | status block summary, task `done`, one line appended to the map's Decisions so far |
 
-wayfinder reads its tracker operations from a "tracker doc". We ship one that maps them to the `conveyor task` CLI (§8), so the skill runs unchanged.
+An adapter is one markdown file, `skills/epic/planners/<name>.md`, holding this table as commands. The root picks a planner with `epic_planner:<name>` (default `wayfinder`). Another skill, such as a spec-kit style planner or your own grilling skill, needs only a new file. No Go changes.
 
 ### 2.2 The loop
 
 ```
- chart ──► decide ──► spec ──► build ──► verify ──► done
-   │         │          │        │          │
- epic run  wayfinder  epic run  build     epic run
- (charts   tickets    (writes   sub-tasks  (checks AC;
-  the map)  (frontier  spec +    (TDD, PR,  gaps → new
-            runs by    creates   review     build
-            itself)    build     loop)      tickets)
-                       tickets)
+ chart ──► [approve] ──► decide ──► spec ──► build ──► verify ──► done
+   │                       │          │        │          │
+ epic run               decision    epic run  build      epic run
+ (grills you,           tickets     (spec +   tickets    (AC vs merged
+  writes map + AC)      run AFK     build     (TDD, PR,  work; gaps →
+                        or HITL)    tickets)  review     new build
+                                              fixes)     tickets)
 ```
 
 | Stage | What happens | Moves on when | Human? |
 |---|---|---|---|
-| `chart` | The epic run grills you on the destination and the acceptance criteria, then creates the decision tickets and their `blocks` links (wayfinder "Chart the map"). | Map written | Yes: grilling. This is the main conversation. |
-| `decide` | Frontier tickets run on their own as they unblock. Each resolution can add tickets or turn fog into tickets. | No open `wayfinder:*` children | Only on grilling/prototype tickets |
-| `spec` | The epic run writes the spec from "Decisions so far", creates build sub-tasks (repo, AC, agent) and `blocks` links, and moves them to todo. | Build tickets exist | No, unless the gate in §3 Q1 is on |
-| `build` | Build tickets run test-first and open PRs. Review comments are picked up every 5 min (§10) and fixed. | Every build child done or cancelled | Only if an agent gets stuck, or for merge (§3 Q2) |
+| `chart` | The epic run grills you on the destination and the AC, then creates the decision tickets and their `blocks` links. | Map and AC written | Yes. This is the main conversation. |
+| *gate* | The run ends in `needs_you` with the plan. **Approve** (button on the Epic view, or a comment `approve`) moves the epic to `decide`, and everything after runs without you. With label `epic_gate:off` there is no stop. | Approved | Yes, unless `epic_gate:off` |
+| `decide` | Frontier tickets run as they unblock. A resolution can add tickets. | No open decision tickets | Only on grilling and prototype tickets |
+| `spec` | The epic run writes the spec, creates `epic:build` sub-tasks (repo, AC ids, agent, skills) with `blocks` links, and moves them to `todo`. | Build tickets exist | No |
+| `build` | Build tickets run test-first and open PRs. Review events requeue them (§10). | Every build child done or cancelled | When an agent gets stuck, and **for merging: the human always merges** |
 | `verify` | The epic run checks every AC against the merged work. Gaps become new build tickets and the stage goes back to `build`. | All AC met | No |
-| `done` | The epic moves to done. | | |
+| `done` | The epic moves to done, and the flow ends. | | |
 
-The epic agent swaps its own stage label, so moving between stages needs no Go code. The one new dispatcher rule: when the last open child settles, wake the epic (§9).
+The epic agent swaps its own stage label, so moving between stages needs no Go code. Go adds one rule: when the last open child settles, wake the epic (§9).
+
+### 2.3 Epic flows (attempts)
+
+An **epic flow** is one attempt to finish the epic. It is not a task and is not shown on the board.
+
+- Approving the plan (or the first run with `epic_gate:off`) starts flow 1.
+- The flow records the tasks it runs, their PRs (head commit, review decision, checks, unresolved count), the one-shot review checks it scheduled (§10), and every audit record (§12).
+- When a flow fails too often (default: 3 child failures in a row, or the epic run says so), the epic goes to `needs_you` with a proposal to restart. `conveyor epic restart KEY --reason "…"` ends the flow as `abandoned`, cancels its open tasks, and starts flow N+1 at `spec` with the map and decisions kept. Restarts should be rare. Nothing restarts on its own.
+- You can query flows (`conveyor epic flows KEY`, `conveyor epic status KEY --flow N`); the UI shows only the current one.
+
+### 2.4 The `epic` skill and its checklist
+
+The skill ships in this repo at `skills/epic/`. "Install hooks" (Settings, `UserHooks("install")`) copies it to `~/.claude/skills/epic/`, and "uninstall" removes it. Every epic run and every child run loads it (the brief names it).
+
+Tasks remember nothing between runs. The skill makes them seem to: **every run starts from `conveyor epic status KEY --json`**, which assembles flow, tasks, PRs, AC coverage and the recent audit tail from the DB. That status is the state. The workspace's STATE.md is only a scratchpad.
+
+Checklist, run at the start and before the status block (`conveyor epic check KEY` does the mechanical items and prints what fails):
+
+1. **Epic label.** Every task in the tree has `epic:<ROOTKEY>`, and no task outside the tree has it.
+2. **Repo labels.** Each task's `repo:*` labels equal its repos. A build task has exactly one repo.
+3. **Acceptance criteria.** The root's `## Acceptance criteria` is a numbered checklist (AC1, AC2, …). Every AC is covered by at least one build task that cites its id, and each AC is ticked only with evidence (PR, test, or commit).
+4. **PRs.** Every build task in `review` or `done` has a PR recorded on the flow. `conveyor epic prs KEY [--commits]` lists PRs and their commits. `conveyor epic search KEY <regex>` runs `git log -G` over the flow's PR branches to find where something changed.
+5. **Sessions.** `conveyor epic sessions KEY [--grep <text>]` lists each run's Claude session (task, run, transcript path) and searches the transcripts. Use it to recall why something was done instead of asking the human again.
+6. **Order and agents.** No `epic:build` task in `todo` lacks an agent, a repo or AC ids. No `blocks` cycles (already refused).
+7. **Audit.** Every stage change, task created, label changed, gate passed and restart is in the audit log. Hooks write most records (§12); the skill only adds the reason with `conveyor epic log KEY "<why>"`.
 
 ## 3. Open questions
 
-1. **AC sign-off gate.** Should the run stop for an explicit "approve" after `chart` (AC and map written) and after `spec` (build tickets created)? Proposal: one gate only, after `chart`, controlled by a per-epic label `epic_gate:off` to skip it. The rest runs AFK.
-2. **Merging.** Who merges build PRs? Proposal: the human, as today. An `epic_automerge` label lets the agent run `gh pr merge --auto` once the PR is approved and checks are green.
-3. **PR fields on cards.** Showing the review decision and CI checks on cards means storing them. Proposal: two nullable columns on `task_repos` (`pr_review`, `pr_checks`), filled by the existing poll. These are PR cache columns, not epic state. The alternative is no columns and PR state only.
-4. **Graph library.** `@xyflow/react` (pan/zoom/minimap, the n8n look, one dependency) or hand-rolled SVG? Proposal: React Flow, with our own layering (no dagre).
-5. **Label names.** Reuse wayfinder's `wayfinder:*` names as they are (proposal; it keeps the skill unchanged), or rename them to `epic:*`?
+1. **Label namespace.** `epic:<ROOTKEY>` (membership) and `epic:<kind>` share a prefix. Keys match `[A-Z]+-\d+[A-Z]*`, so they can't clash, but a filter on `epic:` returns both. Proposal: keep both under `epic:` as you asked. The alternative is `epic_kind:<kind>`.
+2. **Review events.** GitHub can't reach a desktop app without a tunnel. Proposal (§10): one-shot checks scheduled after each push, with backoff, plus `gh webhook forward` for `pull_request_review` events. It's an optional gh extension and only one forward can run per repo at a time. OK to ship the extension path as opt-in?
+3. **Audit export.** Proposal (§12): write OTel-shaped JSON lines to `~/.conveyor/logs/audit.jsonl`, which Alloy, Promtail or the OTel Collector `filelog` receiver can ship to Loki, and turn on Claude Code's own OTel export for epic runs. Exporting OTLP straight from Go adds the OTel SDK; leave that out unless you want it.
+4. **Restart threshold.** 3 child failures in a row before the epic proposes a restart?
 
 ## 4. Requirements
 
 **Epic loop**
-- R1. Adding the label `epic` to a root task turns it into an epic. If no `epic_stage:*` label is present, the stage is `chart`. "New task" gets an "Epic" toggle that just adds the label.
-- R2. `conveyor task label KEY set epic_stage:<s>` replaces any other `epic_stage:*` label in one transaction. More generally, `set` with a `prefix:` replaces labels that share the prefix.
-- R3. The epic agent template follows the loop in §2.2 and uses the wayfinder skill with the Conveyor tracker doc.
-- R4. Decision tickets carry `wayfinder:<type>`. HITL types end their run in `needs_you` with numbered questions, at most 5 per batch.
-- R5. Build tickets carry the epic's AC and a link to the spec, written into their description by the epic run, and are told to work test-first.
-- R6. While any child is running or todo, the epic itself does not run. When the last open child finishes, the epic is requeued with a system comment that names its stage.
+- R1. Adding `epic` to a root task makes it an epic; with no `epic_stage:*` label, the stage is `chart`. "New task" gets an "Epic" toggle.
+- R2. `conveyor task label KEY set <prefix>:<value>` replaces labels with the same prefix in one transaction.
+- R3. After `chart`, the epic waits in `needs_you` for approval unless it has `epic_gate:off`. Approval starts a flow and moves the epic to `decide`. Nothing after that needs the human, except HITL tickets, stuck agents, and merging.
+- R4. No agent merges a PR. The `epic` skill says so, and the PreToolUse hook denies `gh pr merge` in runs of epic tasks.
+- R5. Children carry `epic:<ROOTKEY>`, `epic:<kind>` and `repo:*`. Build tickets carry their AC ids and a link to the spec, and are told to work test-first.
+- R6. While any child is running or in `todo`, the epic does not run. When the last open child settles, the epic is requeued with a system comment that names its stage.
 
-**PR review polling**
-- R7. Every 5 minutes, for each task in `review` with an open PR, new review bodies and inline comments are posted to the task thread as one system comment, which requeues the task. The poller skips comments that start with `ai agent:`, comments already seen, and comments on resolved threads.
-- R8. The poller is one place in the dispatcher's tick: no goroutine or timer per task, a timeout on each `gh` call, and it stops when the app context is cancelled (§10).
+**Flows**
+- R7. `epic_flows` records attempts. Only one flow per epic is active. `conveyor epic flows|status|restart` work on flows. The flow id never appears on the board or the cards.
+
+**Skill**
+- R8. `skills/epic/` is installed and removed together with the user hooks. It holds the checklist (§2.4), the stage loop and `planners/wayfinder.md`.
+- R9. `conveyor epic status|check|prs|search|sessions|log` exist and print `--json`.
+
+**Review checks**
+- R10. Review comments reach the task through **one-shot automations** owned by the task and the flow, not a recurring poll (§10). They are deleted when the task is done or cancelled, or the flow ends.
+
+**Audit**
+- R11. Every epic action produces an audit record (§12). `conveyor epic audit KEY [--flow N] [--since]` queries it, and the JSONL file can be shipped to Loki or an OTel collector.
 
 **Epic view**
-- R9. A page per tree. It opens from any task and resolves to the root by walking `parent_id`. Layout: children are grouped under their parent, and columns follow the `blocks` order.
-- R10. Each card shows: key, title, labels (stage/type chip), task status with a pulse while running, a worktree chip (present/missing), and a PR chip (state, review decision, checks, unresolved comment count). Each chip links out: PR → browser, worktree → shell or editor (existing quick actions), card → task page.
-- R11. A header strip shows the stage pipeline (`chart → … → done`) with the current stage highlighted, plus `n/m` children done and a "wants you" count.
-- R12. Updates are live on `db:changed`. There is no refresh button.
-- R13. Board cards and the task page header get a flow icon that opens this view. Every task gets one; a lone task shows as one node plus its link neighbours.
-- R14. A sidebar entry "Epics" lists tasks labelled `epic` (the board label filter from CV-54 may already cover this; see §11).
+- R12. A page per tree, opened from any task (resolves to the root). Built on React Flow. Children are grouped under their parent; columns follow `blocks`.
+- R13. **Each card shows and edits** the agent (picker of the user's and repos' agents), model, skills (multi-select of the skills found on disk, stored as `skill:*` labels; the agent's own frontmatter skills are shown read-only), repo, and labels. It also shows the key, title, status with a pulse while running, a worktree chip and a PR chip (state, review, checks, unresolved count). Card actions: open task, run or requeue, stop the run (CV-56), answer (when `needs_you`), open the PR, open a shell or editor.
+- R14. On the canvas: drag from one card to another to add a `blocks` link, select an edge and delete it to unlink, and use "+" on a group to add a sub-task. Every edit calls the same core functions as the CLI.
+- R15. A header strip shows the stage pipeline with the current stage, `n/m` children done, the "wants you" count and, at the gate, **Approve plan**.
+- R16. Updates are live on `db:changed`.
+- R17. Board cards and the task page header get a flow icon that opens this view. A lone task shows as one node plus its link neighbours.
 
 ## 5. Out of scope (v1)
 
-- Editing the graph by dragging (drawing an edge = `task link`). It can come later.
+- Auto-merge, in any form.
 - Saved node positions. Custom stage lists per epic.
 - Jira import or sync.
-- Worktree detail (dirty, ahead/behind). It costs a git call per card; the chip shows present/missing only.
+- Worktree detail (dirty, ahead/behind).
+- Editing an agent's own file from the card (the card links to the Agents page instead).
 
 ## 6. Success
 
-- A one-paragraph epic reaches merged PRs, with the human only answering grilling questions and reviewing PRs.
-- From the Epic view you can tell in five seconds the stage, what is blocked, what wants you, and which PR has unread review comments.
+- A one-paragraph epic reaches PRs ready to merge, with the human only answering grilling questions, approving the plan and merging.
+- From the Epic view you can tell in five seconds the stage, what is blocked, what wants you, which PR has unread review comments, and which agent and skills each step uses, and change them on the spot.
+- For any epic, `conveyor epic audit` or a Grafana query answers "who did what, when and why".
 
 ---
 
@@ -126,125 +170,159 @@ The epic agent swaps its own stage label, so moving between stages needs no Go c
 
 ## 7. Data model
 
-No new tables. Epic state is labels plus existing relations.
+```sql
+CREATE TABLE IF NOT EXISTS epic_flows (
+  id INTEGER PRIMARY KEY,
+  epic_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  attempt INTEGER NOT NULL,                 -- 1, 2, …
+  status TEXT NOT NULL,                     -- active | abandoned | done
+  reason TEXT NOT NULL DEFAULT '',
+  started_at TEXT NOT NULL, ended_at TEXT,
+  UNIQUE (epic_id, attempt)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_epic_flows_active ON epic_flows(epic_id) WHERE status = 'active';
 
-- `labels` / `task_labels` (#131): `epic`, `epic_stage:<s>`, `wayfinder:<type>`, optional `epic_gate:off`, `epic_automerge`.
-- `parent_id`: hierarchy. `task_links(kind=blocks)`: order (loops are already refused, see `TestBlockLoops`).
-- Review watermark: an `events` row `pr_review_seen` with detail `<repo_id>:<latest comment id>`. No column.
-- Only if §3 Q3 is accepted: `ALTER TABLE task_repos ADD COLUMN pr_review TEXT; ADD COLUMN pr_checks TEXT;` through an idempotent `migrateAddX`.
+CREATE TABLE IF NOT EXISTS epic_flow_prs (  -- also the flow's task membership
+  flow_id INTEGER NOT NULL REFERENCES epic_flows(id) ON DELETE CASCADE,
+  task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  repo_id INTEGER REFERENCES repos(id),     -- NULL until the task has a PR
+  pr_url TEXT, head_sha TEXT, review TEXT, checks TEXT,
+  unresolved INTEGER NOT NULL DEFAULT 0,
+  seen_comment_id INTEGER NOT NULL DEFAULT 0, -- review watermark
+  updated_at TEXT NOT NULL,
+  UNIQUE (flow_id, task_id, repo_id)
+);
 
-`store.SetPrefixedLabel(db, taskID, "epic_stage:build")` deletes the task's labels that match `epic_stage:%` and adds the new one, in one transaction. About 15 lines next to `AddLabel`.
+ALTER TABLE automations ADD COLUMN run_at TEXT;       -- one-shot: fire once at run_at, then delete
+ALTER TABLE automations ADD COLUMN task_id INTEGER REFERENCES tasks(id) ON DELETE CASCADE;
+ALTER TABLE automations ADD COLUMN flow_id INTEGER REFERENCES epic_flows(id) ON DELETE CASCADE;
+```
 
-## 8. Epic agent and wayfinder
+- One table holds both the flow's tasks and their PRs, so restart and the PR chips need no second table.
+- The `ALTER`s go through the existing idempotent `migrateAddX` pattern. An automation with `run_at` set ignores `schedule`.
+- Commits are not stored. `epic prs --commits` and `epic search` read them from git and `gh` on demand.
+- `store.SetPrefixedLabel(db, taskID, "epic_stage:build")` deletes the task's labels with the same prefix and adds the new one in one transaction.
 
-- **Agent template** `epic` (Agents page preset / `conveyor agent add epic --template epic`). The prompt describes §2.2 and reads the stage from the brief's label list. Stage logic lives in the prompt, not in Go, so it can change without a release.
-- **Skill:** the wayfinder skill is installed in the user's skills. We do not vendor it.
-- **Tracker doc** `docs/wayfinder-conveyor.md`, referenced from the agent prompt. Its "Wayfinding operations" section:
+## 8. Epic agent, skill and brief
 
-  | operation | command |
-  |---|---|
-  | create map | the epic task itself; `conveyor task set KEY --desc` for the body |
-  | create ticket | `conveyor task new "q" --parent KEY --repo R --desc "## Question …"` then `conveyor task label NEW add wayfinder:<type>` |
-  | wire blocking | `conveyor task link A blocks B` |
-  | frontier | `conveyor task show KEY --json` → children in todo with no open blockers |
-  | claim | none: the dispatcher's run is the claim |
-  | resolve | status block `done`; summary = resolution; append to the map's Decisions so far |
-  | out of scope | `conveyor task cancel` + one line in the map |
-
-- **Brief:** `internal/brief` already lists relations (parent, children, links) but not labels. Add a `labels:` line, plus one line when the root has `epic`: "Epic stage: <s>. Children: n/m done, k wants you." Update the golden test.
+- **Agent template** `epic` (Agents page preset). The prompt is short: "You run an epic. Load the `epic` skill and follow it." Stage logic lives in the skill, so it can change without a Go release.
+- **Skill files**: `skills/epic/SKILL.md` (loop, gate, checklist, no-merge rule, commands), `skills/epic/planners/wayfinder.md` (§2.1 table as commands). They are embedded with `go:embed` and written by `UserHooks("install")` next to the hooks. `status` reports the skill too.
+- **Brief** (`internal/brief`):
+  - a `Labels:` line,
+  - for epic members: `Epic <ROOTKEY>, stage <s>, flow <n>. Load the epic skill and run conveyor epic status <ROOTKEY> first.`,
+  - for `skill:*` labels: `Load these skills before starting: a, b.`,
+  - update the golden test.
+- **Model and agent** per task already flow into the launch (`tasks.agent`, `tasks.model`). Nothing changes there.
 
 ## 9. Waking the epic
 
-Nothing wakes a parent today when its children finish. Add one check to the tick:
+Nothing wakes a parent today when its children finish. Add one query to the tick: root tasks labelled `epic` that are not done, cancelled or running, have an active flow, have no children in `todo`, `running` or `needs_you`, and have a child that finished after the epic's last run ended. Requeue each with a system comment, `all sub-tasks settled (stage <s>)`, and write an audit record.
 
-- Find root tasks labelled `epic` whose status is not done/cancelled/running and that have no children in `todo`, `running` or `needs_you`. If such an epic has at least one child that finished after the epic's last run ended, requeue it with a system comment: `all sub-tasks settled (stage <s>)`.
-- This is one SQL query per tick. The epic's run then decides the next stage.
+Restart proposal: when a flow's children reach the failure threshold (§3 Q4) in a row, set the epic to `needs_you` with a system comment that proposes `conveyor epic restart`.
 
-## 10. PR review polling (R7, R8)
+## 10. Review checks: events, not polling
 
-**Where:** `Dispatcher.Tick`, next to `pollPRs`, using the same pattern as `tickAutomations`:
+There is no recurring review poll. A review check is a **one-shot automation** (`run_at`, `task_id`, `flow_id`) that runs `conveyor epic review-check <TASK>` once, then deletes itself.
 
-```go
-const reviewPollEach = 5 * time.Minute
+**What schedules a check:**
 
-func (d *Dispatcher) pollReviews(ctx context.Context) {
-    if !d.lastReview.IsZero() && d.now().Sub(d.lastReview) < reviewPollEach ||
-        !d.reviewBusy.CompareAndSwap(false, true) {
-        return // not due, or the previous pass is still running
-    }
-    d.lastReview = d.now()
-    go func() {
-        defer d.reviewBusy.Store(false)
-        for _, t := range reviewTasks(d.DB) {      // status=review, open PR
-            if ctx.Err() != nil { return }
-            cctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-            err := gh.SyncReviews(cctx, d.DB, t)   // fetch since watermark, post, requeue
-            cancel()
-            if err != nil { d.logf("review poll %s: %v", t.Key, err) }
-        }
-    }()
-}
-```
+| Event | Source | Check at |
+|---|---|---|
+| PR opened, or the agent pushes to the PR branch | PreToolUse/Stop hook sees `gh pr create` or `git push`; the existing PR refresh notices a new head | now + 10 min (replaces any pending check for that task) |
+| A check found nothing new | the check itself | next step of the backoff: 30 min, 2 h, 8 h, then stop |
+| Review submitted, or review comment created | optional `gh webhook forward --events=pull_request_review,pull_request_review_comment` to a localhost endpoint (§3 Q2) | now |
+| You click "check reviews" on the card | UI | now |
 
-Why this can't leak or go stale:
-- There is one ticker for the whole app (the dispatcher's existing one). Nothing is scheduled per task, so a deleted, cancelled or done task has nothing to clean up. It just drops out of the `status=review` query on the next pass.
-- `CompareAndSwap` allows at most one pass in flight. A slow GitHub never piles up goroutines.
-- Every `gh` call runs under a context with a 30 s timeout. `exec.CommandContext` kills the process when that context ends, and app shutdown cancels the parent context.
-- Nothing is held in memory between passes. The watermark lives in the DB, so a restart neither reposts comments nor misses them.
+At most one pending check exists per task. Scheduling replaces the old one by `(task_id, kind)`. After the backoff runs out, the PR goes quiet until the next push, webhook or click. This handles "human reviews two days later" without polling all the time.
 
-**Fetching** (`internal/gh`): `gh api repos/{o}/{r}/pulls/{n}/reviews` and `.../pulls/{n}/comments`, filtered to `id > watermark`, bodies not starting with `ai agent:`, and not by the PR author when the PR author is the agent's account. Unresolved-thread filtering uses `gh api graphql` `reviewThreads(isResolved)`, in the same call that counts unresolved comments for the card chip.
+**Cleanup:** when a task goes to `done` or `cancelled`, the store's status change deletes its automations. When the flow ends, `ON DELETE CASCADE` and an explicit delete do the same. Nothing lives in memory, so there is nothing to leak.
 
-**Posting:** one system comment, `PR review on <url>:` followed by `> file:line` + body per comment. `AddComment` + `UpdateTaskStatus(todo)` follow the existing comment-requeue path, so debounce (`comment_debounce_secs`) applies.
+**The check** (`internal/gh`): `gh api .../pulls/{n}/reviews`, `.../pulls/{n}/comments` and a GraphQL `reviewThreads(isResolved)` call, under a 30 s context. It keeps comments newer than `seen_comment_id`, not starting with `ai agent:`, and not on resolved threads. If any are left, it posts one system comment (`PR review on <url>:` then `> file:line` and the body for each) and requeues through the existing comment path, so the debounce applies. It updates `review`, `checks`, `unresolved` and the watermark on `epic_flow_prs`. The existing 60 s `pollPRs` (PR open/merged state) stays as it is.
 
-**Tests:** a fake `gh` script (as in `gh_test.go`) that returns reviews; assert one comment is posted and that a second pass posts nothing. A dispatcher test with a fake clock asserts there is no second pass inside 5 min and no overlap while `reviewBusy` is set.
+**Tests:** a fake `gh` returning reviews. One check posts one comment; a second posts nothing. The backoff schedules the next step. A done task leaves no automations. The dispatcher fires a `run_at` automation once.
 
 ## 11. Epic view (frontend)
+
+**Library:** `@xyflow/react`. Custom node type `TaskNode` for the card and `group` nodes for parents. Layering is ours, about 40 lines, no dagre. Use React Flow's `nodrag` class on card controls so that pickers and buttons work inside a draggable node. That is the known pitfall with interactive nodes.
 
 **Binding** (`internal/ui/app.go`, thin over `core`):
 
 ```go
 type EpicGraph struct {
-    Root  string      `json:"root"`
-    Nodes []GraphCard `json:"nodes"` // TaskCard + Running, Worktree bool, PRs []PRChip
-    Links []store.Link `json:"links"` // blocks/relates among nodes
+    Root  string       `json:"root"`
+    Stage string       `json:"stage"`
+    Gate  bool         `json:"gate"`          // waiting for plan approval
+    Nodes []GraphCard  `json:"nodes"`         // TaskCard + Agent, Model, Skills, AgentSkills, Running, Worktree, PRs
+    Links []store.Link `json:"links"`
 }
-type PRChip struct{ URL, State, Review, Checks string; Unresolved int }
-func (a *App) EpicGraph(key string) (EpicGraph, error) // any key in the tree; resolves to root
+func (a *App) EpicGraph(key string) (EpicGraph, error)
+func (a *App) EpicApprove(key string) error
+func (a *App) SetTaskSkills(key string, skills []string) error // rewrites skill:* labels
 ```
 
-`GraphCard` embeds the existing `TaskCard` (which already has Parent and Labels). The worktree check is `os.Stat(workspace.PrimaryPath(task))`.
+The agent and model pickers reuse `ListAgents`, `SetTaskAgent` and the existing model setter. The skills list reuses `core/completions.go`'s `scanCommands` (repos first, then the user's). Link edits reuse `task link` and `unlink`. The `blocks` loop check already exists.
 
-**Layout** (`frontend/src/epic.tsx`, one file, about 40 lines of layering):
-- Group nodes per parent, with children inside.
-- Within a group, column = longest `blocks` path from a child that has no blockers inside the group; row = order by key. A `blocks` edge that crosses groups is drawn but does not affect columns.
-- Edges: `blocks` solid with an arrow, `relates` dashed.
-- Stage strip above the canvas, read from the root's `epic_stage:*` label.
+**Layout:** group children per parent. Within a group, the column is the longest `blocks` path from a child with no blockers in the group, and the row is ordered by key. Cross-group `blocks` edges are drawn but don't affect columns. `blocks` edges are solid with an arrow; `relates` edges are dashed.
 
-**Navigation:** `App.tsx` view `{name:'epic', key}`; shortcut `e` on a selected task; an `IconSitemap` ActionIcon on board cards (`components.tsx`) and in the task page header (`views.tsx`). "Epics" in the sidebar = the board filtered by `label:epic` if CV-54's deep-link filter covers it; otherwise a small list.
+**Navigation:** `App.tsx` view `{name:'epic', key}`, shortcut `e`, and an `IconSitemap` on board cards (`components.tsx`) and in the task header (`views.tsx`). "Epics" in the sidebar is the board filtered by `label:epic`.
 
-## 12. CLI
+## 12. Audit logs
+
+**Writers.** Agents are not trusted to log. Most records come from code that already runs on every epic action:
+- the hooks (`UserPromptSubmit`, `PreToolUse`, `Stop`) for runs of epic member tasks: run started and ended, `conveyor`, `gh` and `git push` commands, a denied merge, the status block,
+- the store when it changes the stage label, creates a flow, ends a flow or deletes an automation,
+- the dispatcher when it wakes the epic, a review check fires or a restart is proposed,
+- `conveyor epic log KEY "<why>"` for the agent's reasons.
+
+**Format.** One JSON line per record in `~/.conveyor/logs/audit.jsonl`, with OTel log data model field names, so a collector maps it without custom parsing:
+
+```json
+{"Timestamp":"2026-11-01T10:02:03Z","SeverityText":"INFO","Body":"stage build -> verify",
+ "Attributes":{"event.name":"epic.stage","epic.key":"CV-4","epic.flow":2,"task.key":"CV-4C",
+               "run.id":812,"session.id":"…","actor":"agent|human|conveyor"}}
+```
+
+The same record also goes into `events` (`kind='audit'`, `detail` = the JSON) so `conveyor epic audit` can query it offline. Log rotation uses size-based rename, like the existing logs.
+
+**Shipping.** Grafana Alloy, Promtail or the OTel Collector `filelog` receiver tails `audit.jsonl` into Loki. For agent-side detail, epic runs launch with Claude Code's own OTel telemetry turned on (`CLAUDE_CODE_ENABLE_TELEMETRY=1`, `OTEL_LOGS_EXPORTER=otlp`, `OTEL_RESOURCE_ATTRIBUTES=epic.key=…,epic.flow=…,task.key=…`), but only when the user has set `OTEL_EXPORTER_OTLP_ENDPOINT`. Both streams then join on `epic.key` and `session.id`.
+
+## 13. CLI
 
 ```
-conveyor task label KEY set <prefix:value>   # new: replace same-prefix labels (R2)
-conveyor task graph KEY [--json]             # new: EpicGraph as a text tree, for agents and debugging
+conveyor task label KEY set <prefix>:<value>
+conveyor epic status KEY [--flow N] [--json]     # the "state" every run starts from
+conveyor epic check KEY [--fix]                  # checklist §2.4; --fix repairs labels only
+conveyor epic prs KEY [--commits] [--json]
+conveyor epic search KEY <regex>                 # git log -G over the flow's PR branches
+conveyor epic sessions KEY [--grep <text>]
+conveyor epic flows KEY
+conveyor epic restart KEY --reason "…"
+conveyor epic approve KEY
+conveyor epic log KEY "<message>"
+conveyor epic audit KEY [--flow N] [--since 24h] [--json]
+conveyor epic review-check TASK                  # what the one-shot automation runs
+conveyor task graph KEY [--json]
 ```
 
-Everything else (`new --parent`, `link`, `label add|rm`) exists.
-
-## 13. Delivery plan (sub-tasks)
+## 14. Delivery plan (sub-tasks)
 
 | # | Sub-task | Depends on |
 |---|---|---|
-| A | PR review polling every 5 min (§10). Useful for every task on its own. | — |
-| B | `SetPrefixedLabel` + `task label set` + epic wake-up check in the dispatcher (§7, §9) + `task graph` | — |
-| C | Epic agent template + Conveyor tracker doc for wayfinder + brief line + golden test (§8) | B |
-| D | Epic view: binding, layout, cards with PR/worktree/status chips, icons, stage strip (§11). Needs §3 Q3/Q4 answered. | B (A for the review/unresolved chips) |
-| E | Dogfood one real epic end to end, then fold findings into the agent prompt and this doc | A, C, D |
+| A | One-shot automations (`run_at`, `task_id`, `flow_id`, cleanup on done/cancel) and review checks with backoff (§10). Webhook forward as opt-in. Useful for any task. | — |
+| B | `epic_flows`, `epic_flow_prs`, `SetPrefixedLabel`, `task label set`, epic wake-up, gate and approve, no-merge hook rule, `epic status/check/flows/restart/approve/prs/search/sessions` (§7, §9, §13) | — |
+| C | Audit log: writers in the hooks, store and dispatcher, `audit.jsonl`, `epic log/audit`, Claude OTel env for epic runs (§12) | B |
+| D | `epic` skill + wayfinder planner adapter, installed with the hooks; agent template; brief lines + golden test (§2.4, §8) | B |
+| E | Epic view on React Flow: editable cards (agent/model/skills/repo/labels), edge editing, stage strip with Approve, icons (§11) | B (A for the review chips) |
+| F | Dogfood one real epic end to end, then fold findings into the skill and this doc | A–E |
 
-## 14. Testing
+A and C are general features. Each gets its own PR, and neither is mixed into the Epic view PR.
 
-- Store: `SetPrefixedLabel` replaces only the same prefix.
-- Dispatcher: epic wakes when its children settle and not before; review poll cadence and no overlap (fake clock).
-- gh: review fetch, watermark, `ai agent:` skip, resolved-thread skip.
-- Brief: golden test for an epic root.
-- UI: `npm run build`; a manual check in `wails dev` with a tree seeded through the CLI.
+## 15. Testing
+
+- Store: `SetPrefixedLabel` replaces only the same prefix; one active flow per epic; a done task deletes its automations.
+- Dispatcher: the epic wakes when its children settle and not before; a `run_at` automation fires once; the restart proposal fires at the threshold.
+- gh: review fetch, watermark, `ai agent:` skip, resolved-thread skip, backoff schedule.
+- Hook: `gh pr merge` denied in epic member runs; audit records written for run start and end.
+- CLI: `epic check` flags a missing `epic:<KEY>` label, a repo label mismatch, and an AC without a covering task.
+- Brief: golden test for an epic member with `skill:*` labels.
+- UI: `npm run build`; a manual check in `wails dev` with a tree seeded through the CLI: change an agent on a card, add a skill, draw an edge, approve the plan.
