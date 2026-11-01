@@ -1,11 +1,12 @@
 # Epic Builder: PRD and tech spec
 
-Status: draft v3 (CV-4).
+Status: draft v4 (CV-4).
 - v1 put an `epic_stage` column on tasks. Rejected.
 - v2 used labels and relations only, and planned with wayfinder labels.
 - v3 applies the answers to v2's questions: a default plan gate that `epic_gate:off` turns off, no auto-merge, an internal **epic flow** (one attempt at the epic) that holds PR state, React Flow with editable cards, and `epic:*` labels as an adapter over any planning skill. It also adds the `epic` skill and its checklist, event-driven review checks instead of polling, and audit logs you can query as OTel.
+- v4 applies the answers to v3's questions: the epic label is `epic:<name>` with any name (`epic:os-4`), and kinds move to `epic_kind:<kind>` (§2.1). Review webhooks ship as an opt-in **app** that Conveyor offers to add as a button (§10). Audit is plain JSONL, no OTel (§12). Restart is a button; the human decides, nothing proposes it (§2.3).
 
-Open questions are in §3.
+Decisions are in §3. There are no open questions.
 
 ---
 
@@ -27,16 +28,16 @@ That coordination takes the time. It is also hard to see where an epic stands, b
 1. **An autonomous epic loop.** You describe a large task once. Conveyor plans it and asks you to approve the plan. After that it runs, fixes review comments, and waits for you to merge.
 2. **The Epic view.** A flow chart of the task tree with live status. **On each card you can see and change the agent, model and skills** for that step, and start, stop or answer it.
 3. **The `epic` skill.** It is installed with Conveyor's hooks and keeps every epic run on a checklist (§2.4).
-4. **Audit logs.** Every epic action is a structured log record you can query in Grafana (Loki) or any OTel backend.
+4. **Audit logs.** Every epic action is one JSON line in `audit.jsonl`, which you can query with `conveyor epic audit`, `jq`, or ship anywhere that reads JSON lines.
 
 The building blocks:
 
 | Concept | How it's expressed | New? |
 |---|---|---|
 | "This task is an epic" | label `epic` on the root task | no (labels, #131) |
-| Membership | label `epic:<ROOTKEY>` on every task in the epic, plus `parent_id` | label convention |
+| Membership | label `epic:<name>` on the root and every task in the epic, plus `parent_id`. The name is any string you pick (`epic:os-4`, `epic:payments-v2`) and is unique among epics that are not done | label convention |
 | Stage | label `epic_stage:<stage>` on the root, one at a time | label convention |
-| Kind of child | label `epic:<kind>`: `research`, `prototype`, `grilling` or `build` (§2.1) | label convention |
+| Kind of child | label `epic_kind:<kind>`: `research`, `prototype`, `grilling` or `build` (§2.1) | label convention |
 | Repo | label `repo:<name>`, kept equal to the task's repos | label convention |
 | Skills for a step | labels `skill:<name>`; the brief tells the agent to load them | label convention |
 | Agent and model for a step | `tasks.agent`, `tasks.model` | no |
@@ -46,14 +47,41 @@ The building blocks:
 
 The board stays the source of truth for tasks. The flow chart is relations drawn as a picture, and it can also edit them.
 
-### 2.1 `epic:*` labels as an adapter over planning skills
+### 2.1 Labels as an adapter over planning skills
 
-Conveyor speaks one vocabulary: `epic:<kind>` for child tickets and `epic_stage:<stage>` for the root. A **planner adapter** maps a planning skill's operations onto it. The default is Matt Pocock's [`wayfinder`](https://github.com/mattpocock/skills/blob/main/skills/engineering/wayfinder/SKILL.md):
+Every epic label has one meaning per prefix, so a filter never mixes them:
+
+| Prefix | Means | Example |
+|---|---|---|
+| `epic` (bare) | this task is an epic root | `epic` |
+| `epic:` | belongs to the epic with this name | `epic:os-4` |
+| `epic_stage:` | the root's current stage | `epic_stage:build` |
+| `epic_kind:` | what sort of step a child is | `epic_kind:grilling` |
+| `epic_planner:`, `epic_gate:` | root settings | `epic_planner:wayfinder`, `epic_gate:off` |
+
+**What a kind is.** A kind says what sort of work a child task is, so Conveyor and the agent know how to run it and when it counts as finished. There are four:
+
+| Kind | Purpose | Human? | Output | Stage it belongs to |
+|---|---|---|---|---|
+| `grilling` | settle a question by asking you | yes: the run asks and waits in `needs_you` | a decision line on the root's description | `decide` |
+| `prototype` | try something to answer a design question | yes: you look at it and react | a throwaway branch or notes, never a PR to merge | `decide` |
+| `research` | read code or docs and report | no | findings in the status block and on the root | `decide` |
+| `build` | ship part of the epic | no (except review and merge) | a PR, test-first, citing AC ids | `build`, and new ones from `verify` |
+
+How the kind is used:
+- **Brief.** The brief adds one line per kind that tells the agent what to do and what not to do (for example, `grilling`: "ask, record the decision, open no PR"; `build`: "write the failing test first, open one PR, cite AC ids").
+- **Stage moves.** The epic agent moves from `decide` to `spec` when no open `grilling`, `prototype` or `research` child is left, and from `build` to `verify` when no open `build` child is left.
+- **Checks.** `epic check` requires a repo, an agent and AC ids only on `build` children.
+- **Epic view.** The card shows the kind as a coloured chip, so you can see at a glance which steps will want you.
+
+Kind is a label, so you can change it on the card. Go reads it only in the brief and in `epic check`; the rest is in the skill.
+
+Conveyor speaks this one vocabulary. A **planner adapter** maps a planning skill's operations onto it. The default is Matt Pocock's [`wayfinder`](https://github.com/mattpocock/skills/blob/main/skills/engineering/wayfinder/SKILL.md):
 
 | wayfinder | Conveyor |
 |---|---|
 | map issue | the epic root. Its description holds Destination, AC, Decisions so far, Not yet specified, Out of scope. |
-| ticket `wayfinder:research\|prototype\|grilling\|task` | sub-task labelled `epic:research\|prototype\|grilling\|build` |
+| ticket `wayfinder:research\|prototype\|grilling\|task` | sub-task labelled `epic_kind:research\|prototype\|grilling\|build` |
 | native blocking | `conveyor task link A blocks B` |
 | frontier | children in `todo` with no open blockers. The dispatcher launches exactly these. |
 | claim | the dispatcher starting a run |
@@ -80,7 +108,7 @@ An adapter is one markdown file, `skills/epic/planners/<name>.md`, holding this 
 | `chart` | The epic run grills you on the destination and the AC, then creates the decision tickets and their `blocks` links. | Map and AC written | Yes. This is the main conversation. |
 | *gate* | The run ends in `needs_you` with the plan. **Approve** (button on the Epic view, or a comment `approve`) moves the epic to `decide`, and everything after runs without you. With label `epic_gate:off` there is no stop. | Approved | Yes, unless `epic_gate:off` |
 | `decide` | Frontier tickets run as they unblock. A resolution can add tickets. | No open decision tickets | Only on grilling and prototype tickets |
-| `spec` | The epic run writes the spec, creates `epic:build` sub-tasks (repo, AC ids, agent, skills) with `blocks` links, and moves them to `todo`. | Build tickets exist | No |
+| `spec` | The epic run writes the spec, creates `epic_kind:build` sub-tasks (repo, AC ids, agent, skills) with `blocks` links, and moves them to `todo`. | Build tickets exist | No |
 | `build` | Build tickets run test-first and open PRs. Review events requeue them (§10). | Every build child done or cancelled | When an agent gets stuck, and **for merging: the human always merges** |
 | `verify` | The epic run checks every AC against the merged work. Gaps become new build tickets and the stage goes back to `build`. | All AC met | No |
 | `done` | The epic moves to done, and the flow ends. | | |
@@ -93,7 +121,7 @@ An **epic flow** is one attempt to finish the epic. It is not a task and is not 
 
 - Approving the plan (or the first run with `epic_gate:off`) starts flow 1.
 - The flow records the tasks it runs, their PRs (head commit, review decision, checks, unresolved count), the one-shot review checks it scheduled (§10), and every audit record (§12).
-- When a flow fails too often (default: 3 child failures in a row, or the epic run says so), the epic goes to `needs_you` with a proposal to restart. `conveyor epic restart KEY --reason "…"` ends the flow as `abandoned`, cancels its open tasks, and starts flow N+1 at `spec` with the map and decisions kept. Restarts should be rare. Nothing restarts on its own.
+- **You decide when to restart.** The Epic view header has a **Restart** button (it asks for a reason). It, or `conveyor epic restart KEY --reason "…"`, ends the flow as `abandoned`, cancels its open tasks, and starts flow N+1 at `spec` with the map and decisions kept. Nothing counts failures, proposes a restart or restarts on its own.
 - You can query flows (`conveyor epic flows KEY`, `conveyor epic status KEY --flow N`); the UI shows only the current one.
 
 ### 2.4 The `epic` skill and its checklist
@@ -104,49 +132,49 @@ Tasks remember nothing between runs. The skill makes them seem to: **every run s
 
 Checklist, run at the start and before the status block (`conveyor epic check KEY` does the mechanical items and prints what fails):
 
-1. **Epic label.** Every task in the tree has `epic:<ROOTKEY>`, and no task outside the tree has it.
+1. **Epic label.** Every task in the tree has the root's `epic:<name>`, and no task outside the tree has it.
 2. **Repo labels.** Each task's `repo:*` labels equal its repos. A build task has exactly one repo.
 3. **Acceptance criteria.** The root's `## Acceptance criteria` is a numbered checklist (AC1, AC2, …). Every AC is covered by at least one build task that cites its id, and each AC is ticked only with evidence (PR, test, or commit).
 4. **PRs.** Every build task in `review` or `done` has a PR recorded on the flow. `conveyor epic prs KEY [--commits]` lists PRs and their commits. `conveyor epic search KEY <regex>` runs `git log -G` over the flow's PR branches to find where something changed.
 5. **Sessions.** `conveyor epic sessions KEY [--grep <text>]` lists each run's Claude session (task, run, transcript path) and searches the transcripts. Use it to recall why something was done instead of asking the human again.
-6. **Order and agents.** No `epic:build` task in `todo` lacks an agent, a repo or AC ids. No `blocks` cycles (already refused).
+6. **Order and agents.** No `epic_kind:build` task in `todo` lacks an agent, a repo or AC ids. No `blocks` cycles (already refused).
 7. **Audit.** Every stage change, task created, label changed, gate passed and restart is in the audit log. Hooks write most records (§12); the skill only adds the reason with `conveyor epic log KEY "<why>"`.
 
-## 3. Open questions
+## 3. Decisions (v3 questions)
 
-1. **Label namespace.** `epic:<ROOTKEY>` (membership) and `epic:<kind>` share a prefix. Keys match `[A-Z]+-\d+[A-Z]*`, so they can't clash, but a filter on `epic:` returns both. Proposal: keep both under `epic:` as you asked. The alternative is `epic_kind:<kind>`.
-2. **Review events.** GitHub can't reach a desktop app without a tunnel. Proposal (§10): one-shot checks scheduled after each push, with backoff, plus `gh webhook forward` for `pull_request_review` events. It's an optional gh extension and only one forward can run per repo at a time. OK to ship the extension path as opt-in?
-3. **Audit export.** Proposal (§12): write OTel-shaped JSON lines to `~/.conveyor/logs/audit.jsonl`, which Alloy, Promtail or the OTel Collector `filelog` receiver can ship to Loki, and turn on Claude Code's own OTel export for epic runs. Exporting OTLP straight from Go adds the OTel SDK; leave that out unless you want it.
-4. **Restart threshold.** 3 child failures in a row before the epic proposes a restart?
+1. **Label namespace.** `epic:<name>` is membership only, and the name is any string (`epic:os-4`). Kinds are `epic_kind:<kind>`. See §2.1.
+2. **Review webhooks** are opt-in. `gh webhook forward` ships as a Conveyor **app** (CV-55 manifest). When an epic has open PRs and the app is not installed, the Epic view offers to add it as a button (§10).
+3. **Audit** is `audit.jsonl` and nothing else: no OTel field names, no collector setup, no Claude OTel env. It is written with Go's `log/slog` JSON handler, so it can become the pattern if more of Conveyor's logging moves to structured logs later.
+4. **Restart.** No threshold. The human decides with a visible Restart button.
 
 ## 4. Requirements
 
 **Epic loop**
-- R1. Adding `epic` to a root task makes it an epic; with no `epic_stage:*` label, the stage is `chart`. "New task" gets an "Epic" toggle.
+- R1. Adding `epic` and `epic:<name>` to a root task makes it an epic; with no `epic_stage:*` label, the stage is `chart`. "New task" gets an "Epic" toggle with a name field (default: the task key, lower-cased). Two epics that are not done cannot share a name.
 - R2. `conveyor task label KEY set <prefix>:<value>` replaces labels with the same prefix in one transaction.
 - R3. After `chart`, the epic waits in `needs_you` for approval unless it has `epic_gate:off`. Approval starts a flow and moves the epic to `decide`. Nothing after that needs the human, except HITL tickets, stuck agents, and merging.
 - R4. No agent merges a PR. The `epic` skill says so, and the PreToolUse hook denies `gh pr merge` in runs of epic tasks.
-- R5. Children carry `epic:<ROOTKEY>`, `epic:<kind>` and `repo:*`. Build tickets carry their AC ids and a link to the spec, and are told to work test-first.
+- R5. Children carry `epic:<name>`, `epic_kind:<kind>` and `repo:*`. Build tickets carry their AC ids and a link to the spec, and are told to work test-first.
 - R6. While any child is running or in `todo`, the epic does not run. When the last open child settles, the epic is requeued with a system comment that names its stage.
 
 **Flows**
-- R7. `epic_flows` records attempts. Only one flow per epic is active. `conveyor epic flows|status|restart` work on flows. The flow id never appears on the board or the cards.
+- R7. `epic_flows` records attempts. Only one flow per epic is active. `conveyor epic flows|status|restart` work on flows. Only the human restarts a flow. The flow id never appears on the board or the cards.
 
 **Skill**
 - R8. `skills/epic/` is installed and removed together with the user hooks. It holds the checklist (§2.4), the stage loop and `planners/wayfinder.md`.
 - R9. `conveyor epic status|check|prs|search|sessions|log` exist and print `--json`.
 
 **Review checks**
-- R10. Review comments reach the task through **one-shot automations** owned by the task and the flow, not a recurring poll (§10). They are deleted when the task is done or cancelled, or the flow ends.
+- R10. Review comments reach the task through **one-shot automations** owned by the task and the flow, not a recurring poll (§10). They are deleted when the task is done or cancelled, or the flow ends. Webhook events are opt-in through the review-webhooks app.
 
 **Audit**
-- R11. Every epic action produces an audit record (§12). `conveyor epic audit KEY [--flow N] [--since]` queries it, and the JSONL file can be shipped to Loki or an OTel collector.
+- R11. Every epic action produces one JSON line in `audit.jsonl` (§12). `conveyor epic audit KEY [--flow N] [--since]` queries it.
 
 **Epic view**
 - R12. A page per tree, opened from any task (resolves to the root). Built on React Flow. Children are grouped under their parent; columns follow `blocks`.
 - R13. **Each card shows and edits** the agent (picker of the user's and repos' agents), model, skills (multi-select of the skills found on disk, stored as `skill:*` labels; the agent's own frontmatter skills are shown read-only), repo, and labels. It also shows the key, title, status with a pulse while running, a worktree chip and a PR chip (state, review, checks, unresolved count). Card actions: open task, run or requeue, stop the run (CV-56), answer (when `needs_you`), open the PR, open a shell or editor.
 - R14. On the canvas: drag from one card to another to add a `blocks` link, select an edge and delete it to unlink, and use "+" on a group to add a sub-task. Every edit calls the same core functions as the CLI.
-- R15. A header strip shows the stage pipeline with the current stage, `n/m` children done, the "wants you" count and, at the gate, **Approve plan**.
+- R15. A header strip shows the stage pipeline with the current stage, `n/m` children done, the "wants you" count, at the gate **Approve plan**, and always **Restart** (asks for a reason). If the epic has PRs and the review-webhooks app is not installed, it shows **Add review webhooks** once (dismissable).
 - R16. Updates are live on `db:changed`.
 - R17. Board cards and the task page header get a flow icon that opens this view. A lone task shows as one node plus its link neighbours.
 
@@ -209,7 +237,8 @@ ALTER TABLE automations ADD COLUMN flow_id INTEGER REFERENCES epic_flows(id) ON 
 - **Skill files**: `skills/epic/SKILL.md` (loop, gate, checklist, no-merge rule, commands), `skills/epic/planners/wayfinder.md` (§2.1 table as commands). They are embedded with `go:embed` and written by `UserHooks("install")` next to the hooks. `status` reports the skill too.
 - **Brief** (`internal/brief`):
   - a `Labels:` line,
-  - for epic members: `Epic <ROOTKEY>, stage <s>, flow <n>. Load the epic skill and run conveyor epic status <ROOTKEY> first.`,
+  - for epic members: `Epic <name> (root <ROOTKEY>), stage <s>, flow <n>. Load the epic skill and run conveyor epic status <ROOTKEY> first.`,
+  - for `epic_kind:*`: the one-line rule for that kind (§2.1),
   - for `skill:*` labels: `Load these skills before starting: a, b.`,
   - update the golden test.
 - **Model and agent** per task already flow into the launch (`tasks.agent`, `tasks.model`). Nothing changes there.
@@ -218,7 +247,7 @@ ALTER TABLE automations ADD COLUMN flow_id INTEGER REFERENCES epic_flows(id) ON 
 
 Nothing wakes a parent today when its children finish. Add one query to the tick: root tasks labelled `epic` that are not done, cancelled or running, have an active flow, have no children in `todo`, `running` or `needs_you`, and have a child that finished after the epic's last run ended. Requeue each with a system comment, `all sub-tasks settled (stage <s>)`, and write an audit record.
 
-Restart proposal: when a flow's children reach the failure threshold (§3 Q4) in a row, set the epic to `needs_you` with a system comment that proposes `conveyor epic restart`.
+There is no restart logic in the dispatcher. A failed child goes to `needs_you` as today; restart is the human's button (§2.3).
 
 ## 10. Review checks: events, not polling
 
@@ -230,10 +259,23 @@ There is no recurring review poll. A review check is a **one-shot automation** (
 |---|---|---|
 | PR opened, or the agent pushes to the PR branch | PreToolUse/Stop hook sees `gh pr create` or `git push`; the existing PR refresh notices a new head | now + 10 min (replaces any pending check for that task) |
 | A check found nothing new | the check itself | next step of the backoff: 30 min, 2 h, 8 h, then stop |
-| Review submitted, or review comment created | optional `gh webhook forward --events=pull_request_review,pull_request_review_comment` to a localhost endpoint (§3 Q2) | now |
+| Review submitted, or review comment created | the opt-in review-webhooks app (below) | now |
 | You click "check reviews" on the card | UI | now |
 
 At most one pending check exists per task. Scheduling replaces the old one by `(task_id, kind)`. After the backoff runs out, the PR goes quiet until the next push, webhook or click. This handles "human reviews two days later" without polling all the time.
+
+**Review-webhooks app (opt-in).** GitHub can't reach a desktop app without a tunnel, so this uses the `gh webhook` extension. It ships as an app manifest in `apps/review-webhooks.json`, using what CV-55 already has, so it needs no new UI:
+
+```json
+{"name":"Review webhooks",
+ "actions":[{"id":"forward","label":"Review webhooks","places":["global_nav"],
+   "run":"conveyor review-webhook",
+   "service":{"status":"conveyor review-webhook --status","stop":"conveyor review-webhook --stop"}}]}
+```
+
+- `conveyor review-webhook` listens on `127.0.0.1` (random port, pid file in `~/.conveyor/`) and starts one `gh webhook forward --repo <r> --events=pull_request_review,pull_request_review_comment --url <listener>` per repo that has an open epic PR. An event schedules that task's check for now. It exits with a clear message if the `gh webhook` extension is missing.
+- One forward per repo is a GitHub limit; a second Conveyor on the same repo just fails that repo's forward, and the backoff checks still run.
+- **Prompt to add it:** the Epic view shows **Add review webhooks** when the epic has a PR and the app is not installed. Clicking installs the bundled manifest (same path as importing an app), and the service button appears in the nav. Without it, everything works on push-triggered checks and backoff.
 
 **Cleanup:** when a task goes to `done` or `cancelled`, the store's status change deletes its automations. When the flow ends, `ON DELETE CASCADE` and an explicit delete do the same. Nothing lives in memory, so there is nothing to leak.
 
@@ -257,6 +299,7 @@ type EpicGraph struct {
 }
 func (a *App) EpicGraph(key string) (EpicGraph, error)
 func (a *App) EpicApprove(key string) error
+func (a *App) EpicRestart(key, reason string) error
 func (a *App) SetTaskSkills(key string, skills []string) error // rewrites skill:* labels
 ```
 
@@ -274,17 +317,15 @@ The agent and model pickers reuse `ListAgents`, `SetTaskAgent` and the existing 
 - the dispatcher when it wakes the epic, a review check fires or a restart is proposed,
 - `conveyor epic log KEY "<why>"` for the agent's reasons.
 
-**Format.** One JSON line per record in `~/.conveyor/logs/audit.jsonl`, with OTel log data model field names, so a collector maps it without custom parsing:
+**Format.** One JSON line per record in `~/.conveyor/logs/audit.jsonl`, written by `log/slog`'s `JSONHandler` (stdlib, no new dependency):
 
 ```json
-{"Timestamp":"2026-11-01T10:02:03Z","SeverityText":"INFO","Body":"stage build -> verify",
- "Attributes":{"event.name":"epic.stage","epic.key":"CV-4","epic.flow":2,"task.key":"CV-4C",
-               "run.id":812,"session.id":"…","actor":"agent|human|conveyor"}}
+{"time":"2026-11-01T10:02:03Z","level":"INFO","msg":"stage build -> verify",
+ "event":"epic.stage","epic":"os-4","root":"CV-4","flow":2,"task":"CV-4C",
+ "run":812,"session":"…","actor":"agent|human|conveyor"}
 ```
 
-The same record also goes into `events` (`kind='audit'`, `detail` = the JSON) so `conveyor epic audit` can query it offline. Log rotation uses size-based rename, like the existing logs.
-
-**Shipping.** Grafana Alloy, Promtail or the OTel Collector `filelog` receiver tails `audit.jsonl` into Loki. For agent-side detail, epic runs launch with Claude Code's own OTel telemetry turned on (`CLAUDE_CODE_ENABLE_TELEMETRY=1`, `OTEL_LOGS_EXPORTER=otlp`, `OTEL_RESOURCE_ATTRIBUTES=epic.key=…,epic.flow=…,task.key=…`), but only when the user has set `OTEL_EXPORTER_OTLP_ENDPOINT`. Both streams then join on `epic.key` and `session.id`.
+`conveyor epic audit` reads this file and filters it; `jq` works too. Nothing is copied into the `events` table. Log rotation uses size-based rename, like the existing logs. If more of Conveyor moves to structured logging later, it can reuse this handler.
 
 ## 13. CLI
 
@@ -301,6 +342,7 @@ conveyor epic approve KEY
 conveyor epic log KEY "<message>"
 conveyor epic audit KEY [--flow N] [--since 24h] [--json]
 conveyor epic review-check TASK                  # what the one-shot automation runs
+conveyor review-webhook [--status|--stop]        # what the opt-in app's service button runs
 conveyor task graph KEY [--json]
 ```
 
@@ -308,21 +350,23 @@ conveyor task graph KEY [--json]
 
 | # | Sub-task | Depends on |
 |---|---|---|
-| A | One-shot automations (`run_at`, `task_id`, `flow_id`, cleanup on done/cancel) and review checks with backoff (§10). Webhook forward as opt-in. Useful for any task. | — |
-| B | `epic_flows`, `epic_flow_prs`, `SetPrefixedLabel`, `task label set`, epic wake-up, gate and approve, no-merge hook rule, `epic status/check/flows/restart/approve/prs/search/sessions` (§7, §9, §13) | — |
-| C | Audit log: writers in the hooks, store and dispatcher, `audit.jsonl`, `epic log/audit`, Claude OTel env for epic runs (§12) | B |
-| D | `epic` skill + wayfinder planner adapter, installed with the hooks; agent template; brief lines + golden test (§2.4, §8) | B |
-| E | Epic view on React Flow: editable cards (agent/model/skills/repo/labels), edge editing, stage strip with Approve, icons (§11) | B (A for the review chips) |
+| A | One-shot automations (`run_at`, `task_id`, `flow_id`, cleanup on done/cancel) and review checks with backoff (§10). Useful for any task. | — |
+| A2 | Review-webhooks app: `conveyor review-webhook`, bundled manifest, "Add review webhooks" prompt (§10) | A |
+| B | `epic_flows`, `epic_flow_prs`, `SetPrefixedLabel`, `task label set`, unique epic name, epic wake-up, gate and approve, restart, no-merge hook rule, `epic status/check/flows/restart/approve/prs/search/sessions` (§7, §9, §13) | — |
+| C | Audit log: `slog` JSON writer, records from hooks, store and dispatcher, `epic log/audit` (§12) | B |
+| D | `epic` skill + wayfinder planner adapter, installed with the hooks; agent template; brief lines (epic, kind, skills) + golden test (§2.1, §2.4, §8) | B |
+| E | Epic view on React Flow: editable cards (agent/model/skills/kind/repo/labels), edge editing, stage strip with Approve and Restart, icons (§11) | B (A for the review chips) |
 | F | Dogfood one real epic end to end, then fold findings into the skill and this doc | A–E |
 
-A and C are general features. Each gets its own PR, and neither is mixed into the Epic view PR.
+A, A2 and C are general features. Each gets its own PR, and neither is mixed into the Epic view PR.
 
 ## 15. Testing
 
-- Store: `SetPrefixedLabel` replaces only the same prefix; one active flow per epic; a done task deletes its automations.
-- Dispatcher: the epic wakes when its children settle and not before; a `run_at` automation fires once; the restart proposal fires at the threshold.
+- Store: `SetPrefixedLabel` replaces only the same prefix (`epic:` does not touch `epic_kind:`); one active flow per epic; two open epics can't share a name; a done task deletes its automations.
+- Dispatcher: the epic wakes when its children settle and not before; a `run_at` automation fires once; no restart happens without the human.
+- review-webhook: a posted review event schedules a check for now; missing `gh webhook` extension gives a clear error.
 - gh: review fetch, watermark, `ai agent:` skip, resolved-thread skip, backoff schedule.
 - Hook: `gh pr merge` denied in epic member runs; audit records written for run start and end.
-- CLI: `epic check` flags a missing `epic:<KEY>` label, a repo label mismatch, and an AC without a covering task.
-- Brief: golden test for an epic member with `skill:*` labels.
-- UI: `npm run build`; a manual check in `wails dev` with a tree seeded through the CLI: change an agent on a card, add a skill, draw an edge, approve the plan.
+- CLI: `epic check` flags a missing `epic:<name>` label, a `build` child without AC ids, a repo label mismatch, and an AC without a covering task.
+- Brief: golden test for an epic member with `epic_kind:build` and `skill:*` labels.
+- UI: `npm run build`; a manual check in `wails dev` with a tree seeded through the CLI: change an agent on a card, add a skill, change a kind, draw an edge, approve the plan, restart.
