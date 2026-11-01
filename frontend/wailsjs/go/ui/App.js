@@ -34,6 +34,10 @@ export function AddRepo(arg1, arg2) {
   return window['go']['ui']['App']['AddRepo'](arg1, arg2);
 }
 
+export function AddTaskRepo(arg1, arg2) {
+  return window['go']['ui']['App']['AddTaskRepo'](arg1, arg2);
+}
+
 export function AdoptChild(arg1, arg2) {
   return window['go']['ui']['App']['AdoptChild'](arg1, arg2);
 }
@@ -50,6 +54,14 @@ export function AppPresets() {
   return window['go']['ui']['App']['AppPresets']();
 }
 
+export function AppServiceRunning(arg1, arg2, arg3, arg4) {
+  return window['go']['ui']['App']['AppServiceRunning'](arg1, arg2, arg3, arg4);
+}
+
+export function AppVersion() {
+  return window['go']['ui']['App']['AppVersion']();
+}
+
 export function ApplyLearnings(arg1) {
   return window['go']['ui']['App']['ApplyLearnings'](arg1);
 }
@@ -62,16 +74,16 @@ export function Confirm(arg1) {
   return window['go']['ui']['App']['Confirm'](arg1);
 }
 
+export function ConvertApp(arg1) {
+  return window['go']['ui']['App']['ConvertApp'](arg1);
+}
+
 export function CreateTask(arg1) {
   return window['go']['ui']['App']['CreateTask'](arg1);
 }
 
 export function DeleteApp(arg1) {
   return window['go']['ui']['App']['DeleteApp'](arg1);
-}
-
-export function AppVersion() {
-  return window['go']['ui']['App']['AppVersion']();
 }
 
 export function DeleteAutomation(arg1) {
@@ -92,6 +104,10 @@ export function EditLearning(arg1, arg2) {
 
 export function EnsureWorkspace(arg1) {
   return window['go']['ui']['App']['EnsureWorkspace'](arg1);
+}
+
+export function ExportApp(arg1) {
+  return window['go']['ui']['App']['ExportApp'](arg1);
 }
 
 export function ExportState() {
@@ -120,6 +136,14 @@ export function Home() {
 
 export function ImportState() {
   return window['go']['ui']['App']['ImportState']();
+}
+
+export function InstallManifest(arg1, arg2) {
+  return window['go']['ui']['App']['InstallManifest'](arg1, arg2);
+}
+
+export function InstallPreset(arg1) {
+  return window['go']['ui']['App']['InstallPreset'](arg1);
 }
 
 export function Learnings() {
@@ -158,6 +182,10 @@ export function ListTasks() {
   return window['go']['ui']['App']['ListTasks']();
 }
 
+export function ManifestSchema() {
+  return window['go']['ui']['App']['ManifestSchema']();
+}
+
 export function MergedPR(arg1) {
   return window['go']['ui']['App']['MergedPR'](arg1);
 }
@@ -174,6 +202,10 @@ export function OpenFile(arg1, arg2, arg3) {
   return window['go']['ui']['App']['OpenFile'](arg1, arg2, arg3);
 }
 
+export function PlacedActions(arg1) {
+  return window['go']['ui']['App']['PlacedActions'](arg1);
+}
+
 export function PreviewBrief(arg1) {
   return window['go']['ui']['App']['PreviewBrief'](arg1);
 }
@@ -186,12 +218,20 @@ export function RemoveLabel(arg1, arg2) {
   return window['go']['ui']['App']['RemoveLabel'](arg1, arg2);
 }
 
+export function RemoveTaskRepo(arg1, arg2) {
+  return window['go']['ui']['App']['RemoveTaskRepo'](arg1, arg2);
+}
+
 export function RenderApp(arg1, arg2, arg3) {
   return window['go']['ui']['App']['RenderApp'](arg1, arg2, arg3);
 }
 
 export function RunAction(arg1, arg2, arg3) {
   return window['go']['ui']['App']['RunAction'](arg1, arg2, arg3);
+}
+
+export function RunAppAction(arg1, arg2, arg3, arg4) {
+  return window['go']['ui']['App']['RunAppAction'](arg1, arg2, arg3, arg4);
 }
 
 export function RunAutomation(arg1) {
@@ -258,16 +298,12 @@ export function SpotlightStop(arg1) {
   return window['go']['ui']['App']['SpotlightStop'](arg1);
 }
 
-export function AppServiceRunning(arg1, arg2, arg3, arg4) {
-  return window['go']['ui']['App']['AppServiceRunning'](arg1, arg2, arg3, arg4);
+export function Stop(arg1) {
+  return window['go']['ui']['App']['Stop'](arg1);
 }
 
 export function StopAppService(arg1, arg2, arg3, arg4) {
   return window['go']['ui']['App']['StopAppService'](arg1, arg2, arg3, arg4);
-}
-
-export function Stop(arg1) {
-  return window['go']['ui']['App']['Stop'](arg1);
 }
 
 export function TakeQueuedComment(arg1, arg2) {
@@ -318,42 +354,6 @@ export function UserHooks(arg1) {
   return window['go']['ui']['App']['UserHooks'](arg1);
 }
 
-export function ExportApp(arg1) {
-  return window['go']['ui']['App']['ExportApp'](arg1);
-}
-
-export function InstallManifest(arg1, arg2) {
-  return window['go']['ui']['App']['InstallManifest'](arg1, arg2);
-}
-
-export function ManifestSchema() {
-  return window['go']['ui']['App']['ManifestSchema']();
-}
-
 export function ValidateManifest(arg1) {
   return window['go']['ui']['App']['ValidateManifest'](arg1);
-}
-
-export function InstallPreset(arg1) {
-  return window['go']['ui']['App']['InstallPreset'](arg1);
-}
-
-export function ConvertApp(arg1) {
-  return window['go']['ui']['App']['ConvertApp'](arg1);
-}
-
-export function PlacedActions(arg1) {
-  return window['go']['ui']['App']['PlacedActions'](arg1);
-}
-
-export function RunAppAction(arg1, arg2, arg3, arg4) {
-  return window['go']['ui']['App']['RunAppAction'](arg1, arg2, arg3, arg4);
-}
-
-export function AddTaskRepo(arg1, arg2) {
-  return window['go']['ui']['App']['AddTaskRepo'](arg1, arg2);
-}
-
-export function RemoveTaskRepo(arg1, arg2) {
-  return window['go']['ui']['App']['RemoveTaskRepo'](arg1, arg2);
 }
