@@ -34,6 +34,8 @@ export function AppVersion():Promise<string>;
 
 export function ApplyLearnings(arg1:string):Promise<string>;
 
+export function CheckReviews(arg1:string):Promise<void>;
+
 export function Complete(arg1:string,arg2:Array<string>,arg3:string,arg4:string):Promise<Array<core.Suggestion>>;
 
 export function Confirm(arg1:string):Promise<boolean>;

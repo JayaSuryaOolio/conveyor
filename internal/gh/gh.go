@@ -22,6 +22,7 @@ type PR struct {
 	Number         int    `json:"number"`
 	ReviewDecision string `json:"reviewDecision"`
 	UpdatedAt      string `json:"updatedAt"`
+	HeadRefOid     string `json:"headRefOid"`
 }
 
 // FindPR returns the latest PR for branch in repoPath, or (nil, nil) if none.
@@ -31,7 +32,7 @@ func FindPR(ctx context.Context, repoPath, branch string) (*PR, error) {
 		return nil, ErrNotFound
 	}
 	cmd := exec.CommandContext(ctx, bin, "pr", "list", "--head", branch, "--state", "all",
-		"--json", "url,state,number,reviewDecision,updatedAt", "--limit", "1")
+		"--json", "url,state,number,reviewDecision,updatedAt,headRefOid", "--limit", "1")
 	cmd.Dir = repoPath
 	out, err := cmd.Output()
 	if err != nil {
@@ -76,6 +77,9 @@ func SyncTask(ctx context.Context, db *sql.DB, task store.Task) error {
 		if err := store.UpdateTaskRepo(db, tr); err != nil {
 			return err
 		}
+		if err := scheduleOnNewHead(db, task, tr.RepoID, pr); err != nil {
+			return err
+		}
 		total++
 		switch pr.State {
 		case "MERGED":
@@ -101,4 +105,20 @@ func SyncTask(ctx context.Context, db *sql.DB, task store.Task) error {
 		return err
 	}
 	return nil
+}
+
+// scheduleOnNewHead schedules a review check 10 min out when an open PR is new or was pushed to.
+func scheduleOnNewHead(db *sql.DB, t store.Task, repoID int64, pr *PR) error {
+	if pr.State != "OPEN" || pr.HeadRefOid == "" {
+		return nil
+	}
+	st, err := store.GetPRReview(db, t.ID, repoID)
+	if err != nil || st.HeadSHA == pr.HeadRefOid {
+		return err
+	}
+	st.HeadSHA = pr.HeadRefOid
+	if err := store.SavePRReview(db, st); err != nil {
+		return err
+	}
+	return ScheduleCheck(db, t, firstCheck, 0)
 }

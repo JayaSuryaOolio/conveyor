@@ -285,6 +285,9 @@ export namespace store {
 	    enabled: boolean;
 	    last_run_at?: string;
 	    last_result?: string;
+	    run_at?: string;
+	    task_id?: number;
+	    flow_id?: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new Automation(source);
@@ -301,6 +304,9 @@ export namespace store {
 	        this.enabled = source["enabled"];
 	        this.last_run_at = source["last_run_at"];
 	        this.last_result = source["last_result"];
+	        this.run_at = source["run_at"];
+	        this.task_id = source["task_id"];
+	        this.flow_id = source["flow_id"];
 	    }
 	}
 	export class Comment {

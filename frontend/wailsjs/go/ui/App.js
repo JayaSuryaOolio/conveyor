@@ -62,6 +62,10 @@ export function ApplyLearnings(arg1) {
   return window['go']['ui']['App']['ApplyLearnings'](arg1);
 }
 
+export function CheckReviews(arg1) {
+  return window['go']['ui']['App']['CheckReviews'](arg1);
+}
+
 export function Complete(arg1, arg2, arg3, arg4) {
   return window['go']['ui']['App']['Complete'](arg1, arg2, arg3, arg4);
 }

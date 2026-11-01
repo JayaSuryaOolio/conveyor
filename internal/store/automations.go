@@ -3,13 +3,14 @@ package store
 import (
 	"database/sql"
 	"fmt"
+	"time"
 )
 
-const autoCols = `id, name, schedule, precheck, action_kind, action_arg, enabled, last_run_at, last_result`
+const autoCols = `id, name, schedule, precheck, action_kind, action_arg, enabled, last_run_at, last_result, run_at, task_id, flow_id`
 
 func scanAutomation(r interface{ Scan(...any) error }) (Automation, error) {
 	var a Automation
-	err := r.Scan(&a.ID, &a.Name, &a.Schedule, &a.Precheck, &a.ActionKind, &a.ActionArg, &a.Enabled, &a.LastRunAt, &a.LastResult)
+	err := r.Scan(&a.ID, &a.Name, &a.Schedule, &a.Precheck, &a.ActionKind, &a.ActionArg, &a.Enabled, &a.LastRunAt, &a.LastResult, &a.RunAt, &a.TaskID, &a.FlowID)
 	return a, err
 }
 
@@ -20,8 +21,8 @@ func CreateAutomation(db *sql.DB, a Automation) (Automation, error) {
 		n := now()
 		a.LastRunAt = &n
 	}
-	res, err := db.Exec(`INSERT INTO automations (name, schedule, precheck, action_kind, action_arg, enabled, last_run_at, last_result)
- VALUES (?,?,?,?,?,?,?,?)`, a.Name, a.Schedule, a.Precheck, a.ActionKind, a.ActionArg, a.Enabled, a.LastRunAt, a.LastResult)
+	res, err := db.Exec(`INSERT INTO automations (name, schedule, precheck, action_kind, action_arg, enabled, last_run_at, last_result, run_at, task_id, flow_id)
+ VALUES (?,?,?,?,?,?,?,?,?,?,?)`, a.Name, a.Schedule, a.Precheck, a.ActionKind, a.ActionArg, a.Enabled, a.LastRunAt, a.LastResult, a.RunAt, a.TaskID, a.FlowID)
 	if err != nil {
 		return Automation{}, fmt.Errorf("create automation %q: %w", a.Name, err)
 	}
@@ -80,3 +81,27 @@ func DeleteAutomation(db *sql.DB, name string) error {
 	}
 	return nil
 }
+
+// ScheduleOneShot replaces any automation named a.Name with one that fires once at runAt.
+// Naming it "<kind>:<task key>" makes this "replace the pending check per (task, kind)".
+func ScheduleOneShot(db *sql.DB, a Automation, runAt time.Time) error {
+	a.RunAt = ptr(runAt.UTC().Format(time.RFC3339))
+	a.Enabled = true
+	return inTx(db, func(tx *sql.Tx) error {
+		if _, err := tx.Exec(`DELETE FROM automations WHERE name=?`, a.Name); err != nil {
+			return err
+		}
+		n := now()
+		_, err := tx.Exec(`INSERT INTO automations (name, schedule, precheck, action_kind, action_arg, enabled, last_run_at, run_at, task_id, flow_id)
+ VALUES (?,?,?,?,?,1,?,?,?,?)`, a.Name, a.Schedule, a.Precheck, a.ActionKind, a.ActionArg, n, a.RunAt, a.TaskID, a.FlowID)
+		return err
+	})
+}
+
+// DeleteAutomationByID removes one automation; a missing row is not an error.
+func DeleteAutomationByID(db *sql.DB, id int64) error {
+	_, err := db.Exec(`DELETE FROM automations WHERE id=?`, id)
+	return err
+}
+
+func ptr[T any](v T) *T { return &v }
