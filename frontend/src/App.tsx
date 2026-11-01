@@ -2,11 +2,11 @@ import {useEffect, useRef, useState} from 'react'
 import {ActionIcon, AppShell, Badge, Box, Button, Group, Kbd, NavLink, Stack, Text, Title, Tooltip} from '@mantine/core'
 import {useLocalStorage} from '@mantine/hooks'
 import {IconApps, IconBolt, IconArrowLeft, IconBook2, IconClock, IconLayoutKanban, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconLogs, IconPlus, IconRobot, IconSettings} from '@tabler/icons-react'
-import {AppIcons, AppVersion, DispatcherState, Learnings, ListApps, OpenApp} from '../wailsjs/go/ui/App'
+import {AppVersion, DispatcherState, Learnings} from '../wailsjs/go/ui/App'
 import {Agents} from './agents'
 import {Apps} from './apps'
 import {Automations} from './automations'
-import {AppIcon, Nav, PlacedButtons, Toasts, View, runApp} from './components'
+import {Nav, PlacedButtons, Toasts, View} from './components'
 import {NewTask, Settings} from './forms'
 import {LearningsPage} from './learnings'
 import {Logs} from './logs'
@@ -39,10 +39,7 @@ export default function App() {
     const [mini, setMini] = useLocalStorage({key: 'nav-collapsed', defaultValue: false})
     const {data: learnings} = useData(Learnings, [])
     const proposed = learnings?.filter(l => l.status === 'proposed').length ?? 0
-    const {data: apps} = useData(ListApps, [])
-    const {data: icons} = useData(AppIcons, [])
     const {data: version} = useData(AppVersion, [])
-    const globalApps = (apps ?? []).filter(a => a.global && !a.manifest)
     const nav: Nav = v => setView(v)
 
     useEffect(() => {
@@ -104,16 +101,7 @@ export default function App() {
                             </Tooltip>
                         ))}
                     </Stack>
-                    <Group mt="auto" gap={4} justify={mini ? 'center' : 'flex-start'}>
-                        {globalApps.map(a => (
-                            <Tooltip key={a.id} label={a.name} position="right">
-                                <ActionIcon variant="subtle" color="gray" aria-label={a.name} onClick={() => runApp(a, OpenApp(a.name, '', ''))}>
-                                    <AppIcon name={a.name} icons={icons}/>
-                                </ActionIcon>
-                            </Tooltip>
-                        ))}
-                    </Group>
-                    {!mini && <PlacedButtons place="global_nav" size="compact-xs"/>}
+                    <Box mt="auto">{!mini && <PlacedButtons place="global_nav" size="compact-xs"/>}</Box>
                     <Group gap="xs" justify={mini ? 'center' : 'space-between'} wrap="nowrap">
                         <Tooltip label={dispatcher === 'dispatching' ? 'Dispatcher running in this app' : 'UI only: another process dispatches'} position="right">
                             <Box w={8} h={8} style={{borderRadius: '50%', background: `var(--mantine-color-${dispatcher === 'dispatching' ? 'green' : 'gray'}-6)`}}/>

@@ -547,16 +547,13 @@ func spotlightService() ManifestService {
 }
 
 // LegacyManifest expresses a plain command app (the old {cwd}/{key} template) as a manifest:
-// one action in the nav bar (global) or task sidebar, with the icon of the .app it opens. Unlike the legacy sidebar icons, the
+// one action in the task sidebar, with the icon of the .app it opens. Unlike the legacy sidebar icons, the
 // action runs in the task's primary worktree only.
 func LegacyManifest(a store.App) (string, error) {
 	place := "task_sidebar"
-	if a.Global {
-		place = "global_nav"
-	}
 	run := strings.NewReplacer("{cwd}", "${{ worktree.path }}", "{key}", "${{ task.key }}").Replace(a.Command)
 	act := ManifestAction{ID: "open", Label: a.Name, Run: run, Places: []string{place}, Output: a.Output, IconPath: appBundle(a.Command)}
-	if a.Name == "Spotlight" && !a.Global && !a.Output {
+	if a.Name == "Spotlight" && !a.Output {
 		act.Services = map[string]ManifestService{place: spotlightService()}
 	}
 	b, err := json.MarshalIndent(Manifest{Version: ManifestVersion, Name: a.Name, Actions: []ManifestAction{act}}, "", "  ")

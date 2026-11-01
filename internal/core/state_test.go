@@ -93,16 +93,16 @@ func TestSeedMockState(t *testing.T) {
 	}
 	apps, _ := store.ListApps(db)
 	autos, _ := store.ListAutomations(db)
-	var global, local, out, enabled, disabled bool
+	var out, enabled, disabled bool
 	for _, a := range apps {
-		global, local, out = global || a.Global, local || !a.Global, out || a.Output
+		out = out || a.Output
 	}
 	kinds := map[string]bool{}
 	for _, a := range autos {
 		enabled, disabled = enabled || a.Enabled, disabled || !a.Enabled
 		kinds[a.ActionKind] = true
 	}
-	if store.GetSetting(db, "max_parallel") != "2" || !global || !local || !out || !enabled || !disabled || len(kinds) != 3 {
+	if store.GetSetting(db, "max_parallel") != "2" || !out || !enabled || !disabled || len(kinds) != 3 {
 		t.Fatalf("mock state incomplete: apps %+v autos %+v", apps, autos)
 	}
 }

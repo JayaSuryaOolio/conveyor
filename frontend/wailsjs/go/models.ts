@@ -257,7 +257,6 @@ export namespace store {
 	    id: number;
 	    name: string;
 	    command: string;
-	    global: boolean;
 	    output: boolean;
 	    manifest: string;
 	
@@ -270,7 +269,6 @@ export namespace store {
 	        this.id = source["id"];
 	        this.name = source["name"];
 	        this.command = source["command"];
-	        this.global = source["global"];
 	        this.output = source["output"];
 	        this.manifest = source["manifest"];
 	    }
