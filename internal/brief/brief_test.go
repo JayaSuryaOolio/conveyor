@@ -144,6 +144,9 @@ func TestSettingsShapeBrief(t *testing.T) {
 	if got := FreshPrompt(tk, "/b.md", d, "{key}|{title}|{brief}|{comments}"); got != "CV-3|T|/b.md|- [human] a" {
 		t.Errorf("custom fresh %q", got)
 	}
+	if got := ResumePrompt(tk, "/b.md", nil, ""); !strings.Contains(got, "no new comments") {
+		t.Errorf("empty delta prompt = %q", got)
+	}
 	if got := ResumePrompt(tk, "/b.md", d, "{key}!"); got != "CV-3!" {
 		t.Errorf("custom resume %q", got)
 	}
