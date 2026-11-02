@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/JayaSuryaOolio/conveyor/internal/audit"
 	"github.com/JayaSuryaOolio/conveyor/internal/core"
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 )
@@ -53,6 +54,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	}
 	home, err := core.Home(*homeFlag)
 	if err == nil {
+		audit.Install(home)
 		err = c.fn(home, rest[1:])
 	}
 	if err != nil {

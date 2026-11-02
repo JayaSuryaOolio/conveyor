@@ -202,7 +202,7 @@ func ApproveEpic(db *sql.DB, epicID int64) (EpicFlow, error) {
 	})
 	if err == nil {
 		Audit("epic.flow.start", "task_id", epicID, "flow", f.Attempt)
-		Audit("epic.gate", "task_id", epicID, "result", "approved")
+		Audit("epic.gate", "task_id", epicID, "result", "approved", "actor", "human")
 	}
 	return f, err
 }
@@ -227,7 +227,8 @@ func RestartFlow(db *sql.DB, epicID int64, reason string) (EpicFlow, error) {
 		return setPrefixed(tx, epicID, PrefixStage, PrefixStage+StageSpec)
 	})
 	if err == nil {
-		Audit("epic.flow.restart", "task_id", epicID, "flow", f.Attempt, "reason", reason)
+		Audit("epic.flow.end", "task_id", epicID, "flow", f.Attempt-1, "status", FlowAbandoned, "reason", reason, "actor", "human")
+		Audit("epic.flow.start", "task_id", epicID, "flow", f.Attempt)
 	}
 	return f, err
 }

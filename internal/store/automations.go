@@ -72,11 +72,9 @@ func UpdateAutomation(db *sql.DB, a Automation) error {
 
 // DeleteAutomation removes an automation by name.
 func DeleteAutomation(db *sql.DB, name string) error {
-	res, err := db.Exec(`DELETE FROM automations WHERE name=?`, name)
-	if err != nil {
+	if n, err := deleteAutomation(db, "name", name); err != nil {
 		return fmt.Errorf("delete automation %q: %w", name, err)
-	}
-	if n, _ := res.RowsAffected(); n == 0 {
+	} else if n == 0 {
 		return fmt.Errorf("automation %q: %w", name, sql.ErrNoRows)
 	}
 	return nil
@@ -100,8 +98,24 @@ func ScheduleOnce(db *sql.DB, a Automation, runAt time.Time) error {
 
 // DeleteAutomationByID removes one automation; a missing row is not an error.
 func DeleteAutomationByID(db *sql.DB, id int64) error {
-	_, err := db.Exec(`DELETE FROM automations WHERE id=?`, id)
+	_, err := deleteAutomation(db, "id", id)
 	return err
+}
+
+// deleteAutomation deletes by name or id and audits the delete of a task's automation.
+func deleteAutomation(db *sql.DB, col string, v any) (int64, error) {
+	var name string
+	var taskID *int64
+	db.QueryRow(`SELECT name, task_id FROM automations WHERE `+col+`=?`, v).Scan(&name, &taskID)
+	res, err := db.Exec(`DELETE FROM automations WHERE `+col+`=?`, v)
+	if err != nil {
+		return 0, err
+	}
+	n, _ := res.RowsAffected()
+	if n > 0 && taskID != nil {
+		Audit("epic.automation.delete", "task_id", *taskID, "automation", name)
+	}
+	return n, nil
 }
 
 func ptr[T any](v T) *T { return &v }

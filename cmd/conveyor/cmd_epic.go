@@ -2,20 +2,24 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"strings"
 	"text/tabwriter"
+	"time"
 
+	"github.com/JayaSuryaOolio/conveyor/internal/audit"
 	"github.com/JayaSuryaOolio/conveyor/internal/core"
 	"github.com/JayaSuryaOolio/conveyor/internal/gh"
+	"github.com/JayaSuryaOolio/conveyor/internal/store"
 )
 
 func init() {
-	register("epic", runEpic, "epic builder (status|check|flows|prs|search|sessions|approve|restart|review-check)")
+	register("epic", runEpic, "epic builder (status|check|flows|prs|search|sessions|approve|restart|log|audit|review-check)")
 }
 
-const epicUsage = "usage: conveyor epic status|check|flows|prs|search|sessions|approve|restart KEY ..."
+const epicUsage = "usage: conveyor epic status|check|flows|prs|search|sessions|approve|restart|log|audit KEY ..."
 
 func runEpic(home string, args []string) error {
 	if len(args) == 0 {
@@ -30,6 +34,7 @@ func runEpic(home string, args []string) error {
 		commits := fs.Bool("commits", false, "list each PR branch's commits")
 		step := fs.Int("step", 0, "review-check: empty checks so far (backoff position)")
 		reason := fs.String("reason", "", "why the flow is abandoned")
+		since := fs.Duration("since", 0, "audit: only records newer than this (e.g. 24h)")
 		grep := fs.String("grep", "", "text to find in transcripts")
 		pos, err := parseArgs(fs, rest)
 		if err != nil {
@@ -46,6 +51,42 @@ func runEpic(home string, args []string) error {
 				fmt.Fprintln(out, res)
 			}
 			return err
+		case "log":
+			if len(pos) != 2 {
+				return fmt.Errorf("usage: conveyor epic log KEY \"<message>\"")
+			}
+			t, err := store.GetTaskByKey(s.DB, key)
+			if err != nil {
+				return err
+			}
+			store.Audit("epic.log", "task_id", t.ID, "msg", pos[1], "actor", "agent")
+			return nil
+		case "audit":
+			t, err := store.GetTaskByKey(s.DB, key)
+			if err != nil {
+				return err
+			}
+			root, err := store.EpicRoot(s.DB, t)
+			if err != nil {
+				return err
+			}
+			f := audit.Filter{Root: root.Key, Flow: *flow}
+			if *since > 0 {
+				f.Since = time.Now().Add(-*since)
+			}
+			recs, err := audit.Read(s.Home, f)
+			if err != nil {
+				return err
+			}
+			for _, r := range recs {
+				if *asJSON {
+					b, _ := json.Marshal(r)
+					fmt.Fprintf(out, "%s\n", b)
+				} else {
+					fmt.Fprintf(out, "%v %-8v %-6v %-22v %v\n", r["time"], r["actor"], r["task"], r["event"], r["msg"])
+				}
+			}
+			return nil
 		case "approve":
 			return s.EpicApprove(key)
 		case "restart":

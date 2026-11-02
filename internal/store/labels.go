@@ -130,7 +130,8 @@ func setPrefixed(tx dbtx, taskID int64, prefix string, labels ...string) error {
 		}
 	}
 	if prefix == "epic_stage:" && len(labels) == 1 {
-		Audit("epic.stage", "task_id", taskID, "from", labelValue(before, prefix), "to", labelValue(labels, prefix))
+		from, to := labelValue(before, prefix), labelValue(labels, prefix)
+		Audit("epic.stage", "task_id", taskID, "msg", "stage "+from+" -> "+to, "from", from, "to", to)
 	}
 	return checkEpicName(tx, taskID)
 }

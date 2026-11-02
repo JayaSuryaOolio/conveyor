@@ -2,6 +2,7 @@ package hook
 
 import (
 	"database/sql"
+	"encoding/json"
 	"path/filepath"
 	"strings"
 
@@ -55,4 +56,51 @@ func firstArg(args []string) string {
 		}
 	}
 	return ""
+}
+
+// AuditCommand records the conveyor, gh and git push commands of the run at cwd, and a denied merge.
+// The audit writer drops runs outside an epic.
+func AuditCommand(home string, raw []byte, denied bool) {
+	var p struct {
+		ToolName  string `json:"tool_name"`
+		Cwd       string `json:"cwd"`
+		ToolInput struct {
+			Command string `json:"command"`
+		} `json:"tool_input"`
+	}
+	if json.Unmarshal(raw, &p) != nil || p.ToolName != "Bash" {
+		return
+	}
+	cmd := p.ToolInput.Command
+	key := workspace.KeyFromCwd(home, p.Cwd)
+	if key == "" || !tracked(cmd) {
+		return
+	}
+	store.Audit("epic.command", "task", key, "msg", "command", "command", cmd[:min(len(cmd), 300)])
+	if denied && mergesPR(cmd) {
+		store.Audit("epic.merge_denied", "task", key, "command", cmd[:min(len(cmd), 300)])
+	}
+}
+
+// tracked reports whether any segment runs conveyor, gh or git push.
+func tracked(cmd string) bool {
+	for _, seg := range tokenize(cmd) {
+		for len(seg) > 0 && strings.Contains(seg[0], "=") && !strings.HasPrefix(seg[0], "-") {
+			seg = seg[1:]
+		}
+		if len(seg) == 0 {
+			continue
+		}
+		switch filepath.Base(seg[0]) {
+		case "conveyor", "gh":
+			return true
+		case "git":
+			for _, a := range seg[1:] {
+				if a == "push" {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }

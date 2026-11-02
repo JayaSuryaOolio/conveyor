@@ -105,10 +105,19 @@ func resolveRun(db *sql.DB, task store.Task, session string) (store.Run, error) 
 	for i := len(runs) - 1; i >= 0; i-- {
 		if r := runs[i]; r.Status == "launching" {
 			r.SessionID = sp
+			auditStart(task.ID, r)
 			return r, store.UpdateRun(db, r)
 		}
 	}
-	return store.CreateRun(db, store.Run{TaskID: task.ID, Kind: "interactive", Mode: "fresh", Status: "running", SessionID: sp})
+	r, err := store.CreateRun(db, store.Run{TaskID: task.ID, Kind: "interactive", Mode: "fresh", Status: "running", SessionID: sp})
+	if err == nil {
+		auditStart(task.ID, r)
+	}
+	return r, err
+}
+
+func auditStart(taskID int64, r store.Run) {
+	store.Audit("epic.run.start", "task_id", taskID, "run", r.ID, "session", deref(r.SessionID))
 }
 
 func onPrompt(db *sql.DB, task store.Task, run store.Run) error {
@@ -117,6 +126,7 @@ func onPrompt(db *sql.DB, task store.Task, run store.Run) error {
 		if err := store.UpdateRun(db, run); err != nil {
 			return err
 		}
+		auditStart(task.ID, run)
 	}
 	if task.Status == store.StatusNeedsYou {
 		if latest, err := store.LatestRun(db, task.ID); err == nil && latest.ID == run.ID {
@@ -159,6 +169,10 @@ func onStop(db *sql.DB, task store.Task, run store.Run, p payload) error {
 	}
 	if err := store.UpdateRun(db, run); err != nil {
 		return err
+	}
+	store.Audit("epic.run.end", "task_id", task.ID, "run", run.ID, "session", deref(run.SessionID))
+	if hasBlock {
+		store.Audit("epic.status_block", "task_id", task.ID, "run", run.ID, "status", block.Status, "summary", block.Summary)
 	}
 	if run.Kind != "auto" {
 		return nil
@@ -257,4 +271,11 @@ func bgPending(path, prompt string) bool {
 	}
 	ok, err := transcript.BackgroundPending(path, prompt, time.Now())
 	return err == nil && ok
+}
+
+func deref(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }
