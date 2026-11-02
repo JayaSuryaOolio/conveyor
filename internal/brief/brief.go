@@ -150,7 +150,11 @@ func Build(db *sql.DB, task store.Task) (string, error) {
 		return "", err
 	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "# %s\n\nKey: %s\n\n## Repos\n\n", task.Title, task.Key)
+	fmt.Fprintf(&b, "# %s\n\nKey: %s\n", task.Title, task.Key)
+	if err := labelLines(&b, db, task); err != nil {
+		return "", err
+	}
+	b.WriteString("\n## Repos\n\n")
 	for _, r := range task.Repos {
 		pr := "none"
 		if r.PRURL != nil {
@@ -190,6 +194,50 @@ func Build(db *sql.DB, task store.Task) (string, error) {
 	b.WriteString(relationsHelp)
 	fmt.Fprintf(&b, "\n%s\n## Rules\n\n%s\n## Older history\n\nFull thread: `conveyor task show %s --thread --json`\n", statusBlock, rules(db, true), task.Key)
 	return b.String(), nil
+}
+
+// kindRules is the one-line rule per epic_kind (docs/epic-builder.md §2.1).
+var kindRules = map[string]string{
+	"grilling":  "ask the human your questions and wait for the answers, record the decision on the epic root's Decisions so far, open no PR.",
+	"prototype": "build a throwaway branch or notes that answer the design question and show it to the human; open no PR to merge.",
+	"research":  "read code and docs and report findings in the status block and on the epic root; change no code, open no PR.",
+	"build":     "write the failing test first, open one PR, cite the AC ids it covers. Never merge it.",
+}
+
+// labelLines writes the Labels line and what the epic labels tell the agent:
+// its epic and stage, the rule for its kind and the skills to load.
+func labelLines(b *strings.Builder, db *sql.DB, task store.Task) error {
+	if len(task.Labels) == 0 {
+		return nil
+	}
+	fmt.Fprintf(b, "Labels: %s\n", strings.Join(task.Labels, ", "))
+	if name := store.EpicName(task); name != "" {
+		root, err := store.EpicRoot(db, task)
+		if err != nil {
+			return err
+		}
+		flow := "none"
+		if f, err := store.ActiveFlow(db, root.ID); err != nil {
+			return err
+		} else if f != nil {
+			flow = fmt.Sprint(f.Attempt)
+		}
+		fmt.Fprintf(b, "Epic %s (root %s), stage %s, flow %s. Load the epic skill and run `conveyor epic status %s` first.\n",
+			name, root.Key, store.EpicStage(root), flow, root.Key)
+	}
+	if k := store.LabelValue(task, store.PrefixKind); kindRules[k] != "" {
+		fmt.Fprintf(b, "Kind %s: %s\n", k, kindRules[k])
+	}
+	var skills []string
+	for _, l := range task.Labels {
+		if s, ok := strings.CutPrefix(l, "skill:"); ok && s != "" {
+			skills = append(skills, s)
+		}
+	}
+	if len(skills) > 0 {
+		fmt.Fprintf(b, "Load these skills before starting: %s.\n", strings.Join(skills, ", "))
+	}
+	return nil
 }
 
 // criteria is the latest run's acceptance criteria, or def.
