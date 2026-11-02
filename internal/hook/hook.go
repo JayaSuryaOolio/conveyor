@@ -63,20 +63,18 @@ func Handle(db *sql.DB, home, event string, raw []byte) error {
 	if event == "UserPromptSubmit" {
 		return onPrompt(db, task, run)
 	}
-	if err := onStop(db, task, run, p); err != nil {
-		return err
-	}
-	if err := refreshPR(db, task.ID); err != nil { // best effort: the run is already recorded
+	// Before onStop: its status change fires the chat DM, which reads pr_url for the Open PR button.
+	if err := refreshPR(db, task.ID); err != nil { // best effort
 		store.RecordEvent(db, task.ID, "error", "pr refresh: "+err.Error())
 	}
-	return nil
+	return onStop(db, task, run, p)
 }
 
-// refreshPR syncs the task's PR state once its session returns; the dispatcher poll is the fallback.
+// refreshPR syncs the task's PR state as its session returns; the dispatcher poll is the fallback.
 func refreshPR(db *sql.DB, id int64) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
-	t, err := store.GetTask(db, id) // re-read: onStop may have moved the task
+	t, err := store.GetTask(db, id) // re-read for the latest status
 	if err != nil {
 		return err
 	}
