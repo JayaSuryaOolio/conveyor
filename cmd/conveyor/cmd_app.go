@@ -15,18 +15,16 @@ import (
 )
 
 func init() {
-	register("app", runApp, "open worktrees in external apps, run quick actions (list|presets|add|install|export|convert|run|global|output|rm|open)")
+	register("app", runApp, "open worktrees in external apps, run quick actions (list|presets|add|install|export|convert|run|output|rm|open)")
 	register("hooks", runHooks, "Claude Code hooks in ~/.claude/settings.json (status|install|uninstall)")
 }
 
-const appUsage = `usage: conveyor app list [--json] | presets [--json] | add NAME [--command CMD] [--global] [--output] | add --from-app NAME [--replace]
+const appUsage = `usage: conveyor app list [--json] | presets [--json] | add NAME [--command CMD] [--output] | add --from-app NAME [--replace]
        conveyor app install FILE|- [--replace] (manifest JSON; - reads stdin) | export NAME [FILE] | convert NAME | run APP ACTION [KEY] [--place p]
-       conveyor app global|output NAME on|off | rm NAME
+       conveyor app output NAME on|off | rm NAME
        conveyor app open NAME [KEY|DIR] [--repo r] [--print]
 CMD is a shell command; {cwd} becomes the quoted worktree path and {key} the task key ('' without one).
 add without --command uses the preset of that name.
-A global app is not tied to a worktree: it shows in the UI nav bar instead of on task pages, and open NAME
-(no KEY|DIR) runs it with {cwd} = your home directory.
 An output app is a quick action: it runs to completion in {cwd} and its output is shown (a toast in the app).
 Scripts can use conveyor task sessions KEY [--json] for the task's Claude session ids.`
 
@@ -38,7 +36,6 @@ func runApp(home string, args []string) error {
 	fs := flag.NewFlagSet("app "+cmd, flag.ContinueOnError)
 	asJSON := fs.Bool("json", false, "print JSON")
 	command := fs.String("command", "", "shell command; {cwd} is the worktree path")
-	global := fs.Bool("global", false, "app is not tied to a worktree")
 	output := fs.Bool("output", false, "run to completion and show the output (a quick action)")
 	replace := fs.Bool("replace", false, "install over an app of the same name")
 	fromApp := fs.String("from-app", "", "add: build a manifest app from an installed .app (e.g. \"Visual Studio Code\")")
@@ -82,7 +79,7 @@ func runApp(home string, args []string) error {
 				}
 				return err
 			}
-			a := store.App{Name: pos[0], Command: *command, Global: *global, Output: *output}
+			a := store.App{Name: pos[0], Command: *command, Output: *output}
 			if a.Command == "" {
 				for _, p := range core.AppPresets() {
 					if p.Name == a.Name {
@@ -98,7 +95,7 @@ func runApp(home string, args []string) error {
 			}
 			fmt.Fprintf(out, "added %s: %s\n", a.Name, a.Command)
 			return nil
-		case "global", "output":
+		case "output":
 			if len(pos) != 2 || pos[1] != "on" && pos[1] != "off" {
 				return errors.New(appUsage)
 			}
@@ -106,11 +103,7 @@ func runApp(home string, args []string) error {
 			if err != nil {
 				return err
 			}
-			if cmd == "global" {
-				a.Global = pos[1] == "on"
-			} else {
-				a.Output = pos[1] == "on"
-			}
+			a.Output = pos[1] == "on"
 			return store.UpdateApp(s.DB, a)
 		case "rm":
 			if len(pos) != 1 {
@@ -189,15 +182,11 @@ func runApp(home string, args []string) error {
 	})
 }
 
-// appCwd resolves where an app opens: a directory, a task key's worktree, or (global apps, no arg) home.
+// appCwd resolves where an app opens: a directory, or a task key's worktree.
 // key is the task key when one was given.
 func appCwd(s *core.Service, a store.App, arg []string, repo string) (cwd, key string, err error) {
 	if len(arg) == 0 {
-		if !a.Global {
-			return "", "", fmt.Errorf("%s is not a global app; pass a task KEY or DIR", a.Name)
-		}
-		cwd, err = os.UserHomeDir()
-		return cwd, "", err
+		return "", "", fmt.Errorf("pass a task KEY or DIR to open %s", a.Name)
 	}
 	if fi, err := os.Stat(arg[0]); err == nil && fi.IsDir() {
 		cwd, err = filepath.Abs(arg[0])
@@ -209,12 +198,12 @@ func appCwd(s *core.Service, a store.App, arg []string, repo string) (cwd, key s
 
 func printApps(as []store.App) error {
 	tw := tabwriter.NewWriter(out, 0, 4, 2, ' ', 0)
-	fmt.Fprintln(tw, "NAME\tGLOBAL\tOUTPUT\tCOMMAND")
+	fmt.Fprintln(tw, "NAME\tOUTPUT\tCOMMAND")
 	for _, a := range as {
 		if a.Manifest != "" {
 			a.Command = "(manifest)"
 		}
-		fmt.Fprintf(tw, "%s\t%v\t%v\t%s\n", a.Name, a.Global, a.Output, a.Command)
+		fmt.Fprintf(tw, "%s\t%v\t%s\n", a.Name, a.Output, a.Command)
 	}
 	return tw.Flush()
 }

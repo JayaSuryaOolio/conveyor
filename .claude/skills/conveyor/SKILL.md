@@ -31,6 +31,7 @@ conveyor task stop KEY                # end the running bg session -> needs_you
 conveyor task set KEY [--branch b] [--pr url] [--model m] [--desc d]   # --desc: any status; after a run, a system comment quotes the old one
 conveyor task link KEY blocks|relates OTHER     conveyor task unlink KEY kind OTHER
 conveyor task parent KEY PARENT|--none
+conveyor task repo KEY add|rm NAME   # rm refused once the repo has a PR or is the last one
 conveyor task label KEY add|rm NAME     # labels: many per task (labels + task_labels tables), filter chips on the Board
 conveyor task label KEY set <prefix>:<value>   # replaces only labels with that prefix (epic_stage:build keeps epic:os)
 conveyor task graph KEY [--json]         # parent tree + links around KEY
@@ -41,6 +42,7 @@ conveyor repo add|list|rm|setup <name> [script|-]
 conveyor models [--json]            # model list (API with ANTHROPIC_API_KEY, else built-in); names are not validated, a bad model fails the session -> needs_you
 conveyor state export [FILE] | import FILE [--repo A=name]   # settings/apps/automations/user agents, repos as placeholders
 conveyor hooks status|install|uninstall
+conveyor epic review-check KEY [--step N]   # one PR review check: new feedback -> one system comment (requeues); none -> next backoff (30m, 2h, 8h, stop). Scheduled as a one-shot automation (run_at) 10m after a new PR head, or now via the task page button
 conveyor daemon                       # dispatcher in the foreground
 ```
 

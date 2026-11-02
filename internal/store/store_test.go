@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"sync"
 	"testing"
+	"time"
 )
 
 func openTest(t *testing.T) *sql.DB {
@@ -282,5 +283,28 @@ func TestCreatedBy(t *testing.T) {
 	old := mkTask(t, db, StatusBacklog) // no creator: stays NULL, the frontend falls back to inference
 	if old.CreatedBy != nil {
 		t.Fatalf("created_by = %q, want NULL", *old.CreatedBy)
+	}
+}
+
+func TestDoneOrCancelledDeletesTaskAutomations(t *testing.T) {
+	for _, tc := range []struct {
+		to    Status
+		actor Actor
+	}{{StatusDone, ActorSystem}, {StatusCancelled, ActorHuman}} {
+		db := openTest(t)
+		tk := mkTask(t, db, StatusReview)
+		other := mkTask(t, db, StatusReview)
+		for _, x := range []Task{tk, other} {
+			if err := ScheduleOnce(db, Automation{Name: "review-check:" + x.Key, ActionKind: "cli", ActionArg: "{}", TaskID: &x.ID}, time.Now()); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if _, err := UpdateTaskStatus(db, tk.ID, tc.to, tc.actor); err != nil {
+			t.Fatal(err)
+		}
+		as, _ := ListAutomations(db)
+		if len(as) != 1 || as[0].Name != "review-check:"+other.Key {
+			t.Fatalf("%s: %+v", tc.to, as)
+		}
 	}
 }

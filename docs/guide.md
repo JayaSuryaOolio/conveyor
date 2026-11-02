@@ -195,12 +195,7 @@ conveyor app presets
 conveyor app add Cursor                        # preset
 conveyor app add Zed --command 'zed {cwd}'
 conveyor app open Zed CV-12 [--repo r] [--print]
-conveyor app add Slack --command 'open -a Slack' --global
-conveyor app global Slack on|off               # toggle on an existing app
-conveyor app open Slack                        # global apps need no task or dir
 ```
-
-A global app (Slack, a dashboard, anything not tied to a worktree) is switched on in the Apps page or with `--global`. It is left off the task page and shown instead as an icon at the bottom of the left menu. `{cwd}` in a global app's command is your home folder, so `conveyor app open NAME` with no KEY or DIR works for global apps only.
 
 **Quick actions.** An app with the Quick action switch on (`--output`, or `conveyor app output NAME on|off`) is not an opener: it runs to completion in the task's primary worktree, and its output shows as a toast (or is printed by `conveyor app open`). It appears as a button in the task sidebar. There are no special variables beyond `{cwd}` and `{key}`; scripts get anything else from the CLI, for example `conveyor task sessions KEY [--json]`, which lists the task's Claude session ids (Conveyor runs plus sessions you started in its worktrees). A task's Claude cost through [ccusage](https://github.com/ryoppippi/ccusage) (needs `npx` and `jq`, takes a few seconds):
 
@@ -271,7 +266,7 @@ conveyor agent model <name> <model|""> [--repo r]   ("" inherits default_model)
 conveyor models [--json]                  # model list, tier and alias
 conveyor learning list|accept|reject|edit|apply
 conveyor automation list|add|enable|disable|run|rm
-conveyor app list|presets|add|global|rm|open
+conveyor app list|presets|add|rm|open
 conveyor hooks status|install|uninstall
 conveyor config list | get <key> | set <key> <value>
 conveyor state export [file] | import <file> [--repo A=name ...]

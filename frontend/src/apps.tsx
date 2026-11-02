@@ -20,8 +20,6 @@ function AppForm({initial, onClose}: {initial: store.App; onClose: (saved: boole
             <TextInput data-autofocus label="Name" value={f.name} onChange={e => setF({...f, name: e.target.value})}/>
             <TextInput label="Command" description="Run with sh -c. {cwd} becomes the quoted worktree path and {key} the task key, e.g. open -a Zed {cwd}" ff="monospace"
                        value={f.command} onChange={e => setF({...f, command: e.target.value})}/>
-            <Switch label="Global" description="Not tied to a worktree: shown in the left menu, not on task pages" checked={f.global}
-                    onChange={e => setF({...f, global: e.currentTarget.checked})}/>
             <Switch label="Quick action" checked={f.output} onChange={e => setF({...f, output: e.currentTarget.checked})}
                     description={<>Runs to completion in the task's primary worktree and shows its output as a toast; a button in the task sidebar. Scripts can call <Code>conveyor task sessions {'{key}'}</Code> for the task's Claude session ids.</>}/>
             <div>
@@ -150,25 +148,20 @@ function AppList() {
                 <Title order={3}>Apps</Title>
                 <Group gap="xs">
                     <Button variant="default" leftSection={<IconPuzzle size={16}/>} onClick={() => setImporting(true)}>Install manifest</Button>
-                    <Button leftSection={<IconPlus size={16}/>} onClick={() => setForm(store.App.createFrom({id: 0, name: '', command: '', global: false, output: false, manifest: ''}))}>New app</Button>
+                    <Button leftSection={<IconPlus size={16}/>} onClick={() => setForm(store.App.createFrom({id: 0, name: '', command: '', output: false, manifest: ''}))}>New app</Button>
                 </Group>
             </Group>
-            <Text size="sm" c="dimmed">Apps a task worktree can be opened in, from the icons under each repo on the task page or <Code>conveyor app open NAME KEY</Code>.
-                Global apps (Slack, a dashboard, ...) are not tied to a worktree: they show as icons at the bottom of the left menu instead, and <Code>{'{cwd}'}</Code> is your home folder.</Text>
+            <Text size="sm" c="dimmed">Apps a task worktree can be opened in, from the icons under each repo on the task page or <Code>conveyor app open NAME KEY</Code>.</Text>
             {error && <Text c="red">{error}</Text>}
             {data && data.length === 0 && <Text c="dimmed">None yet. Add one below or create your own.</Text>}
             {data && data.length > 0 && (
                 <Table verticalSpacing="xs">
-                    <Table.Thead><Table.Tr><Table.Th>Name</Table.Th><Table.Th>Command</Table.Th><Table.Th>Global</Table.Th><Table.Th/></Table.Tr></Table.Thead>
+                    <Table.Thead><Table.Tr><Table.Th>Name</Table.Th><Table.Th>Command</Table.Th><Table.Th/></Table.Tr></Table.Thead>
                     <Table.Tbody>
                         {data.map(a => (
                             <Table.Tr key={a.id}>
                                 <Table.Td fw={600}><Group gap="xs" wrap="nowrap"><AppIcon name={a.name} icons={icons}/>{a.name}{a.output && <Badge size="xs" variant="light">quick action</Badge>}{a.manifest && <Badge size="xs" variant="light" color="grape">manifest</Badge>}</Group></Table.Td>
                                 <Table.Td><Code title={a.manifest || a.command} style={{display: 'block', maxWidth: 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>{a.manifest ? manifestSummary(a) : a.command}</Code></Table.Td>
-                                <Table.Td>
-                                    {!a.manifest && <Switch aria-label={`${a.name} is global`} checked={a.global}
-                                            onChange={e => UpdateApp({...a, global: e.currentTarget.checked}).then(reload, errMsg)}/>}
-                                </Table.Td>
                                 <Table.Td>
                                     <Group gap="xs" wrap="nowrap" justify="flex-end">
                                         {a.manifest && <ActionIcon variant="subtle" color="gray" aria-label="Export" title="Export manifest as .json" onClick={() => ExportApp(a.name).then(p => p && toast(`Exported to ${p}`), errMsg)}><IconDownload size={16}/></ActionIcon>}
@@ -207,8 +200,9 @@ function AppList() {
 
 const SLACK: Field[] = [
     {k: 'slack_bot_token', label: 'Bot token', desc: 'xoxb-... from OAuth & Permissions. Posts the DMs as a bot.', kind: 'secret'},
-    {k: 'slack_user_token', label: 'User token (optional)', desc: 'xoxp-... Acts as you instead of the bot, only while "Act as me" is on.', kind: 'secret'},
-    {k: 'slack_app_token', label: 'App token', desc: 'xapp-... with connections:write. Opens the Socket Mode connection, so no public URL is needed.', kind: 'secret'},
+    {k: 'slack_user_token', label: 'User token (optional)', desc: 'xoxp-... If filled, every message Conveyor sends (task DMs, thread replies, command answers) is posted as you instead of the bot, and the bot token is not used. Messages land in your own self-DM and send no push notification.', kind: 'secret'},
+    {k: 'slack_app_token', label: 'App token', desc: 'xapp-... (or a rotating xoxe.xapp-...) with connections:write. Opens the Socket Mode connection, so no public URL is needed.', kind: 'secret'},
+    {k: 'slack_app_refresh_token', label: 'App refresh token (optional)', desc: 'xoxe-1-... Only for a rotating app token: Conveyor uses it to get a new app token when the old one expires, and saves both.', kind: 'secret'},
     {k: 'slack_user_id', label: 'Your Slack member ID', desc: 'U... (profile > Copy member ID). Only this user is DMed and obeyed; everyone else is ignored.'},
 ]
 const STATUSES = ['needs_you', 'review', 'done', 'failed']
@@ -225,8 +219,8 @@ function Integrations() {
                     <Stack gap="sm">
                         <Group justify="space-between">
                             <Group gap="xs"><Title order={5}>Slack</Title>
-                                <Badge variant="light" color={data.chat_enabled === 'on' && (data.slack_impersonate === 'on' && data.slack_user_token || data.slack_bot_token) && data.slack_app_token && data.slack_user_id ? 'green' : 'gray'}>
-                                    {data.chat_enabled !== 'on' ? 'off' : (data.slack_impersonate === 'on' && data.slack_user_token || data.slack_bot_token) && data.slack_app_token && data.slack_user_id ? 'on' : 'needs tokens'}
+                                <Badge variant="light" color={data.chat_enabled === 'on' && (data.slack_user_token || data.slack_bot_token) && data.slack_app_token && data.slack_user_id ? 'green' : 'gray'}>
+                                    {data.chat_enabled !== 'on' ? 'off' : (data.slack_user_token || data.slack_bot_token) && data.slack_app_token && data.slack_user_id ? 'on' : 'needs tokens'}
                                 </Badge>
                             </Group>
                             <Switch label="Send and listen" checked={data.chat_enabled === 'on'} onChange={e => set('chat_enabled', e.currentTarget.checked ? 'on' : 'off')}/>
@@ -236,8 +230,6 @@ function Integrations() {
                             Create the Slack app as described in <Code>docs/slack.md</Code>. Changes apply without a restart.
                         </Text>
                         {SLACK.map(f => <SettingRow key={f.k} f={f} v={data[f.k] ?? ''} reload={reload}/>)}
-                        <Switch label="Act as me (user token)" description="Post as you instead of the bot. Messages then land in your own self-DM and send no push notification."
-                                checked={data.slack_impersonate === 'on'} onChange={e => set('slack_impersonate', e.currentTarget.checked ? 'on' : 'off')}/>
                         <MultiSelect label="Notify on" description="Task statuses that send a DM." data={STATUSES} value={(data.chat_statuses ?? '').split(',').filter(Boolean)}
                                      onChange={v => set('chat_statuses', v.join(','))}/>
                     </Stack>

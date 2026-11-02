@@ -110,6 +110,18 @@ CREATE TABLE IF NOT EXISTS automations (
   last_result TEXT
 );
 
+-- Per-PR review state: head for push detection, watermark for review checks.
+-- ponytail: migrate into epic_flow_prs (epic-builder §7) once sub-task B lands.
+CREATE TABLE IF NOT EXISTS pr_reviews (
+  task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  repo_id INTEGER NOT NULL REFERENCES repos(id),
+  head_sha TEXT NOT NULL DEFAULT '',
+  seen_comment_id INTEGER NOT NULL DEFAULT 0,
+  unresolved INTEGER NOT NULL DEFAULT 0,
+  review TEXT NOT NULL DEFAULT '',
+  PRIMARY KEY (task_id, repo_id)
+);
+
 CREATE TABLE IF NOT EXISTS task_links (
   from_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
   to_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
@@ -157,7 +169,6 @@ CREATE TABLE IF NOT EXISTS apps (
   id INTEGER PRIMARY KEY,
   name TEXT NOT NULL UNIQUE,
   command TEXT NOT NULL,
-  global INTEGER NOT NULL DEFAULT 0,
   output INTEGER NOT NULL DEFAULT 0,
   manifest TEXT NOT NULL DEFAULT ''
 );
@@ -175,7 +186,7 @@ func Migrate(db *sql.DB) error {
 	if _, err := db.Exec(`DELETE FROM task_links WHERE kind='duplicates'`); err != nil {
 		return fmt.Errorf("drop duplicates links: %w", err)
 	}
-	if err := migrateAddAppGlobal(db); err != nil {
+	if err := migrateAppColumns(db); err != nil {
 		return err
 	}
 	if err := migrateAddAppManifest(db); err != nil {
@@ -187,7 +198,31 @@ func Migrate(db *sql.DB) error {
 	if err := migrateAddRepoSetupScript(db); err != nil {
 		return err
 	}
-	return migrateAddCommentSource(db)
+	if err := migrateAddCommentSource(db); err != nil {
+		return err
+	}
+	return migrateAddAutomationOneShot(db)
+}
+
+// migrateAddAutomationOneShot adds automations.run_at/task_id/flow_id.
+// flow_id has no FK yet: epic_flows (epic-builder §7) lands in a parallel sub-task.
+func migrateAddAutomationOneShot(db *sql.DB) error {
+	for col, def := range map[string]string{
+		"run_at":  "TEXT",
+		"task_id": "INTEGER REFERENCES tasks(id) ON DELETE CASCADE",
+		"flow_id": "INTEGER",
+	} {
+		var n int
+		if err := db.QueryRow(`SELECT count(*) FROM pragma_table_info('automations') WHERE name=?`, col).Scan(&n); err != nil {
+			return fmt.Errorf("check automations.%s: %w", col, err)
+		}
+		if n == 0 {
+			if _, err := db.Exec(`ALTER TABLE automations ADD COLUMN ` + col + ` ` + def); err != nil {
+				return fmt.Errorf("add automations.%s: %w", col, err)
+			}
+		}
+	}
+	return nil
 }
 
 // migrateAddRepoSetupScript adds repos.setup_script; existing repos get no script.
@@ -232,17 +267,24 @@ func migrateAddTaskCreatedBy(db *sql.DB) error {
 	return nil
 }
 
-// migrateAddAppGlobal adds apps.global and apps.output to databases created before they existed.
-func migrateAddAppGlobal(db *sql.DB) error {
-	for _, col := range []string{"global", "output"} {
-		var n int
-		if err := db.QueryRow(`SELECT count(*) FROM pragma_table_info('apps') WHERE name=?`, col).Scan(&n); err != nil {
-			return fmt.Errorf("check apps.%s: %w", col, err)
+// migrateAppColumns adds apps.output and drops the legacy apps.global on older databases.
+func migrateAppColumns(db *sql.DB) error {
+	has := func(col string) (n int, err error) {
+		err = db.QueryRow(`SELECT count(*) FROM pragma_table_info('apps') WHERE name=?`, col).Scan(&n)
+		return n, err
+	}
+	if n, err := has("output"); err != nil {
+		return fmt.Errorf("check apps.output: %w", err)
+	} else if n == 0 {
+		if _, err := db.Exec(`ALTER TABLE apps ADD COLUMN output INTEGER NOT NULL DEFAULT 0`); err != nil {
+			return fmt.Errorf("add apps.output: %w", err)
 		}
-		if n == 0 {
-			if _, err := db.Exec(`ALTER TABLE apps ADD COLUMN ` + col + ` INTEGER NOT NULL DEFAULT 0`); err != nil {
-				return fmt.Errorf("add apps.%s: %w", col, err)
-			}
+	}
+	if n, err := has("global"); err != nil {
+		return fmt.Errorf("check apps.global: %w", err)
+	} else if n > 0 {
+		if _, err := db.Exec(`ALTER TABLE apps DROP COLUMN global`); err != nil {
+			return fmt.Errorf("drop apps.global: %w", err)
 		}
 	}
 	return nil

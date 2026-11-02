@@ -1,16 +1,18 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"strings"
 	"text/tabwriter"
 
 	"github.com/JayaSuryaOolio/conveyor/internal/core"
+	"github.com/JayaSuryaOolio/conveyor/internal/gh"
 )
 
 func init() {
-	register("epic", runEpic, "epic builder (status|check|flows|prs|search|sessions|approve|restart)")
+	register("epic", runEpic, "epic builder (status|check|flows|prs|search|sessions|approve|restart|review-check)")
 }
 
 const epicUsage = "usage: conveyor epic status|check|flows|prs|search|sessions|approve|restart KEY ..."
@@ -26,6 +28,7 @@ func runEpic(home string, args []string) error {
 		flow := fs.Int("flow", 0, "flow attempt (default: the active flow)")
 		fix := fs.Bool("fix", false, "repair labels")
 		commits := fs.Bool("commits", false, "list each PR branch's commits")
+		step := fs.Int("step", 0, "review-check: empty checks so far (backoff position)")
 		reason := fs.String("reason", "", "why the flow is abandoned")
 		grep := fs.String("grep", "", "text to find in transcripts")
 		pos, err := parseArgs(fs, rest)
@@ -37,6 +40,12 @@ func runEpic(home string, args []string) error {
 		}
 		key := pos[0]
 		switch cmd {
+		case "review-check":
+			res, err := gh.ReviewCheck(context.Background(), s, key, *step)
+			if err == nil {
+				fmt.Fprintln(out, res)
+			}
+			return err
 		case "approve":
 			return s.EpicApprove(key)
 		case "restart":
