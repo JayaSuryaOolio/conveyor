@@ -233,7 +233,7 @@ ALTER TABLE automations ADD COLUMN flow_id INTEGER REFERENCES epic_flows(id) ON 
 
 ## 8. Epic agent, skill and brief
 
-- **Agent template** `epic` (Agents page preset). The prompt is short: "You run an epic. Load the `epic` skill and follow it." Stage logic lives in the skill, so it can change without a Go release.
+- **Agent** `epic-builder`, seeded into `~/.claude/agents` by `hooks install` (no UI). The prompt is short: "You run an epic. Load the `epic` skill and follow it." Stage logic lives in the skill, so it can change without a Go release.
 - **Skill files**: `skills/epic/SKILL.md` (loop, gate, checklist, no-merge rule, commands), `skills/epic/planners/wayfinder.md` (§2.1 table as commands). They are embedded with `go:embed` and written by `UserHooks("install")` next to the hooks. `status` reports the skill too.
 - **Brief** (`internal/brief`):
   - a `Labels:` line,
