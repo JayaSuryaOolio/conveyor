@@ -1,7 +1,7 @@
 import {lazy, Ref, Suspense, useEffect, useRef, useState} from 'react'
 import {ActionIcon, Anchor, Badge, Box, Breadcrumbs, Button, CloseButton, Code, CopyButton, Divider, Group, Kbd, Paper, Popover, Stack, Text, TextInput, Timeline, Title, Tooltip} from '@mantine/core'
 import {useLocalStorage} from '@mantine/hooks'
-import {IconAbc, IconArrowDown, IconArrowUp, IconClock, IconFlame, IconHash, IconPencil, IconSearch, IconTerminal, IconX, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconMessage, IconPlayerPlay} from '@tabler/icons-react'
+import {IconAbc, IconSitemap, IconArrowDown, IconArrowUp, IconClock, IconFlame, IconHash, IconPencil, IconSearch, IconTerminal, IconX, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconMessage, IconPlayerPlay} from '@tabler/icons-react'
 import {Actions, GetTask, ListTasks, RunLog, SetTaskDescription, Stop, TakeQueuedComment, TermStart} from '../wailsjs/go/ui/App'
 import {core, store, ui} from '../wailsjs/go/models'
 import {Card, CommentBox, Message, Nav, StatusBadge, Time, View, errMsg} from './components'
@@ -259,7 +259,7 @@ function Description({t, reload}: {t: store.Task; reload: () => void}) {
     )
 }
 
-export function TaskPage({k, nav}: {k: string; nav: Nav}) {
+export function TaskPage({k, nav, height = 'calc(100vh - 2 * var(--mantine-spacing-md))'}: {k: string; nav: Nav; height?: string}) {
     const {data: d, error, reload} = useData(() => GetTask(k), [k])
     const [added, setAdded] = useState<ui.TermInfo>()
     const [restored, setRestored] = useState<{body: string}>()
@@ -285,9 +285,10 @@ export function TaskPage({k, nav}: {k: string; nav: Nav}) {
     return (
         // Only the thread scrolls: the comment box, sidebar and terminal dock stay put.
         <TaskKey.Provider value={t.key}>
-        <Box style={{display: 'flex', flexDirection: 'column', height: 'calc(100vh - 2 * var(--mantine-spacing-md))'}}>
+        <Box style={{display: 'flex', flexDirection: 'column', height}}>
         <Box style={{flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: `minmax(0, 1fr) ${side ? '300px' : 'auto'}`, gap: side ? 'var(--mantine-spacing-xl)' : 'var(--mantine-spacing-xs)'}}>
             <Stack gap="sm" mih={0}>
+                <Group justify="space-between" wrap="nowrap" style={{flex: 'none'}}>
                 <Breadcrumbs style={{flex: 'none', flexWrap: 'nowrap'}}>
                     {/* A <button> anchor stays keyboard-focusable; only the underline is dropped. */}
                     <Anchor size="sm" component="button" underline="never" onClick={() => nav({name: 'board'})}>Board</Anchor>
@@ -298,6 +299,8 @@ export function TaskPage({k, nav}: {k: string; nav: Nav}) {
                     )}</CopyButton>
                     {titleGone && <Text size="sm" c="dimmed" truncate>{t.title}</Text>}
                 </Breadcrumbs>
+                <Tooltip label="Epic view (e)"><ActionIcon variant="subtle" color="gray" aria-label="Epic view" onClick={() => nav({name: 'epic', key: t.key})}><IconSitemap size={18}/></ActionIcon></Tooltip>
+                </Group>
                 <ScrollBox floating={answer}>
                     <Stack>
                         <WatchedTitle onGone={setTitleGone}>{t.title}</WatchedTitle>

@@ -346,12 +346,17 @@ func (s *Service) fixRepoLabels(t store.Task) error {
 // GraphNode is a task in an epic or task graph.
 type GraphNode struct {
 	EpicTask
-	ParentKey string `json:"parent"`
+	ParentKey string   `json:"parent"`
+	Model     string   `json:"model"`     // the task's own override; "" = the agent's or the default
+	Worktrees []string `json:"worktrees"` // repos whose worktree exists
 }
 
 // Graph is the parent tree around a task with its links and, for an epic, the flow's PR rows.
 type Graph struct {
 	Root  string         `json:"root"`
+	Name  string         `json:"name"`  // epic name, "" for a plain task tree
+	Stage string         `json:"stage"` // epic stage, "" for a plain task tree
+	Gate  bool           `json:"gate"`  // the epic waits for plan approval
 	Nodes []GraphNode    `json:"nodes"`
 	Links []store.Link   `json:"links"`
 	PRs   []store.FlowPR `json:"prs"`
@@ -409,7 +414,15 @@ func (s *Service) TaskGraph(key string) (Graph, error) {
 		if err != nil {
 			return g, err
 		}
-		gn := GraphNode{EpicTask: et}
+		gn := GraphNode{EpicTask: et, Worktrees: []string{}}
+		if n.Model != nil {
+			gn.Model = *n.Model
+		}
+		for _, r := range n.Repos {
+			if r.WorktreePath != nil {
+				gn.Worktrees = append(gn.Worktrees, r.RepoName)
+			}
+		}
 		if n.ParentID != nil {
 			gn.ParentKey = ids[*n.ParentID]
 		}
@@ -417,6 +430,10 @@ func (s *Service) TaskGraph(key string) (Graph, error) {
 	}
 	slices.SortFunc(g.Nodes, func(a, b GraphNode) int { return strings.Compare(a.Key, b.Key) })
 	if store.IsEpic(root) {
+		g.Name, g.Stage = store.EpicName(root), store.EpicStage(root)
+		if g.Gate, err = store.EpicAtGate(s.DB, root); err != nil {
+			return g, err
+		}
 		if f, err := store.ActiveFlow(s.DB, root.ID); err != nil {
 			return g, err
 		} else if f != nil {
