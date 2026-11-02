@@ -93,6 +93,13 @@ func (s *Service) UserHooks(action string) (string, error) {
 		if err := claude.SetSkill(epic, dir, action == "install"); err != nil {
 			return "", fmt.Errorf("epic skill: %w", err)
 		}
+		if action == "install" { // seed the agent epic roots run under; never overwrites an edited one
+			if _, err := os.Stat(filepath.Join(userAgentsDir(), "epic-builder.md")); err != nil {
+				if err := s.AddAgent("epic-builder", "Runs a Conveyor epic: plans it, waits at the gate, drives its sub-tasks to PRs.", "You run an epic. Load the `epic` skill and follow it.", "user", ""); err != nil {
+					return "", fmt.Errorf("epic-builder agent: %w", err)
+				}
+			}
+		}
 	default:
 		return "", fmt.Errorf("unknown hooks action %q", action)
 	}

@@ -22,6 +22,15 @@ func TestUserHooksInstallEpicSkill(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	agent := filepath.Join(h, ".claude", "agents", "epic-builder.md")
+	if _, err := os.Stat(agent); err != nil {
+		t.Fatal(err)
+	}
+	os.WriteFile(agent, []byte("edited"), 0o644)
+	s.UserHooks("install")
+	if b, _ := os.ReadFile(agent); string(b) != "edited" {
+		t.Fatal("install overwrote the epic-builder agent")
+	}
 	os.RemoveAll(skill)
 	if got, _ := s.UserHooks("status"); got != "outdated" {
 		t.Fatalf("hooks without the skill: %q", got)
