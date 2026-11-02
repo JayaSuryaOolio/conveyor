@@ -2,8 +2,9 @@
 // thread replies and /conveyor commands back, so the Slack mobile app is Conveyor's mobile
 // client. It uses Socket Mode, so no public URL is needed.
 //
-// Settings: slack_bot_token (xoxb-) or slack_user_token (xoxp-, used only while
-// slack_impersonate is on: the app then acts as you instead of as a bot), slack_app_token (xapp-, scope connections:write) and
+// Settings: slack_bot_token (xoxb-), slack_user_token (xoxp-, optional: when set, every post and
+// API call is made as you instead of the bot), slack_app_token (xapp-, scope connections:write;
+// or a rotating xoxe.xapp- token plus slack_app_refresh_token, which Conveyor rotates itself) and
 // slack_user_id (your member id: the only user the bridge talks to or listens to).
 // Buttons need Interactivity enabled in the app (Socket Mode delivers the clicks).
 package slack
@@ -14,6 +15,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 	"sync"
@@ -38,17 +40,56 @@ var mine sync.Map
 var threads sync.Map
 
 // Slack is the transport; get reads settings.
-type Slack struct{ get func(string) string }
+type Slack struct {
+	get func(string) string
+	set func(k, v string) error
+}
 
 // New is a chat.Factory.
-func New(get func(string) string) chat.Transport { return &Slack{get} }
+func New(get func(string) string, set func(k, v string) error) chat.Transport {
+	return &Slack{get, set}
+}
 
-// token is the user token when impersonating, else the bot token.
+// token is the user token when set, else the bot token.
 func (s *Slack) token() string {
-	if t := s.get("slack_user_token"); t != "" && s.get("slack_impersonate") == "on" {
+	if t := s.get("slack_user_token"); t != "" {
 		return t
 	}
 	return s.get("slack_bot_token")
+}
+
+// openConn calls apps.connections.open. A rotating app token expires after 12h: on token_expired
+// it is rotated with slack_app_refresh_token (both new tokens are saved) and the call retried once.
+func (s *Slack) openConn() (map[string]any, error) {
+	r, err := call(s.get("slack_app_token"), "apps.connections.open", struct{}{})
+	if err == nil || !strings.HasSuffix(err.Error(), "token_expired") || s.get("slack_app_refresh_token") == "" {
+		return r, err
+	}
+	resp, err := http.PostForm(api+"tooling.tokens.rotate", url.Values{"refresh_token": {s.get("slack_app_refresh_token")}})
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	var out struct {
+		OK           bool   `json:"ok"`
+		Error        string `json:"error"`
+		Token        string `json:"token"`
+		RefreshToken string `json:"refresh_token"`
+	}
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&out); err != nil {
+		return nil, err
+	}
+	if !out.OK || out.Token == "" || out.RefreshToken == "" {
+		return nil, fmt.Errorf("slack tooling.tokens.rotate: %v", out.Error)
+	}
+	// the old refresh token is dead once rotated, so save both before using the new token
+	if err := s.set("slack_app_refresh_token", out.RefreshToken); err != nil {
+		return nil, err
+	}
+	if err := s.set("slack_app_token", out.Token); err != nil {
+		return nil, err
+	}
+	return call(out.Token, "apps.connections.open", struct{}{})
 }
 
 // post sends chat.postMessage and remembers its ts (see mine).
@@ -185,7 +226,7 @@ type envelope struct {
 
 // session runs one socket connection until it drops.
 func (s *Slack) Listen(ctx context.Context, h func(chat.In) string) error {
-	r, err := call(s.get("slack_app_token"), "apps.connections.open", struct{}{})
+	r, err := s.openConn()
 	if err != nil {
 		return err
 	}

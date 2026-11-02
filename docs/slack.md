@@ -60,14 +60,17 @@ settings:
 2. **Basic Information → App-Level Tokens**: create one with `connections:write` (`xapp-…`).
    **Install App** to get the bot token (`xoxb-…`). Your member ID: profile → ⋮ → Copy member ID.
 3. In Conveyor: Apps → Integrations → Slack, paste both tokens and the member ID (or
-   `conveyor config set slack_bot_token|slack_user_token|slack_app_token|slack_user_id …`). No restart.
+   `conveyor config set slack_bot_token|slack_user_token|slack_app_token|slack_app_refresh_token|slack_user_id …`). No restart.
 
-**Bot or you.** By default Conveyor posts as the bot. To act as yourself instead, add the
-`slack_user_token` (`xoxp-…`, Apps → Integrations → User token): in the manifest add
+**Bot or you.** By default Conveyor posts as the bot. If `slack_user_token` is filled it replaces the bot
+token for everything Conveyor does in Slack (task DMs, thread replies, command answers, reactions): add
 `oauth_config.scopes.user: [chat:write, im:history, im:write, reactions:write]` and `settings.event_subscriptions.user_events: [message.im]`,
-reinstall, copy the *User OAuth Token*, then switch on **Act as me** (`slack_impersonate on`, default
-off). The token is only used while the switch is on. Caveat: messages then land in your own self-DM
-and Slack does not notify you for messages you post yourself, so you get no push in this mode.
+reinstall and copy the *User OAuth Token*. Clear the field to go back to the bot. Caveat: messages then land in
+your own self-DM and Slack does not notify you for messages you post yourself, so you get no push.
+
+**Rotating app token.** If Slack gave you an `xoxe.xapp-…` token (12h expiry) and an `xoxe-1-…` refresh token,
+put them in `slack_app_token` and `slack_app_refresh_token`. When the token expires Conveyor calls
+`tooling.tokens.rotate` and saves the new pair itself.
 
 Only `slack_user_id` is DMed and obeyed; everyone else is ignored.
 
