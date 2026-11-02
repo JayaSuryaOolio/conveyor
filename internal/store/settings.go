@@ -3,7 +3,15 @@ package store
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 )
+
+// tokenPrefixes are the accepted prefixes per Slack token setting. A rotating app token is xoxe.xapp-;
+// a bare xoxe. is a configuration token, which Socket Mode rejects (token_expired).
+var tokenPrefixes = map[string][]string{
+	"slack_app_token": {"xapp-", "xoxe.xapp-"},
+	"slack_bot_token": {"xoxb-"},
+}
 
 // Defaults are the setting values used when a key is unset (tech-spec §5).
 var Defaults = map[string]string{
@@ -42,6 +50,15 @@ func GetSetting(db *sql.DB, key string) string { return getSetting(db, key) }
 
 // SetSetting upserts a setting.
 func SetSetting(db *sql.DB, key, value string) error {
+	if pre, ok := tokenPrefixes[key]; ok && value != "" {
+		okPrefix := false
+		for _, p := range pre {
+			okPrefix = okPrefix || strings.HasPrefix(value, p)
+		}
+		if !okPrefix {
+			return fmt.Errorf("%s must start with %s", key, strings.Join(pre, " or "))
+		}
+	}
 	_, err := db.Exec(`INSERT INTO settings (key, value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value`, key, value)
 	if err != nil {
 		return fmt.Errorf("set setting %q: %w", key, err)
