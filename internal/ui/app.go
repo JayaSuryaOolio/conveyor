@@ -15,6 +15,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/JayaSuryaOolio/conveyor/internal/audit"
 	"github.com/JayaSuryaOolio/conveyor/internal/automation"
 	"github.com/JayaSuryaOolio/conveyor/internal/core"
 	"github.com/JayaSuryaOolio/conveyor/internal/dispatch"
@@ -50,6 +51,7 @@ func (a *App) Startup(ctx context.Context) {
 		runtime.LogFatalf(ctx, "conveyor home: %v", err)
 		return
 	}
+	audit.Install(home)
 	// A Finder-launched app's stderr goes nowhere; keep a log file in the home too.
 	if f, err := core.OpenLog(core.LogPath(home)); err == nil {
 		log.SetOutput(io.MultiWriter(os.Stderr, f))

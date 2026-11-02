@@ -60,6 +60,7 @@ func doHook(home string, args []string, raw []byte) error {
 			return
 		})
 		fmt.Fprintf(out, "%s", res)
+		hook.AuditCommand(home, raw, len(res) > 0)
 		return openErr
 	}
 	db, err := store.Open(core.DBPath(home))
