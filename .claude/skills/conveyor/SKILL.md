@@ -73,7 +73,7 @@ Use a throwaway home for experiments: `conveyor --home $(mktemp -d) ...`. Never 
 | Worktrees | `internal/workspace`; PRs `internal/gh`; terminals `internal/term`, `internal/terminal` |
 | Learnings / automations / Jira | `internal/learning`, `internal/automation`, `internal/jira` |
 | Wails bindings (thin) | `internal/ui/app.go`; app entry `main.go` |
-| UI (React + Mantine) | `frontend/src`: `App.tsx` nav, `views.tsx` board/focus/task page, `workspace.tsx` task sidebar, `relations.tsx`, `forms.tsx` dialogs + settings (incl. Repos tab), `agents.tsx`, `automations.tsx`, `apps.tsx`, `logs.tsx`, `terminals.tsx` |
+| UI (React + Mantine) | `frontend/src`: `App.tsx` nav, `views.tsx` board/focus/task page, `workspace.tsx` task sidebar, `relations.tsx`, `epic.tsx` + `epicLayout.ts` (epic view on @xyflow/react: cards, groups, header strip; layering tested by `node --experimental-strip-types --test frontend/test/epicLayout.test.mjs`; `ListSkills` binding feeds the skills picker), `forms.tsx` dialogs + settings (incl. Repos tab), `agents.tsx`, `automations.tsx`, `apps.tsx`, `logs.tsx`, `terminals.tsx` |
 
 ## Troubleshooting recipes
 

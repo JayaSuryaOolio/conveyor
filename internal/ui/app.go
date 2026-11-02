@@ -507,6 +507,9 @@ func (a *App) SetAgentModel(scope, name, model string) error {
 // ListModels returns the Claude models the pickers offer.
 func (a *App) ListModels() core.ModelList { return a.svc.Models() }
 
+// ListSkills lists the skills the cards' skill pickers offer for the given repos.
+func (a *App) ListSkills(repos []string) []core.Command { return a.svc.ListSkills(repos) }
+
 // SetTaskAgent changes the task's agent ("" clears it).
 func (a *App) SetTaskAgent(key, agent string) error { return a.svc.SetTaskAgent(key, agent) }
 

@@ -1,9 +1,10 @@
 import {useEffect, useRef, useState} from 'react'
 import {ActionIcon, AppShell, Badge, Box, Button, Group, Kbd, NavLink, Stack, Text, Title, Tooltip} from '@mantine/core'
 import {useLocalStorage} from '@mantine/hooks'
-import {IconApps, IconBolt, IconArrowLeft, IconBook2, IconClock, IconLayoutKanban, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconLogs, IconPlus, IconRobot, IconSettings} from '@tabler/icons-react'
+import {IconApps, IconBolt, IconArrowLeft, IconBook2, IconClock, IconLayoutKanban, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconLogs, IconPlus, IconRobot, IconSettings, IconSitemap} from '@tabler/icons-react'
 import {AppVersion, DispatcherState, Learnings} from '../wailsjs/go/ui/App'
 import {Agents} from './agents'
+import {EpicView} from './epic'
 import {Apps} from './apps'
 import {Automations} from './automations'
 import {Nav, PlacedButtons, Toasts, View} from './components'
@@ -14,8 +15,10 @@ import {CommandPalette} from './palette'
 import {useData} from './util'
 import {Board, Focus, TaskPage} from './views'
 
-const NAV: {name: string; key?: string; label: string; icon: typeof IconBolt}[] = [
+// `label` on a view: the board filtered by that label ("Epics" = label:epic).
+const NAV: {name: string; key?: string; label: string; icon: typeof IconBolt; filter?: string}[] = [
     {name: 'board', key: 'b', label: 'Board', icon: IconLayoutKanban},
+    {name: 'board', label: 'Epics', icon: IconSitemap, filter: 'epic'},
     {name: 'focus', key: 'f', label: 'Focus', icon: IconBolt},
     {name: 'learnings', label: 'Learnings', icon: IconBook2},
     {name: 'automations', label: 'Automations', icon: IconClock},
@@ -41,6 +44,8 @@ export default function App() {
     const proposed = learnings?.filter(l => l.status === 'proposed').length ?? 0
     const {data: version} = useData(AppVersion, [])
     const nav: Nav = v => setView(v)
+    const viewRef = useRef(view)
+    viewRef.current = view
 
     useEffect(() => {
         const poll = () => DispatcherState().then(setDispatcher, () => {})
@@ -63,6 +68,7 @@ export default function App() {
                 return
             }
             if (e.key === 'n') { e.preventDefault(); setShowNew(true) }
+            else if (e.key === 'e' && viewRef.current.name === 'task') { e.preventDefault(); setView({name: 'epic', key: viewRef.current.key}) } // epic view of the open task's tree
             else if (e.key === '/') { e.preventDefault(); search.current?.focus() } // only the board mounts the input; refactor: move q+ref into Board
             else if (e.key === 'g') { g = true; setTimeout(() => (g = false), 1000) }
         }
@@ -93,11 +99,11 @@ export default function App() {
                         <Button leftSection={<IconPlus size={16}/>} rightSection={<Kbd size="xs">n</Kbd>} onClick={() => setShowNew(true)}>New task</Button>
                     </>}
                     <Stack gap={2} mt="xs">
-                        {NAV.map(({name, key, label, icon: Icon}) => (
-                            <Tooltip key={name} label={label} position="right" disabled={!mini}>
-                                <NavLink label={mini ? undefined : label} active={view.name === name} leftSection={<Icon size={18}/>} aria-label={label}
+                        {NAV.map(({name, key, label, icon: Icon, filter}) => (
+                            <Tooltip key={label} label={label} position="right" disabled={!mini}>
+                                <NavLink label={mini ? undefined : label} active={view.name === name && (view.label ?? undefined) === filter} leftSection={<Icon size={18}/>} aria-label={label}
                                          rightSection={mini ? undefined : name === 'learnings' && proposed > 0 ? <Badge size="sm" circle>{proposed}</Badge> : key ? <Kbd size="xs" title={`g then ${key}`}>g {key}</Kbd> : undefined}
-                                         onClick={() => setView({name})}/>
+                                         onClick={() => setView(filter ? {name, label: filter} : {name})}/>
                             </Tooltip>
                         ))}
                     </Stack>
@@ -114,6 +120,7 @@ export default function App() {
                 {view.name === 'board' && <Board nav={nav} q={q} setQ={setQ} search={search} link={view}/>}
                 {view.name === 'focus' && <Focus nav={nav}/>}
                 {view.name === 'task' && <TaskPage k={view.key!} nav={nav}/>}
+                {view.name === 'epic' && <EpicView k={view.key!} nav={nav}/>}
                 {view.name === 'learnings' && <LearningsPage nav={nav}/>}
                 {view.name === 'automations' && <Automations/>}
                 {view.name === 'apps' && <Apps/>}

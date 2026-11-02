@@ -3,6 +3,7 @@ package core
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
@@ -32,8 +33,8 @@ func TestAgents(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []Agent{{Name: "rev-1", Description: "Reviews: code", Scope: "a", Model: "opus"}, {Name: "me", Description: "Mine", Scope: "user"}}
-	if len(got) != 2 || got[0] != want[0] || got[1] != want[1] {
+	want := []Agent{{Name: "rev-1", Description: "Reviews: code", Scope: "a", Model: "opus", Skills: []string{}}, {Name: "me", Description: "Mine", Scope: "user", Skills: []string{}}}
+	if len(got) != 2 || !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %+v", got)
 	}
 	if err := s.SetAgentModel("user", "me", "haiku"); err != nil || AgentModel("me") != "haiku" || AgentModel("rev-1", repo) != "opus" {
