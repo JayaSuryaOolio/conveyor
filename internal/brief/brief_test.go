@@ -21,12 +21,26 @@ func TestRenderGolden(t *testing.T) {
 	}
 	defer db.Close()
 	r, _ := store.AddRepo(db, store.Repo{Name: "api", Path: "/src/api", DefaultBranch: "main"})
-	tk, err := store.CreateTask(db, store.Task{Title: "Add login", Description: "Users can log in.", Status: store.StatusTodo},
+	// The task is a build step of epic os-4, whose root is in stage build on flow 1.
+	root, err := store.CreateTask(db, store.Task{Title: "Auth", Status: store.StatusTodo}, []store.TaskRepo{{RepoID: r.ID, IsPrimary: true, Branch: "auth"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, l := range []string{"epic", "epic:os-4", "epic_stage:build"} {
+		store.AddLabel(db, root.ID, l)
+	}
+	if _, err := store.StartFlow(db, root.ID); err != nil {
+		t.Fatal(err)
+	}
+	tk, err := store.CreateTask(db, store.Task{Title: "Add login", Description: "Users can log in.", Status: store.StatusTodo, ParentID: &root.ID},
 		[]store.TaskRepo{{RepoID: r.ID, IsPrimary: true, Branch: "login"}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	wt, pr := "/ws/CV-1/api", "https://example.com/pr/1"
+	for _, l := range []string{"epic:os-4", "epic_kind:build", "repo:api", "skill:tdd", "skill:grilling"} {
+		store.AddLabel(db, tk.ID, l)
+	}
+	wt, pr := "/ws/CV-1A/api", "https://example.com/pr/1"
 	tk.Repos[0].WorktreePath, tk.Repos[0].PRURL = &wt, &pr
 	store.UpdateTaskRepo(db, tk.Repos[0])
 	for i, s := range []string{"first", "second\nline two", "third", "fourth"} {
@@ -47,7 +61,7 @@ func TestRenderGolden(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if path != filepath.Join(dir, "workspaces", "CV-1", "BRIEF.md") {
+	if path != filepath.Join(dir, "workspaces", "CV-1A", "BRIEF.md") {
 		t.Fatalf("path %s", path)
 	}
 	got, _ := os.ReadFile(path)
@@ -65,7 +79,7 @@ func TestRenderGolden(t *testing.T) {
 	}
 
 	// Repo learnings land in the workspace CLAUDE.md, which goes away when they do.
-	ws := filepath.Join(dir, "workspaces", "CV-1", "CLAUDE.md")
+	ws := filepath.Join(dir, "workspaces", "CV-1A", "CLAUDE.md")
 	if _, err := os.Stat(ws); !os.IsNotExist(err) {
 		t.Fatalf("CLAUDE.md without learnings: %v", err)
 	}
@@ -117,6 +131,14 @@ func TestSettingsShapeBrief(t *testing.T) {
 	store.SetSetting(db, "pr_comment_prefix", "")
 	if got, _ = Build(db, tk); strings.Contains(got, "Start every comment") {
 		t.Fatal("empty prefix should drop the rule")
+	}
+	if strings.Contains(got, "Labels:") {
+		t.Fatal("no labels, no Labels line")
+	}
+	tk.Labels = []string{"epic_kind:grilling", "skill:grill-me"}
+	if got, _ = Build(db, tk); !strings.Contains(got, "Kind grilling: ") || !strings.Contains(got, "open no PR") ||
+		!strings.Contains(got, "Load these skills before starting: grill-me.") || strings.Contains(got, "Load the epic skill") {
+		t.Fatalf("kind/skills lines:\n%s", got)
 	}
 	d := []store.Comment{{Author: "human", Body: "a"}}
 	if got := FreshPrompt(tk, "/b.md", d, "{key}|{title}|{brief}|{comments}"); got != "CV-3|T|/b.md|- [human] a" {

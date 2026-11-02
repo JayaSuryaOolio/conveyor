@@ -6,6 +6,11 @@ import {errMsg} from './components'
 import {ModelSelect} from './forms'
 import {useData} from './util'
 
+// Agent presets: fill the Add agent form. The epic prompt stays short; the stage logic lives in the epic skill (docs/epic-builder.md §8).
+const presets: Record<string, {desc: string, prompt: string}> = {
+    epic: {desc: 'Runs a Conveyor epic: plans it, waits at the gate, drives its sub-tasks to PRs.', prompt: 'You run an epic. Load the `epic` skill and follow it.'},
+}
+
 export function Agents() {
     const {data: repoList} = useData(ListRepos, [])
     const repos = repoList?.map(r => r.name) ?? []
@@ -55,6 +60,8 @@ export function Agents() {
             </Table>
             <Modal opened={open} onClose={() => setOpen(false)} title="Add agent" size="md">
                 <Stack gap="sm">
+                    <Select label="Preset" placeholder="none" clearable data={Object.keys(presets)} value={null}
+                            onChange={p => { if (p) { setName(p); setDesc(presets[p].desc); setPrompt(presets[p].prompt) } }}/>
                     <TextInput data-autofocus placeholder="name (a-z, 0-9, -)" value={name} onChange={e => setName(e.target.value)}/>
                     <TextInput placeholder="description" value={desc} onChange={e => setDesc(e.target.value)}/>
                     <Textarea autosize minRows={4} maxRows={14} placeholder="Prompt" value={prompt} onChange={e => setPrompt(e.target.value)}/>

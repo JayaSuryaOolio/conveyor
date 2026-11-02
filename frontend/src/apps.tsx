@@ -126,6 +126,7 @@ function AgentHooks() {
                 <Text size="sm" c="dimmed">
                     Sessions Conveyor starts always report back. Installing adds the same hooks (prompt, stop, notification) to <Code>~/.claude/settings.json</Code>,
                     so a <Code>claude</Code> you start yourself in a task worktree, from an app or any terminal, shows up on the task as an interactive run.
+                    It also installs the <Code>epic</Code> skill to <Code>~/.claude/skills/epic</Code>.
                     Sessions outside Conveyor workspaces are ignored. Same as <Code>conveyor hooks install</Code>.
                 </Text>
                 {error && <Text c="red" size="sm">{error}</Text>}
