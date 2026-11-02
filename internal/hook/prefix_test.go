@@ -58,19 +58,19 @@ func TestPreToolUse(t *testing.T) {
 		return b
 	}
 	p := func() string { return pre }
-	if got := PreToolUse(in("Bash", "ls"), func() string { t.Error("prefix looked up for non-gh"); return pre }); got != nil {
+	if got := PreToolUse(in("Bash", "ls"), func() string { t.Error("prefix looked up for non-gh"); return pre }, nil); got != nil {
 		t.Errorf("allow should be silent, got %s", got)
 	}
-	if got := PreToolUse(in("Bash", "gh pr comment 1 --body hi"), func() string { return "" }); got != nil {
+	if got := PreToolUse(in("Bash", "gh pr comment 1 --body hi"), func() string { return "" }, nil); got != nil {
 		t.Errorf("empty prefix disables the check, got %s", got)
 	}
-	if got := PreToolUse(in("Edit", "gh pr comment 1 --body hi"), p); got != nil {
+	if got := PreToolUse(in("Edit", "gh pr comment 1 --body hi"), p, nil); got != nil {
 		t.Errorf("non-Bash allowed, got %s", got)
 	}
-	if got := PreToolUse([]byte("{"), p); got != nil {
+	if got := PreToolUse([]byte("{"), p, nil); got != nil {
 		t.Errorf("bad json allowed, got %s", got)
 	}
-	raw := PreToolUse(in("Bash", "gh pr comment 1 --body hi"), p)
+	raw := PreToolUse(in("Bash", "gh pr comment 1 --body hi"), p, nil)
 	var m map[string]map[string]string
 	if err := json.Unmarshal(raw, &m); err != nil {
 		t.Fatalf("deny not JSON: %s", raw)

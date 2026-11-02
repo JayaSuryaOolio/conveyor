@@ -8,10 +8,12 @@ import (
 
 // PreToolUse decides a Bash PreToolUse hook call. It returns the JSON for Claude Code to deny a GitHub
 // comment whose body lacks the pr_comment_prefix, and nil (allow, no output) for everything else.
-// prefix is a func so the settings DB is only opened for commands that mention gh.
-func PreToolUse(raw []byte, prefix func() string) []byte {
+// It also denies merging a PR from an epic member's run: merging is the human's call (docs/epic-builder.md R9).
+// prefix and epicMember are funcs so the DB is only opened for commands that mention gh.
+func PreToolUse(raw []byte, prefix func() string, epicMember func(cwd string) bool) []byte {
 	var p struct {
 		ToolName  string `json:"tool_name"`
+		Cwd       string `json:"cwd"`
 		ToolInput struct {
 			Command string `json:"command"`
 		} `json:"tool_input"`
@@ -19,14 +21,21 @@ func PreToolUse(raw []byte, prefix func() string) []byte {
 	if json.Unmarshal(raw, &p) != nil || p.ToolName != "Bash" || !strings.Contains(p.ToolInput.Command, "gh") {
 		return nil
 	}
+	if mergesPR(p.ToolInput.Command) && epicMember != nil && epicMember(p.Cwd) {
+		return deny("Merging is the human's call for epic work. Leave the PR open and say it is ready in your status block.")
+	}
 	pre := prefix()
 	if pre == "" || !missesPrefix(p.ToolInput.Command, pre) {
 		return nil
 	}
+	return deny("Every comment or reply on a PR or issue must start with `" + pre + "`. Run the command again with the body beginning with `" + pre + "`.")
+}
+
+func deny(reason string) []byte {
 	out, _ := json.Marshal(map[string]any{"hookSpecificOutput": map[string]any{
 		"hookEventName":            "PreToolUse",
 		"permissionDecision":       "deny",
-		"permissionDecisionReason": "Every comment or reply on a PR or issue must start with `" + pre + "`. Run the command again with the body beginning with `" + pre + "`.",
+		"permissionDecisionReason": reason,
 	}})
 	return out
 }

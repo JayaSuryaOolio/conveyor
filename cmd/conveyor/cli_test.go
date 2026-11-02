@@ -187,3 +187,76 @@ func TestCLIModels(t *testing.T) {
 		}
 	}
 }
+
+// cvFail runs conveyor expecting a non-zero exit and returns its output.
+func cvFail(t *testing.T, home string, args ...string) string {
+	t.Helper()
+	b, err := exec.Command(bin, append([]string{"--home", home}, args...)...).CombinedOutput()
+	if err == nil {
+		t.Fatalf("conveyor %v: want failure\n%s", args, b)
+	}
+	return string(b)
+}
+
+func TestEpicCLI(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", t.TempDir())
+	repo := t.TempDir()
+	for _, args := range [][]string{{"init", "-b", "main"}, {"-c", "user.name=t", "-c", "user.email=t@t", "commit", "--allow-empty", "-m", "i"}} {
+		if b, err := exec.Command("git", append([]string{"-C", repo}, args...)...).CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, b)
+		}
+	}
+	name := filepath.Base(repo)
+	cv(t, home, "repo", "add", repo)
+
+	desc := "## Acceptance criteria\n- [ ] AC1 first\n- [ ] AC2 second\n"
+	cv(t, home, "task", "new", "Big thing", "--repo", name, "--epic", "--desc", desc)
+	if out := cvFail(t, home, "task", "new", "Clash", "--repo", name, "--epic-name", "cv-1"); !strings.Contains(out, "taken") {
+		t.Fatal(out) // default name is the lower-cased key
+	}
+	cv(t, home, "task", "new", "Build it", "--repo", name, "--parent", "CV-1", "--desc", "covers AC1", "--agent", "sse")
+	cv(t, home, "task", "label", "CV-1A", "set", "epic_kind:build")
+
+	// Checks: the child lacks epic:cv-1; AC2 is uncovered.
+	out := cvFail(t, home, "epic", "check", "CV-1")
+	for _, want := range []string{"CV-1A: missing label epic:cv-1", "AC2 is covered by no build task"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("check missing %q:\n%s", want, out)
+		}
+	}
+	out = cvFail(t, home, "epic", "check", "CV-1", "--fix")
+	if strings.Contains(out, "missing label") || !strings.Contains(out, "AC2") {
+		t.Fatalf("--fix should repair labels only:\n%s", out)
+	}
+	cv(t, home, "task", "label", "CV-1A", "set", "epic_kind:research") // prefix swap keeps epic:cv-1
+	if out := cv(t, home, "task", "show", "CV-1A"); !strings.Contains(out, "epic:cv-1") || !strings.Contains(out, "epic_kind:research") {
+		t.Fatal(out)
+	}
+
+	// Status JSON, approve, restart.
+	var st struct {
+		Stage string
+		Flow  *struct{ Attempt int }
+		Tasks []struct{ Key string }
+	}
+	if err := json.Unmarshal([]byte(cv(t, home, "epic", "status", "CV-1", "--json")), &st); err != nil || st.Stage != "chart" || st.Flow != nil || len(st.Tasks) != 1 {
+		t.Fatalf("status: %v %+v", err, st)
+	}
+	cv(t, home, "epic", "approve", "CV-1")
+	cvFail(t, home, "epic", "approve", "CV-1") // only once
+	if out := cv(t, home, "task", "show", "CV-1"); !strings.Contains(out, "epic_stage:decide") {
+		t.Fatal(out)
+	}
+	cvFail(t, home, "epic", "restart", "CV-1") // reason required
+	cv(t, home, "epic", "restart", "CV-1", "--reason", "wrong plan")
+	if out := cv(t, home, "epic", "flows", "CV-1"); !strings.Contains(out, "flow 1  abandoned") || !strings.Contains(out, "flow 2  active") {
+		t.Fatal(out)
+	}
+	if out := cv(t, home, "task", "show", "CV-1A"); !strings.Contains(out, "cancelled") {
+		t.Fatal(out) // open sub-tasks are cancelled
+	}
+	if out := cv(t, home, "task", "graph", "CV-1A"); !strings.Contains(out, "CV-1  ") || !strings.Contains(out, "(child of CV-1)") {
+		t.Fatal(out)
+	}
+}

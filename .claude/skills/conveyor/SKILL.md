@@ -33,6 +33,10 @@ conveyor task link KEY blocks|relates OTHER     conveyor task unlink KEY kind OT
 conveyor task parent KEY PARENT|--none
 conveyor task repo KEY add|rm NAME   # rm refused once the repo has a PR or is the last one
 conveyor task label KEY add|rm NAME     # labels: many per task (labels + task_labels tables), filter chips on the Board
+conveyor task label KEY set <prefix>:<value>   # replaces only labels with that prefix (epic_stage:build keeps epic:os)
+conveyor task graph KEY [--json]         # parent tree + links around KEY
+conveyor task new "t" --repo r --epic [--epic-name n]   # epic root: labels epic + epic:<name> (default: lower-cased key)
+conveyor epic status|check|flows|prs|search|sessions|approve|restart KEY   # docs/epic-builder.md §13; status/prs take --json
 conveyor agent list|add|model         conveyor config list|get|set
 conveyor repo add|list|rm|setup <name> [script|-]
 conveyor models [--json]            # model list (API with ANTHROPIC_API_KEY, else built-in); names are not validated, a bad model fails the session -> needs_you

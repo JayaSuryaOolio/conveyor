@@ -220,6 +220,20 @@ func onStop(db *sql.DB, task store.Task, run store.Run, p payload) error {
 	case hasBlock && block.Status == "done":
 		to = store.StatusReview
 		task.ConsecutiveFailures = 0
+		if gate, err := store.EpicAtGate(db, task); err != nil {
+			return err
+		} else if gate {
+			to = store.StatusNeedsYou // charted: waits for `conveyor epic approve`
+			store.Audit("epic.gate", "task_id", task.ID, "result", "waiting")
+		} else if store.IsEpic(task) && store.EpicStage(task) == store.StageChart && !store.EpicGateOn(task) {
+			if f, err := store.ActiveFlow(db, task.ID); err != nil {
+				return err
+			} else if f == nil { // gate off: charting is enough to start flow 1
+				if _, err := store.ApproveEpic(db, task.ID); err != nil {
+					return err
+				}
+			}
+		}
 	case hasBlock:
 		task.ConsecutiveFailures++
 		max, _ := strconv.Atoi(store.GetSetting(db, "max_consecutive_failures"))

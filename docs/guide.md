@@ -97,6 +97,8 @@ conveyor task unlink CV-1A blocks CV-1B
 conveyor task label CV-1A add bug        # labels: shown on cards, filterable on the Board; `rm` removes
 ```
 
+**Epics** (docs/epic-builder.md): `task new --epic` labels the root `epic` + `epic:<name>` (name unique among open epics). After charting, the epic waits in needs_you until `conveyor epic approve KEY` (or a human comment `approve`) starts flow 1 at stage `decide`; label `epic_gate:off` skips the wait. The dispatcher wakes an epic with a system comment when its sub-tasks have all settled; only `conveyor epic restart KEY --reason` abandons a flow (cancels open sub-tasks, starts the next flow at `spec`). Agents in epic runs cannot `gh pr merge`.
+
 `conveyor task show` lists the parent, sub-tasks and links. The task page has a Relations section right below the description with the same: parent, sub-tasks and links, each with a trash icon to remove it, plus a row to add "blocks", "is blocked by", "relates to", "is parent of" or "is sub-task of". The picker lists only open tasks (done and cancelled are left out) with each task's status. Tasks that would form a loop, or are already related that way, are greyed out; for "is parent of" so is any task that already has a parent (marked "has parent"), so the UI never silently moves a sub-task. Re-parent explicitly with `conveyor task parent` or from the child's own page. Board cards show the parent key.
 
 ## Comments, resume and fresh sessions
@@ -249,7 +251,12 @@ conveyor task done KEY [--stop]           conveyor task cancel KEY
 conveyor task stop KEY
 conveyor task set KEY [--repo r] [--branch b] [--pr url] [--model m] [--desc d | --desc-file f]
 conveyor task link KEY blocks|relates OTHER    conveyor task unlink KEY kind OTHER
-conveyor task parent KEY PARENT|--none
+conveyor task parent KEY PARENT|--none   conveyor task label KEY add|rm NAME | set <prefix>:<value>
+conveyor task graph KEY [--json]          conveyor task new "t" --repo r --epic [--epic-name n]
+conveyor epic status KEY [--flow N] [--json]    conveyor epic check KEY [--fix]
+conveyor epic prs KEY [--commits] [--json]      conveyor epic search KEY <regex>
+conveyor epic sessions KEY [--grep text]        conveyor epic flows KEY
+conveyor epic approve KEY                       conveyor epic restart KEY --reason "..."
 conveyor task sync KEY                    conveyor task brief KEY [--preview]
 conveyor task log KEY [--follow]          conveyor task attach KEY
 conveyor task open KEY [--shell|--resume|--fresh] [--repo r] [--print]

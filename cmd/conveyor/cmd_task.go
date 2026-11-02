@@ -18,10 +18,10 @@ import (
 )
 
 func init() {
-	register("task", runTask, "manage tasks (new|list|show|comment|move|set|link|unlink|parent|sessions|stop|cancel|done|sync|brief|log|attach|open)")
+	register("task", runTask, "manage tasks (new|list|show|comment|move|set|link|unlink|parent|sessions|stop|cancel|done|sync|brief|log|attach|open|label|graph)")
 }
 
-const taskUsage = "usage: conveyor task new|list|show|comment|move|set|link|unlink|parent|sessions|stop|cancel|done|sync|brief|log|attach|open ..."
+const taskUsage = "usage: conveyor task new|list|show|comment|move|set|link|unlink|parent|sessions|stop|cancel|done|sync|brief|log|attach|open|label|graph ..."
 
 func runTask(home string, args []string) error {
 	if len(args) == 0 {
@@ -59,13 +59,18 @@ func runTask(home string, args []string) error {
 			}
 			return s.Unlink(rest[0], rest[1], rest[2])
 		case "label":
-			if len(rest) != 3 || (rest[1] != "add" && rest[1] != "rm") {
-				return fmt.Errorf("usage: conveyor task label KEY add|rm NAME")
+			if len(rest) != 3 || (rest[1] != "add" && rest[1] != "rm" && rest[1] != "set") {
+				return fmt.Errorf("usage: conveyor task label KEY add|rm NAME | set <prefix>:<value> (set replaces the labels with that prefix)")
 			}
-			if rest[1] == "add" {
+			switch rest[1] {
+			case "add":
 				return s.AddLabel(rest[0], rest[2])
+			case "set":
+				return s.SetLabel(rest[0], rest[2])
 			}
 			return s.RemoveLabel(rest[0], rest[2])
+		case "graph":
+			return taskGraph(s, rest)
 		case "repo":
 			if len(rest) != 3 || (rest[1] != "add" && rest[1] != "rm") {
 				return fmt.Errorf("usage: conveyor task repo KEY add|rm NAME")
@@ -144,6 +149,8 @@ func taskNew(s *core.Service, args []string) error {
 	agent := fs.String("agent", "", "Claude subagent name (see conveyor agent list; sub-tasks default to the parent's)")
 	parent := fs.String("parent", "", "parent task key (the new task becomes its sub-task, e.g. CV-1A)")
 	prio := fs.Int("priority", 0, "priority (higher first)")
+	epic := fs.Bool("epic", false, "make the task an epic root (labels epic and epic:<name>)")
+	epicName := fs.String("epic-name", "", "epic name, unique among open epics (default: the lower-cased key)")
 	pos, err := parseArgs(fs, args)
 	if err != nil {
 		return err
@@ -165,6 +172,7 @@ func taskNew(s *core.Service, args []string) error {
 	t, err := s.CreateTask(core.NewTaskInput{
 		Title: pos[0], Description: d, Repos: splitCSV(*repos), Primary: *primary, Start: *todo,
 		Model: *model, Agent: *agent, ParentKey: *parent, Priority: *prio, CreatedBy: createdBy(*parent),
+		Epic: *epic || *epicName != "", EpicName: *epicName,
 	})
 	if err != nil {
 		return err
@@ -512,4 +520,31 @@ func withStopHint(err error) error {
 		return fmt.Errorf("%w; re-run with --stop to confirm", err)
 	}
 	return err
+}
+
+func taskGraph(s *core.Service, args []string) error {
+	fs := flag.NewFlagSet("task graph", flag.ContinueOnError)
+	asJSON := fs.Bool("json", false, "JSON output")
+	pos, err := parseArgs(fs, args)
+	if err != nil || len(pos) != 1 {
+		return fmt.Errorf("usage: conveyor task graph KEY [--json]")
+	}
+	g, err := s.TaskGraph(pos[0])
+	if err != nil {
+		return err
+	}
+	if *asJSON {
+		return printJSON(g)
+	}
+	for _, n := range g.Nodes {
+		fmt.Fprintf(out, "%s  %-9s %s", n.Key, n.Status, n.Title)
+		if n.ParentKey != "" {
+			fmt.Fprintf(out, "  (child of %s)", n.ParentKey)
+		}
+		fmt.Fprintln(out)
+	}
+	for _, l := range g.Links {
+		fmt.Fprintf(out, "%s %s %s\n", l.From, l.Kind, l.To)
+	}
+	return nil
 }

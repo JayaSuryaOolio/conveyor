@@ -43,6 +43,9 @@ type NewTaskInput struct {
 	ExternalURL string
 	// CreatedBy is stored as tasks.created_by; empty means "human".
 	CreatedBy string
+	// Epic makes the task an epic root named EpicName (default: its lower-cased key).
+	Epic     bool
+	EpicName string
 }
 
 var nonAlnum = regexp.MustCompile(`[^a-z0-9]+`)
@@ -129,7 +132,23 @@ func (s *Service) CreateTask(in NewTaskInput) (store.Task, error) {
 	if parent != nil {
 		t.ParentID = &parent.ID
 	}
-	return store.CreateTask(s.DB, t, links)
+	if in.Epic && in.EpicName != "" { // fail before creating, not after
+		other, err := store.EpicNameTaken(s.DB, 0, in.EpicName)
+		if err != nil {
+			return store.Task{}, err
+		}
+		if other != "" {
+			return store.Task{}, fmt.Errorf("epic name %q is taken by %s", in.EpicName, other)
+		}
+	}
+	created, err := store.CreateTask(s.DB, t, links)
+	if err != nil || !in.Epic {
+		return created, err
+	}
+	if err := store.MakeEpic(s.DB, created.ID, cmp.Or(in.EpicName, strings.ToLower(created.Key))); err != nil {
+		return created, err
+	}
+	return store.GetTask(s.DB, created.ID)
 }
 
 // AfterMerge is what a comment does to a task with a merged PR.
@@ -157,6 +176,13 @@ func (s *Service) AddCommentVia(key, author, source, body string, after AfterMer
 	c, err := store.AddComment(s.DB, store.Comment{TaskID: t.ID, Author: author, Source: source, Body: body})
 	if err != nil {
 		return store.Comment{}, err
+	}
+	if author == store.AuthorHuman && strings.EqualFold(strings.TrimSpace(body), "approve") {
+		if gate, _ := store.EpicAtGate(s.DB, t); gate {
+			if _, err := store.ApproveEpic(s.DB, t.ID); err != nil {
+				return c, err
+			}
+		}
 	}
 	var actor store.Actor
 	switch author {

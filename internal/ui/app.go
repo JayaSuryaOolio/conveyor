@@ -308,6 +308,20 @@ func (a *App) CreateTask(in core.NewTaskInput) (string, error) {
 	return t.Key, err
 }
 
+// EpicGraph returns the task tree around key with its links and the epic flow's PRs.
+func (a *App) EpicGraph(key string) (core.Graph, error) { return a.svc.TaskGraph(key) }
+
+// EpicApprove passes the epic's plan gate.
+func (a *App) EpicApprove(key string) error { return a.svc.EpicApprove(key) }
+
+// EpicRestart abandons the epic's flow, cancels its open sub-tasks and starts the next flow.
+func (a *App) EpicRestart(key, reason string) error { return a.svc.EpicRestart(key, reason) }
+
+// SetTaskSkills replaces the task's skill:* labels.
+func (a *App) SetTaskSkills(key string, skills []string) error {
+	return a.svc.SetTaskSkills(key, skills)
+}
+
 // AddComment posts a human comment; after ("", "ask" or "note") applies once a PR of the task is merged.
 func (a *App) AddComment(key, body, after string) error {
 	if body == "" {
