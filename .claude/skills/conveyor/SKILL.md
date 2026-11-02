@@ -39,6 +39,7 @@ conveyor models [--json]            # model list (API with ANTHROPIC_API_KEY, el
 conveyor state export [FILE] | import FILE [--repo A=name]   # settings/apps/automations/user agents, repos as placeholders
 conveyor hooks status|install|uninstall
 conveyor epic review-check KEY [--step N]   # one PR review check: new feedback -> one system comment (requeues); none -> next backoff (30m, 2h, 8h, stop). Scheduled as a one-shot automation (run_at) 10m after a new PR head, or now via the task page button
+conveyor review-webhook [--status|--stop]   # opt-in app (apps/review-webhooks.json, embedded in package apps): loopback listener + `gh webhook forward` per repo with an open PR; a review event schedules that task's check now. Starts detached (re-execs `--serve`), pid `<home>/review-webhook.pid`
 conveyor daemon                       # dispatcher in the foreground
 ```
 
