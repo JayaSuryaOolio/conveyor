@@ -259,7 +259,7 @@ function Description({t, reload}: {t: store.Task; reload: () => void}) {
     )
 }
 
-export function TaskPage({k, nav}: {k: string; nav: Nav}) {
+export function TaskPage({k, nav, height = 'calc(100vh - 2 * var(--mantine-spacing-md))'}: {k: string; nav: Nav; height?: string}) {
     const {data: d, error, reload} = useData(() => GetTask(k), [k])
     const [added, setAdded] = useState<ui.TermInfo>()
     const [restored, setRestored] = useState<{body: string}>()
@@ -285,7 +285,7 @@ export function TaskPage({k, nav}: {k: string; nav: Nav}) {
     return (
         // Only the thread scrolls: the comment box, sidebar and terminal dock stay put.
         <TaskKey.Provider value={t.key}>
-        <Box style={{display: 'flex', flexDirection: 'column', height: 'calc(100vh - 2 * var(--mantine-spacing-md))'}}>
+        <Box style={{display: 'flex', flexDirection: 'column', height}}>
         <Box style={{flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: `minmax(0, 1fr) ${side ? '300px' : 'auto'}`, gap: side ? 'var(--mantine-spacing-xl)' : 'var(--mantine-spacing-xs)'}}>
             <Stack gap="sm" mih={0}>
                 <Group justify="space-between" wrap="nowrap" style={{flex: 'none'}}>

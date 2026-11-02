@@ -4,7 +4,7 @@ export type LLink = {from: string; to: string; kind: string}
 export type Placed = {key: string; x: number; y: number; w: number; h: number; group: boolean; parent?: string}
 
 // ponytail: fixed card height; a card with many labels/PR chips can overflow its row. Upgrade: measure nodes via useNodesInitialized and re-layout.
-export const CARD = {w: 320, h: 300, gap: 24, pad: 16, head: 44}
+export const CARD = {w: 260, h: 112, gap: 20, pad: 16, head: 44}
 
 /** Column of each key within its group: the longest `blocks` path from a blocker in the same group. Cross-group edges never count. */
 export function columns(keys: string[], links: LLink[]): Map<string, number> {

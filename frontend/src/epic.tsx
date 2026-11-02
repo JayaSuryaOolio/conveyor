@@ -1,53 +1,63 @@
 import {createContext, useContext, useEffect, useMemo, useRef, useState} from 'react'
-import {ActionIcon, Alert, Anchor, Badge, Box, Button, Group, Indicator, Menu, Modal, MultiSelect, Paper, Select, Stack, Text, Textarea, TextInput, Tooltip} from '@mantine/core'
+import {ActionIcon, Alert, Anchor, Badge, Box, Button, Group, Indicator, Menu, Modal, Paper, Stack, Text, Textarea, TextInput, Tooltip} from '@mantine/core'
 import {useLocalStorage} from '@mantine/hooks'
 import {IconCode, IconExternalLink, IconGitPullRequest, IconMessageQuestion, IconPlayerPlay, IconPlayerStop, IconPlus, IconTerminal2} from '@tabler/icons-react'
 import {Background, Controls, Handle, MarkerType, Position, ReactFlow, useEdgesState, useNodesState, type Connection, type Edge, type Node, type NodeProps} from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import {AddLabel, CreateTask, EpicApprove, EpicGraph, EpicRestart, ListAgents, ListApps, ListModels, ListSkills, Move, OpenApp, RemoveLabel, RunAction, SetTaskAgent, SetTaskModel, SetTaskSkills, Stop, Link, Unlink} from '../wailsjs/go/ui/App'
+import {CreateTask, EpicApprove, EpicGraph, EpicRestart, ListApps, Move, OpenApp, RunAction, Stop, Link, Unlink} from '../wailsjs/go/ui/App'
 import {BrowserOpenURL} from '../wailsjs/runtime/runtime'
 import {core, store} from '../wailsjs/go/models'
 import {Nav, StatusBadge, errMsg} from './components'
-import {layout} from './epicLayout'
+import {CARD, layout} from './epicLayout'
 import {useData} from './util'
+import {TaskPage} from './views'
 
-// refactor: the card's pickers are 5 small bindings per card; a single `UpdateTask(key, patch)` binding would cut the round trips.
+// refactor: the modal-open state is local; a router (see App.tsx useHistory note) would give a real deep link like /epic/KEY/task/KEY.
 
 const STAGES = ['chart', 'decide', 'spec', 'build', 'verify', 'done']
 const KINDS = ['grilling', 'prototype', 'research', 'build']
 const KIND_COLOR: Record<string, string> = {grilling: 'orange', prototype: 'grape', research: 'teal', build: 'blue'}
 const NO_RUN = new Set(['running', 'done'])
 
-type Pickers = {agents: core.Agent[]; skills: core.Command[]; models: string[]; nav: Nav; addSub: (parent: string) => void}
-const Ctx = createContext<Pickers>({agents: [], skills: [], models: [], nav: () => {}, addSub: () => {}})
+type Ctx = {nav: Nav; addSub: (parent: string) => void; open: (key: string) => void}
+const Ctx = createContext<Ctx>({nav: () => {}, addSub: () => {}, open: () => {}})
 type CardData = {n: core.GraphNode; prs: store.FlowPR[]}
 
 const skillOf = (labels: string[]) => labels.filter(l => l.startsWith('skill:')).map(l => l.slice(6))
-const hidden = (l: string) => /^(skill:|repo:|epic_kind:|epic_stage:|epic:|epic_gate:|epic_planner:)/.test(l) || l === 'epic'
 
 function PrChip({p}: {p: store.FlowPR}) {
     const bits = [p.review, p.checks, p.unresolved ? `${p.unresolved} unresolved` : ''].filter(Boolean) // blank until the review check has data (sub-task A)
     return (
         <Tooltip label={p.pr_url}>
             <Badge component="button" className="nodrag" size="xs" variant="light" color="violet" leftSection={<IconGitPullRequest size={10}/>}
-                   style={{cursor: 'pointer', textTransform: 'none'}} onClick={() => p.pr_url && BrowserOpenURL(p.pr_url)}>
+                   style={{cursor: 'pointer', textTransform: 'none'}} onClick={e => { e.stopPropagation(); p.pr_url && BrowserOpenURL(p.pr_url) }}>
                 {p.repo}{bits.length > 0 && ' · ' + bits.join(' · ')}
             </Badge>
         </Tooltip>
     )
 }
 
+/** Compact card: header icons + title + one line of read-only details. Clicking the card or any detail opens the task in a modal, where agent/model/skills/kind are edited. */
 function TaskNode({data}: NodeProps<Node<CardData>>) {
     const {n, prs} = data
-    const {agents, skills, models, nav} = useContext(Ctx)
-    const agent = agents.find(a => a.name === n.agent)
+    const {nav, open} = useContext(Ctx)
     const running = n.status === 'running'
     const [editors, setEditors] = useState<store.App[]>([])
     const stuck = n.status === 'needs_you'
-    // Every control gets `nodrag nowheel` so React Flow doesn't start a node drag or zoom the canvas (the known pitfall with interactive nodes).
+    const skills = skillOf(n.labels)
+    // Header controls get `nodrag nowheel` so React Flow doesn't start a node drag or zoom the canvas, and stop clicks reaching the card's open-modal handler.
     const nd = 'nodrag nowheel'
+    const stop = (e: React.MouseEvent) => e.stopPropagation()
+    const details = [
+        n.kind && <Badge key="kind" size="xs" color={KIND_COLOR[n.kind] ?? 'gray'} variant="filled">{n.kind}</Badge>,
+        n.agent && <Text key="agent" size="xs" c="dimmed">{n.agent}</Text>,
+        n.model && <Text key="model" size="xs" c="dimmed">{n.model}</Text>,
+        skills.length > 0 && <Tooltip key="skills" label={skills.join(', ')}><Text size="xs" c="dimmed">{skills.length} skill{skills.length === 1 ? '' : 's'}</Text></Tooltip>,
+        ...n.repos.map(r => <Badge key={r} size="xs" variant="light">{r}</Badge>),
+        n.worktrees.length > 0 && <Tooltip key="wt" label={'worktree: ' + n.worktrees.join(', ')}><Badge size="xs" variant="outline" color="gray">worktree</Badge></Tooltip>,
+    ].filter(Boolean)
     return (
-        <Paper withBorder radius="md" p="xs" w={320} shadow="sm">
+        <Paper withBorder radius="md" p="xs" w={CARD.w} h={CARD.h} shadow="sm" style={{cursor: 'pointer', overflow: 'hidden'}} onClick={() => open(n.key)}>
             <Handle type="target" position={Position.Left}/>
             <Handle type="source" position={Position.Right}/>
             <Stack gap={6}>
@@ -56,12 +66,12 @@ function TaskNode({data}: NodeProps<Node<CardData>>) {
                         <Text size="xs" fw={600} c="dimmed">{n.key}</Text>
                         <Indicator disabled={!running} processing color="cyan" size={8} offset={-2}><StatusBadge status={n.status}/></Indicator>
                     </Group>
-                    <Group gap={2} wrap="nowrap" className={nd}>
-                        <Tooltip label="Open task"><ActionIcon size="sm" variant="subtle" aria-label="Open task" onClick={() => nav({name: 'task', key: n.key})}><IconExternalLink size={14}/></ActionIcon></Tooltip>
+                    <Group gap={2} wrap="nowrap" className={nd} onClick={stop}>
+                        <Tooltip label="Open task page"><ActionIcon size="sm" variant="subtle" aria-label="Open task" onClick={() => nav({name: 'task', key: n.key})}><IconExternalLink size={14}/></ActionIcon></Tooltip>
                         {running
                             ? <Tooltip label="Stop the run"><ActionIcon size="sm" variant="subtle" color="red" aria-label="Stop" onClick={() => Stop(n.key).catch(errMsg)}><IconPlayerStop size={14}/></ActionIcon></Tooltip>
                             : !NO_RUN.has(n.status) && <Tooltip label={n.status === 'todo' ? 'Queued' : n.status === 'backlog' ? 'Run' : 'Requeue'}><ActionIcon size="sm" variant="subtle" aria-label="Run" disabled={n.status === 'todo'} onClick={() => Move(n.key, 'todo', false).catch(errMsg)}><IconPlayerPlay size={14}/></ActionIcon></Tooltip>}
-                        {stuck && <Tooltip label="Answer on the task page"><ActionIcon size="sm" variant="subtle" color="orange" aria-label="Answer" onClick={() => nav({name: 'task', key: n.key})}><IconMessageQuestion size={14}/></ActionIcon></Tooltip>}
+                        {stuck && <Tooltip label="Answer"><ActionIcon size="sm" variant="subtle" color="orange" aria-label="Answer" onClick={() => open(n.key)}><IconMessageQuestion size={14}/></ActionIcon></Tooltip>}
                         {prs[0]?.pr_url && <Tooltip label="Open PR"><ActionIcon size="sm" variant="subtle" aria-label="Open PR" onClick={() => BrowserOpenURL(prs[0].pr_url!)}><IconGitPullRequest size={14}/></ActionIcon></Tooltip>}
                         {n.worktrees.length > 0 && <>
                             <Tooltip label="Shell in worktree"><ActionIcon size="sm" variant="subtle" aria-label="Shell" onClick={() => RunAction(n.key, 'shell', n.worktrees[0]).catch(errMsg)}><IconTerminal2 size={14}/></ActionIcon></Tooltip>
@@ -73,32 +83,14 @@ function TaskNode({data}: NodeProps<Node<CardData>>) {
                     </Group>
                 </Group>
                 <Text size="sm" fw={500} lineClamp={2}>{n.title}</Text>
-                <Group gap={4}>
-                    <Menu withinPortal>
-                        <Menu.Target><Badge className={nd} size="xs" component="button" style={{cursor: 'pointer'}} color={KIND_COLOR[n.kind] ?? 'gray'} variant="filled">{n.kind || 'no kind'}</Badge></Menu.Target>
-                        <Menu.Dropdown>{KINDS.map(k => <Menu.Item key={k} onClick={() => setKind(n, k)}>{k}</Menu.Item>)}</Menu.Dropdown>
-                    </Menu>
-                    {n.repos.map(r => <Badge key={r} size="xs" variant="light">{r}</Badge>)}
-                    {n.worktrees.length > 0 && <Tooltip label={'worktree: ' + n.worktrees.join(', ')}><Badge size="xs" variant="outline" color="gray">worktree</Badge></Tooltip>}
+                <Group gap={6} wrap="wrap">
+                    {details}
                     {prs.filter(p => p.pr_url).map(p => <PrChip key={p.repo} p={p}/>)}
                 </Group>
-                <Select className={nd} size="xs" label="Agent" clearable searchable placeholder="none" value={n.agent || null}
-                        data={agents.map(a => ({value: a.name, label: `${a.name} (${a.scope})`}))}
-                        onChange={v => SetTaskAgent(n.key, v ?? '').catch(errMsg)}/>
-                <Select className={nd} size="xs" label="Model" clearable searchable placeholder={agent?.model || 'default'} value={n.model || null}
-                        data={models} onChange={v => SetTaskModel(n.key, v ?? '').catch(errMsg)}/>
-                <MultiSelect className={nd} size="xs" label="Skills" searchable placeholder="add a skill" value={skillOf(n.labels)}
-                             data={skills.map(s => s.name)} onChange={v => SetTaskSkills(n.key, v).catch(errMsg)}/>
-                {agent && agent.skills.length > 0 && <Group gap={4}><Text size="xs" c="dimmed">from agent</Text>{agent.skills.map(s => <Badge key={s} size="xs" variant="outline" color="gray">{s}</Badge>)}</Group>}
-                {n.labels.filter(l => !hidden(l)).length > 0 && <Group gap={4}>{n.labels.filter(l => !hidden(l)).map(l => <Badge key={l} size="xs" variant="outline" color="gray" style={{textTransform: 'none'}}>{l}</Badge>)}</Group>}
             </Stack>
         </Paper>
     )
 }
-
-/** epic_kind is a label: swap the old one for the new one. refactor: a SetLabel(key, "epic_kind:x") binding over core.SetLabel would be one call and atomic. */
-const setKind = (n: core.GraphNode, kind: string) =>
-    (n.kind ? RemoveLabel(n.key, 'epic_kind:' + n.kind) : Promise.resolve()).then(() => AddLabel(n.key, 'epic_kind:' + kind)).catch(errMsg)
 
 function GroupNode({data}: NodeProps<Node<{n: core.GraphNode}>>) {
     const {nav, addSub} = useContext(Ctx)
@@ -172,11 +164,8 @@ function Header({g, nav, root}: {g: core.Graph; nav: Nav; root: core.GraphNode})
 /** The epic view: the whole tree of key's root on a canvas, live on db:changed (useData reloads). */
 export function EpicView({k, nav}: {k: string; nav: Nav}) {
     const {data: g, error} = useData(() => EpicGraph(k), [k])
-    const repos = useMemo(() => [...new Set((g?.nodes ?? []).flatMap(n => n.repos))].sort(), [g])
-    const {data: agents} = useData(() => ListAgents(repos), [repos.join()])
-    const {data: skills} = useData(() => ListSkills(repos), [repos.join()])
-    const {data: models} = useData(ListModels, [])
     const [adding, setAdding] = useState('')
+    const [task, setTask] = useState('') // key shown in the task modal
     const [title, setTitle] = useState('')
     const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
     const dragged = useRef(new Map<string, {x: number; y: number}>()) // a dragged card keeps its spot across live reloads
@@ -206,7 +195,7 @@ export function EpicView({k, nav}: {k: string; nav: Nav}) {
     if (error) return <Text c="red">{error}</Text>
     if (!g) return <Text c="dimmed">Loading…</Text>
     const root = g.nodes.find(n => n.key === g.root)!
-    const ctx: Pickers = {agents: agents ?? [], skills: skills ?? [], models: (models?.models ?? []).map(m => m.id), nav, addSub: setAdding}
+    const ctx: Ctx = {nav, addSub: setAdding, open: setTask}
     const connect = (c: Connection) => c.source && c.target && c.source !== c.target && Link(c.source, 'blocks', c.target).catch(errMsg)
     const create = () => CreateTask(core.NewTaskInput.createFrom({Title: title, ParentKey: adding})).then(() => { setAdding(''); setTitle('') }, errMsg)
     return (
@@ -222,6 +211,10 @@ export function EpicView({k, nav}: {k: string; nav: Nav}) {
                         <Controls showInteractive={false}/>
                     </ReactFlow>
                 </Box>
+                <Modal opened={!!task} onClose={() => setTask('')} size="min(1200px, 96vw)" padding="sm" title={task}>
+                    {/* the same task page, so agent/model/skills edit here; navigating away from it closes the modal */}
+                    {task && <TaskPage k={task} height="calc(100vh - 140px)" nav={v => { setTask(''); nav(v) }}/>}
+                </Modal>
                 <Modal opened={!!adding} onClose={() => setAdding('')} title={`New sub-task of ${adding}`}>
                     <form onSubmit={e => { e.preventDefault(); if (title.trim()) create() }}>
                         <Stack gap="sm">
