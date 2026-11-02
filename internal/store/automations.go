@@ -82,9 +82,9 @@ func DeleteAutomation(db *sql.DB, name string) error {
 	return nil
 }
 
-// ScheduleOneShot replaces any automation named a.Name with one that fires once at runAt.
+// ScheduleOnce replaces any automation named a.Name with one that fires once at runAt.
 // Naming it "<kind>:<task key>" makes this "replace the pending check per (task, kind)".
-func ScheduleOneShot(db *sql.DB, a Automation, runAt time.Time) error {
+func ScheduleOnce(db *sql.DB, a Automation, runAt time.Time) error {
 	a.RunAt = ptr(runAt.UTC().Format(time.RFC3339))
 	a.Enabled = true
 	return inTx(db, func(tx *sql.Tx) error {

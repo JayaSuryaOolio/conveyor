@@ -183,7 +183,7 @@ func TestOneShotFiresOnceIgnoringSchedule(t *testing.T) {
 	a := store.Automation{Name: "shot:" + tk.Key, Schedule: "", ActionKind: "comment", TaskID: &tk.ID,
 		ActionArg: `{"task_key":"` + tk.Key + `","body":"ping"}`}
 	now := at("2026-01-01T00:05:00Z")
-	if err := store.ScheduleOneShot(svc.DB, a, now.Add(time.Minute)); err != nil {
+	if err := store.ScheduleOnce(svc.DB, a, now.Add(time.Minute)); err != nil {
 		t.Fatal(err)
 	}
 	Tick(context.Background(), svc, now) // not yet

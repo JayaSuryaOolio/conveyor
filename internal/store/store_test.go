@@ -295,7 +295,7 @@ func TestDoneOrCancelledDeletesTaskAutomations(t *testing.T) {
 		tk := mkTask(t, db, StatusReview)
 		other := mkTask(t, db, StatusReview)
 		for _, x := range []Task{tk, other} {
-			if err := ScheduleOneShot(db, Automation{Name: "review-check:" + x.Key, ActionKind: "cli", ActionArg: "{}", TaskID: &x.ID}, time.Now()); err != nil {
+			if err := ScheduleOnce(db, Automation{Name: "review-check:" + x.Key, ActionKind: "cli", ActionArg: "{}", TaskID: &x.ID}, time.Now()); err != nil {
 				t.Fatal(err)
 			}
 		}

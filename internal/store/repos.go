@@ -75,3 +75,19 @@ func RemoveRepo(db *sql.DB, name string) error {
 	}
 	return nil
 }
+
+// AddTaskRepo links a repo to a task as a non-primary repo on the given branch.
+func AddTaskRepo(db *sql.DB, taskID, repoID int64, branch string) error {
+	if _, err := db.Exec(`INSERT INTO task_repos (task_id, repo_id, is_primary, branch) VALUES (?,?,0,?)`, taskID, repoID, branch); err != nil {
+		return fmt.Errorf("add task repo: %w", err)
+	}
+	return nil
+}
+
+// RemoveTaskRepo unlinks a repo from a task.
+func RemoveTaskRepo(db *sql.DB, taskID, repoID int64) error {
+	if _, err := db.Exec(`DELETE FROM task_repos WHERE task_id=? AND repo_id=?`, taskID, repoID); err != nil {
+		return fmt.Errorf("remove task repo: %w", err)
+	}
+	return nil
+}

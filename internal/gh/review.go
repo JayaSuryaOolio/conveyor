@@ -28,7 +28,7 @@ var backoff = []time.Duration{30 * time.Minute, 2 * time.Hour, 8 * time.Hour}
 // step is the number of empty checks so far, so the next empty one uses backoff[step].
 func ScheduleCheck(db *sql.DB, t store.Task, delay time.Duration, step int) error {
 	arg, _ := json.Marshal(map[string]any{"args": []string{"epic", "review-check", t.Key, "--step", strconv.Itoa(step)}})
-	return store.ScheduleOneShot(db, store.Automation{
+	return store.ScheduleOnce(db, store.Automation{
 		Name: "review-check:" + t.Key, ActionKind: "cli", ActionArg: string(arg), TaskID: &t.ID,
 	}, time.Now().Add(delay))
 }

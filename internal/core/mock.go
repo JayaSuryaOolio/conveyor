@@ -50,7 +50,7 @@ var mockTasks = []mockTask{
 }
 
 // mockState is the non-task fixtures, loaded through ImportState: settings, apps
-// (global/per-repo, with/without output) and automations (enabled/disabled, every
+// (with/without output) and automations (enabled/disabled, every
 // action kind). Repos are the mockRepos names. Agents are left out on purpose:
 // import writes them to the real ~/.claude/agents. Add a fixture here whenever a
 // bug needs a particular settings/apps/automations state to reproduce.
@@ -62,9 +62,9 @@ var mockState = State{
 		"brief_extra_rules": "Mock rule: keep changes small.",
 	},
 	Apps: []StateApp{
-		{Name: "Mock Editor", Command: "mock-editor {cwd}", Global: true},
+		{Name: "Mock Editor", Command: "mock-editor {cwd}"},
 		{Name: "Mock Tests", Command: "mock-test --watch", Output: true},
-		{Name: "Mock Global Logs", Command: "mock-logs -f", Global: true, Output: true},
+		{Name: "Mock Logs", Command: "mock-logs -f", Output: true},
 		{Name: "Mock Repo Shell", Command: "mock-shell {cwd}"},
 	},
 	Automations: []StateAutomation{
