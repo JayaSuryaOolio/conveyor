@@ -18,6 +18,7 @@ import (
 	"github.com/JayaSuryaOolio/conveyor/internal/automation"
 	"github.com/JayaSuryaOolio/conveyor/internal/core"
 	"github.com/JayaSuryaOolio/conveyor/internal/dispatch"
+	"github.com/JayaSuryaOolio/conveyor/internal/gh"
 	"github.com/JayaSuryaOolio/conveyor/internal/learning"
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 	"github.com/JayaSuryaOolio/conveyor/internal/term"
@@ -314,6 +315,15 @@ func (a *App) AddComment(key, body, after string) error {
 	}
 	_, err := a.svc.AddComment(key, store.AuthorHuman, body, core.AfterMerge(after))
 	return err
+}
+
+// CheckReviews schedules a PR review check for the task right now (the "check reviews" button).
+func (a *App) CheckReviews(key string) error {
+	t, err := store.GetTaskByKey(a.svc.DB, key)
+	if err != nil {
+		return err
+	}
+	return gh.ScheduleCheck(a.svc.DB, t, 0, 0)
 }
 
 // TakeQueuedComment pulls a still-queued human comment out of the thread and returns its

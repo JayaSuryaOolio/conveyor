@@ -128,4 +128,7 @@ type Automation struct {
 	Enabled    bool    `json:"enabled"`
 	LastRunAt  *string `json:"last_run_at"`
 	LastResult *string `json:"last_result"`
+	RunAt      *string `json:"run_at"` // one-shot: fire once at RunAt (RFC3339), then delete; Schedule is ignored
+	TaskID     *int64  `json:"task_id"`
+	FlowID     *int64  `json:"flow_id"`
 }

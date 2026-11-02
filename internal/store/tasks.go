@@ -196,6 +196,11 @@ func UpdateTaskStatus(db *sql.DB, id int64, to Status, actor Actor) (Task, error
 		if n, _ := res.RowsAffected(); n == 0 {
 			return fmt.Errorf("task %d changed concurrently (was %s)", id, from)
 		}
+		if to == StatusDone || to == StatusCancelled { // nothing left to schedule for a finished task
+			if _, err := tx.Exec(`DELETE FROM automations WHERE task_id=?`, id); err != nil {
+				return fmt.Errorf("delete task automations: %w", err)
+			}
+		}
 		return recordEvent(tx, id, "status_changed", fmt.Sprintf("%s -> %s (%s)", from, to, actor))
 	})
 	if err != nil {

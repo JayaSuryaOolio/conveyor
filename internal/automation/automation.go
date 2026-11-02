@@ -36,6 +36,10 @@ func bin() (string, error) {
 // Due reports whether the cron schedule matched between last_run_at and now.
 // A missed run fires once. Disabled or unparsable automations are never due.
 func Due(a store.Automation, now time.Time) bool {
+	if a.RunAt != nil { // one-shot: the schedule is ignored
+		at, err := time.Parse(time.RFC3339, *a.RunAt)
+		return a.Enabled && err == nil && !at.After(now)
+	}
 	if !a.Enabled || a.LastRunAt == nil {
 		return false
 	}
@@ -225,6 +229,17 @@ func Tick(ctx context.Context, svc *core.Service, now time.Time) error {
 			break
 		}
 		if !Due(a, now) {
+			continue
+		}
+		if a.RunAt != nil {
+			// Delete before running so it fires exactly once, and so the run can schedule its successor.
+			if err := store.DeleteAutomationByID(svc.DB, a.ID); err != nil {
+				errs = append(errs, err)
+				continue
+			}
+			if _, err := RunOne(ctx, svc, a); err != nil {
+				errs = append(errs, fmt.Errorf("automation %s: %w", a.Name, err))
+			}
 			continue
 		}
 		res, err := RunOne(ctx, svc, a)

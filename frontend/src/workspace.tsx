@@ -1,8 +1,8 @@
 import {useState} from 'react'
 import {ActionIcon, Anchor, Badge, Button, Code, Divider, Group, Menu, Modal, Paper, Stack, TagsInput, Text, TextInput, Title, Tooltip} from '@mantine/core'
 import {useClipboard} from '@mantine/hooks'
-import {IconCopy, IconPencil, IconPlus, IconStar, IconX, IconTerminal, IconTerminal2} from '@tabler/icons-react'
-import {Actions, AddLabel, AddTaskRepo, EnsureWorkspace, GetSettings, ListLabels, ListRepos, RemoveLabel, RemoveTaskRepo, RunAction, Sessions, SetTaskRepo, TermStart} from '../wailsjs/go/ui/App'
+import {IconCopy, IconMessageSearch, IconPencil, IconPlus, IconStar, IconX, IconTerminal, IconTerminal2} from '@tabler/icons-react'
+import {Actions, AddLabel, AddTaskRepo, CheckReviews, EnsureWorkspace, GetSettings, ListLabels, ListRepos, RemoveLabel, RemoveTaskRepo, RunAction, Sessions, SetTaskRepo, TermStart} from '../wailsjs/go/ui/App'
 import {core, store, ui} from '../wailsjs/go/models'
 import {BrowserOpenURL} from '../wailsjs/runtime/runtime'
 import {PlacedButtons, StatusSelect, Time, errMsg} from './components'
@@ -110,6 +110,11 @@ function RepoFields({k, r, reload, canRemove, children}: {k: string; r: store.Ta
                         <Text size="xs" c="dimmed">PR</Text>
                         {r.pr_url && r.pr_state && <Badge size="xs" variant="light" color={PR_COLOR[r.pr_state.toLowerCase()] ?? 'gray'}>{r.pr_state}</Badge>}
                         {r.pr_url && <Anchor size="xs" href={r.pr_url} onClick={e => { e.preventDefault(); BrowserOpenURL(r.pr_url!) }}>Open PR</Anchor>}
+                        {r.pr_state === 'OPEN' && (
+                            <Tooltip label="Check reviews now">
+                                <ActionIcon variant="subtle" color="gray" size="xs" aria-label="Check reviews" onClick={() => CheckReviews(k).catch(errMsg)}><IconMessageSearch size={12}/></ActionIcon>
+                            </Tooltip>
+                        )}
                         <Tooltip label="Edit PR URL">
                             <ActionIcon variant="subtle" color="gray" size="xs" aria-label="Edit PR URL" onClick={() => setEditPr(!editPr)}><IconPencil size={12}/></ActionIcon>
                         </Tooltip>

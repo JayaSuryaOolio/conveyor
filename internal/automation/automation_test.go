@@ -172,3 +172,33 @@ func TestTickRecordsRun(t *testing.T) {
 		t.Fatalf("%d tasks", len(ts))
 	}
 }
+
+func TestOneShotFiresOnceIgnoringSchedule(t *testing.T) {
+	svc, _ := env(t)
+	r, _ := store.GetRepoByName(svc.DB, "a")
+	tk, err := store.CreateTask(svc.DB, store.Task{Title: "t", Status: store.StatusReview}, []store.TaskRepo{{RepoID: r.ID, IsPrimary: true, Branch: "t"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	a := store.Automation{Name: "shot:" + tk.Key, Schedule: "", ActionKind: "comment", TaskID: &tk.ID,
+		ActionArg: `{"task_key":"` + tk.Key + `","body":"ping"}`}
+	now := at("2026-01-01T00:05:00Z")
+	if err := store.ScheduleOnce(svc.DB, a, now.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	Tick(context.Background(), svc, now) // not yet
+	if cs, _ := store.ListComments(svc.DB, tk.ID); len(cs) != 0 {
+		t.Fatal("fired early")
+	}
+	for _, d := range []time.Duration{time.Minute, 2 * time.Minute} {
+		if err := Tick(context.Background(), svc, now.Add(d)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if cs, _ := store.ListComments(svc.DB, tk.ID); len(cs) != 1 {
+		t.Fatalf("%d comments, want 1", len(cs))
+	}
+	if as, _ := store.ListAutomations(svc.DB); len(as) != 0 {
+		t.Fatalf("not deleted: %+v", as)
+	}
+}
