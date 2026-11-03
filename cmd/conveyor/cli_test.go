@@ -5,9 +5,13 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/JayaSuryaOolio/conveyor/internal/core"
+	"github.com/JayaSuryaOolio/conveyor/internal/store"
 )
 
 var bin string
@@ -364,5 +368,87 @@ func TestEpicAuditCLI(t *testing.T) {
 	time.Sleep(1100 * time.Millisecond)
 	if out := strings.TrimSpace(cv(t, home, "epic", "audit", "CV-1", "--since", "1s")); out != "" {
 		t.Errorf("since 1s should be empty: %s", out)
+	}
+}
+
+// epic prs --commits and epic search read each PR branch's git log; epic sessions greps run transcripts.
+func TestEpicBranchesAndSessionsCLI(t *testing.T) {
+	home := t.TempDir()
+	proj := t.TempDir()
+	t.Setenv("HOME", proj)
+	repo := t.TempDir()
+	git := func(args ...string) {
+		t.Helper()
+		if b, err := exec.Command("git", append([]string{"-C", repo, "-c", "user.name=t", "-c", "user.email=t@t"}, args...)...).CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, b)
+		}
+	}
+	git("init", "-b", "main")
+	git("commit", "--allow-empty", "-m", "init")
+	git("checkout", "-b", "feat/x")
+	for _, c := range []string{"widget", "gadget"} { // -G matches diff content, so each commit adds a file
+		os.WriteFile(filepath.Join(repo, c+".txt"), []byte("the "+c+"\n"), 0o644)
+		git("add", ".")
+		git("commit", "-m", "add "+c)
+	}
+	git("checkout", "main")
+	name := filepath.Base(repo)
+	cv(t, home, "repo", "add", repo)
+	cv(t, home, "task", "new", "Big thing", "--repo", name, "--epic", "--desc", "## Acceptance criteria\n- [ ] AC1 x\n")
+	cv(t, home, "task", "new", "Build it", "--repo", name, "--parent", "CV-1", "--desc", "AC1")
+	cv(t, home, "task", "new", "No PR", "--repo", name, "--parent", "CV-1", "--desc", "AC1") // skipped: no PR
+	cv(t, home, "task", "set", "CV-1A", "--branch", "feat/x", "--pr", "https://gh/pr/1")
+
+	// Worktree path and a run with a session are only set by the dispatcher, so write them directly.
+	wt := "/work/CV-1A"
+	db, err := store.Open(core.DBPath(home))
+	if err != nil {
+		t.Fatal(err)
+	}
+	tk, err := store.GetTaskByKey(db, "CV-1A")
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := tk.Repos[0]
+	r.WorktreePath = &wt
+	if err := store.UpdateTaskRepo(db, r); err != nil {
+		t.Fatal(err)
+	}
+	sid := "sess1"
+	if _, err := store.CreateRun(db, store.Run{TaskID: tk.ID, Kind: "auto", Mode: "fresh", Status: "finished", SessionID: &sid}); err != nil {
+		t.Fatal(err)
+	}
+	db.Close()
+	dir := filepath.Join(proj, ".claude", "projects", regexp.MustCompile(`[^a-zA-Z0-9]`).ReplaceAllString(wt, "-"))
+	os.MkdirAll(dir, 0o755)
+	tr := filepath.Join(dir, sid+".jsonl")
+	os.WriteFile(tr, []byte(`{"type":"user","message":{"content":"hello"}}`+"\n"+`{"type":"assistant","text":"Fixed the FLUX capacitor"}`+"\n"), 0o644)
+
+	out := cv(t, home, "epic", "prs", "CV-1", "--commits")
+	if !strings.Contains(out, "CV-1A "+name+"/feat/x") || !strings.Contains(out, "add widget") || !strings.Contains(out, "add gadget") || strings.Contains(out, "init") || strings.Contains(out, "CV-1B") {
+		t.Fatalf("prs --commits:\n%s", out)
+	}
+	if out := cv(t, home, "epic", "prs", "CV-1"); strings.Contains(out, "widget") {
+		t.Fatalf("prs without --commits lists commits:\n%s", out)
+	}
+
+	out = cv(t, home, "epic", "search", "CV-1", "gadget")
+	if !strings.Contains(out, "add gadget") || strings.Contains(out, "widget") {
+		t.Fatalf("search gadget:\n%s", out)
+	}
+	if out := cv(t, home, "epic", "search", "CV-1", "nomatch"); strings.TrimSpace(out) != "" {
+		t.Fatalf("search nomatch:\n%s", out)
+	}
+
+	out = cv(t, home, "epic", "sessions", "CV-1")
+	if !strings.Contains(out, "CV-1A run 1 sess1 "+tr) {
+		t.Fatalf("sessions:\n%s", out)
+	}
+	out = cv(t, home, "epic", "sessions", "CV-1", "--grep", "flux")
+	if !strings.Contains(out, "sess1") || !strings.Contains(out, "    {\"type\":\"assistant\",\"text\":\"Fixed the FLUX capacitor\"}") {
+		t.Fatalf("sessions --grep:\n%s", out)
+	}
+	if out := cv(t, home, "epic", "sessions", "CV-1", "--grep", "absent"); strings.TrimSpace(out) != "" {
+		t.Fatalf("sessions --grep absent:\n%s", out)
 	}
 }
