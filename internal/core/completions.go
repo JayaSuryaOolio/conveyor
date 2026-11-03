@@ -74,12 +74,12 @@ func match(s, q string) int {
 }
 
 // Complete returns up to 8 suggestions for the token being typed: kind "@" matches tracked
-// files, a kind ending in "-" (a task key prefix like "CV-") matches task keys and titles,
+// files, kind "CV-" matches task keys and titles,
 // "/" matches skills and commands (the repos' first, then the user's). Prefix matches
 // rank before substring matches. Files are streamed from git ls-files per call, never cached.
 func (s *Service) Complete(key string, repos []string, kind, q string) ([]Suggestion, error) {
-	if strings.HasSuffix(kind, "-") {
-		return s.completeTasks(kind, q)
+	if kind == "CV-" {
+		return s.completeTasks(q)
 	}
 	dirs, err := s.refDirs(key, repos)
 	if err != nil {
@@ -142,25 +142,27 @@ func (s *Service) Complete(key string, repos []string, kind, q string) ([]Sugges
 	return out, nil
 }
 
-// completeTasks suggests tasks whose key starts with prefix (e.g. "CV-") and whose key suffix or
-// title contains q, in store.ListTasks order.
-func (s *Service) completeTasks(prefix, q string) ([]Suggestion, error) {
-	ts, err := store.ListTasks(s.DB)
+// completeTasks suggests tasks whose key suffix or title contains q, in ListTasks order. It runs per
+// keystroke, so it is one LIMITed query on key and title only (no repos/labels, unlike store.ListTasks).
+// Refactor: an index on tasks(key) is unnecessary at this size; revisit if tasks reach the 100k range.
+func (s *Service) completeTasks(q string) ([]Suggestion, error) {
+	q = strings.ToLower(q)
+	rows, err := s.DB.Query(`SELECT key, title FROM tasks
+ WHERE key LIKE 'CV-%' AND (instr(lower(substr(key, 4)), ?1) > 0 OR instr(lower(title), ?1) > 0)
+ ORDER BY priority DESC, created_at ASC, id ASC LIMIT ?2`, q, maxSuggestions)
 	if err != nil {
 		return nil, err
 	}
-	prefix, q = strings.ToUpper(prefix), strings.ToLower(q)
+	defer rows.Close()
 	out := []Suggestion{}
-	for _, t := range ts {
-		rest, ok := strings.CutPrefix(t.Key, prefix)
-		if !ok || !(strings.Contains(strings.ToLower(rest), q) || strings.Contains(strings.ToLower(t.Title), q)) {
-			continue
+	for rows.Next() {
+		var key, title string
+		if err := rows.Scan(&key, &title); err != nil {
+			return nil, err
 		}
-		if out = append(out, Suggestion{Insert: t.Key, Label: t.Key, Hint: t.Title}); len(out) == maxSuggestions {
-			break
-		}
+		out = append(out, Suggestion{Insert: key, Label: key, Hint: title})
 	}
-	return out, nil
+	return out, rows.Err()
 }
 
 // FileOpeners lists the apps an @file reference of the task can open in: the configured preset

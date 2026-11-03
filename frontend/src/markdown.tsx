@@ -31,8 +31,8 @@ const LIST_LINE = /^\s*([-*+]|\d+\.)\s/
 
 let uploads = 0
 
-/** The @file, /command or task key prefix (CV-) being typed just before the caret, if any. */
-const TRIGGER = /(^|\s)(@|\/|[A-Z][A-Z0-9]*-)([^\s@]*)$/
+/** The @file, /command or task key prefix (CV-, Conveyor's fixed key prefix) being typed just before the caret, if any. */
+const TRIGGER = /(^|\s)(@|\/|CV-)([^\s@]*)$/
 
 /** Asks the backend for the token's suggestions (it streams git ls-files per query); stale replies are dropped. */
 function useSuggestions(key: string, repos: string[]) {
@@ -40,7 +40,7 @@ function useSuggestions(key: string, repos: string[]) {
     const seq = useRef(0)
     const query = (t: {kind: string; q: string} | null) => {
         const n = ++seq.current
-        if (!t || (!key && !repos.length && !t.kind.endsWith('-'))) { setItems([]); return }
+        if (!t || (!key && !repos.length && t.kind !== 'CV-')) { setItems([]); return }
         Complete(key, repos, t.kind, t.q).then(r => { if (n === seq.current) setItems(r ?? []) }, () => {})
     }
     return [items, query] as const
