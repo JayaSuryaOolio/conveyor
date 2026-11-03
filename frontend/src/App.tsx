@@ -13,6 +13,7 @@ import {LearningsPage} from './learnings'
 import {Logs} from './logs'
 import {CommandPalette} from './palette'
 import {useData} from './util'
+import {NavContext} from './markdown'
 import {Board, Focus, TaskPage} from './views'
 
 // `label` on a view: the board filtered by that label ("Epics" = label:epic).
@@ -77,6 +78,7 @@ export default function App() {
     }, [])
 
     return (
+        <NavContext.Provider value={nav}>
         <AppShell navbar={{width: mini ? 60 : 220, breakpoint: 0}} padding="md">
             <AppShell.Navbar p="sm">
                 <Stack gap="xs" h="100%">
@@ -132,5 +134,6 @@ export default function App() {
             <CommandPalette nav={nav}/>
             <Toasts/>
         </AppShell>
+        </NavContext.Provider>
     )
 }

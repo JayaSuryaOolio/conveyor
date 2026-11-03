@@ -1,10 +1,11 @@
 import {ListAgents, ListRepos, ListTasks} from '../wailsjs/go/ui/App'
 
-const CACHE_KEY = 'palette-cache-v2'
+const CACHE_KEY = 'palette-cache-v3'
 const TTL = 24 * 3600 * 1000
 export type Raw = {
     tasks: {key: string; title: string; status: string}[]
     agents: {name: string; scope: string; description: string}[]
+    titles: Record<string, string> // every task incl. done/cancelled, for CV- key tooltips in rendered markdown
     labels: string[]
     repos: string[]
 }
@@ -28,6 +29,7 @@ export async function load(force: boolean): Promise<Raw> {
     const raw: Raw = {
         tasks: tasks.filter(t => t.status !== 'done' && t.status !== 'cancelled').map(t => ({key: t.key, title: t.title, status: t.status})),
         agents: agents.map(a => ({name: a.name, scope: a.scope, description: a.description})),
+        titles: Object.fromEntries(tasks.map(t => [t.key, t.title])),
         labels: [...new Set(tasks.flatMap(t => t.labels))].sort(),
         repos: repos.sort(),
     }
