@@ -28,7 +28,7 @@ export function disabledKeys(choice: string, rel: store.Relations, tasks: ui.Tas
 
 type Kids = Map<string, ui.TaskCard[]>
 
-/** Task row; when the task has sub-tasks it gets a chevron that expands them nested 44px right, recursively. Collapsed shows "(2/3 subtasks DONE)". */
+/** Task row; when the task has sub-tasks it gets a chevron that expands them nested 1.25rem (20px, scales with font) right, recursively. Collapsed shows "(2/3 subtasks DONE)". */
 // Refactor: Row/status counting could move to the backend (store.Relations children of linked tasks) if ListTasks gets heavy.
 function Row({task, nav, kids, onRemove}: {task: store.TaskRef; nav: Nav; kids: Kids; onRemove?: () => void}) {
     const [open, setOpen] = useState(false)
@@ -56,7 +56,7 @@ function Row({task, nav, kids, onRemove}: {task: store.TaskRef; nav: Nav; kids: 
                     )}
                 </Group>
             </Group>
-            {open && <Stack gap={2} ml={44}>{subs.map(c => <Row key={c.key} task={c} nav={nav} kids={kids}/>)}</Stack>}
+            {open && <Stack gap={2} ml="1.25rem">{subs.map(c => <Row key={c.key} task={c} nav={nav} kids={kids}/>)}</Stack>}
         </Stack>
     )
 }
