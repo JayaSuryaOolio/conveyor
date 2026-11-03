@@ -1,7 +1,7 @@
 import {useEffect, useRef, useState} from 'react'
 import {ActionIcon, Badge, Button, Checkbox, Code, FileButton, Group, Modal, MultiSelect, Paper, Stack, Switch, Table, Tabs, Text, TextInput, Textarea, Title} from '@mantine/core'
 import {IconDownload, IconPencil, IconPlayerPlay, IconPlus, IconPuzzle, IconTransform, IconTrash, IconUpload} from '@tabler/icons-react'
-import {AddApp, AddReviewWebhooks, GetSettings, SetSetting, AppIcons, AppPresets, Confirm, SetAppDisabled, ConvertApp, DeleteApp, ExportApp, Home, InstallManifest, InstallPreset, ListApps, ManifestSchema, RenderApp, TestApp, UpdateApp, UserHooks, ValidateManifest} from '../wailsjs/go/ui/App'
+import {AddApp, ExampleApps, InstallExample, GetSettings, SetSetting, AppIcons, AppPresets, Confirm, SetAppDisabled, ConvertApp, DeleteApp, ExportApp, Home, InstallManifest, InstallPreset, ListApps, ManifestSchema, RenderApp, TestApp, UpdateApp, UserHooks, ValidateManifest} from '../wailsjs/go/ui/App'
 import {store} from '../wailsjs/go/models'
 import {AppIcon, errMsg, runApp, toast} from './components'
 import {Field, SettingRow} from './forms'
@@ -137,11 +137,13 @@ function AgentHooks() {
 function AppList() {
     const {data, error, reload} = useData(ListApps, [])
     const {data: presets} = useData(AppPresets, [])
+    const {data: examples} = useData(ExampleApps, [])
     const {data: icons} = useData(AppIcons, [])
     const [form, setForm] = useState<store.App>()
     const [importing, setImporting] = useState(false)
     const have = new Set((data ?? []).map(a => a.name))
     const missing = (presets ?? []).filter(p => !have.has(p.name))
+    const offered = (examples ?? []).filter(e => !have.has(e.name))
     return (
         <Stack maw={900}>
             <Group justify="space-between">
@@ -179,19 +181,16 @@ function AppList() {
                     </Table.Tbody>
                 </Table>
             )}
-            {!have.has('Review webhooks') && <>
-                <Title order={5}>Review webhooks</Title>
-                <Group gap="xs" wrap="nowrap">
-                    <Button size="xs" variant="light" leftSection={<IconPlus size={14}/>} onClick={() => AddReviewWebhooks().then(reload, errMsg)}>Add review webhooks</Button>
-                    <Text size="sm" c="dimmed">Review comments on epic PRs trigger a check at once. Needs <Code>gh extension install cli/gh-webhook</Code>. Without it, epics use the timed checks.</Text>
-                </Group>
-            </>}
-            {missing.length > 0 && <>
+            {(missing.length > 0 || offered.length > 0) && <>
                 <Title order={5}>Detected on this Mac</Title>
                 <Group gap="xs">
                     {missing.map(p => (
                         <Button key={p.name} size="xs" variant="light" leftSection={<IconPlus size={14}/>} title={p.command}
                                 onClick={() => InstallPreset(p).then(reload, errMsg)}>{p.name}</Button>
+                    ))}
+                    {offered.map(e => (
+                        <Button key={e.file} size="xs" variant="light" leftSection={<IconPlus size={14}/>} title={e.description}
+                                onClick={() => InstallExample(e.file).then(reload, errMsg)}>{e.name}</Button>
                     ))}
                 </Group>
             </>}

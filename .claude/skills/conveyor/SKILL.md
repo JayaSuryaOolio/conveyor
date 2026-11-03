@@ -43,7 +43,7 @@ conveyor models [--json]            # model list (API with ANTHROPIC_API_KEY, el
 conveyor state export [FILE] | import FILE [--repo A=name]   # settings/apps/automations/user agents, repos as placeholders
 conveyor hooks status|install|uninstall   # install/uninstall also copy/remove skills/epic -> ~/.claude/skills/epic
 conveyor epic review-check KEY [--step N]   # one PR review check: new feedback -> one system comment (requeues); none -> next backoff (30m, 2h, 8h, stop). Scheduled as a one-shot automation (run_at) 10m after a new PR head, or now via the task page button
-conveyor review-webhook [--status|--stop]   # opt-in app (apps/review-webhooks.json, embedded in package apps): loopback listener + `gh webhook forward` per repo with an open PR; a review event schedules that task's check now. Starts detached (re-execs `--serve`), pid `<home>/review-webhook.pid`
+conveyor review-webhook [--status|--stop]   # opt-in app (examples/review-webhooks.json, embedded in package examples): loopback listener + `gh webhook forward` per repo with an open PR; a review event schedules that task's check now. Starts detached (re-execs `--serve`), pid `<home>/review-webhook.pid`
 conveyor daemon                       # dispatcher in the foreground
 ```
 
@@ -74,6 +74,7 @@ Use a throwaway home for experiments: `conveyor --home $(mktemp -d) ...`. Never 
 | Worktrees | `internal/workspace`; PRs `internal/gh`; terminals `internal/term`, `internal/terminal` |
 | Learnings / automations / Jira | `internal/learning`, `internal/automation`, `internal/jira` |
 | Wails bindings (thin) | `internal/ui/app.go`; app entry `main.go` |
+| Example apps | `examples/*.json` (embedded, listed under Apps > Detected, never auto-installed): working manifests to copy when writing a new app |
 | UI (React + Mantine) | `frontend/src`: `App.tsx` nav, `views.tsx` board/focus/task page, `workspace.tsx` task sidebar, `relations.tsx`, `epic.tsx` + `epicLayout.ts` (epic view on @xyflow/react: cards, groups, header strip; layering tested by `node --experimental-strip-types --test frontend/test/epicLayout.test.mjs`; `ListSkills` binding feeds the skills picker), `forms.tsx` dialogs + settings (incl. Repos tab), `agents.tsx`, `automations.tsx`, `apps.tsx`, `logs.tsx`, `terminals.tsx` |
 
 ## Troubleshooting recipes

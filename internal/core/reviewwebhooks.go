@@ -1,11 +1,14 @@
 package core
 
 import (
-	"github.com/JayaSuryaOolio/conveyor/apps"
+	"io/fs"
+	"strings"
+
+	"github.com/JayaSuryaOolio/conveyor/examples"
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 )
 
-// ReviewWebhooksApp is the bundled app's name; installing it (Apps screen) turns on event-driven review checks for epic tasks.
+// ReviewWebhooksApp is the example app's name; installing it turns on event-driven review checks for epic tasks.
 const ReviewWebhooksApp = "Review webhooks"
 
 // ReviewWebhooksInstalled reports whether the app is installed and enabled.
@@ -14,8 +17,32 @@ func (s *Service) ReviewWebhooksInstalled() bool {
 	return err == nil && !a.Disabled
 }
 
-// AddReviewWebhooks installs the bundled manifest (the same path as importing an app).
-func (s *Service) AddReviewWebhooks() error {
-	_, err := s.InstallManifest(apps.ReviewWebhooks, false)
+// Example is a bundled example app (examples/*.json), offered but never auto-installed.
+type Example struct {
+	File        string `json:"file"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+// ExampleApps lists the bundled examples.
+func ExampleApps() []Example {
+	var out []Example
+	files, _ := fs.Glob(examples.FS, "*.json")
+	for _, f := range files {
+		raw, _ := examples.FS.ReadFile(f)
+		if m, err := ParseManifest(string(raw)); err == nil {
+			out = append(out, Example{strings.TrimSuffix(f, ".json"), m.Name, m.Description})
+		}
+	}
+	return out
+}
+
+// InstallExample installs a bundled example by its ExampleApps File (the same path as importing a manifest).
+func (s *Service) InstallExample(file string) error {
+	raw, err := examples.FS.ReadFile(file + ".json")
+	if err != nil {
+		return err
+	}
+	_, err = s.InstallManifest(string(raw), false)
 	return err
 }

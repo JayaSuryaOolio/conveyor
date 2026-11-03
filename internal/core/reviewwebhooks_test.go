@@ -11,7 +11,7 @@ func TestReviewWebhooksInstall(t *testing.T) {
 	if s.ReviewWebhooksInstalled() {
 		t.Fatal("installed on a fresh home")
 	}
-	if err := s.AddReviewWebhooks(); err != nil {
+	if err := s.InstallExample("review-webhooks"); err != nil {
 		t.Fatal(err)
 	}
 	if !s.ReviewWebhooksInstalled() {
@@ -24,7 +24,7 @@ func TestReviewWebhooksInstall(t *testing.T) {
 
 func TestDisabledAppIsInert(t *testing.T) {
 	s := newSvc(t)
-	if err := s.AddReviewWebhooks(); err != nil {
+	if err := s.InstallExample("review-webhooks"); err != nil {
 		t.Fatal(err)
 	}
 	if err := store.SetAppDisabled(s.DB, ReviewWebhooksApp, true); err != nil {

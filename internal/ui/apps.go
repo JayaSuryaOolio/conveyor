@@ -169,5 +169,8 @@ func (a *App) UserHooks(action string) (string, error) { return a.svc.UserHooks(
 // ReviewWebhooksInstalled reports whether the review-webhooks app is installed.
 func (a *App) ReviewWebhooksInstalled() bool { return a.svc.ReviewWebhooksInstalled() }
 
-// AddReviewWebhooks installs the bundled review-webhooks app; epic tasks then get review events pushed.
-func (a *App) AddReviewWebhooks() error { return a.svc.AddReviewWebhooks() }
+// ExampleApps lists the bundled example apps (shown under Detected apps).
+func (a *App) ExampleApps() []core.Example { return core.ExampleApps() }
+
+// InstallExample installs a bundled example app by file name (no extension).
+func (a *App) InstallExample(file string) error { return a.svc.InstallExample(file) }
