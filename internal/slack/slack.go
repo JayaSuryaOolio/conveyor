@@ -61,11 +61,11 @@ func (s *Slack) token() string {
 // openConn calls apps.connections.open. A rotating app token expires after 12h: on token_expired
 // it is rotated with slack_app_refresh_token (both new tokens are saved) and the call retried once.
 func (s *Slack) openConn() (map[string]any, error) {
-	r, err := call(s.get("slack_app_token"), "apps.connections.open", struct{}{})
+	r, err := call(strings.TrimSpace(s.get("slack_app_token")), "apps.connections.open", struct{}{})
 	if err == nil || !strings.HasSuffix(err.Error(), "token_expired") || s.get("slack_app_refresh_token") == "" {
 		return r, err
 	}
-	resp, err := http.PostForm(api+"tooling.tokens.rotate", url.Values{"refresh_token": {s.get("slack_app_refresh_token")}})
+	resp, err := http.PostForm(api+"tooling.tokens.rotate", url.Values{"refresh_token": {strings.TrimSpace(s.get("slack_app_refresh_token"))}})
 	if err != nil {
 		return nil, err
 	}
@@ -166,8 +166,9 @@ func buttons(m chat.Msg) []any {
 	if m.Status == "needs_you" || m.Status == "review" || m.Status == "failed" {
 		els = append(els, btn("Done", "move_done"), btn("Requeue", "move_todo"))
 	}
-	for _, r := range m.PRs {
-		els = append(els, map[string]any{"type": "button", "text": map[string]any{"type": "plain_text", "text": "Open " + r.Name + " PR"}, "action_id": "open_pr", "url": r.URL})
+	for i, r := range m.PRs {
+		// action_ids must be unique within a message or Slack answers invalid_blocks
+		els = append(els, map[string]any{"type": "button", "text": map[string]any{"type": "plain_text", "text": "Open " + r.Name + " PR"}, "action_id": fmt.Sprintf("open_pr_%d", i), "url": r.URL})
 	}
 	return els
 }
@@ -210,6 +211,10 @@ func (s *Slack) Send(m chat.Msg) error {
 		args["thread_ts"] = root
 	}
 	ts, err := s.post(args)
+	if err != nil && strings.HasSuffix(err.Error(), "invalid_blocks") {
+		delete(args, "blocks") // plain text still delivers the message
+		ts, err = s.post(args)
+	}
 	if err == nil && !threaded {
 		threads.Store(m.Key, ts)
 	}
