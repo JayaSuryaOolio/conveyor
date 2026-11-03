@@ -42,12 +42,12 @@ func AppPresets() []store.App {
 			}
 		}
 	}
-	// spotlight (github.com/JayaSuryaOolio/spotlight) mirrors a worktree into its repo's main checkout.
+	// graft (github.com/JayaSuryaOolio/graft) mirrors a worktree into its repo's main checkout.
 	h, _ := os.UserHomeDir()
-	if _, err := exec.LookPath("spotlight"); err == nil {
-		out = append(out, store.App{Name: "Spotlight", Command: "cd {cwd} && spotlight start"})
-	} else if _, err := os.Stat(filepath.Join(h, ".local", "bin", "spotlight")); err == nil {
-		out = append(out, store.App{Name: "Spotlight", Command: "cd {cwd} && ~/.local/bin/spotlight start"})
+	if _, err := exec.LookPath("graft"); err == nil {
+		out = append(out, store.App{Name: "Graft", Command: "cd {cwd} && graft start"})
+	} else if _, err := os.Stat(filepath.Join(h, ".local", "bin", "graft")); err == nil {
+		out = append(out, store.App{Name: "Graft", Command: "cd {cwd} && ~/.local/bin/graft start"})
 	}
 	return out
 }

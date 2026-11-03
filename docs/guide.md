@@ -190,7 +190,7 @@ conveyor automation list | enable NAME | disable NAME | run NAME | rm NAME
 
 ## Apps
 
-An app is a name plus a shell command in which `{cwd}` is replaced by the quoted worktree path and `{key}` by the task key. The Apps page offers presets detected on your Mac (editors, terminals, git clients, Finder). Apps show up as a row of icons on each repo of the task page; hover for the name. A launched icon flashes a check or a cross, and Spotlight shows a green dot while it runs for that worktree (click again to stop it).
+An app is a name plus a shell command in which `{cwd}` is replaced by the quoted worktree path and `{key}` by the task key. The Apps page offers presets detected on your Mac (editors, terminals, git clients, Finder). Apps show up as a row of icons on each repo of the task page; hover for the name. A launched icon flashes a check or a cross, and Graft shows a green dot while it runs for that worktree (click again to stop it).
 
 ```
 conveyor app presets

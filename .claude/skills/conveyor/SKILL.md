@@ -77,6 +77,21 @@ Use a throwaway home for experiments: `conveyor --home $(mktemp -d) ...`. Never 
 | Example apps | `examples/*.json` (embedded, listed under Apps > Detected, never auto-installed): working manifests to copy when writing a new app |
 | UI (React + Mantine) | `frontend/src`: `App.tsx` nav, `views.tsx` board/focus/task page, `workspace.tsx` task sidebar, `relations.tsx`, `epic.tsx` + `epicLayout.ts` (epic view on @xyflow/react: cards, groups, header strip; layering tested by `node --experimental-strip-types --test frontend/test/epicLayout.test.mjs`; `ListSkills` binding feeds the skills picker), `forms.tsx` dialogs + settings (incl. Repos tab), `agents.tsx`, `automations.tsx`, `apps.tsx`, `logs.tsx`, `terminals.tsx` |
 
+## Testing in the repo root (graft)
+
+Some tools only work from the repo's main checkout (a dev stack, Tilt, an IDE or test runner bound to that path). If `conveyor app list` shows a **Graft** app, its `graft` CLI mirrors your worktree's files onto the root checkout so you can run the tests there. Skip it when the tests run fine in the worktree.
+
+```
+cd ~/.conveyor/workspaces/<KEY>/<repo>
+graft start --stash-root-changes   # prints the root path; always pass the flag: without a terminal a dirty root is refused
+graft list                         # verify: "<root>  <-  <this worktree>  (pid N)"
+git -C <root> status --short       # verify: shows your worktree's changes
+cd <root> && <run tests>           # edit in the worktree, never in the root: the mirror overwrites it
+graft stop <root>                  # always: resets the root and restores the stashed changes
+```
+
+One worktree per root: if `start` says another worktree is mirroring, don't stop it (another task owns it); test in your worktree and say so in the status block.
+
 ## Troubleshooting recipes
 
 Known failure modes with confirm/fix steps: `docs/troubleshooting.md` (e.g. a run stuck in running after its session finished, an untracked second PR, a resumed run adopted by a new session id). Run/session id architecture and invariants: `docs/session-identity.md`. Add to it when you fix a new one.
