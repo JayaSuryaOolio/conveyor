@@ -59,12 +59,6 @@ func TestCompletions(t *testing.T) {
 	if got := labels("@", "a.go", tk.Key, nil); got != "src/a.go" {
 		t.Errorf("by key %q", got)
 	}
-	if g, _ := s.Complete("", nil, "CV-", ""); len(g) == 0 || g[0].Insert != tk.Key || g[0].Hint != "t" {
-		t.Errorf("task keys %+v", g)
-	}
-	if g, _ := s.Complete("", nil, "CV-", "zzzz-no-match"); len(g) != 0 {
-		t.Errorf("no match %+v", g)
-	}
 	for _, ref := range []string{"@../../etc/passwd", "@nope.go", "@../a/../../x"} {
 		if err := s.OpenFile(tk.Key, ref, "Finder"); err == nil {
 			t.Errorf("OpenFile %s: want error", ref)

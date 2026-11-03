@@ -3,6 +3,7 @@ import {ActionIcon, Box, Button, Group, Popover, SegmentedControl, Stack, Text, 
 import {IconBold, IconCode, IconItalic, IconLink, IconList, IconListCheck} from '@tabler/icons-react'
 import {Complete, SaveAttachment, ShowError} from '../wailsjs/go/ui/App'
 import {core} from '../wailsjs/go/models'
+import {load} from './paletteCache'
 
 /** The task whose repos @file mentions in rendered markdown resolve against; '' = not clickable. */
 export const TaskKey = createContext('')
@@ -41,6 +42,15 @@ function useSuggestions(key: string, repos: string[]) {
     const query = (t: {kind: string; q: string} | null) => {
         const n = ++seq.current
         if (!t || (!key && !repos.length && t.kind !== 'CV-')) { setItems([]); return }
+        if (t.kind === 'CV-') { // from the Cmd+K palette's cache: no backend call per keystroke
+            const q = t.q.toLowerCase()
+            load(false).then(raw => {
+                if (n !== seq.current) return
+                const hits = raw.tasks.filter(k => k.key.slice(3).toLowerCase().includes(q) || k.title.toLowerCase().includes(q)).slice(0, 8)
+                setItems(hits.map(k => core.Suggestion.createFrom({insert: k.key, label: k.key, hint: k.title})))
+            }, () => {})
+            return
+        }
         Complete(key, repos, t.kind, t.q).then(r => { if (n === seq.current) setItems(r ?? []) }, () => {})
     }
     return [items, query] as const

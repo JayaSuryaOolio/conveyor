@@ -74,13 +74,9 @@ func match(s, q string) int {
 }
 
 // Complete returns up to 8 suggestions for the token being typed: kind "@" matches tracked
-// files, kind "CV-" matches task keys and titles,
-// "/" matches skills and commands (the repos' first, then the user's). Prefix matches
+// files, "/" matches skills and commands (the repos' first, then the user's). Prefix matches
 // rank before substring matches. Files are streamed from git ls-files per call, never cached.
 func (s *Service) Complete(key string, repos []string, kind, q string) ([]Suggestion, error) {
-	if kind == "CV-" {
-		return s.completeTasks(q)
-	}
 	dirs, err := s.refDirs(key, repos)
 	if err != nil {
 		return nil, err
@@ -140,29 +136,6 @@ func (s *Service) Complete(key string, repos []string, kind, q string) ([]Sugges
 		out = out[:maxSuggestions]
 	}
 	return out, nil
-}
-
-// completeTasks suggests tasks whose key suffix or title contains q, in ListTasks order. It runs per
-// keystroke, so it is one LIMITed query on key and title only (no repos/labels, unlike store.ListTasks).
-// Refactor: an index on tasks(key) is unnecessary at this size; revisit if tasks reach the 100k range.
-func (s *Service) completeTasks(q string) ([]Suggestion, error) {
-	q = strings.ToLower(q)
-	rows, err := s.DB.Query(`SELECT key, title FROM tasks
- WHERE key LIKE 'CV-%' AND (instr(lower(substr(key, 4)), ?1) > 0 OR instr(lower(title), ?1) > 0)
- ORDER BY priority DESC, created_at ASC, id ASC LIMIT ?2`, q, maxSuggestions)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	out := []Suggestion{}
-	for rows.Next() {
-		var key, title string
-		if err := rows.Scan(&key, &title); err != nil {
-			return nil, err
-		}
-		out = append(out, Suggestion{Insert: key, Label: key, Hint: title})
-	}
-	return out, rows.Err()
 }
 
 // FileOpeners lists the apps an @file reference of the task can open in: the configured preset
