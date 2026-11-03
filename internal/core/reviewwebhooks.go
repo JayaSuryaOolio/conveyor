@@ -5,26 +5,17 @@ import (
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 )
 
-const (
-	reviewWebhooksApp       = "Review webhooks"
-	reviewWebhooksDismissed = "review_webhooks_dismissed"
-)
+// ReviewWebhooksApp is the bundled app's name; installing it (Apps screen) turns on event-driven review checks for epic tasks.
+const ReviewWebhooksApp = "Review webhooks"
 
-// ReviewWebhooksOffer reports whether to offer the opt-in app: not installed and not dismissed.
-func (s *Service) ReviewWebhooksOffer() bool {
-	if _, err := store.GetApp(s.DB, reviewWebhooksApp); err == nil {
-		return false
-	}
-	return store.GetSetting(s.DB, reviewWebhooksDismissed) != "1"
+// ReviewWebhooksInstalled reports whether the app is installed.
+func (s *Service) ReviewWebhooksInstalled() bool {
+	_, err := store.GetApp(s.DB, ReviewWebhooksApp)
+	return err == nil
 }
 
 // AddReviewWebhooks installs the bundled manifest (the same path as importing an app).
 func (s *Service) AddReviewWebhooks() error {
 	_, err := s.InstallManifest(apps.ReviewWebhooks, false)
 	return err
-}
-
-// DismissReviewWebhooks stops offering the app.
-func (s *Service) DismissReviewWebhooks() error {
-	return store.SetSetting(s.DB, reviewWebhooksDismissed, "1")
 }

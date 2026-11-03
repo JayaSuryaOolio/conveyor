@@ -2,7 +2,7 @@ import {useState} from 'react'
 import {ActionIcon, Anchor, Badge, Button, Code, Divider, Group, Menu, Modal, Paper, Stack, TagsInput, Text, TextInput, Title, Tooltip} from '@mantine/core'
 import {useClipboard} from '@mantine/hooks'
 import {IconCopy, IconMessageSearch, IconPencil, IconPlus, IconStar, IconX, IconTerminal, IconTerminal2} from '@tabler/icons-react'
-import {Actions, AddLabel, AddReviewWebhooks, AddTaskRepo, CheckReviews, DismissReviewWebhooks, ReviewWebhooksOffer, EnsureWorkspace, GetSettings, ListLabels, ListRepos, RemoveLabel, RemoveTaskRepo, RunAction, Sessions, SetTaskRepo, TermStart} from '../wailsjs/go/ui/App'
+import {Actions, AddLabel, AddTaskRepo, CheckReviews, EnsureWorkspace, GetSettings, ListLabels, ListRepos, RemoveLabel, RemoveTaskRepo, RunAction, Sessions, SetTaskRepo, TermStart} from '../wailsjs/go/ui/App'
 import {core, store, ui} from '../wailsjs/go/models'
 import {BrowserOpenURL} from '../wailsjs/runtime/runtime'
 import {PlacedButtons, StatusSelect, Time, errMsg} from './components'
@@ -178,23 +178,6 @@ function AddRepo({k, have, reload}: {k: string; have: string[]; reload: () => vo
     </>)
 }
 
-/** Offers the opt-in review-webhooks app; renders nothing once installed or dismissed. */
-export function ReviewWebhooksPrompt() {
-    const {data: offer, reload} = useData(ReviewWebhooksOffer, [])
-    if (!offer) return null
-    return (
-        <Paper withBorder p="xs" radius="md">
-            <Stack gap={6}>
-                <Text size="xs">Get PR review comments as they land instead of waiting for the next check.</Text>
-                <Group gap="xs">
-                    <Button size="compact-xs" onClick={() => AddReviewWebhooks().then(reload).catch(errMsg)}>Add review webhooks</Button>
-                    <Button size="compact-xs" variant="subtle" color="gray" onClick={() => DismissReviewWebhooks().then(reload).catch(errMsg)}>Dismiss</Button>
-                </Group>
-            </Stack>
-        </Paper>
-    )
-}
-
 export function TaskSidebar({t, runs, reload, onTerm}: {t: store.Task; runs: store.Run[]; reload: () => void; onTerm: (t: ui.TermInfo) => void}) {
     const k = t.key
     const repos = t.repos ?? []
@@ -228,7 +211,6 @@ export function TaskSidebar({t, runs, reload, onTerm}: {t: store.Task; runs: sto
             {repos.map(r => (
                 <RepoFields key={r.repo_id + '|' + r.branch + '|' + (r.pr_url ?? '')} k={k} r={r} reload={reload} canRemove={repos.length > 1}/>
             ))}
-            {repos.some(r => r.pr_url) && <ReviewWebhooksPrompt/>}
             {!hasWorktree && (
                 <Button loading={busy} onClick={() => { setBusy(true); EnsureWorkspace(k).then(() => { reload(); reloadActions(); reloadSessions() }).catch(errMsg).finally(() => setBusy(false)) }}>Create workspace</Button>
             )}

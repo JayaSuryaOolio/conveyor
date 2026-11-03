@@ -161,12 +161,8 @@ func (a *App) SpotlightStop(root string) error { return core.SpotlightStop(root)
 // UserHooks reports or changes Conveyor's hooks in ~/.claude/settings.json ("status", "install", "uninstall").
 func (a *App) UserHooks(action string) (string, error) { return a.svc.UserHooks(action) }
 
-// ReviewWebhooksOffer reports whether to offer "Add review webhooks" (app not installed, not dismissed).
-// The task page shows it for a task with a PR; the Epic view can call the same binding.
-func (a *App) ReviewWebhooksOffer() bool { return a.svc.ReviewWebhooksOffer() }
+// ReviewWebhooksInstalled reports whether the review-webhooks app is installed.
+func (a *App) ReviewWebhooksInstalled() bool { return a.svc.ReviewWebhooksInstalled() }
 
-// AddReviewWebhooks installs the bundled review-webhooks app; its service button appears in the nav.
+// AddReviewWebhooks installs the bundled review-webhooks app; epic tasks then get review events pushed.
 func (a *App) AddReviewWebhooks() error { return a.svc.AddReviewWebhooks() }
-
-// DismissReviewWebhooks hides the offer for good.
-func (a *App) DismissReviewWebhooks() error { return a.svc.DismissReviewWebhooks() }

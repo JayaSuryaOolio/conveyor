@@ -1,7 +1,7 @@
 import {useEffect, useRef, useState} from 'react'
 import {ActionIcon, Badge, Button, Checkbox, Code, FileButton, Group, Modal, MultiSelect, Paper, Stack, Switch, Table, Tabs, Text, TextInput, Textarea, Title} from '@mantine/core'
 import {IconDownload, IconPencil, IconPlayerPlay, IconPlus, IconPuzzle, IconTransform, IconTrash, IconUpload} from '@tabler/icons-react'
-import {AddApp, GetSettings, SetSetting, AppIcons, AppPresets, Confirm, ConvertApp, DeleteApp, ExportApp, Home, InstallManifest, InstallPreset, ListApps, ManifestSchema, RenderApp, TestApp, UpdateApp, UserHooks, ValidateManifest} from '../wailsjs/go/ui/App'
+import {AddApp, AddReviewWebhooks, GetSettings, SetSetting, AppIcons, AppPresets, Confirm, ConvertApp, DeleteApp, ExportApp, Home, InstallManifest, InstallPreset, ListApps, ManifestSchema, RenderApp, TestApp, UpdateApp, UserHooks, ValidateManifest} from '../wailsjs/go/ui/App'
 import {store} from '../wailsjs/go/models'
 import {AppIcon, errMsg, runApp, toast} from './components'
 import {Field, SettingRow} from './forms'
@@ -178,6 +178,13 @@ function AppList() {
                     </Table.Tbody>
                 </Table>
             )}
+            {!have.has('Review webhooks') && <>
+                <Title order={5}>Review webhooks</Title>
+                <Group gap="xs" wrap="nowrap">
+                    <Button size="xs" variant="light" leftSection={<IconPlus size={14}/>} onClick={() => AddReviewWebhooks().then(reload, errMsg)}>Add review webhooks</Button>
+                    <Text size="sm" c="dimmed">Review comments on epic PRs trigger a check at once. Needs <Code>gh extension install cli/gh-webhook</Code>. Without it, epics use the timed checks.</Text>
+                </Group>
+            </>}
             {missing.length > 0 && <>
                 <Title order={5}>Detected on this Mac</Title>
                 <Group gap="xs">

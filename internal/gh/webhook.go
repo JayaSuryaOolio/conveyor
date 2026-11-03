@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os/exec"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
@@ -56,7 +57,7 @@ func WebhookHandler(db *sql.DB) http.Handler {
 			http.Error(w, "bad payload", http.StatusBadRequest)
 			return
 		}
-		tasks, err := liveTasks(db)
+		tasks, err := epicTasks(db)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -77,17 +78,21 @@ func WebhookHandler(db *sql.DB) http.Handler {
 	})
 }
 
-func liveTasks(db *sql.DB) ([]store.Task, error) {
+// epicTasks lists unfinished tasks labelled epic or epic:<name>; other tasks keep the backoff checks.
+func epicTasks(db *sql.DB) ([]store.Task, error) {
 	all, err := store.ListTasks(db)
 	if err != nil {
 		return nil, err
 	}
-	return slices.DeleteFunc(all, func(t store.Task) bool { return t.Status == store.StatusDone || t.Status == store.StatusCancelled }), nil
+	return slices.DeleteFunc(all, func(t store.Task) bool {
+		return t.Status == store.StatusDone || t.Status == store.StatusCancelled ||
+			!slices.ContainsFunc(t.Labels, func(l string) bool { return l == "epic" || strings.HasPrefix(l, "epic:") })
+	}), nil
 }
 
-// openPRRepos lists owner/repo for every open PR of an unfinished task.
+// openPRRepos lists owner/repo for every open PR of an unfinished epic task.
 func openPRRepos(db *sql.DB) []string {
-	tasks, err := liveTasks(db)
+	tasks, err := epicTasks(db)
 	if err != nil {
 		log.Printf("review webhook: list tasks: %v", err)
 		return nil
@@ -108,7 +113,7 @@ func openPRRepos(db *sql.DB) []string {
 }
 
 // RunWebhook serves the handler on a random loopback port and keeps one `gh webhook forward`
-// per repo with an open PR until ctx ends. A failed forward (GitHub allows one per repo) is
+// per repo with an open epic PR until ctx ends. A failed forward (GitHub allows one per repo) is
 // logged and retried on the next scan; the backoff checks still run.
 func RunWebhook(ctx context.Context, db *sql.DB) error {
 	if err := CheckWebhookExt(); err != nil {

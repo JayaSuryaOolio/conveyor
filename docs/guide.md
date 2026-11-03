@@ -225,7 +225,7 @@ For tasks in review, every 60 seconds Conveyor runs `gh pr list --head <branch>`
 
 ### Review webhooks (opt-in)
 
-PR review checks run on push and a backoff (30 min, 2 h, 8 h). For instant checks, install the bundled **Review webhooks** app: the task page offers **Add review webhooks** when a task has a PR (dismissable), or run `conveyor app install apps/review-webhooks.json`. It adds a service button to the nav that runs `conveyor review-webhook`: a listener on `127.0.0.1` (random port, pid in `<home>/review-webhook.pid`, log `logs/review-webhook.log`) plus one `gh webhook forward` per repo with an open PR (needs `gh extension install cli/gh-webhook` and admin on the repo; GitHub allows one forward per repo). A review or review comment schedules that task's check for now. `--status` exits 0 when running; `--stop` stops it.
+PR review checks run on push and a backoff (30 min, 2 h, 8 h). For instant checks on epic tasks (label `epic` or `epic:<name>`), add the bundled **Review webhooks** app on the Apps screen (or `conveyor app install apps/review-webhooks.json`). Once installed, Conveyor starts `conveyor review-webhook` itself: a listener on `127.0.0.1` (random port, pid in `<home>/review-webhook.pid`, log `logs/review-webhook.log`) plus one `gh webhook forward` per repo with an open epic PR (needs `gh extension install cli/gh-webhook` and admin on the repo; GitHub allows one forward per repo). A review or review comment schedules that task's check for now. Without the app or the extension, epics keep the timed checks. `--status` exits 0 when running; `--stop` stops it (Conveyor restarts it within a minute while the app is installed; uninstall the app to opt out).
 
 ## Settings
 
