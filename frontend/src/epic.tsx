@@ -4,7 +4,7 @@ import {useLocalStorage} from '@mantine/hooks'
 import {IconCode, IconExternalLink, IconGitPullRequest, IconMessageQuestion, IconPlayerPlay, IconPlayerStop, IconPlus, IconTerminal2} from '@tabler/icons-react'
 import {Background, Controls, Handle, MarkerType, Position, ReactFlow, useEdgesState, useNodesState, type Connection, type Edge, type Node, type NodeProps} from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import {CreateTask, EpicApprove, EpicGraph, EpicRestart, ListApps, Move, OpenApp, RunAction, Stop, Link, Unlink} from '../wailsjs/go/ui/App'
+import {CreateTask, EpicApprove, EpicGraph, EpicRestart, InstallExample, ListApps, Move, OpenApp, RunAction, Stop, Link, Unlink} from '../wailsjs/go/ui/App'
 import {BrowserOpenURL} from '../wailsjs/runtime/runtime'
 import {core, store} from '../wailsjs/go/models'
 import {Nav, StatusBadge, errMsg} from './components'
@@ -120,7 +120,7 @@ function Header({g, nav, root}: {g: core.Graph; nav: Nav; root: core.GraphNode})
     const [restart, setRestart] = useState(false)
     const [reason, setReason] = useState('')
     const [seen, setSeen] = useLocalStorage({key: 'epic-webhooks-dismissed', defaultValue: false})
-    const {data: apps} = useData(ListApps, [])
+    const {data: apps, reload: reloadApps} = useData(ListApps, [])
     const epic = g.stage !== ''
     const hasPR = g.prs.some(p => p.pr_url)
     const noHooks = !(apps ?? []).some(a => /review.?webhooks/i.test(a.name))
@@ -144,7 +144,7 @@ function Header({g, nav, root}: {g: core.Graph; nav: Nav; root: core.GraphNode})
             <Alert variant="light" withCloseButton onClose={() => setSeen(true)} title="Review comments arrive by backoff polling">
                 <Group gap="sm">
                     <Text size="sm">Add the review-webhooks app to get them as they are posted.</Text>
-                    <Button size="compact-xs" onClick={() => nav({name: 'apps'})}>Add review webhooks</Button>
+                    <Button size="compact-xs" onClick={() => InstallExample('review-webhooks').then(reloadApps, errMsg)}>Add review webhooks</Button>
                 </Group>
             </Alert>
         )}

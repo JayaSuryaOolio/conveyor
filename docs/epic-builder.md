@@ -264,7 +264,7 @@ There is no recurring review poll. A review check is a **one-shot automation** (
 
 At most one pending check exists per task. Scheduling replaces the old one by `(task_id, kind)`. After the backoff runs out, the PR goes quiet until the next push, webhook or click. This handles "human reviews two days later" without polling all the time.
 
-**Review-webhooks app (opt-in).** GitHub can't reach a desktop app without a tunnel, so this uses the `gh webhook` extension. It ships as an app manifest in `apps/review-webhooks.json`, using what CV-55 already has, so it needs no new UI:
+**Review-webhooks app (opt-in).** GitHub can't reach a desktop app without a tunnel, so this uses the `gh webhook` extension. It ships as an app manifest in `examples/review-webhooks.json`, using what CV-55 already has, so it needs no new UI:
 
 ```json
 {"name":"Review webhooks",
