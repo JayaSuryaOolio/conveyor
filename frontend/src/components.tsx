@@ -1,7 +1,7 @@
 import {useEffect, useState} from 'react'
 import {ActionIcon, Badge, Box, Button, Card as MCard, Group, Indicator, Menu, Modal, Notification, Paper, Select, Stack, Text, Tooltip} from '@mantine/core'
-import {IconAppWindow, IconCheck, IconDots, IconPencil, IconSitemap, IconX} from '@tabler/icons-react'
-import {AddComment, AppServiceRunning, MergedPR, Move, PlacedActions, RunAppAction, ShowError, StopAppService, TakeQueuedComment} from '../wailsjs/go/ui/App'
+import {IconAppWindow, IconCheck, IconDots, IconMessageSearch, IconPencil, IconSitemap, IconX} from '@tabler/icons-react'
+import {AddComment, AppServiceRunning, CheckReviews, MergedPR, Move, PlacedActions, RunAppAction, ShowError, StopAppService, TakeQueuedComment} from '../wailsjs/go/ui/App'
 import {store, ui} from '../wailsjs/go/models'
 import {Markdown, MarkdownEditor} from './markdown'
 import {ALL_STATUSES, STATUS_COLOR, STATUS_LABEL, ago, fmtK, fmtTime, useData, useDraft} from './util'
@@ -154,6 +154,7 @@ export function Card({c, nav, onLabel}: {c: ui.TaskCard; nav: Nav; onLabel: (l: 
                 <Text size="xs" fw={600} c="dimmed">{c.key}{c.parent && <Text span size="xs" fw={400}> ↑ {c.parent}</Text>}</Text>
                 <Group gap={4} wrap="nowrap">
                     {c.ctxPeak > 0 && <Badge variant="outline" color="gray" size="xs" title="context peak">{fmtK(c.ctxPeak)}</Badge>}
+                    {c.openPR && <Tooltip label="Check reviews now"><ActionIcon variant="subtle" color="gray" size="sm" aria-label="Check reviews" onClick={e => { e.stopPropagation(); CheckReviews(c.key).catch(errMsg) }}><IconMessageSearch size={16}/></ActionIcon></Tooltip>}
                     <Tooltip label="Epic view"><ActionIcon variant="subtle" color="gray" size="sm" aria-label="Epic view" onClick={e => { e.stopPropagation(); nav({name: 'epic', key: c.key}) }}><IconSitemap size={16}/></ActionIcon></Tooltip>
                     <StatusMenu k={c.key} status={c.status}/>
                 </Group>
