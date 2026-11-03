@@ -143,7 +143,7 @@ func (s *Service) Complete(key string, repos []string, kind, q string) ([]Sugges
 }
 
 // completeTasks suggests tasks whose key starts with prefix (e.g. "CV-") and whose key suffix or
-// title contains q, newest key first is not guaranteed: order follows store.ListTasks.
+// title contains q, in store.ListTasks order.
 func (s *Service) completeTasks(prefix, q string) ([]Suggestion, error) {
 	ts, err := store.ListTasks(s.DB)
 	if err != nil {
