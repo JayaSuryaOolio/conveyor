@@ -64,12 +64,12 @@ func TestReviewCheckPostsOnceThenBacksOff(t *testing.T) {
 	if len(cs) != 1 || cs[0].Author != store.AuthorSystem {
 		t.Fatalf("want one system comment, got %+v", cs)
 	}
-	for _, want := range []string{"PR review on https://github.com/o/r/pull/7:", "> a.go:3\nnil deref", "please rename"} {
+	for _, want := range []string{"PR review on https://github.com/o/r/pull/7:", "> a.go:3 (bob)\nnil deref", "please rename"} {
 		if !strings.Contains(cs[0].Body, want) {
 			t.Errorf("missing %q in %q", want, cs[0].Body)
 		}
 	}
-	for _, no := range []string{"resolved already", "ai agent"} {
+	for _, no := range []string{"resolved already", "ai agent: fixed"} {
 		if strings.Contains(cs[0].Body, no) {
 			t.Errorf("%q leaked into %q", no, cs[0].Body)
 		}
@@ -162,4 +162,14 @@ func mustTime(t *testing.T, s string) time.Time {
 		t.Fatal(err)
 	}
 	return v
+}
+
+func TestCleanStripsBotBoilerplate(t *testing.T) {
+	in := "<!-- cubic:review-summary:start -->\n**8 issues found**\n<!-- end -->\n\n---\n- [ ] autofix\n<details>\n<summary>Prompt for AI agents</summary>\nfix everything\n</details>"
+	if got := clean(in); got != "**8 issues found**" {
+		t.Errorf("got %q", got)
+	}
+	if got := clean(strings.Repeat("x", 5000)); len(got) > itemCap+4 {
+		t.Errorf("not capped: %d", len(got))
+	}
 }

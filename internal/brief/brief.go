@@ -59,6 +59,8 @@ const defaultRules = `- Work only inside the worktrees listed above.
 const (
 	DefaultFresh  = "You are working on Conveyor task {key}: {title}. Read {brief} first and follow it.\n{comments}"
 	DefaultResume = "New comments on {key}:\n{comments}\n(The brief at {brief} is up to date.)"
+	// resumeNoComments is DefaultResume's stand-in when the run was requeued without a new comment.
+	resumeNoComments = "{key} was resumed with no new comments. Do not re-report your last reply; continue any unfinished work, or end with one line saying nothing changed.\n(The brief at {brief} is up to date.)"
 )
 
 // rules is the Rules section body: the defaults, the PR comment prefix rule, then (if extra) the user's extra rules.
@@ -333,7 +335,11 @@ func FreshPrompt(task store.Task, briefPath string, delta []store.Comment, tmpl 
 
 // ResumePrompt is the prompt that resumes a hot session with new comments; tmpl is the prompt_resume setting.
 func ResumePrompt(task store.Task, briefPath string, delta []store.Comment, tmpl string) string {
-	return fill(tmpl, DefaultResume, task, briefPath, delta)
+	def := DefaultResume
+	if len(delta) == 0 {
+		def = resumeNoComments
+	}
+	return fill(tmpl, def, task, briefPath, delta)
 }
 
 // Preview renders the brief and the fresh prompt as a launch would, writing nothing.

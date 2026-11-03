@@ -88,3 +88,20 @@ func TakeQueuedComment(db *sql.DB, taskID, id int64) (body string, ok bool, err 
 	n, _ := res.RowsAffected()
 	return body, n == 1, nil
 }
+
+// ReleaseIfNothingQueued undoes a comment's requeue after the comment was taken back: a todo task
+// that has already run and has nothing queued goes back to needs_you instead of resuming empty.
+func ReleaseIfNothingQueued(db *sql.DB, taskID int64) error {
+	t, err := GetTask(db, taskID)
+	if err != nil || t.Status != StatusTodo {
+		return err
+	}
+	if q, err := UnconsumedComments(db, taskID); err != nil || len(q) > 0 {
+		return err
+	}
+	if _, err := LatestRun(db, taskID); err != nil { // never ran: todo is the right state
+		return nil
+	}
+	_, err = UpdateTaskStatus(db, taskID, StatusNeedsYou, ActorHuman)
+	return err
+}

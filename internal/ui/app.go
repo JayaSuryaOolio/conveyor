@@ -353,6 +353,9 @@ func (a *App) TakeQueuedComment(key string, id int64) (string, error) {
 	if err == nil && !ok {
 		err = fmt.Errorf("the agent already received this message")
 	}
+	if err == nil {
+		err = store.ReleaseIfNothingQueued(a.svc.DB, t.ID)
+	}
 	return body, err
 }
 
