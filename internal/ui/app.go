@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -293,6 +294,12 @@ func (a *App) AddLabel(key, name string) error { return a.svc.AddLabel(key, name
 
 // RemoveLabel takes a label off a task.
 func (a *App) RemoveLabel(key, name string) error { return a.svc.RemoveLabel(key, name) }
+
+// SetLabel atomically sets key's prefix label to value ("epic_kind", "build" -> "epic_kind:build"),
+// dropping its other labels with that prefix. Mirrors `task label set`.
+func (a *App) SetLabel(key, prefix, value string) error {
+	return a.svc.SetLabel(key, strings.TrimSuffix(prefix, ":")+":"+value)
+}
 
 // ListLabels returns every known label name.
 func (a *App) ListLabels() ([]string, error) { return store.ListLabels(a.svc.DB) }

@@ -3,6 +3,7 @@ package ui
 import (
 	"context"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -112,5 +113,24 @@ func TestAutomationCRUDAndDescribeSchedule(t *testing.T) {
 	}
 	if i := a.DescribeSchedule("x"); i.Valid || i.Error == "" {
 		t.Fatalf("describe invalid: %+v", i)
+	}
+}
+
+func TestSetLabelSwapsPrefixOnly(t *testing.T) {
+	a, _ := newApp(t)
+	key, _ := a.CreateTask(core.NewTaskInput{Title: "k", Repos: []string{"a"}})
+	for _, l := range []string{"epic:os", "epic_kind:build", "plain"} {
+		a.AddLabel(key, l)
+	}
+	if err := a.SetLabel(key, "epic_kind", "research"); err != nil {
+		t.Fatal(err)
+	}
+	tk, _ := store.GetTaskByKey(a.svc.DB, key)
+	ls, _ := store.TaskLabels(a.svc.DB, tk.ID)
+	if got := strings.Join(ls, ","); !strings.Contains(got, "epic_kind:research") || strings.Contains(got, "epic_kind:build") || !strings.Contains(got, "epic:os") || !strings.Contains(got, "plain") {
+		t.Fatalf("labels: %v", ls)
+	}
+	if a.SetLabel(key, "epic_kind", "") == nil {
+		t.Fatal("empty value accepted")
 	}
 }
