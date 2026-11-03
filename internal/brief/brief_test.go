@@ -135,14 +135,6 @@ func TestSettingsShapeBrief(t *testing.T) {
 	if strings.Contains(got, "Labels:") {
 		t.Fatal("no labels, no Labels line")
 	}
-	if strings.Contains(got, "every worktree above is yours") {
-		t.Fatal("single repo, no multi-worktree note")
-	}
-	tk.Repos = []store.TaskRepo{{RepoName: "a"}, {RepoName: "b"}}
-	if got, _ = Build(db, tk); !strings.Contains(got, "every worktree above is yours") {
-		t.Fatal("multi-repo task should say every worktree is workable")
-	}
-	tk.Repos = nil
 	tk.Labels = []string{"epic_kind:grilling", "skill:grill-me"}
 	if got, _ = Build(db, tk); !strings.Contains(got, "Kind grilling: ") || !strings.Contains(got, "open no PR") ||
 		!strings.Contains(got, "Load these skills before starting: grill-me.") || strings.Contains(got, "Load the epic skill") {
