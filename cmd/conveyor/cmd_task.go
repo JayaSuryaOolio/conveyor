@@ -18,7 +18,7 @@ import (
 )
 
 func init() {
-	register("task", runTask, "manage tasks (new|list|show|comment|move|set|link|unlink|parent|sessions|stop|cancel|done|sync|brief|log|attach|open|label|graph)")
+	register("task", runTask, "manage tasks (new|list|show|comment|move|set|repo|link|unlink|parent|sessions|stop|cancel|done|sync|brief|log|attach|open|label|graph)")
 }
 
 const taskUsage = "usage: conveyor task new|list|show|comment|move|set|link|unlink|parent|sessions|stop|cancel|done|sync|brief|log|attach|open|label|graph ..."
@@ -388,10 +388,14 @@ func taskSet(s *core.Service, args []string) error {
 		name = t.Repos[0].RepoName
 	}
 	var cur store.TaskRepo
+	found := false
 	for _, r := range t.Repos {
 		if r.RepoName == name {
-			cur = r
+			cur, found = r, true
 		}
+	}
+	if !found {
+		return fmt.Errorf("%s is not attached to %s: add it with `conveyor task repo %s add %s`", name, t.Key, t.Key, name)
 	}
 	if !given["branch"] {
 		*branch = cur.Branch

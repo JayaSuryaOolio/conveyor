@@ -47,6 +47,7 @@ conveyor task link <KEY> blocks <OTHER>      # OTHER waits until KEY is done or 
 conveyor task link <KEY> relates <OTHER>
 conveyor task parent <KEY> <PARENT>|--none   # re-parent; keys do not change
 conveyor task unlink <KEY> blocks <OTHER>
+conveyor task repo <KEY> add <REPO>          # attach another registered repo to a task (worktree appears on its next run)
 ```
 
 New tasks start in backlog; pass `--todo` to let the dispatcher launch them.
