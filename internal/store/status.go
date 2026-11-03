@@ -57,6 +57,7 @@ var transitions = map[edge]actors{
 	{StatusRunning, StatusReview}:    byAny, // system (hook) or human manual override
 	{StatusRunning, StatusFailed}:    bySystem,
 	{StatusRunning, StatusTodo}:      bySystem,
+	{StatusTodo, StatusNeedsYou}:     byHuman, // the only queued comment was taken back
 	{StatusNeedsYou, StatusRunning}:  bySystem,
 	{StatusNeedsYou, StatusTodo}:     byAny,
 	{StatusNeedsYou, StatusDone}:     byHuman,
