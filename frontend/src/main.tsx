@@ -2,6 +2,7 @@ import React from 'react'
 import {createRoot} from 'react-dom/client'
 import {Anchor, MantineProvider, MultiSelect, Select, createTheme} from '@mantine/core'
 import '@mantine/core/styles.css'
+import {HashRouter} from 'react-router'
 import './style.css'
 import App from './App'
 
@@ -22,7 +23,9 @@ const root = createRoot(container!)
 root.render(
     <React.StrictMode>
         <MantineProvider theme={theme} defaultColorScheme="dark">
-            <App/>
+            <HashRouter>
+                <App/>
+            </HashRouter>
         </MantineProvider>
     </React.StrictMode>
 )
