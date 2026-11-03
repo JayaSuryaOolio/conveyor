@@ -25,15 +25,11 @@ func TestMessageKeyRoundTrip(t *testing.T) {
 	}
 }
 
-func TestImpersonateToggleAndOwnPostsIgnored(t *testing.T) {
+func TestUserTokenAndOwnPostsIgnored(t *testing.T) {
 	cfg := map[string]string{"slack_bot_token": "xoxb", "slack_user_token": "xoxp", "slack_app_token": "xapp", "slack_user_id": "U1"}
-	s := &Slack{func(k string) string { return cfg[k] }}
-	if s.token() != "xoxb" {
-		t.Fatal("user token used while impersonation is off")
-	}
-	cfg["slack_impersonate"] = "on"
+	s := &Slack{get: func(k string) string { return cfg[k] }}
 	if s.token() != "xoxp" || !s.Ready() {
-		t.Fatal("user token should win when impersonating and satisfy Ready")
+		t.Fatal("user token should win and satisfy Ready")
 	}
 	delete(cfg, "slack_user_token")
 	delete(cfg, "slack_bot_token")
@@ -54,7 +50,7 @@ func TestButtonsAndInteractive(t *testing.T) {
 	if n := len(buttons(chat.Msg{Key: "CV-7", Status: "done"})); n != 0 {
 		t.Fatalf("done without PR wants no buttons; got %d", n)
 	}
-	s := &Slack{func(k string) string { return map[string]string{"slack_user_id": "U1"}[k] }}
+	s := &Slack{get: func(k string) string { return map[string]string{"slack_user_id": "U1"}[k] }}
 	got := ""
 	h := func(in chat.In) string { got = in.Text; return "ok" }
 	s.interactive([]byte(`{"type":"block_actions","user":{"id":"U2"},"actions":[{"action_id":"move_done","value":"CV-7"}]}`), h)
@@ -78,7 +74,7 @@ func TestSendThreadsPerTask(t *testing.T) {
 	}))
 	defer srv.Close()
 	api = srv.URL + "/"
-	s := &Slack{func(k string) string { return map[string]string{"slack_bot_token": "x", "slack_user_id": "U1"}[k] }}
+	s := &Slack{get: func(k string) string { return map[string]string{"slack_bot_token": "x", "slack_user_id": "U1"}[k] }}
 	m := chat.Msg{Key: "CV-9", Title: "T", Status: "needs_you", Last: "**bold**"}
 	s.Send(m)
 	s.Send(m)
@@ -112,7 +108,7 @@ func TestListenRoutesInteractive(t *testing.T) {
 	})
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) { fmt.Fprint(w, `{"ok":true,"ts":"1.0"}`) })
 	api = srv.URL + "/"
-	s := &Slack{func(k string) string {
+	s := &Slack{get: func(k string) string {
 		return map[string]string{"slack_app_token": "a", "slack_bot_token": "x", "slack_user_id": "U1"}[k]
 	}}
 	ctx, cancel := context.WithCancel(context.Background())
@@ -132,5 +128,32 @@ func TestListenRoutesInteractive(t *testing.T) {
 	}
 	if !got["E1"] || !got["move CV-7 todo"] {
 		t.Fatalf("want ack E1 and command 'move CV-7 todo', got %v", got)
+	}
+}
+
+func TestOpenConnRotatesExpiredToken(t *testing.T) {
+	mux := http.NewServeMux()
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+	mux.HandleFunc("/apps.connections.open", func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") == "Bearer new" {
+			fmt.Fprint(w, `{"ok":true,"url":"wss://x"}`)
+			return
+		}
+		fmt.Fprint(w, `{"ok":false,"error":"token_expired"}`)
+	})
+	mux.HandleFunc("/tooling.tokens.rotate", func(w http.ResponseWriter, r *http.Request) {
+		r.ParseForm()
+		if r.Form.Get("refresh_token") != "old-r" {
+			t.Errorf("refresh token = %q", r.Form.Get("refresh_token"))
+		}
+		fmt.Fprint(w, `{"ok":true,"token":"new","refresh_token":"new-r"}`)
+	})
+	api = srv.URL + "/"
+	cfg := map[string]string{"slack_app_token": "old", "slack_app_refresh_token": "old-r"}
+	s := &Slack{func(k string) string { return cfg[k] }, func(k, v string) error { cfg[k] = v; return nil }}
+	r, err := s.openConn()
+	if err != nil || r["url"] != "wss://x" || cfg["slack_app_token"] != "new" || cfg["slack_app_refresh_token"] != "new-r" {
+		t.Fatalf("r=%v err=%v cfg=%v", r, err, cfg)
 	}
 }

@@ -308,3 +308,23 @@ func TestDoneOrCancelledDeletesTaskAutomations(t *testing.T) {
 		}
 	}
 }
+
+func TestSlackTokenPrefix(t *testing.T) {
+	db := openTest(t)
+	for k, v := range map[string]string{"slack_app_token": "xoxe.xoxp-1-cfg", "slack_bot_token": "xapp-1"} {
+		if SetSetting(db, k, v) == nil {
+			t.Errorf("%s=%q accepted", k, v)
+		}
+	}
+	for k, v := range map[string]string{"slack_app_token": "xapp-1", "slack_bot_token": "xoxb-1"} {
+		if err := SetSetting(db, k, v); err != nil {
+			t.Errorf("%s=%q: %v", k, v, err)
+		}
+	}
+	if err := SetSetting(db, "slack_app_token", "xoxe.xapp-1-r"); err != nil {
+		t.Error(err)
+	}
+	if err := SetSetting(db, "slack_app_token", ""); err != nil {
+		t.Error(err)
+	}
+}

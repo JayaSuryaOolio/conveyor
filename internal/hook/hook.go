@@ -63,20 +63,18 @@ func Handle(db *sql.DB, home, event string, raw []byte) error {
 	if event == "UserPromptSubmit" {
 		return onPrompt(db, task, run)
 	}
-	if err := onStop(db, task, run, p); err != nil {
-		return err
-	}
-	if err := refreshPR(db, task.ID); err != nil { // best effort: the run is already recorded
+	// Before onStop: its status change fires the chat DM, which reads pr_url for the Open PR button.
+	if err := refreshPR(db, task.ID); err != nil { // best effort
 		store.RecordEvent(db, task.ID, "error", "pr refresh: "+err.Error())
 	}
-	return nil
+	return onStop(db, task, run, p)
 }
 
-// refreshPR syncs the task's PR state once its session returns; the dispatcher poll is the fallback.
+// refreshPR syncs the task's PR state as its session returns; the dispatcher poll is the fallback.
 func refreshPR(db *sql.DB, id int64) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
-	t, err := store.GetTask(db, id) // re-read: onStop may have moved the task
+	t, err := store.GetTask(db, id) // re-read for the latest status
 	if err != nil {
 		return err
 	}
@@ -105,10 +103,19 @@ func resolveRun(db *sql.DB, task store.Task, session string) (store.Run, error) 
 	for i := len(runs) - 1; i >= 0; i-- {
 		if r := runs[i]; r.Status == "launching" {
 			r.SessionID = sp
+			auditStart(task.ID, r)
 			return r, store.UpdateRun(db, r)
 		}
 	}
-	return store.CreateRun(db, store.Run{TaskID: task.ID, Kind: "interactive", Mode: "fresh", Status: "running", SessionID: sp})
+	r, err := store.CreateRun(db, store.Run{TaskID: task.ID, Kind: "interactive", Mode: "fresh", Status: "running", SessionID: sp})
+	if err == nil {
+		auditStart(task.ID, r)
+	}
+	return r, err
+}
+
+func auditStart(taskID int64, r store.Run) {
+	store.Audit("epic.run.start", "task_id", taskID, "run", r.ID, "session", deref(r.SessionID))
 }
 
 func onPrompt(db *sql.DB, task store.Task, run store.Run) error {
@@ -117,6 +124,7 @@ func onPrompt(db *sql.DB, task store.Task, run store.Run) error {
 		if err := store.UpdateRun(db, run); err != nil {
 			return err
 		}
+		auditStart(task.ID, run)
 	}
 	if task.Status == store.StatusNeedsYou {
 		if latest, err := store.LatestRun(db, task.ID); err == nil && latest.ID == run.ID {
@@ -159,6 +167,10 @@ func onStop(db *sql.DB, task store.Task, run store.Run, p payload) error {
 	}
 	if err := store.UpdateRun(db, run); err != nil {
 		return err
+	}
+	store.Audit("epic.run.end", "task_id", task.ID, "run", run.ID, "session", deref(run.SessionID))
+	if hasBlock {
+		store.Audit("epic.status_block", "task_id", task.ID, "run", run.ID, "status", block.Status, "summary", block.Summary)
 	}
 	if run.Kind != "auto" {
 		return nil
@@ -220,6 +232,20 @@ func onStop(db *sql.DB, task store.Task, run store.Run, p payload) error {
 	case hasBlock && block.Status == "done":
 		to = store.StatusReview
 		task.ConsecutiveFailures = 0
+		if gate, err := store.EpicAtGate(db, task); err != nil {
+			return err
+		} else if gate {
+			to = store.StatusNeedsYou // charted: waits for `conveyor epic approve`
+			store.Audit("epic.gate", "task_id", task.ID, "result", "waiting")
+		} else if store.IsEpic(task) && store.EpicStage(task) == store.StageChart && !store.EpicGateOn(task) {
+			if f, err := store.ActiveFlow(db, task.ID); err != nil {
+				return err
+			} else if f == nil { // gate off: charting is enough to start flow 1
+				if _, err := store.ApproveEpic(db, task.ID); err != nil {
+					return err
+				}
+			}
+		}
 	case hasBlock:
 		task.ConsecutiveFailures++
 		max, _ := strconv.Atoi(store.GetSetting(db, "max_consecutive_failures"))
@@ -243,4 +269,11 @@ func bgPending(path, prompt string) bool {
 	}
 	ok, err := transcript.BackgroundPending(path, prompt, time.Now())
 	return err == nil && ok
+}
+
+func deref(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }

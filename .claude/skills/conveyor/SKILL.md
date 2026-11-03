@@ -33,11 +33,15 @@ conveyor task link KEY blocks|relates OTHER     conveyor task unlink KEY kind OT
 conveyor task parent KEY PARENT|--none
 conveyor task repo KEY add|rm NAME   # rm refused once the repo has a PR or is the last one
 conveyor task label KEY add|rm NAME     # labels: many per task (labels + task_labels tables), filter chips on the Board
+conveyor task label KEY set <prefix>:<value>   # replaces only labels with that prefix (epic_stage:build keeps epic:os)
+conveyor task graph KEY [--json]         # parent tree + links around KEY
+conveyor task new "t" --repo r --epic [--epic-name n]   # epic root: labels epic + epic:<name> (default: lower-cased key)
+conveyor epic status|check|flows|prs|search|sessions|approve|restart KEY   # docs/epic-builder.md §13; status/prs take --json
 conveyor agent list|add|model         conveyor config list|get|set
 conveyor repo add|list|rm|setup <name> [script|-]
 conveyor models [--json]            # model list (API with ANTHROPIC_API_KEY, else built-in); names are not validated, a bad model fails the session -> needs_you
 conveyor state export [FILE] | import FILE [--repo A=name]   # settings/apps/automations/user agents, repos as placeholders
-conveyor hooks status|install|uninstall
+conveyor hooks status|install|uninstall   # install/uninstall also copy/remove skills/epic -> ~/.claude/skills/epic
 conveyor epic review-check KEY [--step N]   # one PR review check: new feedback -> one system comment (requeues); none -> next backoff (30m, 2h, 8h, stop). Scheduled as a one-shot automation (run_at) 10m after a new PR head, or now via the task page button
 conveyor review-webhook [--status|--stop]   # opt-in app (apps/review-webhooks.json, embedded in package apps): loopback listener + `gh webhook forward` per repo with an open PR; a review event schedules that task's check now. Starts detached (re-execs `--serve`), pid `<home>/review-webhook.pid`
 conveyor daemon                       # dispatcher in the foreground
@@ -70,7 +74,7 @@ Use a throwaway home for experiments: `conveyor --home $(mktemp -d) ...`. Never 
 | Worktrees | `internal/workspace`; PRs `internal/gh`; terminals `internal/term`, `internal/terminal` |
 | Learnings / automations / Jira | `internal/learning`, `internal/automation`, `internal/jira` |
 | Wails bindings (thin) | `internal/ui/app.go`; app entry `main.go` |
-| UI (React + Mantine) | `frontend/src`: `App.tsx` nav, `views.tsx` board/focus/task page, `workspace.tsx` task sidebar, `relations.tsx`, `forms.tsx` dialogs + settings (incl. Repos tab), `agents.tsx`, `automations.tsx`, `apps.tsx`, `logs.tsx`, `terminals.tsx` |
+| UI (React + Mantine) | `frontend/src`: `App.tsx` nav, `views.tsx` board/focus/task page, `workspace.tsx` task sidebar, `relations.tsx`, `epic.tsx` + `epicLayout.ts` (epic view on @xyflow/react: cards, groups, header strip; layering tested by `node --experimental-strip-types --test frontend/test/epicLayout.test.mjs`; `ListSkills` binding feeds the skills picker), `forms.tsx` dialogs + settings (incl. Repos tab), `agents.tsx`, `automations.tsx`, `apps.tsx`, `logs.tsx`, `terminals.tsx` |
 
 ## Troubleshooting recipes
 

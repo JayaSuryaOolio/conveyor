@@ -319,3 +319,57 @@ func TestResumeAsCopyAdoptsLaunchingRun(t *testing.T) {
 		t.Fatalf("%d runs, %+v", len(runs), got)
 	}
 }
+
+const plainDone = "<conveyor>\nstatus: done\nsummary: charted\n</conveyor>"
+
+func TestEpicGate(t *testing.T) {
+	for _, gateOff := range []bool{false, true} {
+		e := setup(t, store.StatusRunning)
+		if err := store.MakeEpic(e.db, e.task.ID, "os"); err != nil {
+			t.Fatal(err)
+		}
+		if gateOff {
+			store.AddLabel(e.db, e.task.ID, store.LabelGateOff)
+		}
+		e.run(t, "auto", "running", "S1", "chart it")
+		if err := e.fire(t, "Stop", map[string]any{"session_id": "S1", "last_assistant_message": plainDone}); err != nil {
+			t.Fatal(err)
+		}
+		got := e.status(t)
+		f, _ := store.ActiveFlow(e.db, e.task.ID)
+		switch {
+		case !gateOff && (got.Status != store.StatusNeedsYou || f != nil || store.EpicStage(got) != store.StageChart):
+			t.Fatalf("gate on: status %s, flow %v, stage %s", got.Status, f, store.EpicStage(got))
+		case gateOff && (got.Status != store.StatusReview || f == nil || store.EpicStage(got) != store.StageDecide):
+			t.Fatalf("gate off: status %s, flow %v, stage %s", got.Status, f, store.EpicStage(got))
+		}
+	}
+}
+
+func TestPreToolUseDeniesMergeForEpicMembers(t *testing.T) {
+	e := setup(t, store.StatusRunning)
+	in := func(cmd string) []byte {
+		b, _ := json.Marshal(map[string]any{"tool_name": "Bash", "cwd": e.cwd(), "tool_input": map[string]any{"command": cmd}})
+		return b
+	}
+	member := func(cwd string) bool { return EpicMember(e.db, e.home, cwd) }
+	none := func() string { return "" }
+	for _, cmd := range []string{"gh pr merge 12 --squash", "gh pr -R o/r merge 12", "cd x && gh api repos/o/r/pulls/12/merge -X PUT"} {
+		if got := PreToolUse(in(cmd), none, member); got != nil {
+			t.Errorf("%q allowed outside an epic: %s", cmd, got)
+		}
+	}
+	if err := store.MakeEpic(e.db, e.task.ID, "os"); err != nil {
+		t.Fatal(err)
+	}
+	for _, cmd := range []string{"gh pr merge 12 --squash", "gh pr -R o/r merge 12", "cd x && gh api repos/o/r/pulls/12/merge -X PUT"} {
+		if got := PreToolUse(in(cmd), none, member); !strings.Contains(string(got), `"deny"`) {
+			t.Errorf("%q not denied for an epic member: %s", cmd, got)
+		}
+	}
+	for _, cmd := range []string{"gh pr view 12", "gh pr create --title merge", "echo gh pr merge"} {
+		if got := PreToolUse(in(cmd), none, member); got != nil {
+			t.Errorf("%q denied: %s", cmd, got)
+		}
+	}
+}

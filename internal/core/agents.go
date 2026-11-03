@@ -14,10 +14,11 @@ import (
 
 // Agent is a Claude Code subagent file. Scope is the repo name or "user".
 type Agent struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	Scope       string `json:"scope"`
-	Model       string `json:"model"`
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	Scope       string   `json:"scope"`
+	Model       string   `json:"model"`
+	Skills      []string `json:"skills"` // frontmatter `skills:`, comma separated; shown read-only on epic cards
 	// Resolved is the model id Model resolves to. Set by `conveyor agent list`, not ListAgents.
 	Resolved string `json:"resolved,omitempty"`
 }
@@ -36,7 +37,7 @@ func scanAgents(dir, scope string) []Agent {
 		if fm["name"] == "" {
 			continue
 		}
-		out = append(out, Agent{Name: fm["name"], Description: fm["description"], Scope: scope, Model: fm["model"]})
+		out = append(out, Agent{Name: fm["name"], Description: fm["description"], Scope: scope, Model: fm["model"], Skills: splitList(fm["skills"])})
 	}
 	return out
 }
@@ -284,4 +285,16 @@ func (s *Service) RemoveTaskRepo(key, repo string) error {
 		return nil
 	}
 	return fmt.Errorf("%s has no repo %q", key, repo)
+}
+
+// splitList reads "a, b" or "[a, b]" (the flat frontmatter parser keeps lists as one string).
+// refactor: claude.Frontmatter could return real YAML lists, then this goes away.
+func splitList(v string) []string {
+	out := []string{}
+	for _, x := range strings.Split(strings.Trim(strings.TrimSpace(v), "[]"), ",") {
+		if x = strings.Trim(strings.TrimSpace(x), `"'`); x != "" {
+			out = append(out, x)
+		}
+	}
+	return out
 }

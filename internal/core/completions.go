@@ -235,3 +235,20 @@ func scanCommands(dir string, seen map[string]bool) []Command {
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out
 }
+
+// ListSkills returns the skills and commands of the named repos' main checkouts, then the user's (the pool a task's skill:* labels pick from).
+func (s *Service) ListSkills(repos []string) []Command {
+	seen := map[string]bool{}
+	var out []Command
+	for _, n := range repos {
+		if r, err := store.GetRepoByName(s.DB, n); err == nil {
+			out = append(out, scanCommands(filepath.Join(r.Path, ".claude"), seen)...)
+		}
+	}
+	h, _ := os.UserHomeDir()
+	out = append(out, scanCommands(filepath.Join(h, ".claude"), seen)...)
+	if out == nil {
+		out = []Command{}
+	}
+	return out
+}

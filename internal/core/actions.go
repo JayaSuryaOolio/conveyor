@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/JayaSuryaOolio/conveyor/internal/brief"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -20,6 +21,7 @@ import (
 	"github.com/JayaSuryaOolio/conveyor/internal/terminal"
 	"github.com/JayaSuryaOolio/conveyor/internal/transcript"
 	"github.com/JayaSuryaOolio/conveyor/internal/workspace"
+	"github.com/JayaSuryaOolio/conveyor/skills"
 )
 
 // Action is one thing the operator can open from the Workspace panel.
@@ -77,16 +79,35 @@ func (s *Service) UserHooks(action string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	epic, err := fs.Sub(skills.FS, "epic")
+	if err != nil {
+		return "", err
+	}
+	dir := filepath.Join(filepath.Dir(path), "skills", "epic") // ~/.claude/skills/epic
 	switch action {
 	case "status":
 	case "install", "uninstall":
 		if err := claude.SetUserHooks(path, bin, s.Home, action == "install"); err != nil {
 			return "", err
 		}
+		if err := claude.SetSkill(epic, dir, action == "install"); err != nil {
+			return "", fmt.Errorf("epic skill: %w", err)
+		}
+		if action == "install" { // seed the agent epic roots run under; never overwrites an edited one
+			if _, err := os.Stat(filepath.Join(userAgentsDir(), "epic-builder.md")); err != nil {
+				if err := s.AddAgent("epic-builder", "Runs a Conveyor epic: plans it, waits at the gate, drives its sub-tasks to PRs.", "You run an epic. Load the `epic` skill and follow it.", "user", ""); err != nil {
+					return "", fmt.Errorf("epic-builder agent: %w", err)
+				}
+			}
+		}
 	default:
 		return "", fmt.Errorf("unknown hooks action %q", action)
 	}
-	return claude.UserHooksStatus(path, bin, s.Home)
+	st, err := claude.UserHooksStatus(path, bin, s.Home)
+	if err != nil {
+		return "", err
+	}
+	return claude.SkillStatus(st, epic, dir), nil
 }
 
 // Actions lists what can be opened for a task. Without a primary worktree it returns none.

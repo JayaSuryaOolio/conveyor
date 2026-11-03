@@ -95,7 +95,27 @@ func (d *Dispatcher) Tick(ctx context.Context) error {
 	d.pollPRs(ctx)
 	d.ensureWebhook()
 	d.tickAutomations(ctx)
+	d.wakeEpics()
 	return d.launchTodo(ctx)
+}
+
+// wakeEpics requeues epic roots whose sub-tasks have all settled (docs/epic-builder.md §9).
+// It only wakes: restarting a flow is always a human decision.
+func (d *Dispatcher) wakeEpics() {
+	epics, err := store.EpicsToWake(d.DB)
+	if err != nil {
+		d.logf("wake epics: %v", err)
+		return
+	}
+	svc := &core.Service{DB: d.DB, Home: d.Home, Bin: d.ConveyorBin}
+	for _, e := range epics {
+		stage := store.EpicStage(e)
+		if _, err := svc.AddComment(e.Key, store.AuthorSystem, fmt.Sprintf("all sub-tasks settled (stage %s)", stage), core.Ask); err != nil {
+			d.logf("wake %s: %v", e.Key, err)
+			continue
+		}
+		store.Audit("epic.wake", "task_id", e.ID, "stage", stage)
+	}
 }
 
 // tickAutomations runs due automations every autoEach, off the main loop so a slow precheck never stalls launches.
@@ -309,6 +329,13 @@ func (d *Dispatcher) launchTodo(ctx context.Context) error {
 		}
 		if busy[t.ID] {
 			continue
+		}
+		if store.IsEpic(t) { // an epic waits while its sub-tasks run (R6)
+			if wait, err := store.EpicHasActiveChildren(d.DB, t); err != nil {
+				return err
+			} else if wait {
+				continue
+			}
 		}
 		if blockers, err := store.OpenBlockers(d.DB, t.ID); err != nil {
 			return err

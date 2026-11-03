@@ -563,3 +563,85 @@ func TestReapFollowsResumedSessionID(t *testing.T) {
 		t.Fatalf("run %+v", got)
 	}
 }
+
+// endedRun records a finished run of the task at the given time.
+func (e *env) endedRun(t *testing.T, task store.Task, at time.Time) {
+	t.Helper()
+	r, err := store.CreateRun(e.db, store.Run{TaskID: task.ID, Kind: "auto", Mode: "fresh", Status: "running"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	end := at.UTC().Format(time.RFC3339)
+	r.Status, r.EndedAt = "done", &end
+	if err := store.UpdateRun(e.db, r); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func (e *env) epic(t *testing.T, status store.Status) (root, child store.Task) {
+	t.Helper()
+	root = e.task(t, "Epic", 0)
+	if err := store.MakeEpic(e.db, root.ID, "os"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.StartFlow(e.db, root.ID); err != nil {
+		t.Fatal(err)
+	}
+	child, err := store.CreateTask(e.db, store.Task{Title: "Child", Status: store.StatusBacklog, ParentID: &root.ID},
+		[]store.TaskRepo{{RepoID: e.repo.ID, IsPrimary: true, Branch: "c"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.UpdateTaskStatus(e.db, root.ID, store.StatusRunning, store.ActorSystem); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.UpdateTaskStatus(e.db, root.ID, status, store.ActorSystem); err != nil {
+		t.Fatal(err)
+	}
+	return root, child
+}
+
+func TestEpicWakesWhenChildrenSettle(t *testing.T) {
+	e := setup(t)
+	root, child := e.epic(t, store.StatusNeedsYou)
+	t0 := time.Now().Add(-time.Hour)
+	e.endedRun(t, root, t0)
+
+	// A child still working: the epic stays asleep.
+	store.UpdateTaskStatus(e.db, child.ID, store.StatusTodo, store.ActorHuman)
+	store.UpdateTaskStatus(e.db, child.ID, store.StatusRunning, store.ActorSystem)
+	e.endedRun(t, child, t0.Add(time.Minute))
+	e.d.wakeEpics()
+	if got := e.get(t, root.ID); got.Status != store.StatusNeedsYou {
+		t.Fatalf("woke with a child running: %s", got.Status)
+	}
+
+	// The child settles after the epic's last run: the epic wakes once.
+	store.UpdateTaskStatus(e.db, child.ID, store.StatusReview, store.ActorSystem)
+	e.d.wakeEpics()
+	if got := e.get(t, root.ID); got.Status != store.StatusTodo {
+		t.Fatalf("not woken: %s", got.Status)
+	}
+	cs, _ := store.ListComments(e.db, root.ID)
+	if n := len(cs); n != 1 || cs[0].Body != "all sub-tasks settled (stage chart)" {
+		t.Fatalf("comments = %+v", cs)
+	}
+	// No flow restart without a human.
+	if f, _ := store.ActiveFlow(e.db, root.ID); f == nil || f.Attempt != 1 {
+		t.Fatalf("flow = %+v", f)
+	}
+}
+
+func TestEpicWaitsWhileChildrenQueued(t *testing.T) {
+	e := setup(t)
+	root, child := e.epic(t, store.StatusNeedsYou)
+	store.UpdateTaskStatus(e.db, root.ID, store.StatusTodo, store.ActorHuman)
+	store.UpdateTaskStatus(e.db, child.ID, store.StatusTodo, store.ActorHuman)
+	e.tick(t)
+	if got := e.get(t, root.ID); got.Status != store.StatusTodo {
+		t.Fatalf("epic launched beside its todo child: %s", got.Status)
+	}
+	if got := e.get(t, child.ID); got.Status != store.StatusRunning {
+		t.Fatalf("child: %s", got.Status)
+	}
+}

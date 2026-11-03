@@ -88,6 +88,7 @@ func ReviewCheck(ctx context.Context, svc *core.Service, key string, step int) (
 	if err != nil {
 		return "", err
 	}
+	store.Audit("epic.review_check", "task_id", t.ID, "step", step)
 	repos, err := store.ListRepos(svc.DB)
 	if err != nil {
 		return "", err

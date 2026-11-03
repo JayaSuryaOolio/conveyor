@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -42,16 +43,24 @@ func runHook(home string, args []string) (err error) {
 func doHook(home string, args []string, raw []byte) error {
 	if args[0] == "PreToolUse" { // the only hook that answers on stdout
 		var openErr error
-		res := hook.PreToolUse(raw, func() string {
+		withDB := func(f func(db *sql.DB)) { // opened per use: only gh commands reach here
 			db, err := store.Open(core.DBPath(home))
 			if err != nil {
 				openErr = err
-				return ""
+				return
 			}
 			defer db.Close()
-			return store.GetSetting(db, "pr_comment_prefix")
+			f(db)
+		}
+		res := hook.PreToolUse(raw, func() (pre string) {
+			withDB(func(db *sql.DB) { pre = store.GetSetting(db, "pr_comment_prefix") })
+			return
+		}, func(cwd string) (member bool) {
+			withDB(func(db *sql.DB) { member = hook.EpicMember(db, home, cwd) })
+			return
 		})
 		fmt.Fprintf(out, "%s", res)
+		hook.AuditCommand(home, raw, len(res) > 0)
 		return openErr
 	}
 	db, err := store.Open(core.DBPath(home))

@@ -224,3 +224,145 @@ func TestReviewWebhookCLI(t *testing.T) {
 		t.Fatal("still running after --stop")
 	}
 }
+
+// cvFail runs conveyor expecting a non-zero exit and returns its output.
+func cvFail(t *testing.T, home string, args ...string) string {
+	t.Helper()
+	b, err := exec.Command(bin, append([]string{"--home", home}, args...)...).CombinedOutput()
+	if err == nil {
+		t.Fatalf("conveyor %v: want failure\n%s", args, b)
+	}
+	return string(b)
+}
+
+func TestEpicCLI(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", t.TempDir())
+	repo := t.TempDir()
+	for _, args := range [][]string{{"init", "-b", "main"}, {"-c", "user.name=t", "-c", "user.email=t@t", "commit", "--allow-empty", "-m", "i"}} {
+		if b, err := exec.Command("git", append([]string{"-C", repo}, args...)...).CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, b)
+		}
+	}
+	name := filepath.Base(repo)
+	cv(t, home, "repo", "add", repo)
+
+	desc := "## Acceptance criteria\n- [ ] AC1 first\n- [ ] AC2 second\n"
+	cv(t, home, "task", "new", "Big thing", "--repo", name, "--epic", "--desc", desc)
+	if out := cvFail(t, home, "task", "new", "Clash", "--repo", name, "--epic-name", "cv-1"); !strings.Contains(out, "taken") {
+		t.Fatal(out) // default name is the lower-cased key
+	}
+	cv(t, home, "task", "new", "Build it", "--repo", name, "--parent", "CV-1", "--desc", "covers AC1", "--agent", "sse")
+	cv(t, home, "task", "label", "CV-1A", "set", "epic_kind:build")
+
+	// Checks: the child lacks epic:cv-1; AC2 is uncovered.
+	out := cvFail(t, home, "epic", "check", "CV-1")
+	for _, want := range []string{"CV-1A: missing label epic:cv-1", "AC2 is covered by no build task"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("check missing %q:\n%s", want, out)
+		}
+	}
+	out = cvFail(t, home, "epic", "check", "CV-1", "--fix")
+	if strings.Contains(out, "missing label") || !strings.Contains(out, "AC2") {
+		t.Fatalf("--fix should repair labels only:\n%s", out)
+	}
+	cv(t, home, "task", "label", "CV-1A", "set", "epic_kind:research") // prefix swap keeps epic:cv-1
+	if out := cv(t, home, "task", "show", "CV-1A"); !strings.Contains(out, "epic:cv-1") || !strings.Contains(out, "epic_kind:research") {
+		t.Fatal(out)
+	}
+
+	// Status JSON, approve, restart.
+	var st struct {
+		Stage string
+		Flow  *struct{ Attempt int }
+		Tasks []struct{ Key string }
+	}
+	if err := json.Unmarshal([]byte(cv(t, home, "epic", "status", "CV-1", "--json")), &st); err != nil || st.Stage != "chart" || st.Flow != nil || len(st.Tasks) != 1 {
+		t.Fatalf("status: %v %+v", err, st)
+	}
+	cv(t, home, "epic", "approve", "CV-1")
+	cvFail(t, home, "epic", "approve", "CV-1") // only once
+	if out := cv(t, home, "task", "show", "CV-1"); !strings.Contains(out, "epic_stage:decide") {
+		t.Fatal(out)
+	}
+	cvFail(t, home, "epic", "restart", "CV-1") // reason required
+	cv(t, home, "epic", "restart", "CV-1", "--reason", "wrong plan")
+	if out := cv(t, home, "epic", "flows", "CV-1"); !strings.Contains(out, "flow 1  abandoned") || !strings.Contains(out, "flow 2  active") {
+		t.Fatal(out)
+	}
+	if out := cv(t, home, "task", "show", "CV-1A"); !strings.Contains(out, "cancelled") {
+		t.Fatal(out) // open sub-tasks are cancelled
+	}
+	if out := cv(t, home, "task", "graph", "CV-1A"); !strings.Contains(out, "CV-1  ") || !strings.Contains(out, "(child of CV-1)") {
+		t.Fatal(out)
+	}
+}
+
+// Hook, store and CLI actions of an epic member land in audit.jsonl; epic audit filters by flow and since.
+func TestEpicAuditCLI(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", t.TempDir())
+	repo := t.TempDir()
+	for _, args := range [][]string{{"init", "-b", "main"}, {"-c", "user.name=t", "-c", "user.email=t@t", "commit", "--allow-empty", "-m", "i"}} {
+		if b, err := exec.Command("git", append([]string{"-C", repo}, args...)...).CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, b)
+		}
+	}
+	name := filepath.Base(repo)
+	cv(t, home, "repo", "add", repo)
+	cv(t, home, "task", "new", "Big thing", "--repo", name, "--epic", "--desc", "## Acceptance criteria\n- [ ] AC1 x\n")
+	cv(t, home, "task", "new", "Build it", "--repo", name, "--parent", "CV-1", "--desc", "AC1")
+	cv(t, home, "task", "label", "CV-1A", "set", "epic:cv-1")
+	cv(t, home, "epic", "approve", "CV-1") // flow 1
+
+	cwd := filepath.Join(home, "workspaces", "CV-1A")
+	os.MkdirAll(cwd, 0o755)
+	hookEvent := func(event, payload string) string {
+		c := exec.Command(bin, "--home", home, "hook", event)
+		c.Stdin = strings.NewReader(payload)
+		b, err := c.CombinedOutput()
+		if err != nil {
+			t.Fatalf("hook %s: %v\n%s", event, err, b)
+		}
+		return string(b)
+	}
+	pay := func(extra string) string { return `{"session_id":"S1","cwd":"` + cwd + `"` + extra + `}` }
+	hookEvent("UserPromptSubmit", pay(""))
+	hookEvent("PreToolUse", pay(`,"tool_name":"Bash","tool_input":{"command":"git push origin HEAD"}`))
+	if out := hookEvent("PreToolUse", pay(`,"tool_name":"Bash","tool_input":{"command":"gh pr merge 3"}`)); !strings.Contains(out, "deny") {
+		t.Fatalf("merge not denied: %s", out)
+	}
+	hookEvent("Stop", pay(`,"last_assistant_message":"<conveyor>\nstatus: done\nsummary: s\n</conveyor>"`))
+	cv(t, home, "epic", "log", "CV-1", "chose option B")
+	cv(t, home, "epic", "restart", "CV-1", "--reason", "wrong plan") // flow 2
+
+	events := func(args ...string) (ev []string) {
+		for _, l := range strings.Split(strings.TrimSpace(cv(t, home, append([]string{"epic", "audit", "CV-1A", "--json"}, args...)...)), "\n") {
+			var r map[string]any
+			if err := json.Unmarshal([]byte(l), &r); err != nil || r["root"] != "CV-1" || r["epic"] != "cv-1" {
+				t.Fatalf("bad record %q: %v", l, err)
+			}
+			ev = append(ev, r["event"].(string))
+		}
+		return
+	}
+	all := strings.Join(events(), " ")
+	for _, want := range []string{"epic.run.start", "epic.command", "epic.merge_denied", "epic.run.end", "epic.status_block", "epic.log", "epic.flow.end", "epic.flow.start"} {
+		if !strings.Contains(all, want) {
+			t.Errorf("missing %s in %s", want, all)
+		}
+	}
+	if f1 := strings.Join(events("--flow", "1"), " "); !strings.Contains(f1, "epic.run.start") || strings.Count(f1, "epic.flow.start") != 1 {
+		t.Errorf("flow 1: %s", f1)
+	}
+	if f2 := events("--flow", "2"); len(f2) != 1 || f2[0] != "epic.flow.start" {
+		t.Errorf("flow 2: %v", f2)
+	}
+	if out := cv(t, home, "epic", "audit", "CV-1", "--since", "1h"); !strings.Contains(out, "chose option B") {
+		t.Errorf("since 1h: %s", out)
+	}
+	time.Sleep(1100 * time.Millisecond)
+	if out := strings.TrimSpace(cv(t, home, "epic", "audit", "CV-1", "--since", "1s")); out != "" {
+		t.Errorf("since 1s should be empty: %s", out)
+	}
+}

@@ -18,11 +18,13 @@ export function NewTask({nav, close}: {nav: Nav; close: () => void}) {
     const [model, setModel] = useState('')
     const [agent, setAgent] = useState('')
     const [start, setStart] = useState(false)
+    const [epic, setEpic] = useState(false)
+    const [epicName, setEpicName] = useState('')
     const prim = sel.includes(primary) ? primary : sel[0] ?? ''
     const submit = () =>
         CreateTask(core.NewTaskInput.createFrom({
             Title: title, Description: desc, Repos: sel, Primary: prim,
-            Start: start, Model: model, Agent: agent, ParentKey: parent,
+            Start: start, Model: model, Agent: agent, ParentKey: parent, Epic: epic, EpicName: epicName.trim(),
         })).then(key => { setTitle(''); setDesc(''); close(); nav({name: 'task', key}) }, errMsg)
     // Picking a parent prefills repos, primary and agent from it; they stay editable. Clearing leaves them.
     const pickParent = (key: string | null) => {
@@ -46,6 +48,8 @@ export function NewTask({nav, close}: {nav: Nav; close: () => void}) {
                 <ModelSelect value={model} onChange={setModel}/>
                 <AgentSelect repos={sel} value={agent} onChange={setAgent}/>
                 <Checkbox label="Start now (todo)" checked={start} onChange={e => setStart(e.currentTarget.checked)}/>
+                <Checkbox label="Epic" checked={epic} onChange={e => setEpic(e.currentTarget.checked)}/>
+                {epic && <TextInput label="Epic name" placeholder="default: the lower-cased task key" value={epicName} onChange={e => setEpicName(e.target.value)}/>}
                 <Group justify="flex-end">
                     <Button variant="default" onClick={() => { setTitle(''); setDesc(''); close() }}>Cancel</Button>
                     <Button onClick={submit} disabled={!title.trim() || sel.length === 0}>Create</Button>

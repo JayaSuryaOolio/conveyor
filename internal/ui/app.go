@@ -15,6 +15,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/JayaSuryaOolio/conveyor/internal/audit"
 	"github.com/JayaSuryaOolio/conveyor/internal/automation"
 	"github.com/JayaSuryaOolio/conveyor/internal/core"
 	"github.com/JayaSuryaOolio/conveyor/internal/dispatch"
@@ -50,6 +51,7 @@ func (a *App) Startup(ctx context.Context) {
 		runtime.LogFatalf(ctx, "conveyor home: %v", err)
 		return
 	}
+	audit.Install(home)
 	// A Finder-launched app's stderr goes nowhere; keep a log file in the home too.
 	if f, err := core.OpenLog(core.LogPath(home)); err == nil {
 		log.SetOutput(io.MultiWriter(os.Stderr, f))
@@ -308,6 +310,20 @@ func (a *App) CreateTask(in core.NewTaskInput) (string, error) {
 	return t.Key, err
 }
 
+// EpicGraph returns the task tree around key with its links and the epic flow's PRs.
+func (a *App) EpicGraph(key string) (core.Graph, error) { return a.svc.TaskGraph(key) }
+
+// EpicApprove passes the epic's plan gate.
+func (a *App) EpicApprove(key string) error { return a.svc.EpicApprove(key) }
+
+// EpicRestart abandons the epic's flow, cancels its open sub-tasks and starts the next flow.
+func (a *App) EpicRestart(key, reason string) error { return a.svc.EpicRestart(key, reason) }
+
+// SetTaskSkills replaces the task's skill:* labels.
+func (a *App) SetTaskSkills(key string, skills []string) error {
+	return a.svc.SetTaskSkills(key, skills)
+}
+
 // AddComment posts a human comment; after ("", "ask" or "note") applies once a PR of the task is merged.
 func (a *App) AddComment(key, body, after string) error {
 	if body == "" {
@@ -492,6 +508,9 @@ func (a *App) SetAgentModel(scope, name, model string) error {
 
 // ListModels returns the Claude models the pickers offer.
 func (a *App) ListModels() core.ModelList { return a.svc.Models() }
+
+// ListSkills lists the skills the cards' skill pickers offer for the given repos.
+func (a *App) ListSkills(repos []string) []core.Command { return a.svc.ListSkills(repos) }
 
 // SetTaskAgent changes the task's agent ("" clears it).
 func (a *App) SetTaskAgent(key, agent string) error { return a.svc.SetTaskAgent(key, agent) }

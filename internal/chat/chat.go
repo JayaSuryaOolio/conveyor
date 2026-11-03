@@ -41,8 +41,8 @@ type Transport interface {
 	Listen(ctx context.Context, h func(In) string) error // one session; returns when it drops
 }
 
-// Factory builds a Transport reading its config through get (a settings getter).
-type Factory func(get func(string) string) Transport
+// Factory builds a Transport reading its config through get and saving changed config (e.g. rotated tokens) through set.
+type Factory func(get func(string) string, set func(k, v string) error) Transport
 
 type bridge struct {
 	svc  *core.Service
@@ -60,7 +60,7 @@ func (b *bridge) active(fs map[string]Factory) Transport {
 	if f == nil {
 		return nil
 	}
-	if t := f(b.setting); t.Ready() {
+	if t := f(b.setting, func(k, v string) error { return store.SetSetting(b.svc.DB, k, v) }); t.Ready() {
 		return t
 	}
 	return nil
