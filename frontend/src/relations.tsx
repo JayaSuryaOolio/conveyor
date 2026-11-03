@@ -1,6 +1,6 @@
 import {useState} from 'react'
 import {ActionIcon, Anchor, Badge, Group, Select, Stack, Text, Title, Tooltip} from '@mantine/core'
-import {IconPlus, IconTrash} from '@tabler/icons-react'
+import {IconChevronDown, IconChevronRight, IconPlus, IconTrash} from '@tabler/icons-react'
 import {AdoptChild, Link, ListTasks, SetParent, Unlink} from '../wailsjs/go/ui/App'
 import {store, ui} from '../wailsjs/go/models'
 import {Nav, StatusBadge, errMsg} from './components'
@@ -26,20 +26,38 @@ export function disabledKeys(choice: string, rel: store.Relations, tasks: ui.Tas
     return kind === 'blocks' ? [...linked, ...(from ? rel.blocked_by_all : rel.blocks_all)] : linked
 }
 
-function Row({task, nav, onRemove}: {task: store.TaskRef; nav: Nav; onRemove: () => void}) {
+type Kids = Map<string, ui.TaskCard[]>
+
+/** Task row; when the task has sub-tasks it gets a chevron that expands them nested 44px right, recursively. Collapsed shows "(2/3 subtasks DONE)". */
+// Refactor: Row/status counting could move to the backend (store.Relations children of linked tasks) if ListTasks gets heavy.
+function Row({task, nav, kids, onRemove}: {task: store.TaskRef; nav: Nav; kids: Kids; onRemove?: () => void}) {
+    const [open, setOpen] = useState(false)
+    const subs = kids.get(task.key) ?? []
+    const done = subs.filter(s => s.status === 'done').length
     return (
-        <Group gap={6} wrap="nowrap" justify="space-between">
-            <Group gap={6} wrap="nowrap" miw={0}>
-                <Anchor size="sm" component="button" ta="left" onClick={() => nav({name: 'task', key: task.key})}>{task.key}</Anchor>
-                <Text size="sm" lineClamp={1} title={task.title}>{task.title}</Text>
+        <Stack gap={2}>
+            <Group gap={6} wrap="nowrap" justify="space-between">
+                <Group gap={6} wrap="nowrap" miw={0}>
+                    {subs.length > 0
+                        ? <ActionIcon variant="subtle" color="gray" size="xs" aria-label={open ? 'Collapse sub-tasks' : 'Expand sub-tasks'} aria-expanded={open} onClick={() => setOpen(!open)}>
+                            {open ? <IconChevronDown size={14}/> : <IconChevronRight size={14}/>}
+                        </ActionIcon>
+                        : <span style={{width: 18, flex: 'none'}}/>}
+                    <Anchor size="sm" component="button" ta="left" onClick={() => nav({name: 'task', key: task.key})}>{task.key}</Anchor>
+                    <Text size="sm" lineClamp={1} title={task.title}>{task.title}</Text>
+                    {subs.length > 0 && !open && <Text size="xs" c="dimmed" style={{whiteSpace: 'nowrap'}}>({done}/{subs.length} subtasks DONE)</Text>}
+                </Group>
+                <Group gap={4} wrap="nowrap">
+                    <StatusBadge status={task.status}/>
+                    {onRemove && (
+                        <Tooltip label="Remove link">
+                            <ActionIcon variant="subtle" color="gray" size="sm" aria-label="Remove link" onClick={onRemove}><IconTrash size={14}/></ActionIcon>
+                        </Tooltip>
+                    )}
+                </Group>
             </Group>
-            <Group gap={4} wrap="nowrap">
-                <StatusBadge status={task.status}/>
-                <Tooltip label="Remove link">
-                    <ActionIcon variant="subtle" color="gray" size="sm" aria-label="Remove link" onClick={onRemove}><IconTrash size={14}/></ActionIcon>
-                </Tooltip>
-            </Group>
-        </Group>
+            {open && <Stack gap={2} ml={44}>{subs.map(c => <Row key={c.key} task={c} nav={nav} kids={kids}/>)}</Stack>}
+        </Stack>
     )
 }
 
@@ -60,24 +78,26 @@ export function Relations({k, status, rel, nav, reload}: {k: string; status: str
     const options = (tasks ?? []).filter(x => x.key !== k && !closed(x))
     const off = disabledKeys(choice, rel, options)
     const hasParent = new Set(choice === 'parent' ? options.filter(t => t.parent && !rel.children.some(c => c.key === t.key)).map(t => t.key) : [])
+    const kids: Kids = new Map()
+    for (const t of tasks ?? []) if (t.parent) kids.set(t.parent, [...(kids.get(t.parent) ?? []), t])
     const byKey = new Map(options.map(t => [t.key, t]))
     const labels = [...new Set(rel.links.map(l => l.label))]
     return (
         <Stack gap="xs">
             <Title order={5}>Relations</Title>
             {status === 'todo' && blockers.length > 0 && <Text size="xs" c="orange">Not launched: blocked by {blockers.map(l => l.task.key).join(', ')}</Text>}
-            {rel.parent && <Stack gap={2}><Text size="xs" c="dimmed">Parent</Text><Row task={rel.parent} nav={nav} onRemove={() => done(SetParent(k, ''))}/></Stack>}
+            {rel.parent && <Stack gap={2}><Text size="xs" c="dimmed">Parent</Text><Row task={rel.parent} nav={nav} kids={kids} onRemove={() => done(SetParent(k, ''))}/></Stack>}
             {rel.children.length > 0 && (
                 <Stack gap={2}>
                     <Text size="xs" c="dimmed">Sub-tasks</Text>
-                    {rel.children.map(c => <Row key={c.key} task={c} nav={nav} onRemove={() => done(SetParent(c.key, ''))}/>)}
+                    {rel.children.map(c => <Row key={c.key} task={c} nav={nav} kids={kids} onRemove={() => done(SetParent(c.key, ''))}/>)}
                 </Stack>
             )}
             {labels.map(label => (
                 <Stack key={label} gap={2}>
                     <Text size="xs" c="dimmed">{label}</Text>
                     {rel.links.filter(l => l.label === label).map(l => (
-                        <Row key={l.kind + l.task.key} task={l.task} nav={nav}
+                        <Row key={l.kind + l.task.key} task={l.task} nav={nav} kids={kids}
                              onRemove={() => done(l.from ? Unlink(k, l.kind, l.task.key) : Unlink(l.task.key, l.kind, k))}/>
                     ))}
                 </Stack>
