@@ -8,10 +8,10 @@ import (
 // ReviewWebhooksApp is the bundled app's name; installing it (Apps screen) turns on event-driven review checks for epic tasks.
 const ReviewWebhooksApp = "Review webhooks"
 
-// ReviewWebhooksInstalled reports whether the app is installed.
+// ReviewWebhooksInstalled reports whether the app is installed and enabled.
 func (s *Service) ReviewWebhooksInstalled() bool {
-	_, err := store.GetApp(s.DB, ReviewWebhooksApp)
-	return err == nil
+	a, err := store.GetApp(s.DB, ReviewWebhooksApp)
+	return err == nil && !a.Disabled
 }
 
 // AddReviewWebhooks installs the bundled manifest (the same path as importing an app).

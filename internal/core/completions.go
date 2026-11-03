@@ -150,7 +150,7 @@ func (s *Service) FileOpeners(key, ref string) ([]string, error) {
 	}
 	out := []string{}
 	for _, a := range apps {
-		if slices.Contains(editorApps, a.Name) {
+		if !a.Disabled && slices.Contains(editorApps, a.Name) {
 			out = append(out, a.Name)
 		}
 	}

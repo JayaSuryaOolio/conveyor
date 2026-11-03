@@ -113,6 +113,9 @@ func (s *Service) OpenApp(name, key, repo string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	if a.Disabled {
+		return "", fmt.Errorf("app %q is disabled", name)
+	}
 	cwd, err := s.WorktreePath(key, repo)
 	if err != nil {
 		return "", err

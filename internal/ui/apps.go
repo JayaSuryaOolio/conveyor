@@ -52,6 +52,11 @@ func (a *App) InstallManifest(raw string, replace bool) error {
 	return err
 }
 
+// SetAppDisabled turns an app off or on; its manifest stays so it can be re-enabled in one click.
+func (a *App) SetAppDisabled(name string, disabled bool) error {
+	return store.SetAppDisabled(a.svc.DB, name, disabled)
+}
+
 // ExportApp saves the manifest JSON of a manifest app to a file the user picks and returns its path ("" if cancelled).
 func (a *App) ExportApp(name string) (string, error) {
 	raw, err := a.svc.ExportApp(name)
