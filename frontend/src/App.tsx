@@ -1,4 +1,5 @@
-import {useEffect, useRef, useState} from 'react'
+import {useEffect, useMemo, useRef, useState} from 'react'
+import {useLocation, useNavigate} from 'react-router'
 import {ActionIcon, AppShell, Badge, Box, Button, Group, Kbd, NavLink, Stack, Text, Title, Tooltip} from '@mantine/core'
 import {useLocalStorage} from '@mantine/hooks'
 import {IconApps, IconBolt, IconArrowLeft, IconBook2, IconClock, IconLayoutKanban, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconLogs, IconPlus, IconRobot, IconSettings, IconSitemap} from '@tabler/icons-react'
@@ -14,6 +15,7 @@ import {Logs} from './logs'
 import {CommandPalette} from './palette'
 import {useData} from './util'
 import {NavContext} from './markdown'
+import {fromLocation, toPath} from './router'
 import {Board, Focus, TaskPage} from './views'
 
 // `label` on a view: the board filtered by that label ("Epics" = label:epic).
@@ -29,13 +31,14 @@ const NAV: {name: string; key?: string; label: string; icon: typeof IconBolt; fi
     {name: 'settings', label: 'Settings', icon: IconSettings},
 ]
 
-const HISTORY_MAX = 50 // ponytail: in-memory only; persist to localStorage if history should survive reloads
-
 export default function App() {
-    // refactor: view + history could move into a small useHistory hook / router if more screens need deep links
-    const [{view, past}, hist] = useState<{view: View; past: View[]}>({view: {name: 'board'}, past: []})
-    const setView = (v: View) => hist(s => !v.label && !v.repo && s.view.name === v.name && s.view.key === v.key ? s : {view: v, past: [...s.past, s.view].slice(-HISTORY_MAX)})
-    const back = () => hist(s => s.past.length ? {view: s.past[s.past.length - 1], past: s.past.slice(0, -1)} : s)
+    // History lives in react-router (hash history); views map to URLs in router.ts.
+    const loc = useLocation()
+    const navigate = useNavigate()
+    const view = useMemo(() => fromLocation(loc), [loc]) // new object per navigation, so re-picking a board filter re-applies it
+    const canBack = (window.history.state?.idx ?? 0) > 0
+    const setView = (v: View) => { const to = toPath(v); if (to !== viewRef.current.path) navigate(to) }
+    const back = () => { if (window.history.state?.idx > 0) navigate(-1) }
     const [showNew, setShowNew] = useState(false)
     const [q, setQ] = useState('')
     const search = useRef<HTMLInputElement>(null)
@@ -45,8 +48,8 @@ export default function App() {
     const proposed = learnings?.filter(l => l.status === 'proposed').length ?? 0
     const {data: version} = useData(AppVersion, [])
     const nav: Nav = v => setView(v)
-    const viewRef = useRef(view)
-    viewRef.current = view
+    const viewRef = useRef({view, path: ''})
+    viewRef.current = {view, path: loc.pathname + loc.search}
 
     useEffect(() => {
         const poll = () => DispatcherState().then(setDispatcher, () => {})
@@ -69,7 +72,7 @@ export default function App() {
                 return
             }
             if (e.key === 'n') { e.preventDefault(); setShowNew(true) }
-            else if (e.key === 'e' && viewRef.current.name === 'task') { e.preventDefault(); setView({name: 'epic', key: viewRef.current.key}) } // epic view of the open task's tree
+            else if (e.key === 'e' && viewRef.current.view.name === 'task') { e.preventDefault(); setView({name: 'epic', key: viewRef.current.view.key}) } // epic view of the open task's tree
             else if (e.key === '/') { e.preventDefault(); search.current?.focus() } // only the board mounts the input; refactor: move q+ref into Board
             else if (e.key === 'g') { g = true; setTimeout(() => (g = false), 1000) }
         }
@@ -85,7 +88,7 @@ export default function App() {
                     <Group justify={mini ? 'center' : 'space-between'} wrap="nowrap">
                         {!mini && <Group gap={4} wrap="nowrap">
                             <Tooltip label="Back (⌘[)" position="right">
-                                <ActionIcon variant="subtle" color="gray" aria-label="Back" disabled={!past.length} onClick={back}><IconArrowLeft size={18}/></ActionIcon>
+                                <ActionIcon variant="subtle" color="gray" aria-label="Back" disabled={!canBack} onClick={back}><IconArrowLeft size={18}/></ActionIcon>
                             </Tooltip>
                             <Title order={4}>Conveyor</Title>
                         </Group>}
@@ -122,7 +125,7 @@ export default function App() {
                 {view.name === 'board' && <Board nav={nav} q={q} setQ={setQ} search={search} link={view}/>}
                 {view.name === 'focus' && <Focus nav={nav}/>}
                 {view.name === 'task' && <TaskPage k={view.key!} nav={nav}/>}
-                {view.name === 'epic' && <EpicView k={view.key!} nav={nav}/>}
+                {view.name === 'epic' && <EpicView k={view.key!} task={view.task} nav={nav}/>}
                 {view.name === 'learnings' && <LearningsPage nav={nav}/>}
                 {view.name === 'automations' && <Automations/>}
                 {view.name === 'apps' && <Apps/>}

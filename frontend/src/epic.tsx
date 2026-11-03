@@ -12,8 +12,6 @@ import {CARD, layout} from './epicLayout'
 import {useData} from './util'
 import {TaskPage} from './views'
 
-// refactor: the modal-open state is local; a router (see App.tsx useHistory note) would give a real deep link like /epic/KEY/task/KEY.
-
 const STAGES = ['chart', 'decide', 'spec', 'build', 'verify', 'done']
 const KINDS = ['grilling', 'prototype', 'research', 'build']
 const KIND_COLOR: Record<string, string> = {grilling: 'orange', prototype: 'grape', research: 'teal', build: 'blue'}
@@ -162,10 +160,11 @@ function Header({g, nav, root}: {g: core.Graph; nav: Nav; root: core.GraphNode})
 }
 
 /** The epic view: the whole tree of key's root on a canvas, live on db:changed (useData reloads). */
-export function EpicView({k, nav}: {k: string; nav: Nav}) {
+/** `task` is the key in the URL (/epic/KEY/task/KEY): the open task modal, so it deep-links and Back closes it. */
+export function EpicView({k, task = '', nav}: {k: string; task?: string; nav: Nav}) {
     const {data: g, error} = useData(() => EpicGraph(k), [k])
     const [adding, setAdding] = useState('')
-    const [task, setTask] = useState('') // key shown in the task modal
+    const setTask = (t: string) => nav({name: 'epic', key: k, task: t || undefined})
     const [title, setTitle] = useState('')
     const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
     const dragged = useRef(new Map<string, {x: number; y: number}>()) // a dragged card keeps its spot across live reloads
@@ -213,7 +212,7 @@ export function EpicView({k, nav}: {k: string; nav: Nav}) {
                 </Box>
                 <Modal opened={!!task} onClose={() => setTask('')} size="min(1200px, 96vw)" padding="sm" title={task}>
                     {/* the same task page, so agent/model/skills edit here; navigating away from it closes the modal */}
-                    {task && <TaskPage k={task} height="calc(100vh - 140px)" nav={v => { setTask(''); nav(v) }}/>}
+                    {task && <TaskPage k={task} height="calc(100vh - 140px)" nav={nav}/>}
                 </Modal>
                 <Modal opened={!!adding} onClose={() => setAdding('')} title={`New sub-task of ${adding}`}>
                     <form onSubmit={e => { e.preventDefault(); if (title.trim()) create() }}>
