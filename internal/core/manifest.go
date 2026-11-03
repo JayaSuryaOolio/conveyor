@@ -541,10 +541,10 @@ func (s *Service) resolveAction(app, id, key string) (*ManifestAction, map[strin
 	return act, vars, cwd, nil
 }
 
-// spotlightService detects and stops the spotlight instance mirroring ${{ worktree.path }}:
-// `spotlight list` prints "ROOT  <-  WORKTREE  (pid N)" and stop takes the root.
-func spotlightService() ManifestService {
-	bin := shq(spotlightBin())
+// graftService detects and stops the graft instance mirroring ${{ worktree.path }}:
+// `graft list` prints "ROOT  <-  WORKTREE  (pid N)" and stop takes the root.
+func graftService() ManifestService {
+	bin := shq(graftBin())
 	root := bin + ` list | awk -v w=${{ worktree.path }} -F '  <-  ' '{sub(/  \(pid [0-9]+\)$/, "", $2); if ($2 == w) print $1}'`
 	return ManifestService{Status: root + " | grep -q .", Stop: `r=$(` + root + `); [ -n "$r" ] && ` + bin + ` stop "$r"`}
 }
@@ -556,8 +556,8 @@ func LegacyManifest(a store.App) (string, error) {
 	place := "task_sidebar"
 	run := strings.NewReplacer("{cwd}", "${{ worktree.path }}", "{key}", "${{ task.key }}").Replace(a.Command)
 	act := ManifestAction{ID: "open", Label: a.Name, Run: run, Places: []string{place}, Output: a.Output, IconPath: appBundle(a.Command)}
-	if a.Name == "Spotlight" && !a.Output {
-		act.Services = map[string]ManifestService{place: spotlightService()}
+	if a.Name == "Graft" && !a.Output {
+		act.Services = map[string]ManifestService{place: graftService()}
 	}
 	b, err := json.MarshalIndent(Manifest{Version: ManifestVersion, Name: a.Name, Actions: []ManifestAction{act}}, "", "  ")
 	return string(b), err

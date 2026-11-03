@@ -157,11 +157,11 @@ func (a *App) AppIcons() (map[string]string, error) {
 	return core.AppIcons(a.svc.Home, apps), nil
 }
 
-// SpotlightRoot returns the root checkout spotlight mirrors worktree into, "" when inactive for it.
-func (a *App) SpotlightRoot(worktree string) string { return core.SpotlightRoot(worktree) }
+// GraftRoot returns the root checkout graft mirrors worktree into, "" when inactive for it.
+func (a *App) GraftRoot(worktree string) string { return core.GraftRoot(worktree) }
 
-// SpotlightStop stops the spotlight instance mirroring into root.
-func (a *App) SpotlightStop(root string) error { return core.SpotlightStop(root) }
+// GraftStop stops the graft instance mirroring into root.
+func (a *App) GraftStop(root string) error { return core.GraftStop(root) }
 
 // UserHooks reports or changes Conveyor's hooks in ~/.claude/settings.json ("status", "install", "uninstall").
 func (a *App) UserHooks(action string) (string, error) { return a.svc.UserHooks(action) }

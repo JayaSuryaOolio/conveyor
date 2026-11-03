@@ -35,12 +35,12 @@ func TestAppPresets(t *testing.T) {
 	}
 }
 
-func TestSpotlightRoot(t *testing.T) {
+func TestGraftRoot(t *testing.T) {
 	list := "/r/a  <-  /w/one two  (pid 12)\n/r/b  <-  /w/three  (pid 3)\n"
-	if got := spotlightRoot(list, "/w/one two"); got != "/r/a" {
+	if got := graftRoot(list, "/w/one two"); got != "/r/a" {
 		t.Fatal(got)
 	}
-	if spotlightRoot(list, "/w/other") != "" || spotlightRoot("no spotlight instances running\n", "/w/three") != "" {
+	if graftRoot(list, "/w/other") != "" || graftRoot("no graft instances running\n", "/w/three") != "" {
 		t.Fatal("matched inactive worktree")
 	}
 }
@@ -242,12 +242,12 @@ func TestServiceManifest(t *testing.T) {
 	if err := s.StopAppService("Multi", "a", "board_card", ""); err == nil {
 		t.Fatal("stopped a missing service")
 	}
-	// a fake spotlight CLI listing one instance: status and stop must find the root by worktree
+	// a fake graft CLI listing one instance: status and stop must find the root by worktree
 	dir := t.TempDir()
 	log := filepath.Join(dir, "stopped")
-	os.WriteFile(filepath.Join(dir, "spotlight"), []byte("#!/bin/sh\nif [ \"$1\" = list ]; then echo '/r/a  <-  /w/one two  (pid 12)'; else echo \"$2\" > "+log+"; fi\n"), 0o755)
+	os.WriteFile(filepath.Join(dir, "graft"), []byte("#!/bin/sh\nif [ \"$1\" = list ]; then echo '/r/a  <-  /w/one two  (pid 12)'; else echo \"$2\" > "+log+"; fi\n"), 0o755)
 	t.Setenv("PATH", dir+":"+os.Getenv("PATH"))
-	sv := spotlightService()
+	sv := graftService()
 	run := func(script, wt string) error {
 		return exec.Command("sh", "-c", RenderManifest(script, map[string]string{"worktree.path": wt})).Run()
 	}

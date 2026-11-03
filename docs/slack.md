@@ -16,7 +16,7 @@ Not configurable yet: destination (always a DM to `slack_user_id`) and per-featu
 
 ## Slack
 
-Slack is **not** an "app" in the Spotlight/Graft sense. Apps (`internal/core/apps.go`) are *outbound
+Slack is **not** an "app" in the Graft sense. Apps (`internal/core/apps.go`) are *outbound
 launchers*: Conveyor runs a command against a worktree. Slack is a *two-way client of Conveyor*: it
 reacts to task events and sends commands back. That is the shape of the Jira importer and the
 dispatcher, so it lives in `internal/slack` and runs inside the dispatcher (daemon or desktop app).
