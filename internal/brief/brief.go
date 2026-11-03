@@ -163,6 +163,10 @@ func Build(db *sql.DB, task store.Task) (string, error) {
 		}
 		fmt.Fprintf(&b, "- %s: %s (branch `%s`, PR: %s)\n", r.RepoName, deref(r.WorktreePath), r.Branch, pr)
 	}
+	if len(task.Repos) > 1 {
+		// Claude Code's own prompt says to stay in its cwd, the primary worktree; this overrides that.
+		b.WriteString("\nThe session starts in one of these worktrees, but every worktree above is yours: change whichever ones the task needs, one or all of them, using absolute paths or `git -C <path>`. Commit, push and open a PR from each worktree you change.\n")
+	}
 	desc := strings.TrimSpace(task.Description)
 	if desc == "" {
 		desc = "(none)"
