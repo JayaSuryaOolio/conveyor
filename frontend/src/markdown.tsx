@@ -31,8 +31,8 @@ const LIST_LINE = /^\s*([-*+]|\d+\.)\s/
 
 let uploads = 0
 
-/** The @file or /command being typed just before the caret, if any. */
-const TRIGGER = /(^|\s)([@/])([^\s@]*)$/
+/** The @file, /command or task key prefix (CV-) being typed just before the caret, if any. */
+const TRIGGER = /(^|\s)(@|\/|[A-Z][A-Z0-9]*-)([^\s@]*)$/
 
 /** Asks the backend for the token's suggestions (it streams git ls-files per query); stale replies are dropped. */
 function useSuggestions(key: string, repos: string[]) {
@@ -40,7 +40,7 @@ function useSuggestions(key: string, repos: string[]) {
     const seq = useRef(0)
     const query = (t: {kind: string; q: string} | null) => {
         const n = ++seq.current
-        if (!t || (!key && !repos.length)) { setItems([]); return }
+        if (!t || (!key && !repos.length && !t.kind.endsWith('-'))) { setItems([]); return }
         Complete(key, repos, t.kind, t.q).then(r => { if (n === seq.current) setItems(r ?? []) }, () => {})
     }
     return [items, query] as const
@@ -71,14 +71,14 @@ export function MarkdownEditor({value, onChange, onSubmit, submitLabel = 'Send',
     const items = trig ? found : []
     const track = (t: HTMLTextAreaElement) => {
         const m = t.selectionStart === t.selectionEnd ? TRIGGER.exec(t.value.slice(0, t.selectionStart)) : null
-        const next = m ? {kind: m[2], q: m[3], at: t.selectionStart - m[3].length - 1} : null
+        const next = m ? {kind: m[2], q: m[3], at: t.selectionStart - m[3].length - m[2].length} : null
         if (next?.kind !== trig?.kind || next?.q !== trig?.q || next?.at !== trig?.at) setTrig(next)
         setHi(0)
     }
     const pick = (i: core.Suggestion) => {
         if (!trig) return
         const t = ref.current
-        const end = trig.at + 1 + trig.q.length
+        const end = trig.at + trig.kind.length + trig.q.length
         apply(v => ({value: v.slice(0, trig.at) + i.insert + ' ' + v.slice(end), start: trig.at + i.insert.length + 1, end: trig.at + i.insert.length + 1}))
         setTrig(null)
         t?.focus()
@@ -188,7 +188,7 @@ export function MarkdownEditor({value, onChange, onSubmit, submitLabel = 'Send',
                             <Group key={i.insert} gap="xs" wrap="nowrap" px="xs" py={2} style={{cursor: 'pointer', borderRadius: 4}}
                                    bg={n === hi ? 'var(--mantine-color-default-hover)' : undefined}
                                    onMouseEnter={() => setHi(n)} onMouseDown={e => { e.preventDefault(); pick(i) }}>
-                                <Text size="sm" ff="monospace" c={trig?.kind === '@' ? 'blue' : 'violet'} truncate={trig?.kind === '@' ? 'start' : 'end'} style={{flex: 'none', maxWidth: '100%'}}><span dir="ltr">{i.label}</span></Text>
+                                <Text size="sm" ff="monospace" c={trig?.kind === '/' ? 'violet' : 'blue'} truncate={trig?.kind === '@' ? 'start' : 'end'} style={{flex: 'none', maxWidth: '100%'}}><span dir="ltr">{i.label}</span></Text>
                                 {i.hint && <Text size="xs" c="dimmed" truncate>{i.hint}</Text>}
                             </Group>
                         ))}
@@ -198,7 +198,7 @@ export function MarkdownEditor({value, onChange, onSubmit, submitLabel = 'Send',
                     {value.trim() ? <Markdown>{value}</Markdown> : <Text size="sm" c="dimmed">Nothing to preview</Text>}
                 </Stack>}
             <Group justify="space-between" wrap="nowrap" px="xs" py={6} style={{borderTop: '1px solid var(--mantine-color-default-border)'}}>
-                <Text size="xs" c="dimmed">{pending ? 'Uploading…' : <>Markdown supported · @ files · / commands · paste or drop images{onSubmit && ' · ⌘↵ to send'}</>}</Text>
+                <Text size="xs" c="dimmed">{pending ? 'Uploading…' : <>Markdown supported · @ files · / commands · CV- tasks · paste or drop images{onSubmit && ' · ⌘↵ to send'}</>}</Text>
                 {onSubmit && <Button size="compact-sm" onClick={submit} loading={submitting} disabled={!canSubmit || pending > 0}>{submitLabel}</Button>}
             </Group>
         </Box>

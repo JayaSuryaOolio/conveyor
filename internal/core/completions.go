@@ -74,9 +74,13 @@ func match(s, q string) int {
 }
 
 // Complete returns up to 8 suggestions for the token being typed: kind "@" matches tracked
-// files, "/" matches skills and commands (the repos' first, then the user's). Prefix matches
+// files, a kind ending in "-" (a task key prefix like "CV-") matches task keys and titles,
+// "/" matches skills and commands (the repos' first, then the user's). Prefix matches
 // rank before substring matches. Files are streamed from git ls-files per call, never cached.
 func (s *Service) Complete(key string, repos []string, kind, q string) ([]Suggestion, error) {
+	if strings.HasSuffix(kind, "-") {
+		return s.completeTasks(kind, q)
+	}
 	dirs, err := s.refDirs(key, repos)
 	if err != nil {
 		return nil, err
@@ -134,6 +138,27 @@ func (s *Service) Complete(key string, repos []string, kind, q string) ([]Sugges
 	out := append(best, rest...)
 	if len(out) > maxSuggestions {
 		out = out[:maxSuggestions]
+	}
+	return out, nil
+}
+
+// completeTasks suggests tasks whose key starts with prefix (e.g. "CV-") and whose key suffix or
+// title contains q, newest key first is not guaranteed: order follows store.ListTasks.
+func (s *Service) completeTasks(prefix, q string) ([]Suggestion, error) {
+	ts, err := store.ListTasks(s.DB)
+	if err != nil {
+		return nil, err
+	}
+	prefix, q = strings.ToUpper(prefix), strings.ToLower(q)
+	out := []Suggestion{}
+	for _, t := range ts {
+		rest, ok := strings.CutPrefix(t.Key, prefix)
+		if !ok || !(strings.Contains(strings.ToLower(rest), q) || strings.Contains(strings.ToLower(t.Title), q)) {
+			continue
+		}
+		if out = append(out, Suggestion{Insert: t.Key, Label: t.Key, Hint: t.Title}); len(out) == maxSuggestions {
+			break
+		}
 	}
 	return out, nil
 }
