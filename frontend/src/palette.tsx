@@ -3,39 +3,13 @@ import {ActionIcon, Badge, Group, Text, Tooltip} from '@mantine/core'
 import {Spotlight, spotlight} from '@mantine/spotlight'
 import '@mantine/spotlight/styles.css'
 import {IconFilter, IconLayoutKanban, IconRefresh, IconRobot, IconSearch, IconSettings} from '@tabler/icons-react'
-import {ListAgents, ListRepos, ListTasks} from '../wailsjs/go/ui/App'
 import {Nav} from './components'
 import {SETTING_LABELS} from './forms'
+import {load, Raw} from './paletteCache'
 
 type Item = {id: string; label: string; hint: string; go: () => void}
 
-const CACHE_KEY = 'palette-cache-v2'
-const TTL = 24 * 3600 * 1000
 const PER_GROUP = 20
-type Raw = {
-    tasks: {key: string; title: string; status: string}[]
-    agents: {name: string; scope: string; description: string}[]
-    labels: string[]
-    repos: string[]
-}
-
-/** Board items and agents are fetched once a day (or on the reload button); settings are static. */
-async function load(force: boolean): Promise<Raw> {
-    try {
-        const c = JSON.parse(localStorage.getItem(CACHE_KEY) ?? 'null')
-        if (!force && c && Date.now() - c.at < TTL) return c.raw
-    } catch {}
-    const repos = (await ListRepos()).map(r => r.name)
-    const [tasks, agents] = await Promise.all([ListTasks(), ListAgents(repos)])
-    const raw: Raw = {
-        tasks: tasks.filter(t => t.status !== 'done' && t.status !== 'cancelled').map(t => ({key: t.key, title: t.title, status: t.status})),
-        agents: agents.map(a => ({name: a.name, scope: a.scope, description: a.description})),
-        labels: [...new Set(tasks.flatMap(t => t.labels))].sort(),
-        repos: repos.sort(),
-    }
-    try { localStorage.setItem(CACHE_KEY, JSON.stringify({at: Date.now(), raw})) } catch {}
-    return raw
-}
 
 export function CommandPalette({nav}: {nav: Nav}) {
     const [raw, setRaw] = useState<Raw>()
