@@ -52,6 +52,11 @@ func (a *App) InstallManifest(raw string, replace bool) error {
 	return err
 }
 
+// SetAppDisabled turns an app off or on; its manifest stays so it can be re-enabled in one click.
+func (a *App) SetAppDisabled(name string, disabled bool) error {
+	return store.SetAppDisabled(a.svc.DB, name, disabled)
+}
+
 // ExportApp saves the manifest JSON of a manifest app to a file the user picks and returns its path ("" if cancelled).
 func (a *App) ExportApp(name string) (string, error) {
 	raw, err := a.svc.ExportApp(name)
@@ -160,3 +165,9 @@ func (a *App) SpotlightStop(root string) error { return core.SpotlightStop(root)
 
 // UserHooks reports or changes Conveyor's hooks in ~/.claude/settings.json ("status", "install", "uninstall").
 func (a *App) UserHooks(action string) (string, error) { return a.svc.UserHooks(action) }
+
+// ReviewWebhooksInstalled reports whether the review-webhooks app is installed.
+func (a *App) ReviewWebhooksInstalled() bool { return a.svc.ReviewWebhooksInstalled() }
+
+// AddReviewWebhooks installs the bundled review-webhooks app; epic tasks then get review events pushed.
+func (a *App) AddReviewWebhooks() error { return a.svc.AddReviewWebhooks() }

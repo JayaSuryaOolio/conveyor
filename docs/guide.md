@@ -227,6 +227,10 @@ Not yet: app hooks (an app reacting to task events). Later, Claude itself could 
 
 For tasks in review, every 60 seconds Conveyor runs `gh pr list --head <branch>` in each repo and stores the PR URL and state. If every PR is merged or closed and at least one merged, the task moves to done. If every PR was closed without merging, a system comment is added and the task goes to needs_you. `conveyor task sync KEY` does this once, on demand. You can also attach a PR by hand: `conveyor task set KEY --repo r --pr URL`.
 
+### Review webhooks (opt-in)
+
+PR review checks run on push and a backoff (30 min, 2 h, 8 h). For instant checks on epic tasks (label `epic` or `epic:<name>`), add the bundled **Review webhooks** app on the Apps screen (or `conveyor app install apps/review-webhooks.json`). Once installed, Conveyor starts `conveyor review-webhook` itself: a listener on `127.0.0.1` (random port, pid in `<home>/review-webhook.pid`, log `logs/review-webhook.log`) plus one `gh webhook forward` per repo with an open epic PR (needs `gh extension install cli/gh-webhook` and admin on the repo; GitHub allows one forward per repo). A review or review comment schedules that task's check for now. Without the app or the extension, epics keep the timed checks. `--status` exits 0 when running; `--stop` stops it (Conveyor restarts it within a minute while the app is installed; uninstall the app to opt out).
+
 ## Settings
 
 Settings are in the app (Settings page) or `conveyor config list|get|set`.
@@ -270,6 +274,7 @@ conveyor learning list|accept|reject|edit|apply
 conveyor automation list|add|enable|disable|run|rm
 conveyor app list|presets|add|rm|open
 conveyor hooks status|install|uninstall
+conveyor review-webhook [--status|--stop]      # opt-in review-webhooks app (see Apps)
 conveyor config list | get <key> | set <key> <value>
 conveyor state export [file] | import <file> [--repo A=name ...]
 conveyor --home <empty dir> mock seed          # mock repos, tasks, settings, apps, automations (fixtures: internal/core/mock.go)

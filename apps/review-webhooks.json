@@ -1,0 +1,4 @@
+{"version":2,"name":"Review webhooks",
+ "actions":[{"id":"forward","label":"Review webhooks","places":["global_nav"],
+   "run":"conveyor review-webhook",
+   "services":{"global_nav":{"status":"conveyor review-webhook --status","stop":"conveyor review-webhook --stop"}}}]}

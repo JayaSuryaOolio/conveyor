@@ -189,6 +189,42 @@ func TestCLIModels(t *testing.T) {
 	}
 }
 
+func TestReviewWebhookCLI(t *testing.T) {
+	home, ghDir := t.TempDir(), t.TempDir()
+	run := func() ([]byte, error) {
+		return exec.Command(bin, "--home", home, "review-webhook").CombinedOutput()
+	}
+	t.Setenv("PATH", ghDir+":/usr/bin:/bin")
+
+	// gh without the extension: a clear error, nothing started
+	os.WriteFile(filepath.Join(ghDir, "gh"), []byte("#!/bin/sh\nexit 1\n"), 0o755)
+	if b, err := run(); err == nil || !strings.Contains(string(b), "gh extension install cli/gh-webhook") {
+		t.Fatalf("want missing-extension error, got %v: %s", err, b)
+	}
+	if _, err := exec.Command(bin, "--home", home, "review-webhook", "--status").CombinedOutput(); err == nil {
+		t.Fatal("status ok with nothing running")
+	}
+
+	// gh with the extension (forward just sleeps): start, status, stop
+	os.WriteFile(filepath.Join(ghDir, "gh"), []byte("#!/bin/sh\n[ \"$3\" = --help ] && exit 0\nsleep 30\n"), 0o755)
+	if b, err := run(); err != nil {
+		t.Fatalf("start: %v: %s", err, b)
+	}
+	for i := 0; i < 50 && runningPID(home) == 0; i++ {
+		time.Sleep(100 * time.Millisecond)
+	}
+	if out := cv(t, home, "review-webhook", "--status"); !strings.Contains(out, "running") {
+		t.Fatal(out)
+	}
+	cv(t, home, "review-webhook", "--stop")
+	for i := 0; i < 50 && runningPID(home) != 0; i++ {
+		time.Sleep(100 * time.Millisecond)
+	}
+	if runningPID(home) != 0 {
+		t.Fatal("still running after --stop")
+	}
+}
+
 // cvFail runs conveyor expecting a non-zero exit and returns its output.
 func cvFail(t *testing.T, home string, args ...string) string {
 	t.Helper()

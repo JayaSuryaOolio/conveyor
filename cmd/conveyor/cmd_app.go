@@ -15,13 +15,13 @@ import (
 )
 
 func init() {
-	register("app", runApp, "open worktrees in external apps, run quick actions (list|presets|add|install|export|convert|run|output|rm|open)")
+	register("app", runApp, "open worktrees in external apps, run quick actions (list|presets|add|install|export|convert|run|output|enable|disable|rm|open)")
 	register("hooks", runHooks, "Claude Code hooks in ~/.claude/settings.json (status|install|uninstall)")
 }
 
 const appUsage = `usage: conveyor app list [--json] | presets [--json] | add NAME [--command CMD] [--output] | add --from-app NAME [--replace]
        conveyor app install FILE|- [--replace] (manifest JSON; - reads stdin) | export NAME [FILE] | convert NAME | run APP ACTION [KEY] [--place p]
-       conveyor app output NAME on|off | rm NAME
+       conveyor app output NAME on|off | enable NAME | disable NAME | rm NAME
        conveyor app open NAME [KEY|DIR] [--repo r] [--print]
 CMD is a shell command; {cwd} becomes the quoted worktree path and {key} the task key ('' without one).
 add without --command uses the preset of that name.
@@ -105,6 +105,11 @@ func runApp(home string, args []string) error {
 			}
 			a.Output = pos[1] == "on"
 			return store.UpdateApp(s.DB, a)
+		case "enable", "disable":
+			if len(pos) != 1 {
+				return errors.New(appUsage)
+			}
+			return store.SetAppDisabled(s.DB, pos[0], cmd == "disable")
 		case "rm":
 			if len(pos) != 1 {
 				return errors.New(appUsage)
@@ -202,6 +207,9 @@ func printApps(as []store.App) error {
 	for _, a := range as {
 		if a.Manifest != "" {
 			a.Command = "(manifest)"
+		}
+		if a.Disabled {
+			a.Command += " (disabled)"
 		}
 		fmt.Fprintf(tw, "%s\t%v\t%s\n", a.Name, a.Output, a.Command)
 	}

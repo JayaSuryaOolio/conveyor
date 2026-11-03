@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -42,6 +43,7 @@ type Dispatcher struct {
 
 	lastPoll time.Time
 	lastAuto time.Time
+	lastHook time.Time
 	autoBusy atomic.Bool // an automation pass is in flight (prechecks can take a minute)
 }
 
@@ -91,6 +93,7 @@ func (d *Dispatcher) Tick(ctx context.Context) error {
 		d.logf("reap: %v", err)
 	}
 	d.pollPRs(ctx)
+	d.ensureWebhook()
 	d.tickAutomations(ctx)
 	d.wakeEpics()
 	return d.launchTodo(ctx)
@@ -286,6 +289,19 @@ func (d *Dispatcher) pollPRs(ctx context.Context) {
 		if got, err := store.GetTask(d.DB, t.ID); err == nil && got.Status == store.StatusDone {
 			(&core.Service{DB: d.DB}).CleanupSessions(t.ID)
 		}
+	}
+}
+
+// ensureWebhook starts the review-webhook listener once the app is installed (a no-op when it already runs).
+// Without the app or the gh extension, epics keep the backoff checks.
+func (d *Dispatcher) ensureWebhook() {
+	if d.ConveyorBin == "" || !d.lastHook.IsZero() && d.now().Sub(d.lastHook) < time.Minute ||
+		!(&core.Service{DB: d.DB}).ReviewWebhooksInstalled() {
+		return
+	}
+	d.lastHook = d.now()
+	if out, err := exec.Command(d.ConveyorBin, "--home", d.Home, "review-webhook").CombinedOutput(); err != nil {
+		d.logf("review-webhook: %v: %s", err, out)
 	}
 }
 

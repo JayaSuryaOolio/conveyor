@@ -428,7 +428,7 @@ func (s *Service) PlacedActions(place string) ([]Placed, error) {
 	}
 	out := []Placed{}
 	for _, a := range apps {
-		if a.Manifest == "" {
+		if a.Manifest == "" || a.Disabled {
 			continue
 		}
 		m, err := ParseManifest(a.Manifest)
@@ -499,6 +499,9 @@ func (s *Service) resolveAction(app, id, key string) (*ManifestAction, map[strin
 	a, err := store.GetApp(s.DB, app)
 	if err != nil {
 		return nil, nil, "", err
+	}
+	if a.Disabled {
+		return nil, nil, "", fmt.Errorf("app %q is disabled", app)
 	}
 	m, err := ParseManifest(a.Manifest)
 	if err != nil {

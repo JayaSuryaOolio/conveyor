@@ -28,6 +28,8 @@ type StateApp struct {
 	Name    string `json:"name"`
 	Command string `json:"command"`
 	Output  bool   `json:"output"`
+	// Disabled apps stay installed but inactive.
+	Disabled bool `json:"disabled,omitempty"`
 	// Manifest is the app's portable manifest JSON (icons inlined); set for manifest apps.
 	Manifest string `json:"manifest,omitempty"`
 }
@@ -98,7 +100,7 @@ func (s *Service) ExportState() (State, error) {
 		return st, err
 	}
 	for _, a := range apps {
-		sa := StateApp{Name: a.Name, Command: a.Command, Output: a.Output}
+		sa := StateApp{Name: a.Name, Command: a.Command, Output: a.Output, Disabled: a.Disabled}
 		if a.Manifest != "" {
 			if sa.Manifest, err = portableManifest(a.Manifest); err != nil {
 				return st, fmt.Errorf("app %q: %w", a.Name, err)
@@ -178,7 +180,7 @@ func (s *Service) ImportState(st State, repoMap map[string]string) ([]string, er
 				continue
 			}
 		}
-		if _, err := store.CreateApp(s.DB, store.App{Name: a.Name, Command: a.Command, Output: a.Output, Manifest: a.Manifest}); err != nil {
+		if _, err := store.CreateApp(s.DB, store.App{Name: a.Name, Command: a.Command, Output: a.Output, Manifest: a.Manifest, Disabled: a.Disabled}); err != nil {
 			return out, err
 		}
 		out = append(out, "added app "+a.Name)
