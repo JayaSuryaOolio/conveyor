@@ -213,6 +213,7 @@ type TaskCard struct {
 	LastSummary string   `json:"lastSummary"`
 	CtxPeak     int64    `json:"ctxPeak"`
 	UpdatedAt   string   `json:"updatedAt"`
+	OpenPR      bool     `json:"openPR"` // any repo has an OPEN PR (shows the board's "check reviews" button)
 }
 
 // TaskDetail is the task page payload; Runs are oldest first (newest last).
@@ -241,6 +242,7 @@ func (a *App) ListTasks() ([]TaskCard, error) {
 		}
 		for _, r := range t.Repos {
 			c.Repos = append(c.Repos, r.RepoName)
+			c.OpenPR = c.OpenPR || (r.PRState != nil && *r.PRState == "OPEN")
 		}
 		switch r, err := store.LatestRun(a.svc.DB, t.ID); {
 		case err == nil:
