@@ -1,9 +1,10 @@
 import {useContext, useEffect, useState} from 'react'
-import {Menu, Modal} from '@mantine/core'
+import {Menu, Modal, Tooltip} from '@mantine/core'
 import Md from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import {FileOpeners, Home, OpenFile, ShowError} from '../wailsjs/go/ui/App'
-import {TaskKey} from './markdown'
+import {NavContext, TaskKey} from './markdown'
+import {load} from './paletteCache'
 import {BrowserOpenURL} from '../wailsjs/runtime/runtime'
 
 let homeP: Promise<string> | undefined
@@ -31,9 +32,12 @@ function Img({src, alt}: {src?: string; alt?: string}) {
 /** @file and /command tokens (after a space or line start), as typed in the editor's autocomplete. */
 const REF = /(^|\s)(@[\w./-]*[\w/-]|\/[a-z][\w:-]*)(?=$|[\s,;:!?)]|\.(?:\s|$))/g
 
+/** CV-* task keys (Conveyor's fixed key prefix); empty group 1 matches wrapText's (prefix)(token) shape. */
+const TASK = /()(\bCV-[0-9A-Z]+\b)/g
+
 type Node = {type: string; value?: string; children?: Node[]; data?: object}
-/** Wraps REF matches in text nodes (not in code or links) in <span class="md-ref md-ref-file|cmd">. */
-const remarkRefs = () => (tree: Node) => {
+/** Wraps `re` matches (group 1 = leading context to keep, group 2 = token) in text nodes (not in code or links) in <span class=cls(token)>. */
+const wrapText = (re: RegExp, cls: (tok: string) => string) => () => (tree: Node) => {
     const walk = (n: Node) => {
         if (!n.children || n.type === 'link' || n.type === 'linkReference') return
         n.children = n.children.flatMap(c => {
@@ -41,11 +45,10 @@ const remarkRefs = () => (tree: Node) => {
             const out: Node[] = []
             const v = c.value ?? ''
             let at = 0
-            for (const m of v.matchAll(REF)) {
+            for (const m of v.matchAll(re)) {
                 const start = m.index! + m[1].length
                 if (start > at) out.push({type: 'text', value: v.slice(at, start)})
-                const cls = 'md-ref md-ref-' + (m[2][0] === '@' ? 'file' : 'cmd')
-                out.push({type: 'ref', data: {hName: 'span', hProperties: {className: cls}}, children: [{type: 'text', value: m[2]}]})
+                out.push({type: 'ref', data: {hName: 'span', hProperties: {className: cls(m[2])}}, children: [{type: 'text', value: m[2]}]})
                 at = start + m[2].length
             }
             if (!out.length) return [c]
@@ -55,6 +58,8 @@ const remarkRefs = () => (tree: Node) => {
     }
     walk(tree)
 }
+const remarkRefs = wrapText(REF, tok => 'md-ref md-ref-' + (tok[0] === '@' ? 'file' : 'cmd'))
+const remarkTaskKeys = wrapText(TASK, () => 'md-ref md-ref-task')
 
 /** An @file mention inside a task: click to open it in a configured editor or reveal it in Finder. */
 function FileRef({children}: {children?: React.ReactNode}) {
@@ -76,7 +81,22 @@ function FileRef({children}: {children?: React.ReactNode}) {
     )
 }
 
-const plugins = [remarkGfm, remarkRefs]
+/** A CV-* key: a link to the task with its title as tooltip when the key is known; plain text otherwise (unknown key, cache not loaded). */
+function TaskRef({children}: {children?: React.ReactNode}) {
+    const nav = useContext(NavContext)
+    const key = String(children)
+    const [title, setTitle] = useState<string>()
+    useEffect(() => { load(false).then(r => setTitle(r.titles?.[key]), () => {}) }, [key])
+    // refactor: a task created after the daily cache load stays plain text until reload; see paletteCache
+    if (!title) return <span>{children}</span>
+    return (
+        <Tooltip label={title} withinPortal>
+            <a href="#" className="md-ref md-ref-task" onClick={e => { e.preventDefault(); nav({name: 'task', key}) }}>{children}</a>
+        </Tooltip>
+    )
+}
+
+const plugins = [remarkGfm, remarkRefs, remarkTaskKeys]
 const components = {
     // Never navigate the webview: hand links to the system browser.
     a: ({href, children}: {href?: string; children?: React.ReactNode}) => (
@@ -84,7 +104,9 @@ const components = {
     ),
     img: Img,
     span: ({className, children}: {className?: string; children?: React.ReactNode}) =>
-        className === 'md-ref md-ref-file' ? <FileRef>{children}</FileRef> : <span className={className}>{children}</span>,
+        className === 'md-ref md-ref-file' ? <FileRef>{children}</FileRef>
+            : className === 'md-ref md-ref-task' ? <TaskRef>{children}</TaskRef>
+            : <span className={className}>{children}</span>,
 }
 
 export default function MdRender({children}: {children: string}) {

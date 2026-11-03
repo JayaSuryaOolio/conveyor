@@ -4,9 +4,13 @@ import {IconBold, IconCode, IconItalic, IconLink, IconList, IconListCheck} from 
 import {Complete, SaveAttachment, ShowError} from '../wailsjs/go/ui/App'
 import {core} from '../wailsjs/go/models'
 import {load} from './paletteCache'
+import type {Nav} from './components'
 
 /** The task whose repos @file mentions in rendered markdown resolve against; '' = not clickable. */
 export const TaskKey = createContext('')
+
+/** Navigates the app; lets rendered CV-* keys open their task. No-op outside App. */
+export const NavContext = createContext<Nav>(() => {})
 
 const MdRender = lazy(() => import('./md-render'))
 
