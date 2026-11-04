@@ -39,6 +39,15 @@ func Parse(msg string) (b Block, rest string, ok bool) {
 	return Block{}, msg, false
 }
 
+// emptyLearning reports whether v is a placeholder ("none", "n/a", "-") rather than a real learning.
+func emptyLearning(v string) bool {
+	switch strings.ToLower(strings.Trim(v, " \t.,;:!-–—*_`'\"()")) {
+	case "", "none", "n/a":
+		return true
+	}
+	return false
+}
+
 func parseBody(body string) (Block, bool) {
 	var b Block
 	var key string
@@ -50,7 +59,7 @@ func parseBody(body string) (Block, bool) {
 			v := strings.TrimSpace(m[2])
 			switch key {
 			case "learning":
-				if v != "" {
+				if !emptyLearning(v) {
 					b.Learnings = append(b.Learnings, v)
 				}
 			case "spawn":

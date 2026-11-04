@@ -56,3 +56,11 @@ func TestLastWins(t *testing.T) {
 		t.Fatalf("rest %q", rest)
 	}
 }
+
+func TestLearningNoneIgnored(t *testing.T) {
+	for _, v := range []string{"none", "None", " NONE. ", "n/a", "N/A.", "-", "—", "`none`"} {
+		if b, _, _ := Parse("<conveyor>\nstatus: done\nlearning: " + v + "\n</conveyor>"); len(b.Learnings) != 0 {
+			t.Fatalf("%q kept: %+v", v, b.Learnings)
+		}
+	}
+}
