@@ -39,6 +39,9 @@ func Pull(ctx context.Context, svc *core.Service, epicKey string) ([]string, err
 	if rerr := store.RecordJiraSync(svc.DB, epic.ID, start.Format(time.RFC3339), msg); rerr != nil && err == nil {
 		err = rerr
 	}
+	if err == nil {
+		Complete(ctx, svc, epic.ID) // failures land in last_error
+	}
 	return created, err
 }
 

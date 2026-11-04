@@ -206,6 +206,7 @@ func UpdateTaskStatus(db *sql.DB, id int64, to Status, actor Actor) (Task, error
 	if err != nil {
 		return Task{}, err
 	}
+	notifyTask(id)
 	return GetTask(db, id)
 }
 
@@ -232,5 +233,6 @@ func UpdateTaskRepo(db *sql.DB, r TaskRepo) error {
 	if n, _ := res.RowsAffected(); n == 0 {
 		return fmt.Errorf("task repo %d/%d: %w", r.TaskID, r.RepoID, sql.ErrNoRows)
 	}
+	notifyTask(r.TaskID)
 	return nil
 }

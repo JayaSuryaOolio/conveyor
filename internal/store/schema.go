@@ -174,6 +174,14 @@ CREATE TABLE IF NOT EXISTS jira_sources (
   done INTEGER NOT NULL DEFAULT 0
 );
 
+-- what Conveyor last wrote to Jira for a task: transition name and the branch/PR comment (id + body)
+CREATE TABLE IF NOT EXISTS jira_sync (
+  task_id INTEGER PRIMARY KEY REFERENCES tasks(id) ON DELETE CASCADE,
+  status TEXT NOT NULL DEFAULT '',
+  comment_id TEXT NOT NULL DEFAULT '',
+  comment TEXT NOT NULL DEFAULT ''
+);
+
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 
 CREATE TABLE IF NOT EXISTS apps (

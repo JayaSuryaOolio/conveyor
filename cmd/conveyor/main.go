@@ -13,6 +13,7 @@ import (
 
 	"github.com/JayaSuryaOolio/conveyor/internal/audit"
 	"github.com/JayaSuryaOolio/conveyor/internal/core"
+	"github.com/JayaSuryaOolio/conveyor/internal/jira"
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 )
 
@@ -88,7 +89,9 @@ func openService(home string) (*core.Service, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &core.Service{DB: db, Home: home}, nil
+	svc := &core.Service{DB: db, Home: home}
+	jira.Attach(svc)
+	return svc, nil
 }
 
 // withService opens the service, runs fn and closes the DB.
@@ -98,6 +101,7 @@ func withService(home string, fn func(s *core.Service) error) error {
 		return err
 	}
 	defer s.DB.Close()
+	defer jira.Wait() // runs before Close: let Jira write-backs finish
 	return fn(s)
 }
 
