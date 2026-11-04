@@ -67,6 +67,7 @@ func (a *App) Startup(ctx context.Context) {
 		return
 	}
 	a.svc = &core.Service{DB: db, Home: home, Bin: conveyorBin()}
+	jira.Attach(a.svc)
 	a.startTerms()
 	automation.Bin = conveyorBin() // the cli automation kind runs the CLI, not the app binary
 	ctx, a.cancel = context.WithCancel(ctx)

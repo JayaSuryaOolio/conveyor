@@ -52,10 +52,9 @@ func adfText(raw json.RawMessage) string {
 	return b.String()
 }
 
-// search runs `acli jira workitem search` for jql and returns the issues with the given fields.
-func search(ctx context.Context, jql, fields string) ([]issue, error) {
-	out, err := exec.CommandContext(ctx, "acli", "jira", "workitem", "search", "--jql", jql,
-		"--fields", fields, "--paginate", "--json").Output()
+// acli runs `acli <args>` and returns stdout; a missing or unauthenticated acli gets a clear error.
+func acli(ctx context.Context, args ...string) ([]byte, error) {
+	out, err := exec.CommandContext(ctx, "acli", args...).Output()
 	if err != nil {
 		var ee *exec.ExitError
 		switch {
@@ -65,6 +64,15 @@ func search(ctx context.Context, jql, fields string) ([]issue, error) {
 			return nil, fmt.Errorf("acli failed (not authenticated? run `acli jira auth login`): %w: %s", err, strings.TrimSpace(string(ee.Stderr)))
 		}
 		return nil, fmt.Errorf("acli: %w", err)
+	}
+	return out, nil
+}
+
+// search runs `acli jira workitem search` for jql and returns the issues with the given fields.
+func search(ctx context.Context, jql, fields string) ([]issue, error) {
+	out, err := acli(ctx, "jira", "workitem", "search", "--jql", jql, "--fields", fields, "--paginate", "--json")
+	if err != nil {
+		return nil, err
 	}
 	var issues []issue
 	if err := json.Unmarshal(out, &issues); err != nil {
