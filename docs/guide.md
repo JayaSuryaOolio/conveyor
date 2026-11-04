@@ -279,6 +279,8 @@ conveyor config list | get <key> | set <key> <value>
 conveyor state export [file] | import <file> [--repo A=name ...]
 conveyor --home <empty dir> mock seed          # mock repos, tasks, settings, apps, automations (fixtures: internal/core/mock.go)
 conveyor import jira --jql "..." --repo a      # needs acli
+conveyor jira source EPIC [--key PROJ-1 --repo R --interval SEC --status-map JSON | --clear]   # attach/show/detach a Jira epic as the epic's source
+conveyor jira sync EPIC                  # pull now; the app also polls every source per its interval (default 300s)
 conveyor daemon                                # run the dispatcher in the foreground
 ```
 
