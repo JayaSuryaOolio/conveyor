@@ -163,6 +163,17 @@ CREATE TABLE IF NOT EXISTS epic_flow_prs (
   UNIQUE (flow_id, task_id, repo_id)
 );
 
+CREATE TABLE IF NOT EXISTS jira_sources (
+  epic_id INTEGER PRIMARY KEY REFERENCES tasks(id) ON DELETE CASCADE,
+  jira_key TEXT NOT NULL,
+  default_repo TEXT NOT NULL DEFAULT '',
+  interval_sec INTEGER NOT NULL DEFAULT 300,
+  status_map TEXT NOT NULL DEFAULT '',
+  last_sync TEXT,
+  last_error TEXT NOT NULL DEFAULT '',
+  done INTEGER NOT NULL DEFAULT 0
+);
+
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 
 CREATE TABLE IF NOT EXISTS apps (

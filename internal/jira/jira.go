@@ -19,6 +19,7 @@ type issue struct {
 	Self   string `json:"self"`
 	Fields struct {
 		Summary     string          `json:"summary"`
+		Labels      []string        `json:"labels"`
 		Description json.RawMessage `json:"description"`
 	} `json:"fields"`
 }
@@ -51,22 +52,34 @@ func adfText(raw json.RawMessage) string {
 	return b.String()
 }
 
-// Import runs `acli jira workitem search` for jql and creates a backlog task in
-// repo for each issue whose key is not yet an external_key. It returns the new task keys.
-// The task URL is <jira_base_url>/browse/KEY when that setting is set, else the issue's API URL.
-func Import(ctx context.Context, svc *core.Service, jql, repo string) ([]string, error) {
+// search runs `acli jira workitem search` for jql and returns the issues with the given fields.
+func search(ctx context.Context, jql, fields string) ([]issue, error) {
 	out, err := exec.CommandContext(ctx, "acli", "jira", "workitem", "search", "--jql", jql,
-		"--fields", "key,summary,description", "--paginate", "--json").Output()
+		"--fields", fields, "--paginate", "--json").Output()
 	if err != nil {
 		var ee *exec.ExitError
-		if errors.As(err, &ee) {
-			return nil, fmt.Errorf("acli: %w: %s", err, strings.TrimSpace(string(ee.Stderr)))
+		switch {
+		case errors.Is(err, exec.ErrNotFound):
+			return nil, errors.New("acli not found on PATH: install it and run `acli jira auth login`")
+		case errors.As(err, &ee):
+			return nil, fmt.Errorf("acli failed (not authenticated? run `acli jira auth login`): %w: %s", err, strings.TrimSpace(string(ee.Stderr)))
 		}
 		return nil, fmt.Errorf("acli: %w", err)
 	}
 	var issues []issue
 	if err := json.Unmarshal(out, &issues); err != nil {
 		return nil, fmt.Errorf("parse acli output: %w", err)
+	}
+	return issues, nil
+}
+
+// Import runs `acli jira workitem search` for jql and creates a backlog task in
+// repo for each issue whose key is not yet an external_key. It returns the new task keys.
+// The task URL is <jira_base_url>/browse/KEY when that setting is set, else the issue's API URL.
+func Import(ctx context.Context, svc *core.Service, jql, repo string) ([]string, error) {
+	issues, err := search(ctx, jql, "key,summary,description")
+	if err != nil {
+		return nil, err
 	}
 	base := strings.TrimRight(store.GetSetting(svc.DB, "jira_base_url"), "/")
 	var created []string
