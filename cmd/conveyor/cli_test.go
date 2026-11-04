@@ -452,3 +452,41 @@ func TestEpicBranchesAndSessionsCLI(t *testing.T) {
 		t.Fatalf("sessions --grep absent:\n%s", out)
 	}
 }
+
+// AC1/AC4: attach a source, sync via a fake acli, detach.
+func TestJiraCLI(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", t.TempDir())
+	repo := t.TempDir()
+	for _, args := range [][]string{{"init", "-b", "main"}, {"-c", "user.name=t", "-c", "user.email=t@t", "commit", "--allow-empty", "-m", "i"}} {
+		if b, err := exec.Command("git", append([]string{"-C", repo}, args...)...).CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, b)
+		}
+	}
+	name := filepath.Base(repo)
+	cv(t, home, "repo", "add", repo)
+	cv(t, home, "task", "new", "Epic", "--repo", name, "--epic")
+
+	acli := t.TempDir()
+	script := "#!/bin/sh\ncase \"$5\" in \"parent = OS-1\"*) echo '[{\"key\":\"OS-2\",\"fields\":{\"summary\":\"child\"}}]';; *) echo '[]';; esac\n"
+	os.WriteFile(filepath.Join(acli, "acli"), []byte(script), 0o755)
+	t.Setenv("PATH", acli+":"+os.Getenv("PATH"))
+
+	if out := cv(t, home, "jira", "source", "CV-1"); !strings.Contains(out, "no jira source") {
+		t.Fatal(out)
+	}
+	if out := cvFail(t, home, "jira", "source", "CV-1", "--key", "bad"); !strings.Contains(out, "invalid jira key") {
+		t.Fatal(out)
+	}
+	cv(t, home, "jira", "source", "CV-1", "--key", "OS-1", "--repo", name, "--interval", "60")
+	if out := cv(t, home, "jira", "sync", "CV-1"); !strings.Contains(out, "created CV-1A") {
+		t.Fatal(out)
+	}
+	if out := cv(t, home, "jira", "source", "CV-1"); !strings.Contains(out, "key=OS-1") || !strings.Contains(out, "interval=60s") || strings.Contains(out, "last_sync=\n") {
+		t.Fatal(out)
+	}
+	cv(t, home, "jira", "source", "CV-1", "--clear")
+	if out := cv(t, home, "jira", "source", "CV-1"); !strings.Contains(out, "no jira source") {
+		t.Fatal(out)
+	}
+}

@@ -10,6 +10,7 @@ import {core, store} from '../wailsjs/go/models'
 import {Nav, StatusBadge, errMsg} from './components'
 import {CARD, layout} from './epicLayout'
 import {useData} from './util'
+import {JiraSource} from './jiraSource'
 import {TaskPage} from './views'
 
 const STAGES = ['chart', 'decide', 'spec', 'build', 'verify', 'done']
@@ -138,6 +139,7 @@ function Header({g, nav, root}: {g: core.Graph; nav: Nav; root: core.GraphNode})
                 </Group>
             </Group>
         </Paper>
+        {epic && <JiraSource epic={root.key}/>}
         {epic && hasPR && noHooks && !seen && (
             <Alert variant="light" withCloseButton onClose={() => setSeen(true)} title="Review comments arrive by backoff polling">
                 <Group gap="sm">
