@@ -70,7 +70,7 @@ state: branch ..., PR #N, tests: pass|fail|not run
 next: what remains
 criteria:
 - [x] AC1 - evidence
-learning: a non-obvious fact about this repo that would save a future task real time; ...
+learning: only if this repo had a trap that cost you >10 min and is not in CLAUDE.md/SKILL.md/LEARNINGS.md. Name the file or command. Omit the line otherwise. (repeatable line)
 spawn: title of a follow-up task | its description
 </conveyor>
 ```
