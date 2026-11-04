@@ -490,3 +490,70 @@ func TestJiraCLI(t *testing.T) {
 		t.Fatal(out)
 	}
 }
+
+// AC9: fake acli end to end through the binary: pull, idempotent re-pull, label->repo, write-back, epic completion.
+func TestJiraEndToEnd(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", t.TempDir())
+	var names []string
+	for i := 0; i < 2; i++ {
+		repo := t.TempDir()
+		for _, args := range [][]string{{"init", "-b", "main"}, {"-c", "user.name=t", "-c", "user.email=t@t", "commit", "--allow-empty", "-m", "i"}} {
+			if b, err := exec.Command("git", append([]string{"-C", repo}, args...)...).CombinedOutput(); err != nil {
+				t.Fatalf("git %v: %v\n%s", args, err, b)
+			}
+		}
+		cv(t, home, "repo", "add", repo)
+		names = append(names, filepath.Base(repo))
+	}
+	cv(t, home, "task", "new", "Epic", "--repo", names[0], "--epic")
+
+	// search answers <dir>/<parent key>.json; every call is logged to <dir>/argv.
+	dir := t.TempDir()
+	script := `#!/bin/sh
+echo "$*" >> ` + dir + `/argv
+case "$3 $4" in "transition "*|"comment update") exit 0;; "comment create") echo '{"id":"c1"}'; exit 0;; esac
+k=${5#parent = }; k=${k%% *}
+cat ` + dir + `/$k.json 2>/dev/null || echo '[]'
+`
+	os.WriteFile(filepath.Join(dir, "acli"), []byte(script), 0o755)
+	os.WriteFile(filepath.Join(dir, "OS-1.json"), []byte(`[
+{"key":"OS-10","fields":{"summary":"Ten","labels":["repo:`+names[1]+`"]}},
+{"key":"OS-11","fields":{"summary":"Eleven","labels":[]}}]`), 0o644)
+	os.WriteFile(filepath.Join(dir, "OS-10.json"), []byte(`[{"key":"OS-100","fields":{"summary":"Sub","labels":[]}}]`), 0o644)
+	t.Setenv("PATH", dir+":"+os.Getenv("PATH"))
+	argv := func() string { b, _ := os.ReadFile(filepath.Join(dir, "argv")); return string(b) }
+
+	cv(t, home, "jira", "source", "CV-1", "--key", "OS-1", "--repo", names[0])
+	out := cv(t, home, "jira", "sync", "CV-1")
+	if strings.Count(out, "created ") != 3 {
+		t.Fatalf("pull:\n%s", out)
+	}
+	// Keys: CV-1A=OS-10 (label repo), CV-1A1=OS-100 (sub-task), CV-1B=OS-11 (default repo).
+	if s := cv(t, home, "task", "show", "CV-1A", "--json"); !strings.Contains(s, names[1]) || !strings.Contains(s, "OS-10") {
+		t.Fatalf("label->repo:\n%s", s)
+	}
+	if s := cv(t, home, "task", "show", "CV-1B", "--json"); !strings.Contains(s, names[0]) {
+		t.Fatalf("default repo:\n%s", s)
+	}
+	if out := cv(t, home, "jira", "sync", "CV-1"); strings.Contains(out, "created") {
+		t.Fatalf("re-pull not idempotent:\n%s", out)
+	}
+
+	cv(t, home, "task", "move", "CV-1A", "todo")
+	if !strings.Contains(argv(), "transition --key OS-10 --status To Do --yes") {
+		t.Fatalf("no write-back:\n%s", argv())
+	}
+	if strings.Contains(argv(), "--key OS-1 ") && strings.Contains(argv(), "--status Done") {
+		t.Fatal("epic completed early")
+	}
+	for _, k := range []string{"CV-1A", "CV-1A1", "CV-1B"} {
+		cv(t, home, "task", "move", k, "cancelled") // done needs a run; cancelled also counts as finished
+	}
+	if !strings.Contains(argv(), "transition --key OS-1 --status Done --yes") {
+		t.Fatalf("epic not completed:\n%s", argv())
+	}
+	if s := cv(t, home, "jira", "source", "CV-1"); !strings.Contains(s, "done=true") {
+		t.Fatal(s)
+	}
+}
