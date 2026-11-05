@@ -205,7 +205,7 @@ conveyor app open Zed CV-12 [--repo r] [--print]
 conveyor app add Usage --output --command 'ids=$(conveyor task sessions {key} --json) && npx -y ccusage session --json --offline | jq -r --argjson ids "$ids" '"'"'[.session[] | select(.period as $p | $ids | index($p))] | "Claude usage: $\((map(.totalCost) | add // 0) * 100 | round / 100) across \(length) of \($ids | length) sessions"'"'"
 ```
 
-**Manifest apps.** A manifest (`conveyor app install FILE`, or the Apps page) declares actions placed in UI slots (`global_nav`, `task_sidebar`, `board_card`), plus agents and automations installed with the app. Run scripts use `${{ var }}` placeholders (`task.key`, `worktree.path`, ...). An action can carry an `icon` (a `data:image/` URL) to show as an icon button.
+**Manifest apps.** A manifest (`conveyor app install FILE`, or the Apps page) declares actions placed in UI slots (`global_nav`, `task_sidebar`, `board_card`), plus agents and automations installed with the app. Run scripts use `${{ var }}` placeholders (`task.key`, `worktree.path`, ...). A manifest may set `check`, a shell sample run (30 s limit); install fails and stores nothing if it exits non-zero (the bundled `acli` example checks `acli --version`). An action can carry an `icon` (a `data:image/` URL) to show as an icon button.
 
 An action's icon is either `icon` (an inline `data:image/` URL: base64 PNG, or SVG with `%23` for `#`) or `iconPath` (an absolute or `~/` png, jpg, gif, webp, svg or icns file of at most 1 MB (icns is converted to png), or a macOS `.app` bundle whose icon is extracted, e.g. `/Applications/Visual Studio Code.app`). Installing copies an `iconPath` file to `<home>/app-icons` and stores the manifest pointing at the copy, so the original can move or be deleted; uninstall removes the copy. Export (`ExportApp`, state export) inlines the icon so manifests move between machines.
 
@@ -278,7 +278,7 @@ conveyor review-webhook [--status|--stop]      # opt-in review-webhooks app (see
 conveyor config list | get <key> | set <key> <value>
 conveyor state export [file] | import <file> [--repo A=name ...]
 conveyor --home <empty dir> mock seed          # mock repos, tasks, settings, apps, automations (fixtures: internal/core/mock.go)
-conveyor import jira --jql "..." --repo a      # needs acli
+conveyor import jira --jql "..." --repo a      # needs acli: install it from the Apps page (Detected apps) after `brew install acli` and `acli jira auth login`
 conveyor jira source EPIC [--key PROJ-1 --repo R --interval SEC --status-map JSON | --clear]   # attach/show/detach a Jira epic as the epic's source
 conveyor jira sync EPIC                  # pull now; the app also polls every source per its interval (default 300s)
 conveyor daemon                                # run the dispatcher in the foreground

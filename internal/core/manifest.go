@@ -20,9 +20,11 @@ import (
 // (like GitHub Actions), filled with shell-quoted values from the Vars table.
 type Manifest struct {
 	// Version is the manifest schema version; absent means 1. See migrateManifest.
-	Version     int              `json:"version,omitempty"`
-	Name        string           `json:"name"`
-	Description string           `json:"description,omitempty"`
+	Version     int    `json:"version,omitempty"`
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+	// Check is a sample-run script (`sh -c`, 30s); install fails, storing nothing, if it exits non-zero.
+	Check       string           `json:"check,omitempty"`
 	Actions     []ManifestAction `json:"actions,omitempty"`
 	Agents      []ManifestAgent  `json:"agents,omitempty"`
 	Automations []ManifestAuto   `json:"automations,omitempty"`
@@ -349,6 +351,11 @@ func (s *Service) InstallManifest(raw string, replace bool) (store.App, error) {
 	if err != nil {
 		return store.App{}, err
 	}
+	if m.Check != "" {
+		if err := runCheck(m.Check); err != nil {
+			return store.App{}, fmt.Errorf("%s: sample run failed (is the tool installed and on PATH?): %w", m.Name, err)
+		}
+	}
 	// read icons before a replace uninstalls the copies an exported manifest points at
 	icons, err := readIcons(m)
 	if err != nil {
@@ -384,6 +391,15 @@ func (s *Service) InstallManifest(raw string, replace bool) (store.App, error) {
 		return store.App{}, err
 	}
 	return a, nil
+}
+
+func runCheck(script string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if out, err := exec.CommandContext(ctx, "sh", "-c", script).CombinedOutput(); err != nil {
+		return fmt.Errorf("%w: %s", err, strings.TrimSpace(string(out)))
+	}
+	return nil
 }
 
 // UninstallApp deletes the app; a manifest app's automations and agents go with it.
