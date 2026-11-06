@@ -49,7 +49,7 @@ conveyor task repo <KEY> add <REPO>          # attach another registered repo to
 New tasks start in backlog; pass ` + "`--todo`" + ` to let the dispatcher launch them.
 `
 
-const defaultRules = `- Work only inside the worktrees listed above. Every one of them is yours, not just the one the session starts in: change whichever the task needs, using absolute paths or `+"`git -C <path>`"+`.
+const defaultRules = `- Work only inside the worktrees listed above. Every one of them is yours, not just the one the session starts in: change whichever the task needs, using absolute paths or `+"`git -C <path>`"+`. For more than a small change in a repo other than the one the session starts in, hand it to a sub-task with `+"`--repo <that repo>`"+` instead: its session starts in that repo and loads its CLAUDE.md, skills, commands and agents, which this session does not fully see.
 - Open at most one PR per repo.
 - Never push to the default branch.
 - The repo's CLAUDE.md, skills, commands and agents are the authority on how to work in it (build, test, commit, PR, changesets). Use them over your own defaults and over generic user-level skills; where they disagree with this brief, follow the repo, except for the worktree, PR and status block rules here.
