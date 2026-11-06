@@ -187,6 +187,25 @@ func TestBlockedTaskWaits(t *testing.T) {
 	}
 }
 
+// Backlog is parked: clearing blockers never starts it. Only todo tasks auto-start (TestBlockedTaskWaits).
+func TestBacklogTaskStaysParkedWhenBlockerDone(t *testing.T) {
+	e := setup(t)
+	a, parked := e.task(t, "a", 0), e.task(t, "parked", 0)
+	if err := store.AddLink(e.db, a.ID, parked.ID, store.LinkBlocks); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.UpdateTaskStatus(e.db, parked.ID, store.StatusBacklog, store.ActorHuman); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.UpdateTaskStatus(e.db, a.ID, store.StatusCancelled, store.ActorHuman); err != nil {
+		t.Fatal(err)
+	}
+	e.tick(t)
+	if got := e.get(t, parked.ID).Status; got != store.StatusBacklog {
+		t.Fatalf("backlog task is %s, want backlog", got)
+	}
+}
+
 func TestDebounce(t *testing.T) {
 	e := setup(t)
 	tk := e.task(t, "t", 0)
