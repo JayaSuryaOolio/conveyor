@@ -11,14 +11,14 @@ import (
 	"net/http"
 	"os/exec"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 )
 
 const (
-	webhookEvents = "pull_request_review,pull_request_review_comment,issue_comment"
-	rescanEvery   = time.Minute
+	rescanEvery = time.Minute
 )
 
 // ErrNoWebhookExt means `gh webhook` is not installed.
@@ -121,8 +121,11 @@ func openPRRepos(db *sql.DB) []string {
 
 // RunWebhook serves the handler on a random loopback port and keeps one `gh webhook forward`
 // per repo with an open PR until ctx ends. A failed forward (GitHub allows one per repo) is
-// logged and retried on the next scan; the backoff checks still run.
-func RunWebhook(ctx context.Context, db *sql.DB) error {
+// logged and retried on the next scan; the backoff checks still run. events are fixed until it restarts.
+func RunWebhook(ctx context.Context, db *sql.DB, events []string) error {
+	if len(events) == 0 {
+		return errors.New("no review webhook events enabled: turn one on in the app's settings")
+	}
 	if err := CheckWebhookExt(); err != nil {
 		return err
 	}
@@ -145,7 +148,7 @@ func RunWebhook(ctx context.Context, db *sql.DB) error {
 			}
 			running[repo] = true
 			log.Printf("review webhook: forwarding %s", repo)
-			cmd := exec.CommandContext(ctx, "gh", "webhook", "forward", "--repo", repo, "--events="+webhookEvents, "--url", url)
+			cmd := exec.CommandContext(ctx, "gh", "webhook", "forward", "--repo", repo, "--events="+strings.Join(events, ","), "--url", url)
 			go func() {
 				out, err := cmd.CombinedOutput()
 				if ctx.Err() == nil {

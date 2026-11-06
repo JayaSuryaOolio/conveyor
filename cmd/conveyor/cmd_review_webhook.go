@@ -67,7 +67,7 @@ func runReviewWebhook(home string, args []string) error {
 		defer os.Remove(pidFile(home))
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 		defer cancel()
-		return withService(home, func(s *core.Service) error { return gh.RunWebhook(ctx, s.DB) })
+		return withService(home, func(s *core.Service) error { return gh.RunWebhook(ctx, s.DB, s.EnabledReviewWebhookEvents()) })
 	}
 	// Start: check up front so a missing extension shows as an error, then detach.
 	if pid != 0 {

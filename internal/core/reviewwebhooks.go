@@ -12,6 +12,21 @@ import (
 // ReviewWebhooksApp is the example app's name; installing it turns on event-driven review checks for all tasks.
 const ReviewWebhooksApp = "Review webhooks"
 
+// ReviewWebhookEvents are the GitHub events the listener can forward; each is a boolean setting
+// of the app (examples/review-webhooks.json) named after the event.
+var ReviewWebhookEvents = []string{"pull_request_review", "pull_request_review_comment", "issue_comment"}
+
+// EnabledReviewWebhookEvents are the events the app's settings leave on (all when it is not installed).
+func (s *Service) EnabledReviewWebhookEvents() []string {
+	off := map[string]bool{}
+	if st, err := s.appSettings(ReviewWebhooksApp); err == nil {
+		for _, x := range st {
+			off[x.Key] = x.Value == "false"
+		}
+	}
+	return slices.DeleteFunc(slices.Clone(ReviewWebhookEvents), func(e string) bool { return off[e] })
+}
+
 // ReviewWebhooksInstalled reports whether the app is installed and enabled.
 func (s *Service) ReviewWebhooksInstalled() bool {
 	a, err := store.GetApp(s.DB, ReviewWebhooksApp)

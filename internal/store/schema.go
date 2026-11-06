@@ -192,7 +192,8 @@ CREATE TABLE IF NOT EXISTS apps (
   command TEXT NOT NULL,
   output INTEGER NOT NULL DEFAULT 0,
   manifest TEXT NOT NULL DEFAULT '',
-  disabled INTEGER NOT NULL DEFAULT 0
+  disabled INTEGER NOT NULL DEFAULT 0,
+  settings TEXT NOT NULL DEFAULT '{}'
 );
 `
 
@@ -215,6 +216,9 @@ func Migrate(db *sql.DB) error {
 		return err
 	}
 	if err := migrateAddAppDisabled(db); err != nil {
+		return err
+	}
+	if err := migrateAddAppSettings(db); err != nil {
 		return err
 	}
 	if err := migrateAddTaskCreatedBy(db); err != nil {
@@ -357,6 +361,20 @@ func migrateAddAppDisabled(db *sql.DB) error {
 	if n == 0 {
 		if _, err := db.Exec(`ALTER TABLE apps ADD COLUMN disabled INTEGER NOT NULL DEFAULT 0`); err != nil {
 			return fmt.Errorf("add apps.disabled: %w", err)
+		}
+	}
+	return nil
+}
+
+// migrateAddAppSettings adds apps.settings (JSON object of the user's values for the manifest's settings).
+func migrateAddAppSettings(db *sql.DB) error {
+	var n int
+	if err := db.QueryRow(`SELECT count(*) FROM pragma_table_info('apps') WHERE name='settings'`).Scan(&n); err != nil {
+		return fmt.Errorf("check apps.settings: %w", err)
+	}
+	if n == 0 {
+		if _, err := db.Exec(`ALTER TABLE apps ADD COLUMN settings TEXT NOT NULL DEFAULT '{}'`); err != nil {
+			return fmt.Errorf("add apps.settings: %w", err)
 		}
 	}
 	return nil
