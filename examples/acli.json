@@ -1,0 +1,3 @@
+{"version":2,"name":"Atlassian CLI (acli)","description":"Jira sync shells out to acli. Install it (brew install acli) and run `acli jira auth login` yourself; this checks it runs.",
+ "check":"acli --version",
+ "actions":[{"id":"auth-status","label":"acli auth status","places":["global_nav"],"output":true,"run":"acli jira auth status"}]}

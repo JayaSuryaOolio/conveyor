@@ -1,6 +1,9 @@
 package core
 
 import (
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
@@ -41,5 +44,24 @@ func TestDisabledAppIsInert(t *testing.T) {
 	}
 	if p, _ := s.PlacedActions("global_nav"); len(p) != 1 || !s.ReviewWebhooksInstalled() {
 		t.Fatal("re-enabled app not active")
+	}
+}
+
+func TestInstallCheckGatesInstall(t *testing.T) {
+	s := newSvc(t)
+	t.Setenv("PATH", t.TempDir()) // no acli on PATH
+	if err := s.InstallExample("acli"); err == nil || !strings.Contains(err.Error(), "sample run failed") {
+		t.Fatalf("installed without acli: %v", err)
+	}
+	if _, err := store.GetApp(s.DB, "Atlassian CLI (acli)"); err == nil {
+		t.Fatal("failed install left an app behind")
+	}
+	bin := t.TempDir()
+	if err := os.WriteFile(filepath.Join(bin, "acli"), []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+":/usr/bin:/bin")
+	if err := s.InstallExample("acli"); err != nil {
+		t.Fatal(err)
 	}
 }
