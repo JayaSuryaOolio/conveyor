@@ -57,7 +57,7 @@ function TaskNode({data}: NodeProps<Node<CardData>>) {
         n.worktrees.length > 0 && <Tooltip key="wt" label={'worktree: ' + n.worktrees.join(', ')}><Badge size="xs" variant="outline" color="gray">worktree</Badge></Tooltip>,
     ].filter(Boolean)
     return (
-        <Paper withBorder radius="md" p="xs" w={CARD.w} h={CARD.h} shadow="sm" style={{cursor: 'pointer', overflow: 'hidden'}} onClick={() => open(n.key)}>
+        <Paper withBorder radius="md" p="xs" w={CARD.w} shadow="sm" style={{cursor: 'pointer'}} onClick={() => open(n.key)}>
             <Handle type="target" position={Position.Left}/>
             <Handle type="source" position={Position.Right}/>
             <Stack gap={6}>
@@ -170,10 +170,23 @@ export function EpicView({k, nav}: {k: string; nav: Nav}) {
     const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
     const dragged = useRef(new Map<string, {x: number; y: number}>()) // a dragged card keeps its spot across live reloads
 
+    // Leaf-card heights as React Flow measured them (cards size to content). A change re-runs the layout below; layout never changes a card's height, so this settles.
+    const [heights, setHeights] = useState<ReadonlyMap<string, number>>(new Map())
+    const measure: typeof onNodesChange = changes => {
+        onNodesChange(changes)
+        const next = new Map(heights)
+        for (const c of changes) {
+            // groups are sized by layout itself, so only leaves (no child points at them) are measured
+            if (c.type === 'dimensions' && c.dimensions && !g?.nodes.some(n => n.parent === c.id)) next.set(c.id, Math.ceil(c.dimensions.height))
+        }
+        if ([...next].some(([k, h]) => heights.get(k) !== h)) setHeights(next)
+    }
+    // refactor: stale keys stay in `heights` after a task is removed; harmless (layout only looks up live keys).
+
     useEffect(() => {
         if (!g) return
         const byKey = new Map(g.nodes.map(n => [n.key, n]))
-        const placed = layout(g.nodes.map(n => ({key: n.key, parent: n.parent})), g.links)
+        const placed = layout(g.nodes.map(n => ({key: n.key, parent: n.parent})), g.links, heights)
         setNodes(placed.map(p => {
             const n = byKey.get(p.key)!
             const pos = dragged.current.get(p.key) ?? {x: p.x, y: p.y}
@@ -181,7 +194,7 @@ export function EpicView({k, nav}: {k: string; nav: Nav}) {
                     style: p.group ? {width: p.w, height: p.h} : undefined, zIndex: p.group ? 0 : 1,
                     data: p.group ? {n} : {n, prs: g.prs.filter(r => r.task === p.key)}}
         }))
-    }, [g])
+    }, [g, heights])
 
     const derived: Edge[] = useMemo(() => (g?.links ?? []).map(l => ({
         id: `${l.kind}:${l.from}:${l.to}`, source: l.from, target: l.to, deletable: true,
@@ -203,7 +216,7 @@ export function EpicView({k, nav}: {k: string; nav: Nav}) {
             <Stack gap="sm" h="calc(100vh - 2 * var(--mantine-spacing-md))">
                 <Header g={g} nav={nav} root={root}/>
                 <Box style={{flex: 1, minHeight: 0, border: '1px solid var(--mantine-color-default-border)', borderRadius: 8}}>
-                    <ReactFlow nodes={nodes} edges={edges} onEdgesChange={onEdgesChange} nodeTypes={nodeTypes} onNodesChange={onNodesChange} fitView minZoom={0.2}
+                    <ReactFlow nodes={nodes} edges={edges} onEdgesChange={onEdgesChange} nodeTypes={nodeTypes} onNodesChange={measure} fitView minZoom={0.2}
                                onNodeDragStop={(_, n) => dragged.current.set(n.id, n.position)}
                                onConnect={connect}
                                onEdgesDelete={es => es.forEach(e => { const [kind, from, to] = e.id.split(':'); Unlink(from, kind, to).catch(errMsg) })}>
