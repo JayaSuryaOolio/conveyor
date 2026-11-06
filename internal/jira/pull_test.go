@@ -12,13 +12,17 @@ import (
 )
 
 // fakeAcli puts an acli on PATH that logs each jql to <dir>/argv and answers with <dir>/<parent key>.json.
-// A file named "fail" makes it exit 1 like an unauthenticated acli.
+// A file named "fail" makes it exit 1 like an unauthenticated acli; keys listed in <dir>/mine are assigned to the user.
 func fakeAcli(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
 	script := `#!/bin/sh
 echo "$5" >> ` + dir + `/argv
 [ -f ` + dir + `/fail ] && { echo "not logged in" >&2; exit 1; }
+case "$5" in "key = "*"assignee = currentUser()")
+k=${5#key = }; k=${k%% *}
+grep -qx "$k" ` + dir + `/mine 2>/dev/null && echo "[{\"key\":\"$k\"}]" || echo '[]'; exit 0;;
+esac
 k=${5#parent = }; k=${k%% *}
 cat ` + dir + `/$k.json 2>/dev/null || echo '[]'
 `

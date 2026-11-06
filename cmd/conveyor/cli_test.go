@@ -468,7 +468,7 @@ func TestJiraCLI(t *testing.T) {
 	cv(t, home, "task", "new", "Epic", "--repo", name, "--epic")
 
 	acli := t.TempDir()
-	script := "#!/bin/sh\ncase \"$5\" in \"parent = OS-1\"*) echo '[{\"key\":\"OS-2\",\"fields\":{\"summary\":\"child\"}}]';; *) echo '[]';; esac\n"
+	script := "#!/bin/sh\ncase \"$5\" in \"key = OS-1 \"*) echo '[{\"key\":\"OS-1\"}]';; \"parent = OS-1\"*) echo '[{\"key\":\"OS-2\",\"fields\":{\"summary\":\"child\"}}]';; *) echo '[]';; esac\n"
 	os.WriteFile(filepath.Join(acli, "acli"), []byte(script), 0o755)
 	t.Setenv("PATH", acli+":"+os.Getenv("PATH"))
 
@@ -476,6 +476,12 @@ func TestJiraCLI(t *testing.T) {
 		t.Fatal(out)
 	}
 	if out := cvFail(t, home, "jira", "source", "CV-1", "--key", "bad"); !strings.Contains(out, "invalid jira key") {
+		t.Fatal(out)
+	}
+	if out := cvFail(t, home, "jira", "source", "CV-1", "--key", "OS-2"); !strings.Contains(out, "not assigned") {
+		t.Fatal(out)
+	}
+	if out := cv(t, home, "jira", "source", "CV-1"); !strings.Contains(out, "no jira source") {
 		t.Fatal(out)
 	}
 	cv(t, home, "jira", "source", "CV-1", "--key", "OS-1", "--repo", name, "--interval", "60")
@@ -512,6 +518,7 @@ func TestJiraEndToEnd(t *testing.T) {
 	dir := t.TempDir()
 	script := `#!/bin/sh
 echo "$*" >> ` + dir + `/argv
+case "$5" in "key = "*) k=${5#key = }; echo "[{\"key\":\"${k%% *}\"}]"; exit 0;; esac
 case "$3 $4" in "transition "*|"comment update") exit 0;; "comment create") echo '{"id":"c1"}'; exit 0;; esac
 k=${5#parent = }; k=${k%% *}
 cat ` + dir + `/$k.json 2>/dev/null || echo '[]'
