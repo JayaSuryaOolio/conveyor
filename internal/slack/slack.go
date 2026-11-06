@@ -15,6 +15,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -110,6 +111,9 @@ func (s *Slack) post(args map[string]any) (string, error) {
 	ts, _ := r["ts"].(string)
 	if err == nil && ts != "" {
 		mine.Store(ts, true)
+	}
+	if err != nil {
+		log.Printf("chat: slack post: %v", err)
 	}
 	return ts, err
 }
@@ -253,6 +257,7 @@ func (s *Slack) Listen(ctx context.Context, h func(chat.In) string) error {
 		return err
 	}
 	defer c.Close()
+	log.Printf("chat: slack connected")
 	// the Home tab keeps its content, so publishing the guide once per connection is enough
 	call(s.token(), "views.publish", map[string]any{"user_id": s.get("slack_user_id"), "view": map[string]any{"type": "home", "blocks": home}})
 	go func() { <-ctx.Done(); c.Close() }()
@@ -367,7 +372,10 @@ func (s *Slack) event(payload []byte, handle func(chat.In) string) {
 	m, _ := msgs[0].(map[string]any)
 	text, _ := m["text"].(string)
 	key := keyOf(text)
-	if key == "" {
+	if key == "" { // a reply under a non-task message (e.g. a forward) is a command about that message
+		quote, files := content(m, false)
+		fwd := func() (string, []chat.File) { return s.fetch(quote, files) }
+		s.post(map[string]any{"channel": e.Channel, "thread_ts": e.ThreadTS, "text": handle(chat.In{Text: e.Text, Fwd: fwd})})
 		return
 	}
 	threads.LoadOrStore(key, e.ThreadTS) // the agent's answer comes back into this thread

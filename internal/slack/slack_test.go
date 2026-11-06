@@ -177,3 +177,28 @@ func TestLookBackForward(t *testing.T) {
 		t.Fatalf("q=%q files=%+v", q, fs)
 	}
 }
+
+// A reply in the thread of a forward (no task key in the root) is a command about the forward.
+func TestThreadReplyUnderForward(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "conversations.history") {
+			fmt.Fprint(w, `{"ok":true,"messages":[{"ts":"5.0","text":"/conveyor new x","attachments":[{"is_share":true,"text":"it crashes"}]}]}`)
+			return
+		}
+		fmt.Fprint(w, `{"ok":true,"ts":"7.0"}`)
+	}))
+	defer srv.Close()
+	api = srv.URL + "/"
+	s := &Slack{get: func(k string) string { return map[string]string{"slack_bot_token": "x", "slack_user_id": "U1"}[k] }}
+	var got chat.In
+	s.event([]byte(`{"event":{"type":"message","user":"U1","text":"new B do it","channel":"D1","ts":"6.0","thread_ts":"5.0"}}`), func(in chat.In) string {
+		got = in
+		return "ok"
+	})
+	if got.Text != "new B do it" || got.Key != "" || got.Fwd == nil {
+		t.Fatalf("not handled as a command: %+v", got)
+	}
+	if q, _ := got.Fwd(); q != "> it crashes" {
+		t.Fatalf("fwd %q", q)
+	}
+}

@@ -162,9 +162,13 @@ func TestNewTaskFromForward(t *testing.T) {
 	if r := b.handle(In{Text: "New B “bump sdk”"}); !strings.HasPrefix(r, "created ") || !strings.Contains(r, " bump sdk (") {
 		t.Fatal(r)
 	}
+	// "/conveyor" typed as a forward's comment, where Slack doesn't run slash commands
+	if r := b.handle(In{Text: "/conveyor new b “bump sdk”"}); !strings.HasPrefix(r, "created ") {
+		t.Fatal(r)
+	}
 	ts, _ := store.ListTasks(db)
-	if len(ts) != 3 {
-		t.Fatalf("want 3 tasks, got %d", len(ts))
+	if len(ts) != 4 {
+		t.Fatalf("want 4 tasks, got %d", len(ts))
 	}
 	for _, tk := range ts {
 		if tk.Title == "bump sdk" {

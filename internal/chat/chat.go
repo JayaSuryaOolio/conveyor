@@ -221,6 +221,15 @@ func (b *bridge) notify(t Transport) {
 
 // handle serves one inbound item and returns the reply text.
 func (b *bridge) handle(in In) string {
+	out := b.run(in)
+	reply, _, _ := strings.Cut(out, "\n")
+	b.logf("chat: %s %q -> %q", in.Key, in.Text, reply)
+	return out
+}
+
+func (b *bridge) run(in In) string {
+	// "/conveyor" typed as text (a forward's comment can't run a slash command) is not a command word
+	in.Text = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(in.Text), "/conveyor"))
 	if in.Key != "" {
 		return b.comment(in.Key, in.Text)
 	}
