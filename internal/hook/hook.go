@@ -173,7 +173,7 @@ func onStop(db *sql.DB, task store.Task, run store.Run, p payload) error {
 		store.Audit("epic.status_block", "task_id", task.ID, "run", run.ID, "status", block.Status, "summary", block.Summary)
 	}
 	if run.Kind != "auto" {
-		return nil
+		return settleInteractive(db, task)
 	}
 
 	body := final
@@ -256,6 +256,33 @@ func onStop(db *sql.DB, task store.Task, run store.Run, p payload) error {
 		if err := store.UpdateTask(db, task); err != nil {
 			return err
 		}
+	}
+	_, err = store.UpdateTaskStatus(db, task.ID, to, store.ActorSystem)
+	return err
+}
+
+// settleInteractive hands a running task back once an outside (manual) session goes idle, so
+// messages queued meanwhile are not stuck behind a session the human may never close: queued
+// comments requeue the task (todo), otherwise it waits on the human (needs_you), the same edge as
+// reapInteractive. Another active run on the task keeps it running.
+func settleInteractive(db *sql.DB, task store.Task) error {
+	if cur, err := store.GetTask(db, task.ID); err != nil || cur.Status != store.StatusRunning {
+		return err
+	}
+	active, err := store.ActiveRuns(db)
+	if err != nil {
+		return err
+	}
+	for _, o := range active {
+		if o.TaskID == task.ID {
+			return nil
+		}
+	}
+	to := store.StatusNeedsYou
+	if pending, err := store.UnconsumedComments(db, task.ID); err != nil {
+		return err
+	} else if len(pending) > 0 {
+		to = store.StatusTodo
 	}
 	_, err = store.UpdateTaskStatus(db, task.ID, to, store.ActorSystem)
 	return err
