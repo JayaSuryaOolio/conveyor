@@ -59,3 +59,33 @@ func TestEpicWithNoFlow(t *testing.T) {
 		t.Fatalf("restart flow: %+v", f)
 	}
 }
+
+// An epic root defaults to the epic-builder preset once hooks seeded it; --agent still wins.
+func TestEpicRootDefaultAgent(t *testing.T) {
+	h := t.TempDir()
+	t.Setenv("HOME", h)
+	s := newSvc(t)
+	agent := func(in NewTaskInput) string {
+		in.Repos, in.Epic = []string{"a"}, true
+		e, err := s.CreateTask(in)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if e.Agent == nil {
+			return ""
+		}
+		return *e.Agent
+	}
+	if got := agent(NewTaskInput{Title: "e0", EpicName: "e0"}); got != "" {
+		t.Fatalf("no preset installed: agent %q", got)
+	}
+	if _, err := s.UserHooks("install"); err != nil {
+		t.Fatal(err)
+	}
+	if got := agent(NewTaskInput{Title: "e1", EpicName: "e1"}); got != "epic-builder" {
+		t.Fatalf("agent %q", got)
+	}
+	if got := agent(NewTaskInput{Title: "e2", EpicName: "e2", Agent: "sse"}); got != "sse" {
+		t.Fatalf("explicit agent: %q", got)
+	}
+}
