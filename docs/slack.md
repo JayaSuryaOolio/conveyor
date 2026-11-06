@@ -51,7 +51,7 @@ features:
   bot_user: {display_name: Conveyor}
   slash_commands:
     - {command: /conveyor, url: https://example.com, description: Control Conveyor tasks, usage_hint: help}
-oauth_config: {scopes: {bot: [chat:write, im:history, reactions:write]}}
+oauth_config: {scopes: {bot: [chat:write, im:history, reactions:write, files:read]}}
 settings:
   event_subscriptions: {bot_events: [message.im]}
   interactivity: {is_enabled: true}
@@ -64,7 +64,7 @@ settings:
 
 **Bot or you.** By default Conveyor posts as the bot. If `slack_user_token` is filled it replaces the bot
 token for everything Conveyor does in Slack (task DMs, thread replies, command answers, reactions): add
-`oauth_config.scopes.user: [chat:write, im:history, im:write, reactions:write]` and `settings.event_subscriptions.user_events: [message.im]`,
+`oauth_config.scopes.user: [chat:write, im:history, im:write, reactions:write, files:read]` and `settings.event_subscriptions.user_events: [message.im]`,
 reinstall and copy the *User OAuth Token*. Clear the field to go back to the bot. Caveat: messages then land in
 your own self-DM and Slack does not notify you for messages you post yourself, so you get no push.
 
@@ -83,6 +83,11 @@ Open the Conveyor DM. Type a plain message, no slash needed:
 - `show CV-12` (or just `CV-12`) - status, repos, PRs, last agent message
 - `CV-12 use the v2 API` - comment on CV-12 (requeues it)
 - `move CV-12 done` - todo | done | cancelled
+- `new [REPO] your comment` - new backlog task. Forward a Slack message (images too) to the
+  Conveyor DM, then send `new …` or `/conveyor new …`; or type the comment in the forward box.
+  The description is your comment, the forwarded text with author and link, and its images
+  (saved under `~/.conveyor/attachments`, needs `files:read`). REPO can be left out with one
+  registered repo. Slash commands only work in the app's DM; `@app` mentions in channels are not wired.
 - Reply in a notification's thread - comments on that task.
 
 Notifications (needs_you, review, done, failed; pick which in settings) carry the agent's last

@@ -157,3 +157,23 @@ func TestOpenConnRotatesExpiredToken(t *testing.T) {
 		t.Fatalf("r=%v err=%v cfg=%v", r, err, cfg)
 	}
 }
+
+func TestLookBackForward(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/img" {
+			w.Header().Set("Content-Type", "image/png")
+			w.Write([]byte("PNG"))
+			return
+		}
+		fmt.Fprintf(w, `{"ok":true,"messages":[{"ts":"9.0","bot_id":"B1","text":"ours"},
+			{"ts":"8.0","text":"look","attachments":[{"is_share":true,"text":"it crashes","author_name":"Bob",
+			"files":[{"name":"shot","mimetype":"image/png","url_private_download":"%s/img"}]}]}]}`, "http://"+r.Host)
+	}))
+	defer srv.Close()
+	api = srv.URL + "/"
+	s := &Slack{get: func(k string) string { return map[string]string{"slack_bot_token": "x"}[k] }}
+	q, fs := s.lookBack("D1", "")
+	if !strings.Contains(q, "> look") || !strings.Contains(q, "> it crashes\n\n— Bob") || len(fs) != 1 || fs[0].Name != "shot.png" || string(fs[0].Data) != "PNG" {
+		t.Fatalf("q=%q files=%+v", q, fs)
+	}
+}

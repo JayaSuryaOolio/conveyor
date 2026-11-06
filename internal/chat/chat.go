@@ -8,7 +8,9 @@
 package chat
 
 import (
+	"cmp"
 	"context"
+	"encoding/base64"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -31,7 +33,18 @@ type Msg struct {
 type Link struct{ Name, URL string }
 
 // In is one inbound item: a reply to a Msg thread (Key set) or a command (Key empty).
-type In struct{ Key, Text string }
+// Fwd, when set, returns the message the command refers to (e.g. one forwarded to the
+// bot) as Markdown plus its images; it is called only by "new", so nothing is fetched otherwise.
+type In struct {
+	Key, Text string
+	Fwd       func() (string, []File)
+}
+
+// File is an image carried by a forwarded message.
+type File struct {
+	Name string
+	Data []byte
+}
 
 // Transport delivers Msgs to the user and inbound items back. Implementations must be
 // safe to Send from one goroutine while Listen runs in another.
@@ -211,7 +224,62 @@ func (b *bridge) handle(in In) string {
 	if in.Key != "" {
 		return b.comment(in.Key, in.Text)
 	}
+	if f := strings.Fields(in.Text); len(f) > 0 && f[0] == "new" {
+		return b.create(strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(in.Text), "new")), in.Fwd)
+	}
 	return b.command(in.Text)
+}
+
+// create makes a backlog task from "new [REPO] comment": the comment, then the forwarded
+// message and its images. REPO may be omitted when only one repo is registered.
+func (b *bridge) create(text string, fwd func() (string, []File)) string {
+	repos, err := store.ListRepos(b.svc.DB)
+	if err != nil {
+		return err.Error()
+	}
+	var names []string
+	repo := ""
+	for _, r := range repos {
+		names = append(names, r.Name)
+		if f := strings.Fields(text); len(f) > 0 && f[0] == r.Name {
+			repo = r.Name
+		}
+	}
+	if repo != "" {
+		text = strings.TrimSpace(strings.TrimPrefix(text, repo))
+	} else if len(names) == 1 {
+		repo = names[0]
+	} else {
+		return "Name a repo: new REPO your comment (repos: " + strings.Join(names, ", ") + ")"
+	}
+	desc, quote := text, ""
+	if fwd != nil {
+		var imgs []File
+		quote, imgs = fwd()
+		for _, f := range imgs {
+			p, err := core.SaveAttachment(b.svc.Home, "", f.Name, base64.StdEncoding.EncodeToString(f.Data))
+			if err != nil {
+				quote += "\n\n(image " + f.Name + " not saved: " + err.Error() + ")"
+				continue
+			}
+			quote += "\n\n![" + f.Name + "](" + p + ")"
+		}
+		if quote = strings.TrimSpace(quote); quote != "" {
+			desc = strings.TrimSpace(desc + "\n\n## Forwarded message\n\n" + quote)
+		}
+	}
+	title, _, _ := strings.Cut(strings.TrimSpace(strings.TrimLeft(cmp.Or(text, quote), "> ")), "\n")
+	if title == "" {
+		return "Usage: new [REPO] your comment (forward a message to me first to include it)"
+	}
+	if r := []rune(title); len(r) > 80 {
+		title = string(r[:80]) + "…"
+	}
+	t, err := b.svc.CreateTask(core.NewTaskInput{Title: title, Description: desc, Repos: []string{repo}, Source: b.setting("chat_transport")})
+	if err != nil {
+		return "warning: " + err.Error()
+	}
+	return fmt.Sprintf("created %s %s (backlog; move %s todo to start it)", t.Key, t.Title, t.Key)
 }
 
 func (b *bridge) comment(key, body string) string {
@@ -224,6 +292,7 @@ func (b *bridge) comment(key, body string) string {
 // Help is the command guide shown for "help" and unknown commands; transports may reuse it.
 const Help = `*Conveyor commands* (send as a DM, or /conveyor …)
 • list — tasks waiting on you
+• new [REPO] your comment — new backlog task from your comment and the message you forwarded to me just before (images included)
 • KEY your comment — comment on a task (e.g. CV-12 use the v2 API)
 • show KEY (or just KEY) — status, repos, PRs and the last agent message
 • move KEY todo|done|cancelled — change status

@@ -272,15 +272,25 @@ func (s *Slack) Listen(ctx context.Context, h func(chat.In) string) error {
 			s.interactive(e.Payload, h)
 		case "slash_commands":
 			var p struct {
-				UserID string `json:"user_id"`
-				Text   string `json:"text"`
+				UserID      string `json:"user_id"`
+				Text        string `json:"text"`
+				ChannelID   string `json:"channel_id"`
+				ResponseURL string `json:"response_url"`
 			}
 			json.Unmarshal(e.Payload, &p)
-			reply := "not allowed"
-			if p.UserID == s.get("slack_user_id") {
-				reply = h(chat.In{Text: p.Text})
+			if p.UserID != s.get("slack_user_id") {
+				c.WriteJSON(map[string]any{"envelope_id": e.EnvelopeID, "payload": map[string]any{"text": "not allowed"}})
+				continue
 			}
-			c.WriteJSON(map[string]any{"envelope_id": e.EnvelopeID, "payload": map[string]any{"text": reply}})
+			// ack now and answer via response_url: "new" may download images past Slack's 3s ack limit
+			c.WriteJSON(map[string]any{"envelope_id": e.EnvelopeID})
+			go func() {
+				in := chat.In{Text: p.Text, Fwd: func() (string, []chat.File) { return s.lookBack(p.ChannelID, "") }}
+				body, _ := json.Marshal(map[string]any{"text": h(in)})
+				if r, err := http.Post(p.ResponseURL, "application/json", strings.NewReader(string(body))); err == nil {
+					r.Body.Close()
+				}
+			}()
 		}
 	}
 }
@@ -314,7 +324,8 @@ func (s *Slack) event(payload []byte, handle func(chat.In) string) {
 			ThreadTS                               string `json:"thread_ts"`
 		} `json:"event"`
 	}
-	if json.Unmarshal(payload, &p) != nil {
+	var raw struct{ Event map[string]any }
+	if json.Unmarshal(payload, &p) != nil || json.Unmarshal(payload, &raw) != nil {
 		return
 	}
 	e := p.Event
@@ -322,7 +333,7 @@ func (s *Slack) event(payload []byte, handle func(chat.In) string) {
 	if e.User != s.get("slack_user_id") {
 		return
 	}
-	if e.Type != "message" || e.Subtype != "" || e.BotID != "" {
+	if e.Type != "message" || (e.Subtype != "" && e.Subtype != "file_share") || e.BotID != "" {
 		return
 	}
 	if _, ours := mine.Load(e.TS); ours {
@@ -331,7 +342,18 @@ func (s *Slack) event(payload []byte, handle func(chat.In) string) {
 	// acknowledge at once; needs the reactions:write scope, best effort
 	call(bot, "reactions.add", map[string]any{"channel": e.Channel, "timestamp": e.TS, "name": "eyes"})
 	if e.ThreadTS == "" { // a plain DM is a command, so /conveyor is optional
-		s.post(map[string]any{"channel": e.Channel, "text": handle(chat.In{Text: e.Text})})
+		quote, files := content(raw.Event, false)
+		if strings.TrimSpace(e.Text) == "" && (quote != "" || len(files) > 0) { // a bare forward: keep it for "new"
+			s.post(map[string]any{"channel": e.Channel, "text": "Got it. Send `new [REPO] your comment` (or `/conveyor new …`) to make a task from it."})
+			return
+		}
+		fwd := func() (string, []chat.File) { // forwarded with the comment, else the message just before
+			if quote == "" && len(files) == 0 {
+				return s.lookBack(e.Channel, e.TS)
+			}
+			return s.fetch(quote, files)
+		}
+		s.post(map[string]any{"channel": e.Channel, "text": handle(chat.In{Text: e.Text, Fwd: fwd})})
 		return
 	}
 	h, err := call(bot, "conversations.history", map[string]any{"channel": e.Channel, "latest": e.ThreadTS, "inclusive": true, "limit": 1})
@@ -374,4 +396,129 @@ func (s *Slack) interactive(payload []byte, handle func(chat.In) string) {
 			s.post(map[string]any{"channel": p.Channel.ID, "thread_ts": p.Message.TS, "text": handle(chat.In{Text: "move " + a.Value + " " + status})})
 		}
 	}
+}
+
+// ---- forwarded messages for "new" ----
+
+// content reads a message's forwarded/shared attachments as a Markdown quote and collects
+// its files (the message's own and the shared ones). withText also quotes the message's
+// own text, which for the command message itself is the command, not content.
+func content(m map[string]any, withText bool) (string, []map[string]any) {
+	var parts []string
+	var files []map[string]any
+	add := func(fs any) {
+		l, _ := fs.([]any)
+		for _, f := range l {
+			if f, ok := f.(map[string]any); ok {
+				files = append(files, f)
+			}
+		}
+	}
+	quote := func(t string) string { return "> " + strings.ReplaceAll(strings.TrimSpace(t), "\n", "\n> ") }
+	if t, _ := m["text"].(string); withText && strings.TrimSpace(t) != "" {
+		parts = append(parts, quote(t))
+	}
+	add(m["files"])
+	atts, _ := m["attachments"].([]any)
+	for _, a := range atts {
+		a, _ := a.(map[string]any)
+		t, _ := a["text"].(string)
+		if t == "" {
+			t, _ = a["fallback"].(string)
+		}
+		if strings.TrimSpace(t) != "" {
+			q := quote(t)
+			author, _ := a["author_name"].(string)
+			link, _ := a["from_url"].(string)
+			if by := strings.TrimSpace(author + " " + link); by != "" {
+				q += "\n\n— " + by
+			}
+			parts = append(parts, q)
+		}
+		add(a["files"])
+	}
+	return strings.Join(parts, "\n\n"), files
+}
+
+// lookBack finds the message just before the command in channel (before ts, or now when
+// ts is empty), skipping our own posts, and returns it when it carries any content.
+func (s *Slack) lookBack(channel, ts string) (string, []chat.File) {
+	args := map[string]any{"channel": channel, "limit": 10}
+	if ts != "" {
+		args["latest"] = ts // exclusive by default
+	}
+	h, err := call(s.token(), "conversations.history", args)
+	if err != nil {
+		return "(could not read the forwarded message: " + err.Error() + ")", nil
+	}
+	msgs, _ := h["messages"].([]any)
+	for _, m := range msgs { // newest first
+		m, _ := m.(map[string]any)
+		mts, _ := m["ts"].(string)
+		if _, ours := mine.Load(mts); ours || m["bot_id"] != nil {
+			continue
+		}
+		if q, fs := content(m, false); q == "" && len(fs) == 0 {
+			return "", nil // the message before is not a forward
+		}
+		return s.fetch(content(m, true))
+	}
+	return "", nil
+}
+
+var imgExt = map[string]string{"image/png": ".png", "image/jpeg": ".jpg", "image/gif": ".gif", "image/webp": ".webp"}
+
+// fetch downloads the image files (needs the files:read scope); other files and failed
+// downloads are listed in the quote instead.
+func (s *Slack) fetch(quote string, files []map[string]any) (string, []chat.File) {
+	var out []chat.File
+	for _, f := range files {
+		name, _ := f["name"].(string)
+		mime, _ := f["mimetype"].(string)
+		link, _ := f["permalink"].(string)
+		u, _ := f["url_private_download"].(string)
+		if u == "" {
+			u, _ = f["url_private"].(string)
+		}
+		ext, img := imgExt[mime]
+		var data []byte
+		var err error
+		if img {
+			data, err = s.download(u)
+		}
+		if img && err == nil {
+			if !strings.HasSuffix(strings.ToLower(name), ext) {
+				name += ext
+			}
+			out = append(out, chat.File{Name: name, Data: data})
+			continue
+		}
+		note := "\n\n(file " + name + " " + link
+		if err != nil {
+			note += ", not downloaded: " + err.Error()
+		}
+		quote += note + ")"
+	}
+	return quote, out
+}
+
+func (s *Slack) download(u string) ([]byte, error) {
+	if u == "" {
+		return nil, fmt.Errorf("no url")
+	}
+	req, err := http.NewRequest("GET", u, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+s.token())
+	resp, err := (&http.Client{Timeout: 30 * time.Second}).Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	// without files:read Slack answers 200 with its HTML login page
+	if resp.StatusCode != 200 || !strings.HasPrefix(resp.Header.Get("Content-Type"), "image/") {
+		return nil, fmt.Errorf("HTTP %d %s (does the app have files:read?)", resp.StatusCode, resp.Header.Get("Content-Type"))
+	}
+	return io.ReadAll(io.LimitReader(resp.Body, 10<<20+1))
 }
