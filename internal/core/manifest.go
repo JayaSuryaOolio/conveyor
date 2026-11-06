@@ -20,8 +20,10 @@ import (
 // (like GitHub Actions), filled with shell-quoted values from the Vars table.
 type Manifest struct {
 	// Version is the manifest schema version; absent means 1. See migrateManifest.
-	Version     int    `json:"version,omitempty"`
-	Name        string `json:"name"`
+	Version int    `json:"version,omitempty"`
+	Name    string `json:"name"`
+	// ID names the app's runtime files (logs/app/<id>.log, apps/<id>.pid) and is ${{ app.id }}; default: Name as a slug.
+	ID          string `json:"id,omitempty"`
 	Description string `json:"description,omitempty"`
 	// Check is a sample-run script (`sh -c`, 30s); install fails, storing nothing, if it exits non-zero.
 	Check       string           `json:"check,omitempty"`
@@ -113,12 +115,20 @@ func migrateManifest(m *Manifest) error {
 var Placements = map[string]bool{"global_nav": false, "task_sidebar": true, "board_card": true}
 
 // ManifestVars are the placeholders available to `run`, e.g. ${{ task.key }}.
-var ManifestVars = []string{"app.name", "task.key", "task.title", "task.status", "repo.name", "worktree.path"}
+var ManifestVars = []string{"app.name", "app.id", "task.key", "task.title", "task.status", "repo.name", "worktree.path"}
 
 var (
 	varRe = regexp.MustCompile(`\$\{\{\s*([\w.]+)\s*\}\}`)
 	idRe  = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*$`)
 )
+
+// AppID is the manifest's id, else its name as a slug ("Review webhooks" -> "review-webhooks").
+func (m Manifest) AppID() string {
+	if m.ID != "" {
+		return m.ID
+	}
+	return strings.Trim(regexp.MustCompile(`[^a-z0-9]+`).ReplaceAllString(strings.ToLower(m.Name), "-"), "-")
+}
 
 // ParseManifest decodes and validates manifest JSON.
 func ParseManifest(raw string) (Manifest, error) {
@@ -136,6 +146,9 @@ func ParseManifest(raw string) (Manifest, error) {
 	}
 	if len(m.Actions)+len(m.Agents)+len(m.Automations) == 0 {
 		return m, fmt.Errorf("manifest: declare at least one action, agent or automation")
+	}
+	if m.ID != "" && !idRe.MatchString(m.ID) {
+		return m, fmt.Errorf("manifest: id %q must match [a-z0-9-]+", m.ID)
 	}
 	seen := map[string]bool{}
 	for i, a := range m.Actions {
@@ -535,7 +548,7 @@ func (s *Service) resolveAction(app, id, key string) (*ManifestAction, map[strin
 	if act == nil {
 		return nil, nil, "", fmt.Errorf("app %q has no action %q", app, id)
 	}
-	vars := map[string]string{"app.name": m.Name}
+	vars := map[string]string{"app.name": m.Name, "app.id": m.AppID()}
 	cwd := ""
 	if key == "" {
 		if cwd, err = os.UserHomeDir(); err != nil {

@@ -274,7 +274,7 @@ At most one pending check exists per task. Scheduling replaces the old one by `(
    "services":{"task_sidebar":{"status":"conveyor review-webhook --status","stop":"conveyor review-webhook --stop"}}}]}
 ```
 
-- `conveyor review-webhook` listens on `127.0.0.1` (random port, pid file in `~/.conveyor/`) and starts one `gh webhook forward --repo <r> --events=pull_request_review,pull_request_review_comment,issue_comment --url <listener>` per repo that has an open epic PR. An event schedules that task's check for now. It exits with a clear message if the `gh webhook` extension is missing.
+- `conveyor review-webhook` listens on `127.0.0.1` (random port, pid file `apps/<app-id>.pid`) and starts one `gh webhook forward --repo <r> --events=pull_request_review,pull_request_review_comment,issue_comment --url <listener>` per repo that has an open epic PR. An event schedules that task's check for now. It exits with a clear message if the `gh webhook` extension is missing.
 - One forward per repo is a GitHub limit; a second Conveyor on the same repo just fails that repo's forward, and the backoff checks still run.
 - **Prompt to add it:** the Epic view shows **Add review webhooks** when the epic has a PR and the app is not installed. Clicking installs the bundled manifest (same path as importing an app), and the service button appears in the Apps section of each task's right sidebar and asks for confirmation before starting. Without it, everything works on push-triggered checks and backoff.
 

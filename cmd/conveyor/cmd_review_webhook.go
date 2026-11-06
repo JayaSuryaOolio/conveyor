@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"syscall"
@@ -21,11 +22,14 @@ func init() {
 	register("review-webhook", runReviewWebhook, "opt-in review webhooks: forward PR review events to review checks ([--status|--stop])")
 }
 
-func pidFile(home string) string { return filepath.Join(home, "review-webhook.pid") }
+// defaultApp is the id the built-in start (an open epic) runs under; the bundled manifest's slug matches it.
+const defaultApp = "review-webhooks"
+
+func pidFile(home, app string) string { return filepath.Join(home, "apps", app+".pid") }
 
 // runningPID returns the live listener's pid, or 0.
-func runningPID(home string) int {
-	b, err := os.ReadFile(pidFile(home))
+func runningPID(home, app string) int {
+	b, err := os.ReadFile(pidFile(home, app))
 	if err != nil {
 		return 0
 	}
@@ -41,10 +45,14 @@ func runReviewWebhook(home string, args []string) error {
 	status := fs.Bool("status", false, "exit 0 when the listener is running")
 	stop := fs.Bool("stop", false, "stop the listener")
 	serve := fs.Bool("serve", false, "run in the foreground (what the default start launches)")
+	app := fs.String("app", defaultApp, "app id: names the pid file and logs/app/<id>.log (${{ app.id }})")
 	if _, err := parseArgs(fs, args); err != nil {
 		return err
 	}
-	pid := runningPID(home)
+	if !regexp.MustCompile(`^[a-z0-9][a-z0-9-]*$`).MatchString(*app) {
+		return fmt.Errorf("invalid --app %q", *app)
+	}
+	pid := runningPID(home, *app)
 	switch {
 	case *status:
 		if pid == 0 {
@@ -61,10 +69,13 @@ func runReviewWebhook(home string, args []string) error {
 		if pid != 0 {
 			return fmt.Errorf("review-webhook already running (pid %d)", pid)
 		}
-		if err := os.WriteFile(pidFile(home), []byte(strconv.Itoa(os.Getpid())), 0o600); err != nil {
+		if err := os.MkdirAll(filepath.Dir(pidFile(home, *app)), 0o755); err != nil {
 			return err
 		}
-		defer os.Remove(pidFile(home))
+		if err := os.WriteFile(pidFile(home, *app), []byte(strconv.Itoa(os.Getpid())), 0o600); err != nil {
+			return err
+		}
+		defer os.Remove(pidFile(home, *app))
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 		defer cancel()
 		return withService(home, func(s *core.Service) error { return gh.RunWebhook(ctx, s.DB) })
@@ -81,20 +92,18 @@ func runReviewWebhook(home string, args []string) error {
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Join(home, "logs"), 0o755); err != nil {
-		return err
-	}
-	logf, err := os.OpenFile(filepath.Join(home, "logs", "review-webhook.log"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	logRel := filepath.Join("logs", "app", *app+".log")
+	logf, err := core.OpenLog(filepath.Join(home, logRel))
 	if err != nil {
 		return err
 	}
 	defer logf.Close()
-	c := exec.Command(self, "--home", home, "review-webhook", "--serve")
+	c := exec.Command(self, "--home", home, "review-webhook", "--app", *app, "--serve")
 	c.Stdout, c.Stderr = logf, logf
 	c.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 	if err := c.Start(); err != nil {
 		return err
 	}
-	fmt.Fprintf(out, "started (pid %d), log logs/review-webhook.log\n", c.Process.Pid)
+	fmt.Fprintf(out, "started (pid %d), log %s\n", c.Process.Pid, logRel)
 	return c.Process.Release()
 }

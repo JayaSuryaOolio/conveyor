@@ -214,19 +214,33 @@ func TestReviewWebhookCLI(t *testing.T) {
 	if b, err := run(); err != nil {
 		t.Fatalf("start: %v: %s", err, b)
 	}
-	for i := 0; i < 50 && runningPID(home) == 0; i++ {
+	for i := 0; i < 50 && runningPID(home, defaultApp) == 0; i++ {
 		time.Sleep(100 * time.Millisecond)
 	}
 	if out := cv(t, home, "review-webhook", "--status"); !strings.Contains(out, "running") {
 		t.Fatal(out)
 	}
 	cv(t, home, "review-webhook", "--stop")
-	for i := 0; i < 50 && runningPID(home) != 0; i++ {
+	for i := 0; i < 50 && runningPID(home, defaultApp) != 0; i++ {
 		time.Sleep(100 * time.Millisecond)
 	}
-	if runningPID(home) != 0 {
+	if runningPID(home, defaultApp) != 0 {
 		t.Fatal("still running after --stop")
 	}
+	// a second instance under its own id gets its own pid file and log
+	if out := cv(t, home, "review-webhook", "--app", "rw-v2"); !strings.Contains(out, "logs/app/rw-v2.log") {
+		t.Fatal(out)
+	}
+	for i := 0; i < 50 && runningPID(home, "rw-v2") == 0; i++ {
+		time.Sleep(100 * time.Millisecond)
+	}
+	if runningPID(home, defaultApp) != 0 || runningPID(home, "rw-v2") == 0 {
+		t.Fatal("instances not independent")
+	}
+	if _, err := os.Stat(filepath.Join(home, "logs", "app", "rw-v2.log")); err != nil {
+		t.Fatal(err)
+	}
+	cv(t, home, "review-webhook", "--app", "rw-v2", "--stop")
 }
 
 // cvFail runs conveyor expecting a non-zero exit and returns its output.
