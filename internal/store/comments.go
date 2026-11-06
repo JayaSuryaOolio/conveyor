@@ -105,3 +105,15 @@ func ReleaseIfNothingQueued(db *sql.DB, taskID int64) error {
 	_, err = UpdateTaskStatus(db, taskID, StatusNeedsYou, ActorHuman)
 	return err
 }
+
+// LatestComment returns the task's newest comment (sql.ErrNoRows when it has none).
+func LatestComment(db *sql.DB, taskID int64) (Comment, error) {
+	cs, err := queryComments(db, `task_id=? AND id=(SELECT MAX(id) FROM comments WHERE task_id=?)`, taskID, taskID)
+	if err != nil {
+		return Comment{}, err
+	}
+	if len(cs) == 0 {
+		return Comment{}, sql.ErrNoRows
+	}
+	return cs[0], nil
+}

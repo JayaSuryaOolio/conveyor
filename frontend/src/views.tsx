@@ -14,6 +14,9 @@ const TermDock = lazy(() => import('./terminals'))
 
 const COLUMNS = [['backlog', 'Backlog'], ['todo', 'Todo'], ['running', 'Running'], ['needs_you', 'Needs you'], ['review', 'Review'], ['done', 'Done (7d)'], ['cancelled', 'Cancelled (7d)']]
 const FOCUS_ORDER = ['needs_you', 'review', 'failed', 'running', 'todo']
+// Focus: what is waiting on you first (the agent spoke last, or it failed), newest message first; then the rest by newest message.
+const lastAt = (c: ui.TaskCard) => Date.parse(c.lastMsgAt || c.updatedAt)
+const waiting = (c: ui.TaskCard) => c.status === 'needs_you' || c.status === 'review' || c.status === 'failed' ? 0 : 1
 const WEEK = 7 * 24 * 3600 * 1000
 const ARCHIVE = ['done', 'cancelled'] // collapsed until opened
 
@@ -141,7 +144,7 @@ export function Focus({nav}: {nav: Nav}) {
     if (error) return <Text c="red">{error}</Text>
     const rows = (data ?? [])
         .filter(c => FOCUS_ORDER.includes(c.status))
-        .sort((a, b) => FOCUS_ORDER.indexOf(a.status) - FOCUS_ORDER.indexOf(b.status))
+        .sort((a, b) => waiting(a) - waiting(b) || lastAt(b) - lastAt(a) || a.priority - b.priority)
     return (
         <Stack maw={800}>
             <Title order={3}>Focus</Title>
@@ -153,6 +156,7 @@ export function Focus({nav}: {nav: Nav}) {
                             <StatusBadge status={c.status}/>
                             <Text size="sm" fw={600}>{c.key}</Text>
                             <Text size="sm" style={{flex: 1}} lineClamp={1}>{c.title}</Text>
+                            <Text size="xs" c="dimmed">{c.lastMsgBy ? c.lastMsgBy + ' · ' : ''}<Time iso={c.lastMsgAt || c.updatedAt}/></Text>
                             <Button variant="default" size="xs" onClick={() => nav({name: 'task', key: c.key})}>Open</Button>
                         </Group>
                         {c.lastSummary && <Box mah={40} style={{overflow: 'hidden'}}><Markdown c="dimmed">{c.lastSummary}</Markdown></Box>}
