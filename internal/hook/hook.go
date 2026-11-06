@@ -193,11 +193,9 @@ func onStop(db *sql.DB, task store.Task, run store.Run, p payload) error {
 		}
 	}
 	for _, l := range block.Learnings {
-		// Skip a learning this repo already has in any status, so a rejected one doesn't come back.
-		if _, err := db.Exec(`INSERT INTO learnings (task_id, run_id, repo_id, body, status, created_at)
-			SELECT ?,?,?,?,'proposed',? WHERE NOT EXISTS (SELECT 1 FROM learnings WHERE repo_id IS ? AND body = ?)`,
-			task.ID, run.ID, repoID, l, ended, repoID, l); err != nil {
-			return fmt.Errorf("insert learning: %w", err)
+		// Skip a learning this repo already has in any status (case/punctuation-insensitive), so a rejected one doesn't come back.
+		if err := store.InsertLearningIfNew(db, task.ID, run.ID, repoID, l, ended); err != nil {
+			return err
 		}
 	}
 	for _, s := range block.Spawn {

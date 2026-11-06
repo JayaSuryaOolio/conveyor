@@ -583,6 +583,16 @@ func (a *App) AcceptLearning(id int64, target string) error {
 // RejectLearning rejects a learning.
 func (a *App) RejectLearning(id int64) error { return learning.Reject(a.svc.DB, id) }
 
+// RejectSimilarLearnings rejects this learning and every proposed one sharing its first 40 characters; returns the count.
+func (a *App) RejectSimilarLearnings(id int64) (int, error) {
+	return store.RejectSamePrefix(a.svc.DB, id)
+}
+
+// RejectLearningCategory bulk-rejects proposed learnings in a junk category ("placeholder", "personal-env"); returns the count.
+func (a *App) RejectLearningCategory(category string) (int, error) {
+	return store.RejectCategory(a.svc.DB, category)
+}
+
 // EditLearning replaces a learning's body.
 func (a *App) EditLearning(id int64, body string) error { return learning.Edit(a.svc.DB, id, body) }
 
