@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/JayaSuryaOolio/conveyor/internal/core"
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 )
 
@@ -662,5 +663,44 @@ func TestEpicWaitsWhileChildrenQueued(t *testing.T) {
 	}
 	if got := e.get(t, child.ID); got.Status != store.StatusRunning {
 		t.Fatalf("child: %s", got.Status)
+	}
+}
+
+// A spawned `[todo]` child blocked by a task starts once the blocker is done; a plain one stays in backlog.
+func TestSpawnedTodoChildStartsAfterBlocker(t *testing.T) {
+	e := setup(t)
+	parent, blocker := e.task(t, "parent", 0), e.task(t, "blocker", 0)
+	parent, _ = store.GetTask(e.db, parent.ID)
+	kids, err := core.SpawnChildren(e.db, parent, []string{"[todo] auto | do it", "parked | do it later"})
+	if err != nil || len(kids) != 2 {
+		t.Fatalf("spawn: %v %d", err, len(kids))
+	}
+	auto, parked := kids[0], kids[1]
+	if auto.Status != store.StatusTodo || parked.Status != store.StatusBacklog {
+		t.Fatalf("statuses %s/%s", auto.Status, parked.Status)
+	}
+	for _, id := range []int64{auto.ID, parked.ID} {
+		if err := store.AddLink(e.db, blocker.ID, id, store.LinkBlocks); err != nil {
+			t.Fatal(err)
+		}
+	}
+	e.tick(t) // blocker launches; its children wait
+	if got := e.get(t, auto.ID).Status; got != store.StatusTodo {
+		t.Fatalf("blocked todo child is %s", got)
+	}
+	for _, to := range []struct {
+		s store.Status
+		a store.Actor
+	}{{store.StatusReview, store.ActorSystem}, {store.StatusDone, store.ActorHuman}} {
+		if _, err := store.UpdateTaskStatus(e.db, blocker.ID, to.s, to.a); err != nil {
+			t.Fatal(err)
+		}
+	}
+	e.tick(t)
+	if got := e.get(t, auto.ID).Status; got != store.StatusRunning {
+		t.Fatalf("todo child is %s, want running", got)
+	}
+	if got := e.get(t, parked.ID).Status; got != store.StatusBacklog {
+		t.Fatalf("backlog child is %s", got)
 	}
 }
