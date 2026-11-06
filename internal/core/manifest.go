@@ -37,6 +37,8 @@ type ManifestAction struct {
 	Run    string   `json:"run"`
 	Places []string `json:"places"`
 	Output bool     `json:"output,omitempty"`
+	// Confirm, when set, is asked (OK/Cancel) before the action runs or starts its service; stopping is never confirmed.
+	Confirm string `json:"confirm,omitempty"`
 	// Icon, a data:image/ URL (e.g. an inline SVG), shows the action as an icon button with
 	// Label as its tooltip.
 	Icon string `json:"icon,omitempty"`
@@ -434,6 +436,7 @@ type Placed struct {
 	Output  bool   `json:"output"`
 	Service bool   `json:"service"`
 	Icon    string `json:"icon,omitempty"`
+	Confirm string `json:"confirm,omitempty"`
 }
 
 // PlacedActions lists the manifest actions that asked for place.
@@ -458,7 +461,7 @@ func (s *Service) PlacedActions(place string) ([]Placed, error) {
 				if x.IconPath != "" {
 					icon = iconURL(x.IconPath)
 				}
-				out = append(out, Placed{a.Name, x.ID, x.Label, x.Output, svc, icon})
+				out = append(out, Placed{a.Name, x.ID, x.Label, x.Output, svc, icon, x.Confirm})
 			}
 		}
 	}

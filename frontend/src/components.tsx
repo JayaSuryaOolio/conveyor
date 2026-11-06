@@ -46,16 +46,26 @@ export const runApp = (a: store.App, p: Promise<string>) =>
 export function PlacedButtons({place, k = '', size = 'xs'}: {place: string; k?: string; size?: string}) {
     const {data} = useData(() => PlacedActions(place), [place])
     const [busy, setBusy] = useState('')
+    const [ask, setAsk] = useState<{label: string; msg: string; go: () => void}>()
     if (!data?.length) return null
-    const run = (a: {app: string; id: string; label: string; output: boolean; icon?: string}) => {
+    // A manifest action's `confirm` text is asked before it runs (or starts its service).
+    const guard = (a: {label: string; confirm?: string}, go: () => void) => (a.confirm ? setAsk({label: a.label, msg: a.confirm, go}) : go())
+    const run = (a: {app: string; id: string; label: string; output: boolean; icon?: string; confirm?: string}) => guard(a, () => {
         setBusy(a.app + a.id)
         RunAppAction(a.app, a.id, place, k).then(out => { if (a.output) toast(out || `${a.label}: done`) }, appErr).finally(() => setBusy(''))
-    }
+    })
     return (
         <Group gap={4} onClick={e => e.stopPropagation()}>
+            <Modal opened={!!ask} onClose={() => setAsk(undefined)} title={ask?.label}>
+                <Text size="sm" mb="sm">{ask?.msg}</Text>
+                <Group justify="flex-end">
+                    <Button variant="default" onClick={() => setAsk(undefined)}>Cancel</Button>
+                    <Button data-autofocus onClick={() => { ask?.go(); setAsk(undefined) }}>Continue</Button>
+                </Group>
+            </Modal>
             {/* icon actions first, then text buttons (sort is stable, so manifest order holds within each group) */}
             {[...data].sort((x, y) => Number(!!y.icon) - Number(!!x.icon)).map(a => a.service
-                ? <ServiceButton key={a.app + a.id} a={a} place={place} k={k} size={size}/>
+                ? <ServiceButton key={a.app + a.id} a={a} place={place} k={k} size={size} guard={guard}/>
                 : a.icon
                     ? <Tooltip key={a.app + a.id} label={a.label}><ActionIcon size={iconSize(size)} variant="default" aria-label={a.label} loading={busy === a.app + a.id} onClick={() => run(a)}><ActionImg src={a.icon}/></ActionIcon></Tooltip>
                     : <Button key={a.app + a.id} size={size} variant="default" loading={busy === a.app + a.id} title={a.app} onClick={() => run(a)}>{a.label}</Button>)}
@@ -68,14 +78,15 @@ const ActionImg = ({src}: {src: string}) => <img src={src} alt="" width={16} hei
 const iconSize = (size: string) => (size.startsWith('compact') ? 'sm' : 'md')
 
 /** A service action at `place` (each place has its own service): a green pulsing dot while its status script succeeds, a click then stops it; otherwise a click starts it and flashes a check/cross. */
-function ServiceButton({a, place, k, size}: {a: {app: string; id: string; label: string; icon?: string}; place: string; k: string; size: string}) {
+function ServiceButton({a, place, k, size, guard}: {a: {app: string; id: string; label: string; icon?: string; confirm?: string}; place: string; k: string; size: string; guard: (a: {label: string; confirm?: string}, go: () => void) => void}) {
     const [running, setRunning] = useState(false)
     const [res, setRes] = useState<boolean | null>(null)
     const check = () => AppServiceRunning(a.app, a.id, place, k).then(setRunning, () => setRunning(false))
     useEffect(() => { check() }, [a.app, a.id, place, k]) // eslint-disable-line react-hooks/exhaustive-deps
-    const click = () => (running ? StopAppService(a.app, a.id, place, k) : RunAppAction(a.app, a.id, place, k).then(() => {}))
+    const go = () => (running ? StopAppService(a.app, a.id, place, k) : RunAppAction(a.app, a.id, place, k).then(() => {}))
         .then(() => setRes(true), e => { setRes(false); appErr(e) })
         .finally(() => { setTimeout(() => setRes(null), 1500); check() })
+    const click = () => (running ? go() : guard(a, go))
     const flash = res === null ? undefined : res ? <IconCheck size={14} color="var(--mantine-color-green-6)"/> : <IconX size={14} color="var(--mantine-color-red-6)"/>
     return (
         <Tooltip label={running ? `${a.label} running – click to stop` : a.label}>
