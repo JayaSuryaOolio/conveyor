@@ -1,6 +1,6 @@
 import {useState} from 'react'
 import {Button, Group, Stack, Text, TextInput, Title} from '@mantine/core'
-import {AcceptLearning, ApplyLearnings, EditLearning, Learnings as ListLearnings, RejectLearning} from '../wailsjs/go/ui/App'
+import {AcceptLearning, ApplyLearnings, EditLearning, Learnings as ListLearnings, RejectLearning, RejectLearningCategory, RejectSimilarLearnings} from '../wailsjs/go/ui/App'
 import {ui} from '../wailsjs/go/models'
 import {Nav, errMsg} from './components'
 import {useData} from './util'
@@ -13,6 +13,11 @@ export function LearningsPage({nav}: {nav: Nav}) {
         <Stack maw={1000}>
             <Title order={3}>Learnings</Title>
             {error && <Text c="red">{error}</Text>}
+            <Group gap="xs">
+                {['placeholder', 'personal-env'].map(c => (
+                    <Button key={c} size="xs" variant="default" color="red" onClick={() => RejectLearningCategory(c).then(reload, errMsg)}>Reject all {c}</Button>
+                ))}
+            </Group>
             {data?.length === 0 && <Text c="dimmed">Nothing proposed.</Text>}
             {Object.keys(groups).sort().map(repo => (
                 <Stack key={repo} gap="xs">
@@ -42,6 +47,7 @@ function LearningItem({l, reload}: {l: ui.LearningRow; reload: () => void}) {
                 {l.status === 'accepted' ? 'Accepted' : 'Accept'}
             </Button>
             <Button variant="default" color="red" onClick={() => RejectLearning(l.id).then(done, errMsg)}>Reject</Button>
+            <Button variant="default" color="red" title="Reject every proposed learning starting with the same 40 characters" onClick={() => RejectSimilarLearnings(l.id).then(done, errMsg)}>Reject similar</Button>
         </Group>
     )
 }
