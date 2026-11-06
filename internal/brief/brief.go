@@ -27,7 +27,7 @@ next: what remains
 criteria:
 - [x] AC1 - evidence
 - [ ] AC2 - why not
-learning: a non-obvious fact about this repo that would save a future task real time; not a recap of this task or a one-off workaround; usually none (repeatable line)
+learning: only if this repo had a trap that cost you >10 min and is not in CLAUDE.md/SKILL.md/LEARNINGS.md. Name the file or command. Omit the line otherwise. (repeatable line)
 spawn: child task title | description with everything its agent needs (repeatable line)
 </conveyor>
 ` + "```" + `
