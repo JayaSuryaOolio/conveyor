@@ -292,11 +292,11 @@ func (d *Dispatcher) pollPRs(ctx context.Context) {
 	}
 }
 
-// ensureWebhook starts the review-webhook listener once the app is installed (a no-op when it already runs).
-// Without the app or the gh extension, epics keep the backoff checks.
+// ensureWebhook starts the review-webhook listener once the app is installed or an epic task is open
+// (a no-op when it already runs). Without the gh extension, tasks keep the backoff checks.
 func (d *Dispatcher) ensureWebhook() {
 	if d.ConveyorBin == "" || !d.lastHook.IsZero() && d.now().Sub(d.lastHook) < time.Minute ||
-		!(&core.Service{DB: d.DB}).ReviewWebhooksInstalled() {
+		!(&core.Service{DB: d.DB}).ReviewWebhooksWanted() {
 		return
 	}
 	d.lastHook = d.now()

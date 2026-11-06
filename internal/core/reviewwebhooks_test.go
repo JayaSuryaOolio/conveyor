@@ -25,6 +25,21 @@ func TestReviewWebhooksInstall(t *testing.T) {
 	}
 }
 
+func TestReviewWebhooksWanted(t *testing.T) {
+	s := newSvc(t)
+	if s.ReviewWebhooksWanted() {
+		t.Fatal("wanted on a fresh home")
+	}
+	tk, err := s.CreateTask(NewTaskInput{Title: "e", Repos: []string{"a"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	store.AddLabel(s.DB, tk.ID, "epic:x")
+	if !s.ReviewWebhooksWanted() {
+		t.Fatal("open epic task should want it")
+	}
+}
+
 func TestDisabledAppIsInert(t *testing.T) {
 	s := newSvc(t)
 	if err := s.InstallExample("review-webhooks"); err != nil {
