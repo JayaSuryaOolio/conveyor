@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -103,20 +104,20 @@ func TestNotFound(t *testing.T) {
 
 func TestResume(t *testing.T) {
 	log := fakeClaude(t, map[string]string{"resume": "backgrounded · same\n"})
-	id, err := Resume(context.Background(), t.TempDir(), "bg1", "sess1", "/s.json", "delta")
+	id, err := Resume(context.Background(), t.TempDir(), "bg1", "sess1", "/s.json", "delta", []string{"/w2", "/w3"})
 	if err != nil || id != "same" {
 		t.Fatalf("id=%q err=%v", id, err)
 	}
 	cs := readLog(t, log)
 	if len(cs) != 2 || !reflect.DeepEqual(cs[0].args, []string{"stop", "bg1"}) ||
-		!reflect.DeepEqual(cs[1].args, []string{"--bg", "--resume", "sess1", "--settings", "/s.json", "delta"}) {
+		!reflect.DeepEqual(cs[1].args, []string{"--bg", "--resume", "sess1", "--settings", "/s.json", "delta", "--add-dir", "/w2", "/w3"}) {
 		t.Fatalf("calls %+v", cs)
 	}
 }
 
 func TestResumeCopy(t *testing.T) {
 	fakeClaude(t, map[string]string{"resume": "started a copy as newid.\nbackgrounded · other\n"})
-	id, err := Resume(context.Background(), t.TempDir(), "bg1", "s", "/s.json", "p")
+	id, err := Resume(context.Background(), t.TempDir(), "bg1", "s", "/s.json", "p", nil)
 	if err != nil || id != "newid" {
 		t.Fatalf("id=%q err=%v", id, err)
 	}
@@ -162,6 +163,16 @@ func TestWriteSettings(t *testing.T) {
 	if m.Worktree.BgIsolation != "none" || len(m.Hooks) != 5 {
 		t.Fatalf("settings %s", b)
 	}
+	var perm struct {
+		Permissions struct {
+			BlockWritesOutsideWorkingDirectories bool
+			AdditionalDirectories                []string
+		}
+	}
+	json.Unmarshal(b, &perm)
+	if !perm.Permissions.BlockWritesOutsideWorkingDirectories || !slices.Contains(perm.Permissions.AdditionalDirectories, "/tmp") {
+		t.Fatalf("writes outside the worktrees must be blocked, /tmp allowed: %s", b)
+	}
 	if !strings.Contains(string(b), `"matcher": "Bash"`) {
 		t.Fatalf("PreToolUse needs a Bash matcher: %s", b)
 	}
@@ -175,7 +186,7 @@ func TestCommandStrings(t *testing.T) {
 	if got := AttachCommand("a b"); got != "claude attach 'a b'" {
 		t.Fatal(got)
 	}
-	if got := ResumeCommand("s 1", "/my dir/s.json"); got != "claude --resume 's 1' --settings '/my dir/s.json'" {
+	if got := ResumeCommand("s 1", "/my dir/s.json", []string{"/a b"}); got != "claude --resume 's 1' --settings '/my dir/s.json' --add-dir '/a b'" {
 		t.Fatal(got)
 	}
 	got := FreshCommand("/my dir/s.json", "/my dir/brief.md", []string{"/a b", "/it's"})

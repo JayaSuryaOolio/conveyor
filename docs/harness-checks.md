@@ -54,7 +54,7 @@ Per run (transcript):
 | 3 | Tests after the last code edit | Stop (gate) | transcript scan, already read | medium: keyword heuristic; edits via `sed -i` are missed | built |
 | 4 | Changeset present | Stop (gate) | one `git diff` | medium: changes that need no release; the message says to explain in the summary | built |
 | 5 | Per-run waste metrics (hook denials, re-reads, duplicate commands, large results) saved on the run at Stop, shown by `task show --runs` and read by conveyor-doctor | Stop | transcript scan | none (measurement, never blocks) | built (CV-88A): runs `hook_denials`, `rereads`, `dup_bash`, `big_results` |
-| 6 | Edits outside the task's worktrees | PreToolUse on Edit/Write (deny, allow the scratchpad, `/tmp`, `~/.claude`) | path prefix check | low | sub-task |
+| 6 | Edits outside the task's worktrees | Claude Code's own `permissions.blockWritesOutsideWorkingDirectories` in the launch settings, not a hook; `additionalDirectories` allows `/tmp` (scratchpad), `$TMPDIR`, `~/.claude/projects` (memory) and `~/.claude/plans`. Resumes pass `--add-dir` again (a resumed session forgets it). Bash writes are not covered | none | low | built (CV-88B) |
 | 7 | Stuck loop: the same failing Bash command 3 times in a row | PreToolUse (Bash), state in a per-session file | small file read/write per call | low | sub-task |
 | 8 | PR body has the repo template's sections | Stop (gate), reads `.github/pull_request_template.md` headings | 1 gh call | medium: templates vary | later, after 5 shows it matters |
 | 9 | `done` with unchecked criteria, or `tests: not run` after code edits | Stop (gate) | none | high: partial work is often legitimate | not planned; 3 covers the useful part |
