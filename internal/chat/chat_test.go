@@ -136,3 +136,41 @@ func TestRetryDelayBacksOffAndCaps(t *testing.T) {
 		}
 	}
 }
+
+func TestNewTaskFromForward(t *testing.T) {
+	home := t.TempDir()
+	db, err := store.Open(filepath.Join(home, "c.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	store.AddRepo(db, store.Repo{Name: "a", Path: "/x/a", DefaultBranch: "main"})
+	b := &bridge{&core.Service{DB: db, Home: home}, t.Logf}
+	png := []byte("\x89PNG\r\n\x1a\n")
+	fwd := func() (string, []File) { return "> it crashes\n\n— Bob", []File{{"shot.png", png}} }
+	if r := b.handle(In{Text: "new fix this crash", Fwd: fwd}); !strings.HasPrefix(r, "created ") {
+		t.Fatal(r)
+	}
+	store.AddRepo(db, store.Repo{Name: "b", Path: "/x/b", DefaultBranch: "main"})
+	if r := b.handle(In{Text: "new fix it"}); !strings.Contains(r, "Name a repo") {
+		t.Fatalf("two repos need a name: %s", r)
+	}
+	if r := b.handle(In{Text: "new b", Fwd: fwd}); !strings.HasPrefix(r, "created ") {
+		t.Fatal(r)
+	}
+	ts, _ := store.ListTasks(db)
+	if len(ts) != 2 {
+		t.Fatalf("want 2 tasks, got %d", len(ts))
+	}
+	for _, tk := range ts {
+		if !strings.Contains(tk.Description, "> it crashes") || !strings.Contains(tk.Description, "![shot.png]("+home) {
+			t.Fatalf("description lacks quote or image:\n%s", tk.Description)
+		}
+	}
+	if ts[0].Title != "fix this crash" && ts[1].Title != "fix this crash" {
+		t.Fatalf("titles: %q %q", ts[0].Title, ts[1].Title)
+	}
+	if ts[0].Title != "it crashes" && ts[1].Title != "it crashes" {
+		t.Fatal("empty comment should take the title from the forward")
+	}
+}
