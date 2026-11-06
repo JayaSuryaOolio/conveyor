@@ -2,9 +2,12 @@ package chat
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/JayaSuryaOolio/conveyor/internal/core"
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
@@ -35,7 +38,9 @@ func TestNotifyHonoursStatusesAndToggle(t *testing.T) {
 	store.UpdateTaskStatus(db, tk.ID, store.StatusNeedsYou, store.ActorSystem)
 	store.UpdateTaskStatus(db, tk.ID, store.StatusTodo, store.ActorHuman)
 	store.UpdateTaskStatus(db, tk.ID, store.StatusRunning, store.ActorSystem)
-	store.UpdateTaskStatus(db, tk.ID, store.StatusReview, store.ActorSystem) // filtered out
+	store.UpdateTaskStatus(db, tk.ID, store.StatusReview, store.ActorSystem)   // filtered out
+	store.UpdateTaskStatus(db, tk.ID, store.StatusRunning, store.ActorSystem)  // first needs_you is now stale
+	store.UpdateTaskStatus(db, tk.ID, store.StatusNeedsYou, store.ActorSystem) // current: sent
 	b.notify(f)
 	if len(f.got) != 1 || f.got[0].Status != "needs_you" {
 		t.Fatalf("want one needs_you msg, got %+v", f.got)
@@ -47,6 +52,38 @@ func TestNotifyHonoursStatusesAndToggle(t *testing.T) {
 	b.notify(f)
 	if len(f.got) != 1 {
 		t.Fatalf("replayed while disabled: %+v", f.got)
+	}
+}
+
+type failing struct{ n int }
+
+func (f *failing) Ready() bool                                   { return true }
+func (f *failing) Send(Msg) error                                { f.n++; return errors.New("invalid_blocks") }
+func (f *failing) Listen(context.Context, func(In) string) error { return nil }
+
+// A send that keeps failing holds the cursor only until the event is maxRetry old (CV-98).
+func TestNotifyDropsEventFailingPastMaxRetry(t *testing.T) {
+	db, err := store.Open(filepath.Join(t.TempDir(), "c.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	repo, _ := store.AddRepo(db, store.Repo{Name: "a", Path: "/x/a", DefaultBranch: "main"})
+	tk, _ := store.CreateTask(db, store.Task{Title: "t", Status: store.StatusRunning}, []store.TaskRepo{{RepoID: repo.ID, IsPrimary: true, Branch: "t"}})
+	b := &bridge{&core.Service{DB: db}, t.Logf}
+	f := &failing{}
+	b.notify(f)
+	store.SetSetting(db, "chat_statuses", "review")
+	store.UpdateTaskStatus(db, tk.ID, store.StatusReview, store.ActorSystem)
+	b.notify(f)
+	b.notify(f)
+	if f.n != 2 || store.GetSetting(db, cursorKey) == strconv.FormatInt(b.maxEvent(), 10) {
+		t.Fatalf("fresh failure should retry and hold the cursor: sends=%d", f.n)
+	}
+	db.Exec(`UPDATE events SET created_at=? WHERE kind='status_changed'`, time.Now().Add(-2*maxRetry).UTC().Format(time.RFC3339))
+	b.notify(f)
+	if got := store.GetSetting(db, cursorKey); got != strconv.FormatInt(b.maxEvent(), 10) {
+		t.Fatalf("old failing event should be dropped, cursor=%s", got)
 	}
 }
 
