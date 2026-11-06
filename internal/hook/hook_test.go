@@ -45,6 +45,15 @@ func (e env) fire(t *testing.T, event string, m map[string]any) error {
 	if _, ok := m["cwd"]; !ok {
 		m["cwd"] = e.cwd()
 	}
+	_, err := e.fireOut(t, event, m)
+	return err
+}
+
+func (e env) fireOut(t *testing.T, event string, m map[string]any) (string, error) {
+	t.Helper()
+	if _, ok := m["cwd"]; !ok {
+		m["cwd"] = e.cwd()
+	}
 	b, _ := json.Marshal(m)
 	return Handle(e.db, e.home, event, b)
 }
@@ -272,7 +281,7 @@ func TestOutsideWorkspacesIgnored(t *testing.T) {
 
 func TestMalformedJSON(t *testing.T) {
 	e := setup(t, store.StatusRunning)
-	if err := Handle(e.db, e.home, "Stop", []byte("{nope")); err == nil {
+	if _, err := Handle(e.db, e.home, "Stop", []byte("{nope")); err == nil {
 		t.Fatal("want error")
 	}
 }

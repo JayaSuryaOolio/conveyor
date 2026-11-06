@@ -25,49 +25,66 @@ type payload struct {
 	LastAssistantMessage string `json:"last_assistant_message"`
 	Message              string `json:"message"`
 	NotificationType     string `json:"notification_type"`
+	StopHookActive       bool   `json:"stop_hook_active"`
+	FilePath             string `json:"file_path"` // InstructionsLoaded
 }
 
-// Handle processes one hook event. Callers log the returned error and still exit 0.
-func Handle(db *sql.DB, home, event string, raw []byte) error {
+// Handle processes one hook event and returns what to print on stdout (a Stop it blocks), or "".
+// Callers log the returned error and still exit 0.
+func Handle(db *sql.DB, home, event string, raw []byte) (string, error) {
 	var p payload
 	if err := json.Unmarshal(raw, &p); err != nil {
-		return fmt.Errorf("parse %s payload: %w", event, err)
+		return "", fmt.Errorf("parse %s payload: %w", event, err)
 	}
 	key := workspace.KeyFromCwd(home, p.Cwd)
 	if key == "" {
-		return nil // not one of ours
+		return "", nil // not one of ours
 	}
 	task, err := store.GetTaskByKey(db, key)
 	if err != nil {
-		return fmt.Errorf("hook %s: %w", event, err)
+		return "", fmt.Errorf("hook %s: %w", event, err)
+	}
+	if event == "InstructionsLoaded" { // read by the completion check: was the repo's CLAUDE.md loaded
+		if !strings.HasPrefix(p.FilePath, workspace.Dir(home, key)+"/") {
+			return "", nil // user-level and other files: not what the check asks about
+		}
+		return "", store.RecordEvent(db, task.ID, "instructions_loaded", p.FilePath)
 	}
 	if event == "Notification" {
 		if err := store.RecordEvent(db, task.ID, "notification", strings.TrimSpace(p.NotificationType+" "+p.Message)); err != nil {
-			return err
+			return "", err
 		}
 		// The session is blocked on the human (a question or a permission prompt). The answer fires no
 		// hook, so the task stays here until the next Stop (which resumes it) or prompt.
 		if task.Status == store.StatusRunning && (p.NotificationType == "permission_prompt" || p.NotificationType == "elicitation_dialog") {
 			_, err := store.UpdateTaskStatus(db, task.ID, store.StatusNeedsYou, store.ActorSystem)
-			return err
+			return "", err
 		}
-		return nil
+		return "", nil
 	}
 	if event != "UserPromptSubmit" && event != "Stop" {
-		return nil
+		return "", nil
 	}
 	run, err := resolveRun(db, task, p.SessionID)
 	if err != nil {
-		return err
+		return "", err
 	}
 	if event == "UserPromptSubmit" {
-		return onPrompt(db, task, run)
+		return "", onPrompt(db, task, run)
 	}
 	// Before onStop: its status change fires the chat DM, which reads pr_url for the Open PR button.
-	if err := refreshPR(db, task.ID); err != nil { // best effort
-		store.RecordEvent(db, task.ID, "error", "pr refresh: "+err.Error())
+	prErr := refreshPR(db, task.ID)
+	if prErr != nil { // best effort
+		store.RecordEvent(db, task.ID, "error", "pr refresh: "+prErr.Error())
 	}
-	return onStop(db, task, run, p)
+	gaps, err := completionGaps(db, task, run, p, prErr == nil)
+	if err != nil {
+		store.RecordEvent(db, task.ID, "error", "completion check: "+err.Error())
+	}
+	if len(gaps) > 0 { // the session keeps going; its next Stop records the run
+		return stopBlock(gaps), store.RecordEvent(db, task.ID, "completion_check", strings.Join(gaps, "; "))
+	}
+	return "", onStop(db, task, run, p)
 }
 
 // refreshPR syncs the task's PR state as its session returns; the dispatcher poll is the fallback.

@@ -159,7 +159,7 @@ func TestWriteSettings(t *testing.T) {
 	if err := json.Unmarshal(b, &m); err != nil {
 		t.Fatal(err)
 	}
-	if m.Worktree.BgIsolation != "none" || len(m.Hooks) != 4 {
+	if m.Worktree.BgIsolation != "none" || len(m.Hooks) != 5 {
 		t.Fatalf("settings %s", b)
 	}
 	if !strings.Contains(string(b), `"matcher": "Bash"`) {
