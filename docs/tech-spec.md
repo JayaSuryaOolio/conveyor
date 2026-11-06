@@ -318,7 +318,7 @@ criteria:
 - [x] AC1 — evidence
 - [ ] AC2 — why not
 learning: a lesson (repeatable line)
-spawn: child task title | description with everything its agent needs (repeatable line)
+spawn: [todo] child task title | description with everything its agent needs (repeatable line; [todo] is optional: the child starts once unblocked, else it waits in backlog)
 </conveyor>
 ```
 

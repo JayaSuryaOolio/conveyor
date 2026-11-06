@@ -73,11 +73,11 @@ next: what remains
 criteria:
 - [x] AC1 - evidence
 learning: only if this repo had a trap that cost you >10 min and is not in CLAUDE.md/SKILL.md/LEARNINGS.md. Name the file or command. Omit the line otherwise. (repeatable line)
-spawn: title of a follow-up task | its description
+spawn: [todo] title of a follow-up task | its description
 </conveyor>
 ```
 
-Each `spawn:` line becomes a backlog sub-task with the parent's repos and the text after `|` as its description. A line without a description creates nothing and records a `spawn_failed` event, so no sub-task starts without context; `conveyor task new --parent` likewise requires `--desc`.
+Each `spawn:` line becomes a backlog sub-task (or a todo one the dispatcher starts, when the title starts with `[todo]`) with the parent's repos and the text after `|` as its description. A line without a description creates nothing and records a `spawn_failed` event, so no sub-task starts without context; `conveyor task new --parent` likewise requires `--desc`.
 
 Without a block the agent is treated as asking you a question. `BRIEF.md` explains this protocol to the agent, along with the task, repos, latest runs and your comments. The `brief_extra_rules` setting adds your own rules to it.
 
