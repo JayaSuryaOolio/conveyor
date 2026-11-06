@@ -201,4 +201,8 @@ func TestThreadReplyUnderForward(t *testing.T) {
 	if q, _ := got.Fwd(); q != "> it crashes" {
 		t.Fatalf("fwd %q", q)
 	}
+	s.event([]byte(`{"event":{"type":"message","user":"U1","text":"thanks","channel":"D1","ts":"6.1","thread_ts":"5.0"}}`), func(chat.In) string {
+		t.Fatal("plain chatter in a thread must not run a command")
+		return ""
+	})
 }

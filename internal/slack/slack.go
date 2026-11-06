@@ -372,7 +372,10 @@ func (s *Slack) event(payload []byte, handle func(chat.In) string) {
 	m, _ := msgs[0].(map[string]any)
 	text, _ := m["text"].(string)
 	key := keyOf(text)
-	if key == "" { // a reply under a non-task message (e.g. a forward) is a command about that message
+	if key == "" { // only "new ..." under a non-task message (e.g. a forward) acts on it; other chatter is ignored
+		if f := strings.Fields(strings.TrimPrefix(strings.TrimSpace(e.Text), "/conveyor")); len(f) == 0 || !strings.EqualFold(f[0], "new") {
+			return
+		}
 		quote, files := content(m, false)
 		fwd := func() (string, []chat.File) { return s.fetch(quote, files) }
 		s.post(map[string]any{"channel": e.Channel, "thread_ts": e.ThreadTS, "text": handle(chat.In{Text: e.Text, Fwd: fwd})})
