@@ -165,7 +165,7 @@ Checklist, run at the start and before the status block (`conveyor epic check KE
 - R9. `conveyor epic status|check|prs|search|sessions|log` exist and print `--json`.
 
 **Review checks**
-- R10. Review comments reach the task through **one-shot automations** owned by the task and the flow, not a recurring poll (§10). They are deleted when the task is done or cancelled, or the flow ends. Webhook events are opt-in through the review-webhooks app.
+- R10. Review comments reach the task through **one-shot automations** owned by the task and the flow, not a recurring poll (§10). They are deleted when the task is done or cancelled, or the flow ends. An open epic starts the review-webhook listener itself; the review-webhooks app opts non-epic tasks in.
 
 **Audit**
 - R11. Every epic action produces one JSON line in `audit.jsonl` (§12). `conveyor epic audit KEY [--flow N] [--since]` queries it.

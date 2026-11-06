@@ -23,7 +23,6 @@ func post(h http.Handler, event, body string) int {
 
 func TestWebhookSchedulesCheckNow(t *testing.T) {
 	svc, tk := reviewTask(t)
-	store.AddLabel(svc.DB, tk.ID, "epic:os-4")
 	h := WebhookHandler(svc.DB)
 
 	if c := post(h, "pull_request_review", `{"pull_request":{"html_url":"https://github.com/o/r/pull/99"}}`); c != 204 {
@@ -46,12 +45,12 @@ func TestWebhookSchedulesCheckNow(t *testing.T) {
 
 func TestWebhookRepos(t *testing.T) {
 	svc, tk := reviewTask(t)
-	if got := openPRRepos(svc.DB); len(got) != 0 {
-		t.Fatalf("non-epic task forwarded: %v", got)
-	}
-	store.AddLabel(svc.DB, tk.ID, "epic")
 	if got := openPRRepos(svc.DB); len(got) != 1 || got[0] != "o/r" {
 		t.Fatalf("got %v", got)
+	}
+	store.UpdateTaskStatus(svc.DB, tk.ID, store.StatusDone, store.ActorSystem)
+	if got := openPRRepos(svc.DB); len(got) != 0 {
+		t.Fatalf("done task forwarded: %v", got)
 	}
 }
 
