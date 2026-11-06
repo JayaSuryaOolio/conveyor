@@ -404,7 +404,7 @@ func (d *Dispatcher) start(ctx context.Context, task store.Task, delta []store.C
 	}
 	var bg string
 	if prev != nil {
-		bg, err = claude.Resume(ctx, cwd, *prev.BgID, *prev.SessionID, settings, run.Prompt)
+		bg, err = claude.Resume(ctx, cwd, *prev.BgID, *prev.SessionID, settings, run.Prompt, workspace.OtherPaths(task))
 	} else {
 		bg, err = claude.Launch(ctx, d.spec(task, cwd, settings, run.Prompt))
 	}

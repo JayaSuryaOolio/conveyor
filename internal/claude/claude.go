@@ -99,11 +99,16 @@ func Launch(ctx context.Context, s LaunchSpec) (string, error) {
 	return m[1], nil
 }
 
-// Resume stops bgID (errors ignored) then resumes sessionID with --bg --resume and --settings (Claude may not carry the hooks over).
+// Resume stops bgID (errors ignored) then resumes sessionID with --bg --resume and --settings (Claude may not carry the hooks over)
+// and addDirs again: a resumed session forgets its --add-dir dirs, and the settings block writes outside the working directories.
 // It returns the printed bg id, or X if the output says "started a copy as X".
-func Resume(ctx context.Context, cwd, bgID, sessionID, settingsPath, prompt string) (string, error) {
+func Resume(ctx context.Context, cwd, bgID, sessionID, settingsPath, prompt string, addDirs []string) (string, error) {
 	_ = Stop(ctx, bgID)
-	out, err := run(ctx, cwd, nil, "--bg", "--resume", sessionID, "--settings", settingsPath, prompt)
+	args := []string{"--bg", "--resume", sessionID, "--settings", settingsPath, prompt}
+	if len(addDirs) > 0 { // after the prompt: the flag is variadic
+		args = append(append(args, "--add-dir"), addDirs...)
+	}
+	out, err := run(ctx, cwd, nil, args...)
 	if err != nil {
 		return "", err
 	}
@@ -158,19 +163,22 @@ func q(s string) string { return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'" 
 // AttachCommand is the terminal command to attach to a background session.
 func AttachCommand(bgID string) string { return "claude attach " + q(bgID) }
 
-// ResumeCommand resumes a session interactively (no bypass, no --bg).
-func ResumeCommand(sessionID, settingsPath string) string {
-	return "claude --resume " + q(sessionID) + " --settings " + q(settingsPath)
+// ResumeCommand resumes a session interactively (no bypass, no --bg), re-adding addDirs (Resume says why).
+func ResumeCommand(sessionID, settingsPath string, addDirs []string) string {
+	return "claude --resume " + q(sessionID) + " --settings " + q(settingsPath) + addDirFlags(addDirs)
+}
+
+func addDirFlags(dirs []string) (s string) {
+	for _, d := range dirs {
+		s += " --add-dir " + q(d)
+	}
+	return s
 }
 
 // FreshCommand starts an interactive session primed with the brief.
 func FreshCommand(settingsPath, briefPath string, addDirs []string) string {
 	// The prompt goes before --add-dir, which is variadic.
-	c := "claude --settings " + q(settingsPath) + " " + q("Read "+briefPath+" first, then wait for my instructions.")
-	for _, d := range addDirs {
-		c += " --add-dir " + q(d)
-	}
-	return c
+	return "claude --settings " + q(settingsPath) + " " + q("Read "+briefPath+" first, then wait for my instructions.") + addDirFlags(addDirs)
 }
 
 // hookCommand is the command Claude Code runs for ev. The user-level install
@@ -189,7 +197,8 @@ func WriteSettings(home, conveyorBin string) (string, error) {
 	pre := hook("PreToolUse")
 	pre[0].(map[string]any)["matcher"] = "Bash"
 	b, err := json.MarshalIndent(map[string]any{
-		"worktree": map[string]any{"bgIsolation": "none"},
+		"worktree":    map[string]any{"bgIsolation": "none"},
+		"permissions": writeScope(),
 		"hooks": map[string]any{
 			"PreToolUse":       pre,
 			"UserPromptSubmit": hook("UserPromptSubmit"),
@@ -207,6 +216,18 @@ func WriteSettings(home, conveyorBin string) (string, error) {
 		return "", fmt.Errorf("write settings: %w", err)
 	}
 	return path, nil
+}
+
+// writeScope confines Claude's Edit/Write/NotebookEdit tools to the session's working directories (cwd and
+// --add-dir: the task's worktrees) in every permission mode, bypass included, plus the temp dirs (the
+// scratchpad lives in /tmp) and ~/.claude's memory and plans. Claude Code (2.1.314+) enforces it and
+// tells the agent which dirs are allowed; older versions ignore the key. Bash writes are not covered.
+func writeScope() map[string]any {
+	dirs := []string{"/tmp", filepath.Clean(os.TempDir())}
+	if h, err := os.UserHomeDir(); err == nil {
+		dirs = append(dirs, filepath.Join(h, ".claude", "projects"), filepath.Join(h, ".claude", "plans"))
+	}
+	return map[string]any{"blockWritesOutsideWorkingDirectories": true, "additionalDirectories": dirs}
 }
 
 // writeAtomic replaces path via a uniquely named temp file in the same directory,
