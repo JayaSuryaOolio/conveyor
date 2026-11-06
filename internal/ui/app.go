@@ -216,7 +216,9 @@ type TaskCard struct {
 	LastSummary string   `json:"lastSummary"`
 	CtxPeak     int64    `json:"ctxPeak"`
 	UpdatedAt   string   `json:"updatedAt"`
-	OpenPR      bool     `json:"openPR"` // any repo has an OPEN PR (shows the board's "check reviews" button)
+	LastMsgAt   string   `json:"lastMsgAt"` // newest comment (human or agent); "" when none
+	LastMsgBy   string   `json:"lastMsgBy"` // its author: human, agent or system
+	OpenPR      bool     `json:"openPR"`    // any repo has an OPEN PR (shows the board's "check reviews" button)
 }
 
 // TaskDetail is the task page payload; Runs are oldest first (newest last).
@@ -253,6 +255,12 @@ func (a *App) ListTasks() ([]TaskCard, error) {
 			if r.Summary != nil {
 				c.LastSummary = *r.Summary
 			}
+		case !errors.Is(err, sql.ErrNoRows):
+			return nil, err
+		}
+		switch m, err := store.LatestComment(a.svc.DB, t.ID); {
+		case err == nil:
+			c.LastMsgAt, c.LastMsgBy = m.CreatedAt, string(m.Author)
 		case !errors.Is(err, sql.ErrNoRows):
 			return nil, err
 		}
