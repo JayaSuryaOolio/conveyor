@@ -231,6 +231,26 @@ func TestInteractiveStopLeavesTask(t *testing.T) {
 	}
 }
 
+func TestInteractiveStopReleasesRunningTask(t *testing.T) {
+	for _, queued := range []bool{false, true} {
+		e := setup(t, store.StatusRunning)
+		e.run(t, "interactive", "running", "I1", "")
+		if queued {
+			store.AddComment(e.db, store.Comment{TaskID: e.task.ID, Author: store.AuthorHuman, Body: "hi"})
+		}
+		if err := e.fire(t, "Stop", map[string]any{"session_id": "I1", "last_assistant_message": "x"}); err != nil {
+			t.Fatal(err)
+		}
+		want := store.StatusNeedsYou
+		if queued {
+			want = store.StatusTodo
+		}
+		if got := e.status(t).Status; got != want {
+			t.Fatalf("queued=%v: status %s, want %s", queued, got, want)
+		}
+	}
+}
+
 func TestResumeUsesNewestRunOfSession(t *testing.T) {
 	e := setup(t, store.StatusRunning)
 	e.run(t, "auto", "finished", "S1", "first")
