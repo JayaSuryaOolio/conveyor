@@ -369,6 +369,9 @@ func TestEpicAuditCLI(t *testing.T) {
 		return
 	}
 	all := strings.Join(events(), " ")
+	if n := strings.Count(all, "epic.run.start"); n != 1 {
+		t.Errorf("epic.run.start x%d, want 1: %s", n, all)
+	}
 	for _, want := range []string{"epic.run.start", "epic.command", "epic.merge_denied", "epic.run.end", "epic.status_block", "epic.log", "epic.flow.end", "epic.flow.start"} {
 		if !strings.Contains(all, want) {
 			t.Errorf("missing %s in %s", want, all)
