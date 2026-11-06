@@ -46,6 +46,8 @@ conveyor task unlink <KEY> blocks <OTHER>
 conveyor task repo <KEY> add <REPO>          # attach another registered repo to a task (worktree appears on its next run)
 ` + "```" + `
 
+If this task depends on another task's unmerged PR, record it with ` + "`conveyor task link <THAT-KEY> blocks <KEY>`" + ` instead of a learning.
+
 New tasks start in backlog; pass ` + "`--todo`" + ` to let the dispatcher launch them.
 `
 
