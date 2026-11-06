@@ -201,11 +201,6 @@ func UpdateTaskStatus(db *sql.DB, id int64, to Status, actor Actor) (Task, error
 				return fmt.Errorf("delete task automations: %w", err)
 			}
 		}
-		if to == StatusDone || to == StatusCancelled {
-			if err := promoteUnblocked(tx, id); err != nil {
-				return err
-			}
-		}
 		return recordEvent(tx, id, "status_changed", fmt.Sprintf("%s -> %s (%s)", from, to, actor))
 	})
 	if err != nil {
@@ -239,37 +234,5 @@ func UpdateTaskRepo(db *sql.DB, r TaskRepo) error {
 		return fmt.Errorf("task repo %d/%d: %w", r.TaskID, r.RepoID, sql.ErrNoRows)
 	}
 	notifyTask(r.TaskID)
-	return nil
-}
-
-// promoteUnblocked moves backlog tasks blocked by id to todo once none of their blockers is open,
-// so the dispatcher launches them without a manual start.
-func promoteUnblocked(tx *sql.Tx, id int64) error {
-	rows, err := tx.Query(`SELECT t.id FROM task_links l JOIN tasks t ON t.id=l.to_id
- WHERE l.kind=? AND l.from_id=? AND t.status=? AND NOT EXISTS (
-  SELECT 1 FROM task_links l2 JOIN tasks b ON b.id=l2.from_id
-  WHERE l2.kind=? AND l2.to_id=t.id AND b.status NOT IN (?,?))`,
-		LinkBlocks, id, StatusBacklog, LinkBlocks, StatusDone, StatusCancelled)
-	if err != nil {
-		return fmt.Errorf("unblocked tasks: %w", err)
-	}
-	var ids []int64
-	for rows.Next() {
-		var tid int64
-		if err := rows.Scan(&tid); err != nil {
-			rows.Close()
-			return err
-		}
-		ids = append(ids, tid)
-	}
-	rows.Close()
-	for _, tid := range ids {
-		if _, err := tx.Exec(`UPDATE tasks SET status=?, updated_at=? WHERE id=? AND status=?`, StatusTodo, now(), tid, StatusBacklog); err != nil {
-			return fmt.Errorf("promote task: %w", err)
-		}
-		if err := recordEvent(tx, tid, "status_changed", fmt.Sprintf("backlog -> todo (blockers cleared by task %d)", id)); err != nil {
-			return err
-		}
-	}
 	return nil
 }
