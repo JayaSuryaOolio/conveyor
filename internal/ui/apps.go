@@ -92,6 +92,14 @@ func (a *App) ManifestSchema() map[string][]string {
 	return map[string][]string{"vars": core.ManifestVars, "places": places, "version": {strconv.Itoa(core.ManifestVersion)}}
 }
 
+// AppSettings lists a manifest app's settings with their current values.
+func (a *App) AppSettings(name string) ([]core.AppSetting, error) { return a.svc.AppSettings(name) }
+
+// SaveAppSettings stores the app's setting values (key -> value).
+func (a *App) SaveAppSettings(name string, vals map[string]string) error {
+	return a.svc.SaveAppSettings(name, vals)
+}
+
 // ConvertApp turns a plain command app into a manifest app.
 func (a *App) ConvertApp(name string) error { return a.svc.ConvertApp(name) }
 

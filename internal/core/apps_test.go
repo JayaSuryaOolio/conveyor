@@ -210,7 +210,7 @@ func TestServiceManifest(t *testing.T) {
 		}
 	}
 	// v1 `service` migrates to `services` at each place; v2 rejects it, v1 rejects `services`
-	if m, err := ParseManifest(fmt.Sprintf(bad, "board_card", svc)); err != nil || m.Version != 2 || m.Actions[0].Services["board_card"].Stop != "true" {
+	if m, err := ParseManifest(fmt.Sprintf(bad, "board_card", svc)); err != nil || m.Version != ManifestVersion || m.Actions[0].Services["board_card"].Stop != "true" {
 		t.Fatal("migrate:", m, err)
 	}
 	for _, x := range []string{

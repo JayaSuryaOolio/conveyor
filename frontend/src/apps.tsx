@@ -1,7 +1,7 @@
 import {useEffect, useRef, useState} from 'react'
-import {ActionIcon, Badge, Button, Checkbox, Code, FileButton, Group, Modal, MultiSelect, Paper, Stack, Switch, Table, Tabs, Text, TextInput, Textarea, Title} from '@mantine/core'
-import {IconDownload, IconPencil, IconPlayerPlay, IconPlus, IconPuzzle, IconTransform, IconTrash, IconUpload} from '@tabler/icons-react'
-import {AddApp, ExampleApps, InstallExample, GetSettings, SetSetting, AppIcons, AppPresets, Confirm, SetAppDisabled, ConvertApp, DeleteApp, ExportApp, Home, InstallManifest, InstallPreset, ListApps, ManifestSchema, RenderApp, TestApp, UpdateApp, UserHooks, ValidateManifest} from '../wailsjs/go/ui/App'
+import {ActionIcon, Badge, Button, Checkbox, Code, FileButton, Group, Modal, MultiSelect, NumberInput, Paper, Select, Stack, Switch, Table, Tabs, Text, TextInput, Textarea, Title} from '@mantine/core'
+import {IconDownload, IconPencil, IconPlayerPlay, IconPlus, IconPuzzle, IconSettings, IconTransform, IconTrash, IconUpload} from '@tabler/icons-react'
+import {AddApp, AppSettings, SaveAppSettings, ExampleApps, InstallExample, GetSettings, SetSetting, AppIcons, AppPresets, Confirm, SetAppDisabled, ConvertApp, DeleteApp, ExportApp, Home, InstallManifest, InstallPreset, ListApps, ManifestSchema, RenderApp, TestApp, UpdateApp, UserHooks, ValidateManifest} from '../wailsjs/go/ui/App'
 import {store} from '../wailsjs/go/models'
 import {AppIcon, errMsg, runApp, toast} from './components'
 import {Field, SettingRow} from './forms'
@@ -108,6 +108,43 @@ function manifestSummary(a: store.App) {
     } catch { return 'invalid manifest' }
 }
 
+/** Settings declared by the app's manifest, one row per setting like VS Code's extension settings; values are strings. */
+function SettingsForm({app, onClose}: {app: string; onClose: () => void}) {
+    const {data, error} = useData(() => AppSettings(app), [app])
+    const [vals, setVals] = useState<Record<string, string>>({})
+    // seed once: db:changed reloads must not wipe edits
+    useEffect(() => { if (data) setVals(v => Object.keys(v).length ? v : Object.fromEntries(data.map(s => [s.key, s.value]))) }, [data])
+    return (
+        <Stack gap="md">
+            {error && <Text c="red" size="sm">{error}</Text>}
+            {data?.map(s => {
+                const v = vals[s.key] ?? s.value, set = (x: string) => setVals({...vals, [s.key]: x})
+                return (
+                    <div key={s.key}>
+                        <Text size="sm" fw={600} ff="monospace">{s.key}</Text>
+                        {s.type === 'boolean'
+                            ? <Switch mt={4} label={s.description} checked={v === 'true'} onChange={e => set(String(e.currentTarget.checked))}/>
+                            : <>
+                                {s.description && <Text size="xs" c="dimmed" mb={4}>{s.description}</Text>}
+                                {s.type === 'number' ? <NumberInput value={v} onChange={x => set(String(x))}/>
+                                    : s.type === 'enum' ? <Select data={s.options ?? []} value={v} onChange={x => x && set(x)} allowDeselect={false}/>
+                                    : <TextInput value={v} onChange={e => set(e.target.value)}/>}
+                            </>}
+                    </div>
+                )
+            })}
+            <Group justify="flex-end">
+                <Button variant="default" onClick={onClose}>Cancel</Button>
+                <Button onClick={() => SaveAppSettings(app, vals).then(onClose, errMsg)}>Save</Button>
+            </Group>
+        </Stack>
+    )
+}
+
+function hasSettings(a: store.App) {
+    try { return JSON.parse(a.manifest).settings?.length > 0 } catch { return false }
+}
+
 function AgentHooks() {
     const {data: status, error, reload} = useData(() => UserHooks('status'), [])
     const act = (a: string) => UserHooks(a).then(reload, errMsg)
@@ -141,6 +178,7 @@ function AppList() {
     const {data: icons} = useData(AppIcons, [])
     const [form, setForm] = useState<store.App>()
     const [importing, setImporting] = useState(false)
+    const [settingsApp, setSettingsApp] = useState('')
     const have = new Set((data ?? []).map(a => a.name))
     const missing = (presets ?? []).filter(p => !have.has(p.name))
     const offered = (examples ?? []).filter(e => !have.has(e.name))
@@ -167,6 +205,7 @@ function AppList() {
                                 <Table.Td>
                                     <Group gap="xs" wrap="nowrap" justify="flex-end">
                                         <Switch size="xs" aria-label={`Enable ${a.name}`} title={a.disabled ? 'Disabled: enable to use it again' : 'Disable (keeps its settings)'} checked={!a.disabled} onChange={e => SetAppDisabled(a.name, !e.currentTarget.checked).then(reload, errMsg)}/>
+                                        {hasSettings(a) && <ActionIcon variant="subtle" color="gray" aria-label="Settings" title="Settings" onClick={() => setSettingsApp(a.name)}><IconSettings size={16}/></ActionIcon>}
                                         {a.manifest && <ActionIcon variant="subtle" color="gray" aria-label="Export" title="Export manifest as .json" onClick={() => ExportApp(a.name).then(p => p && toast(`Exported to ${p}`), errMsg)}><IconDownload size={16}/></ActionIcon>}
                                         {!a.manifest && <>
                                             <ActionIcon variant="subtle" color="gray" aria-label="Test" title="Test on home folder" onClick={() => runApp(a, TestApp(a))}><IconPlayerPlay size={16}/></ActionIcon>
@@ -203,6 +242,9 @@ function AppList() {
             <AgentHooks/>
             <Modal opened={importing} onClose={() => setImporting(false)} title="Install app from manifest" size="lg">
                 {importing && <ManifestForm onClose={saved => { setImporting(false); if (saved) reload() }}/>}
+            </Modal>
+            <Modal opened={!!settingsApp} onClose={() => setSettingsApp('')} title={`${settingsApp} settings`} size="lg">
+                {settingsApp && <SettingsForm app={settingsApp} onClose={() => setSettingsApp('')}/>}
             </Modal>
             <Modal opened={!!form} onClose={() => setForm(undefined)} title={form?.id ? 'Edit app' : 'New app'} size="lg">
                 {form && <AppForm initial={form} onClose={saved => { setForm(undefined); if (saved) reload() }}/>}
