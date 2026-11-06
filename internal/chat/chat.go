@@ -119,8 +119,14 @@ func (b *bridge) maxEvent() (cur int64) {
 	return
 }
 
+// maxRetry bounds how long one failing event can hold the cursor; past it the event is
+// dropped, so a permanent error (invalid_blocks, revoked token) can't stall the queue and
+// later flood Slack with the backlog when it clears.
+const maxRetry = time.Hour
+
 // notify sends a Msg for each new system status change the user asked for. A nil t
 // (disabled/unconfigured) skips events rather than replaying them when re-enabled.
+// An event the task has since moved past (any later status change) is skipped as stale.
 func (b *bridge) notify(t Transport) {
 	cur, err := strconv.ParseInt(b.setting(cursorKey), 10, 64)
 	if err != nil || t == nil { // first run or off: start from now, never replay history
@@ -128,7 +134,7 @@ func (b *bridge) notify(t Transport) {
 		return
 	}
 	want := b.wanted() // before Query: the DB has one connection
-	rows, err := b.svc.DB.Query(`SELECT id, task_id, detail FROM events WHERE kind='status_changed' AND id>? ORDER BY id`, cur)
+	rows, err := b.svc.DB.Query(`SELECT id, task_id, detail, created_at FROM events WHERE kind='status_changed' AND id>? ORDER BY id`, cur)
 	if err != nil {
 		b.logf("chat: events: %v", err)
 		return
@@ -136,12 +142,14 @@ func (b *bridge) notify(t Transport) {
 	type ev struct {
 		id, task int64
 		to       string
+		at       time.Time
 	}
 	var evs []ev
 	for rows.Next() {
 		var e ev
-		var detail string
-		if rows.Scan(&e.id, &e.task, &detail) == nil {
+		var detail, at string
+		if rows.Scan(&e.id, &e.task, &detail, &at) == nil {
+			e.at, _ = time.Parse(time.RFC3339, at)
 			if m := toStatus.FindStringSubmatch(detail); m != nil && want[m[1]] {
 				e.to = m[1]
 			}
@@ -152,7 +160,10 @@ func (b *bridge) notify(t Transport) {
 	for _, e := range evs {
 		if e.to != "" {
 			task, err := store.GetTask(b.svc.DB, e.task)
-			if err != nil {
+			var later bool // the task changed status again since: this one is stale
+			b.svc.DB.QueryRow(`SELECT EXISTS(SELECT 1 FROM events WHERE task_id=? AND kind='status_changed' AND id>?)`, e.task, e.id).Scan(&later)
+			if err != nil || later {
+				store.SetSetting(b.svc.DB, cursorKey, strconv.FormatInt(e.id, 10))
 				continue
 			}
 			m := Msg{Key: task.Key, Title: task.Title, Status: e.to}
@@ -169,8 +180,11 @@ func (b *bridge) notify(t Transport) {
 				}
 			}
 			if err := t.Send(m); err != nil {
-				b.logf("chat: send: %v", err)
-				return // retry this event next tick
+				if time.Since(e.at) < maxRetry {
+					b.logf("chat: send %s: %v", task.Key, err)
+					return // retry this event next tick
+				}
+				b.logf("chat: send %s: %v; dropped after %s", task.Key, err, maxRetry)
 			}
 		}
 		store.SetSetting(b.svc.DB, cursorKey, strconv.FormatInt(e.id, 10))
