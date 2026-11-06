@@ -210,6 +210,8 @@ const SLACK: Field[] = [
     {k: 'slack_user_token', label: 'User token (optional)', desc: 'xoxp-... If filled, every message Conveyor sends (task DMs, thread replies, command answers) is posted as you instead of the bot, and the bot token is not used. Messages land in your own self-DM and send no push notification.', kind: 'secret'},
     {k: 'slack_app_token', label: 'App token', desc: 'xapp-... (or a rotating xoxe.xapp-...) with connections:write. Opens the Socket Mode connection, so no public URL is needed.', kind: 'secret'},
     {k: 'slack_app_refresh_token', label: 'App refresh token (optional)', desc: 'xoxe-1-... Only for a rotating app token: Conveyor uses it to get a new app token when the old one expires, and saves both.', kind: 'secret'},
+    {k: 'slack_client_id', label: 'Client ID (rotating app token only)', desc: 'Basic Information > App Credentials. Needed with the refresh token.'},
+    {k: 'slack_client_secret', label: 'Client Secret (rotating app token only)', desc: 'Basic Information > App Credentials. Needed with the refresh token.', kind: 'secret'},
     {k: 'slack_user_id', label: 'Your Slack member ID', desc: 'U... (profile > Copy member ID). Only this user is DMed and obeyed; everyone else is ignored.'},
 ]
 const STATUSES = ['needs_you', 'review', 'done', 'failed']

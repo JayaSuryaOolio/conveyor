@@ -4,7 +4,8 @@
 //
 // Settings: slack_bot_token (xoxb-), slack_user_token (xoxp-, optional: when set, every post and
 // API call is made as you instead of the bot), slack_app_token (xapp-, scope connections:write;
-// or a rotating xoxe.xapp- token plus slack_app_refresh_token, which Conveyor rotates itself) and
+// or a rotating xoxe.xapp- token plus slack_app_refresh_token, slack_client_id and slack_client_secret,
+// which Conveyor refreshes itself) and
 // slack_user_id (your member id: the only user the bridge talks to or listens to).
 // Buttons need Interactivity enabled in the app (Socket Mode delivers the clicks).
 package slack
@@ -59,13 +60,24 @@ func (s *Slack) token() string {
 }
 
 // openConn calls apps.connections.open. A rotating app token expires after 12h: on token_expired
-// it is rotated with slack_app_refresh_token (both new tokens are saved) and the call retried once.
+// it is refreshed with slack_app_refresh_token (both new tokens are saved) and the call retried once.
+// App-level tokens refresh through oauth.v2.access with the app's client credentials;
+// tooling.tokens.rotate only takes configuration-token refresh tokens (invalid_refresh_token).
 func (s *Slack) openConn() (map[string]any, error) {
 	r, err := call(strings.TrimSpace(s.get("slack_app_token")), "apps.connections.open", struct{}{})
 	if err == nil || !strings.HasSuffix(err.Error(), "token_expired") || s.get("slack_app_refresh_token") == "" {
 		return r, err
 	}
-	resp, err := http.PostForm(api+"tooling.tokens.rotate", url.Values{"refresh_token": {strings.TrimSpace(s.get("slack_app_refresh_token"))}})
+	id, secret := strings.TrimSpace(s.get("slack_client_id")), strings.TrimSpace(s.get("slack_client_secret"))
+	if id == "" || secret == "" {
+		return nil, fmt.Errorf("slack app token expired: set slack_client_id and slack_client_secret to refresh it")
+	}
+	resp, err := http.PostForm(api+"oauth.v2.access", url.Values{
+		"grant_type":    {"refresh_token"},
+		"refresh_token": {strings.TrimSpace(s.get("slack_app_refresh_token"))},
+		"client_id":     {id},
+		"client_secret": {secret},
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -73,16 +85,16 @@ func (s *Slack) openConn() (map[string]any, error) {
 	var out struct {
 		OK           bool   `json:"ok"`
 		Error        string `json:"error"`
-		Token        string `json:"token"`
+		Token        string `json:"access_token"`
 		RefreshToken string `json:"refresh_token"`
 	}
 	if err := json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&out); err != nil {
 		return nil, err
 	}
 	if !out.OK || out.Token == "" || out.RefreshToken == "" {
-		return nil, fmt.Errorf("slack tooling.tokens.rotate: %v", out.Error)
+		return nil, fmt.Errorf("slack oauth.v2.access: %v", out.Error)
 	}
-	// the old refresh token is dead once rotated, so save both before using the new token
+	// the old refresh token is dead once used, so save both before using the new token
 	if err := s.set("slack_app_refresh_token", out.RefreshToken); err != nil {
 		return nil, err
 	}

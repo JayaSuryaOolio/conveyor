@@ -34,6 +34,8 @@ var Defaults = map[string]string{
 	"slack_user_token":         "",                             // xoxp-…: optional; when set, all posts are made as you (into your self-DM) instead of the bot
 	"slack_app_token":          "",                             // xapp-…: Socket Mode, scope connections:write
 	"slack_app_refresh_token":  "",                             // xoxe-1-…: optional; rotates a 12h xoxe.xapp- slack_app_token when it expires
+	"slack_client_id":          "",                             // app Client ID: needed with slack_app_refresh_token (oauth.v2.access)
+	"slack_client_secret":      "",                             // app Client Secret: needed with slack_app_refresh_token
 	"slack_user_id":            "",                             // your Slack member id: the only user the bridge DMs or obeys
 }
 
