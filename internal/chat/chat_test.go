@@ -188,3 +188,21 @@ func TestNewTaskFromForward(t *testing.T) {
 		t.Fatal("empty comment should take the title from the forward")
 	}
 }
+
+func TestThreadCmd(t *testing.T) {
+	for in, want := range map[string]string{
+		"move done":        "move CV-1 done",
+		"Move to Done":     "move CV-1 done",
+		"move CV-2 todo":   "move CV-2 todo",
+		"show":             "show CV-1",
+		"list":             "list",
+		"move on please":   "",
+		"move on":          "",
+		"show me the diff": "",
+		"use the v2 API":   "",
+	} {
+		if got := threadCmd("CV-1", in); got != want {
+			t.Errorf("threadCmd(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

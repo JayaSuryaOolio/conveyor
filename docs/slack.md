@@ -88,7 +88,10 @@ Open the Conveyor DM. Type a plain message, no slash needed:
   The description is your comment, the forwarded text with author and link, and its images
   (saved under `~/.conveyor/attachments`, needs `files:read`). REPO can be left out with one
   registered repo. Slash commands only work in the app's DM; `@app` mentions in channels are not wired.
-- Reply in a notification's thread - comments on that task.
+- Reply in a notification's thread, or to the `created KEY` answer to `new` - comments on that task.
+  `move done`, `move to done`, `show`, `list` or `help` typed there run as commands on that task instead.
+- DM commands are answered in their own thread; a task made by `new` gets its notifications in that thread.
+  Slack redeliveries are ignored, and "also send to conversation" thread replies count as replies.
 
 Notifications (needs_you, review, done, failed; pick which in settings) carry the agent's last
 message (rendered as Markdown via a Block Kit `markdown` block) and PR links, plus buttons: **Done** / **Requeue** (while it needs you, is in review or failed)
@@ -98,6 +101,5 @@ thread: later notifications for it, and the agent's answers to your thread repli
 Thread roots are kept in memory, so after a restart a task's next update starts a new thread.
 
 ## Not done (add when needed)
-- Block Kit modals, channel mode, retry/dedupe
-  beyond the event cursor (`slack_cursor`), token storage in
+- Block Kit modals, channel mode, replying to an ephemeral `/conveyor` answer (Slack cannot thread them), token storage in
   Keychain (tokens sit in the local settings table like other settings).

@@ -340,18 +340,32 @@ func (s *Slack) event(payload []byte, handle func(chat.In) string) {
 	if e.User != s.get("slack_user_id") {
 		return
 	}
-	if e.Type != "message" || (e.Subtype != "" && e.Subtype != "file_share") || e.BotID != "" {
+	// thread_broadcast is a thread reply also sent to the conversation: still a reply
+	if e.Type != "message" || (e.Subtype != "" && e.Subtype != "file_share" && e.Subtype != "thread_broadcast") || e.BotID != "" {
 		return
 	}
 	if _, ours := mine.Load(e.TS); ours {
 		return
 	}
+	// Slack redelivers an event it thinks went unacked; a second copy must not comment twice.
+	// ponytail: grows by one short string per message; fine for one user's DMs.
+	if _, dup := seen.LoadOrStore(e.Channel+"/"+e.TS, true); dup {
+		return
+	}
 	// acknowledge at once; needs the reactions:write scope, best effort
 	call(bot, "reactions.add", map[string]any{"channel": e.Channel, "timestamp": e.TS, "name": "eyes"})
+	// reply answers in thread (the command's own thread for a top-level DM) and keeps a created
+	// task's later notifications in that thread too
+	reply := func(thread, text string) {
+		if m := createdRe.FindStringSubmatch(text); m != nil {
+			threads.LoadOrStore(m[1], thread)
+		}
+		s.post(map[string]any{"channel": e.Channel, "thread_ts": thread, "text": text})
+	}
 	if e.ThreadTS == "" { // a plain DM is a command, so /conveyor is optional
 		quote, files := content(raw.Event, false)
 		if strings.TrimSpace(e.Text) == "" && (quote != "" || len(files) > 0) { // a bare forward: keep it for "new"
-			s.post(map[string]any{"channel": e.Channel, "text": "Got it. Send `new [REPO] your comment` (or `/conveyor new …`) to make a task from it."})
+			reply(e.TS, "Got it. Reply `new [REPO] your comment` here (or send `/conveyor new …`) to make a task from it.")
 			return
 		}
 		fwd := func() (string, []chat.File) { // forwarded with the comment, else the message just before
@@ -360,33 +374,49 @@ func (s *Slack) event(payload []byte, handle func(chat.In) string) {
 			}
 			return s.fetch(quote, files)
 		}
-		s.post(map[string]any{"channel": e.Channel, "text": handle(chat.In{Text: e.Text, Fwd: fwd})})
+		reply(e.TS, handle(chat.In{Text: e.Text, Fwd: fwd}))
 		return
 	}
-	h, err := call(bot, "conversations.history", map[string]any{"channel": e.Channel, "latest": e.ThreadTS, "inclusive": true, "limit": 1})
+	h, err := call(bot, "conversations.replies", map[string]any{"channel": e.Channel, "ts": e.ThreadTS, "limit": 200})
 	if err != nil {
+		log.Printf("chat: slack thread %s: %v", e.ThreadTS, err)
 		return
 	}
 	msgs, _ := h["messages"].([]any)
 	if len(msgs) == 0 {
 		return
 	}
-	m, _ := msgs[0].(map[string]any)
-	text, _ := m["text"].(string)
-	key := keyOf(text)
-	if key == "" { // only "new ..." under a non-task message (e.g. a forward) acts on it; other chatter is ignored
-		if f := strings.Fields(strings.TrimPrefix(strings.TrimSpace(e.Text), "/conveyor")); len(f) == 0 || !strings.EqualFold(f[0], "new") {
-			return
-		}
-		quote, files := content(m, false)
+	root, _ := msgs[0].(map[string]any)
+	rootText, _ := root["text"].(string)
+	key := keyOf(rootText)
+	if f := strings.Fields(strings.TrimPrefix(strings.TrimSpace(e.Text), "/conveyor")); key == "" && len(f) > 0 && strings.EqualFold(f[0], "new") {
+		// "new ..." under a non-task message (e.g. a forward) makes a task from that message
+		quote, files := content(root, false)
 		fwd := func() (string, []chat.File) { return s.fetch(quote, files) }
-		s.post(map[string]any{"channel": e.Channel, "thread_ts": e.ThreadTS, "text": handle(chat.In{Text: e.Text, Fwd: fwd})})
+		reply(e.ThreadTS, handle(chat.In{Text: e.Text, Fwd: fwd}))
+		return
+	}
+	if key == "" { // a thread where "new" made a task: the newest "created KEY" names it
+		for _, m := range msgs {
+			m, _ := m.(map[string]any)
+			t, _ := m["text"].(string)
+			if c := createdRe.FindStringSubmatch(t); c != nil {
+				key = c[1]
+			}
+		}
+	}
+	if key == "" { // other chatter is ignored
 		return
 	}
 	threads.LoadOrStore(key, e.ThreadTS) // the agent's answer comes back into this thread
-	reply := ":speech_balloon: " + handle(chat.In{Key: key, Text: e.Text})
-	s.post(map[string]any{"channel": e.Channel, "thread_ts": e.ThreadTS, "text": reply})
+	reply(e.ThreadTS, ":speech_balloon: "+handle(chat.In{Key: key, Text: e.Text}))
 }
+
+// createdRe reads the task key from the "created KEY ..." reply to "new".
+var createdRe = regexp.MustCompile(`^created ([A-Za-z0-9]+-[A-Za-z0-9]+) `)
+
+// seen holds channel/ts of handled messages (see event).
+var seen sync.Map
 
 // interactive runs a button click (block_actions) as the matching command and answers in the
 // message's thread. Link buttons (open_pr) also arrive here and are ignored.
