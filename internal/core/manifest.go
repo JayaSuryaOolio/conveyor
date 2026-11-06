@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -62,6 +63,9 @@ type ManifestService struct {
 	Run    string `json:"run,omitempty"`
 	Status string `json:"status"`
 	Stop   string `json:"stop"`
+	// Autostart makes the dispatcher start this service (Run) whenever Status fails while the app is enabled.
+	// It runs with no task, so scripts must not use task.* or repo.* variables.
+	Autostart bool `json:"autostart,omitempty"`
 }
 
 type ManifestAgent struct {
@@ -646,4 +650,33 @@ func (s *Service) ExportApp(name string) (string, error) {
 		return "", fmt.Errorf("app %q is not a manifest app; convert it first", name)
 	}
 	return portableManifest(a.Manifest)
+}
+
+// EnsureServices starts every enabled app's autostart service that is not running; errors are returned together.
+func (s *Service) EnsureServices() error {
+	apps, err := store.ListApps(s.DB)
+	if err != nil {
+		return err
+	}
+	var errs []error
+	for _, a := range apps {
+		m, perr := ParseManifest(a.Manifest)
+		if a.Manifest == "" || a.Disabled || perr != nil {
+			continue
+		}
+		for _, x := range m.Actions {
+			for place, sv := range x.Services {
+				if !sv.Autostart {
+					continue
+				}
+				if up, _ := s.AppServiceRunning(a.Name, x.ID, place, ""); up {
+					continue
+				}
+				if _, err := s.RunAppAction(a.Name, x.ID, place, ""); err != nil {
+					errs = append(errs, err)
+				}
+			}
+		}
+	}
+	return errors.Join(errs...)
 }

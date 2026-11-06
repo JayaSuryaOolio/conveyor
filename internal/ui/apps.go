@@ -166,9 +166,6 @@ func (a *App) GraftStop(root string) error { return core.GraftStop(root) }
 // UserHooks reports or changes Conveyor's hooks in ~/.claude/settings.json ("status", "install", "uninstall").
 func (a *App) UserHooks(action string) (string, error) { return a.svc.UserHooks(action) }
 
-// ReviewWebhooksInstalled reports whether the review-webhooks app is installed.
-func (a *App) ReviewWebhooksInstalled() bool { return a.svc.ReviewWebhooksInstalled() }
-
 // ExampleApps lists the bundled example apps (shown under Templates).
 func (a *App) ExampleApps() []core.Example { return core.ExampleApps() }
 

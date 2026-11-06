@@ -2,4 +2,4 @@
  "actions":[{"id":"forward","label":"Review webhooks","places":["task_sidebar"],
    "confirm":"This turns on instant review checks for ALL tasks with an open PR, not just this one.",
    "run":"conveyor review-webhook --app ${{ app.id }}",
-   "services":{"task_sidebar":{"status":"conveyor review-webhook --app ${{ app.id }} --status","stop":"conveyor review-webhook --app ${{ app.id }} --stop"}}}]}
+   "services":{"task_sidebar":{"autostart":true,"status":"conveyor review-webhook --app ${{ app.id }} --status","stop":"conveyor review-webhook --app ${{ app.id }} --stop"}}}]}

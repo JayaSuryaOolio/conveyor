@@ -9,56 +9,43 @@ import (
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 )
 
-func TestReviewWebhooksInstall(t *testing.T) {
+func TestHasOpenEpic(t *testing.T) {
 	s := newSvc(t)
-	if s.ReviewWebhooksInstalled() {
-		t.Fatal("installed on a fresh home")
-	}
-	if err := s.InstallExample("review-webhooks"); err != nil {
-		t.Fatal(err)
-	}
-	if !s.ReviewWebhooksInstalled() {
-		t.Fatal("not installed")
-	}
-	if p, _ := s.PlacedActions("task_sidebar"); len(p) != 1 || !p[0].Service || p[0].Confirm == "" {
-		t.Fatalf("want one task_sidebar service button, got %+v", p)
-	}
-}
-
-func TestReviewWebhooksWanted(t *testing.T) {
-	s := newSvc(t)
-	if s.ReviewWebhooksWanted() {
-		t.Fatal("wanted on a fresh home")
+	if s.HasOpenEpic() {
+		t.Fatal("open epic on a fresh home")
 	}
 	tk, err := s.CreateTask(NewTaskInput{Title: "e", Repos: []string{"a"}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	store.AddLabel(s.DB, tk.ID, "epic:x")
-	if !s.ReviewWebhooksWanted() {
-		t.Fatal("open epic task should want it")
+	if !s.HasOpenEpic() {
+		t.Fatal("open epic task not seen")
 	}
 }
 
-func TestDisabledAppIsInert(t *testing.T) {
+// An enabled app's autostart service is started when down; a disabled app is left alone.
+func TestEnsureServices(t *testing.T) {
 	s := newSvc(t)
-	if err := s.InstallExample("review-webhooks"); err != nil {
+	flag := filepath.Join(t.TempDir(), "up")
+	raw := `{"version":2,"name":"Svc","actions":[{"id":"go","label":"Go","places":["global_nav"],"run":"touch ` + flag + `",
+	 "services":{"global_nav":{"status":"test -e ` + flag + `","stop":"rm ` + flag + `","autostart":true}}}]}`
+	if _, err := s.InstallManifest(raw, false); err != nil {
 		t.Fatal(err)
 	}
-	if err := store.SetAppDisabled(s.DB, ReviewWebhooksApp, true); err != nil {
+	store.SetAppDisabled(s.DB, "Svc", true)
+	if err := s.EnsureServices(); err != nil {
 		t.Fatal(err)
 	}
-	if p, _ := s.PlacedActions("task_sidebar"); len(p) != 0 || s.ReviewWebhooksInstalled() {
-		t.Fatalf("disabled app still active: %+v", p)
+	if _, err := os.Stat(flag); err == nil {
+		t.Fatal("disabled app was started")
 	}
-	if _, err := s.RunAppAction(ReviewWebhooksApp, "review-webhooks", "task_sidebar", ""); err == nil {
-		t.Fatal("disabled action ran")
-	}
-	if err := store.SetAppDisabled(s.DB, ReviewWebhooksApp, false); err != nil {
+	store.SetAppDisabled(s.DB, "Svc", false)
+	if err := s.EnsureServices(); err != nil {
 		t.Fatal(err)
 	}
-	if p, _ := s.PlacedActions("task_sidebar"); len(p) != 1 || !s.ReviewWebhooksInstalled() {
-		t.Fatal("re-enabled app not active")
+	if _, err := os.Stat(flag); err != nil {
+		t.Fatal("autostart service not started")
 	}
 }
 
