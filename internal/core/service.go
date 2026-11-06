@@ -5,6 +5,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -93,6 +95,11 @@ func (s *Service) CreateTask(in NewTaskInput) (store.Task, error) {
 	}
 	if in.Agent == "" && !in.AgentSet && parent != nil && parent.Agent != nil {
 		in.Agent = *parent.Agent // like repos: a sub-task starts with its parent's agent
+	}
+	if in.Epic && in.Agent == "" && !in.AgentSet { // epic roots run under the preset `hooks install` seeds
+		if _, err := os.Stat(filepath.Join(userAgentsDir(), "epic-builder.md")); err == nil {
+			in.Agent = "epic-builder"
+		}
 	}
 	if len(in.Repos) == 0 {
 		return store.Task{}, fmt.Errorf("at least one repo is required")
