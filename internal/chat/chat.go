@@ -80,7 +80,16 @@ func Run(ctx context.Context, svc *core.Service, logf func(string, ...any), fs m
 	}
 }
 
+// retryDelay is 5s doubling per consecutive listen failure, capped at 10 minutes.
+func retryDelay(fails int) time.Duration {
+	if fails > 8 { // 5s<<8 already exceeds the cap; also avoids shift overflow
+		fails = 8
+	}
+	return min(5*time.Second<<max(fails-1, 0), 10*time.Minute)
+}
+
 func (b *bridge) listen(ctx context.Context, fs map[string]Factory) {
+	fails, last := 0, ""
 	for ctx.Err() == nil {
 		if t := b.active(fs); t != nil {
 			sctx, cancel := context.WithCancel(ctx)
@@ -92,14 +101,20 @@ func (b *bridge) listen(ctx context.Context, fs map[string]Factory) {
 					}
 				}
 			}()
-			if err := t.Listen(sctx, b.handle); err != nil && sctx.Err() == nil {
-				b.logf("chat: listen: %v", err)
+			if err := t.Listen(sctx, b.handle); err == nil {
+				fails, last = 0, ""
+			} else if sctx.Err() == nil {
+				fails++
+				if err.Error() != last { // a persistent error (e.g. invalid_refresh_token) logs once
+					last = err.Error()
+					b.logf("chat: listen: %v", err)
+				}
 			}
 			cancel()
 		}
 		select {
 		case <-ctx.Done():
-		case <-time.After(5 * time.Second):
+		case <-time.After(retryDelay(fails)):
 		}
 	}
 }
