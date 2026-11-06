@@ -2,6 +2,7 @@ package core
 
 import (
 	"slices"
+	"strings"
 
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 )
@@ -24,4 +25,22 @@ func (s *Service) EnabledReviewWebhookEvents(appID string) []string {
 		}
 	}
 	return slices.DeleteFunc(slices.Clone(ReviewWebhookEvents), func(e string) bool { return off[e] })
+}
+
+// ReviewWebhookAppID is the id of the first enabled app with an action whose run starts
+// `conveyor review-webhook`, or "" when none is installed.
+func (s *Service) ReviewWebhookAppID() string {
+	apps, _ := store.ListApps(s.DB)
+	for _, a := range apps {
+		m, err := ParseManifest(a.Manifest)
+		if a.Manifest == "" || a.Disabled || err != nil {
+			continue
+		}
+		for _, x := range m.Actions {
+			if strings.Contains(x.Run, "conveyor review-webhook") {
+				return m.AppID()
+			}
+		}
+	}
+	return ""
 }

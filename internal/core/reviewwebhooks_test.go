@@ -67,3 +67,22 @@ func TestInstallCheckGatesInstall(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// The app is found by its manifest, whatever its name or id; disabled apps are skipped.
+func TestReviewWebhookAppID(t *testing.T) {
+	s := newSvc(t)
+	if id := s.ReviewWebhookAppID(); id != "" {
+		t.Fatalf("id %q on a fresh home", id)
+	}
+	raw := `{"version":2,"name":"Other","id":"rw-v2","actions":[{"id":"go","label":"Go","places":["task_sidebar"],"run":"conveyor review-webhook --app ${{ app.id }}"}]}`
+	if _, err := s.InstallManifest(raw, false); err != nil {
+		t.Fatal(err)
+	}
+	if id := s.ReviewWebhookAppID(); id != "rw-v2" {
+		t.Fatalf("id %q, want rw-v2", id)
+	}
+	store.SetAppDisabled(s.DB, "Other", true)
+	if id := s.ReviewWebhookAppID(); id != "" {
+		t.Fatalf("disabled app found: %q", id)
+	}
+}

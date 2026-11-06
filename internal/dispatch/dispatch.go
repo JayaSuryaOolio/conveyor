@@ -293,7 +293,7 @@ func (d *Dispatcher) pollPRs(ctx context.Context) {
 }
 
 // ensureWebhook keeps services running: every enabled app's autostart service, and the built-in
-// review-webhook listener while an epic is open (no-ops when running; without the gh extension tasks keep backoff checks).
+// review-webhook listener (under the installed app's id) while an epic is open (no-ops when running; without the gh extension tasks keep backoff checks).
 func (d *Dispatcher) ensureWebhook() {
 	if d.ConveyorBin == "" || !d.lastHook.IsZero() && d.now().Sub(d.lastHook) < time.Minute {
 		return
@@ -306,7 +306,11 @@ func (d *Dispatcher) ensureWebhook() {
 	if !svc.HasOpenEpic() {
 		return
 	}
-	if out, err := exec.Command(d.ConveyorBin, "--home", d.Home, "review-webhook").CombinedOutput(); err != nil {
+	args := []string{"--home", d.Home, "review-webhook"}
+	if id := svc.ReviewWebhookAppID(); id != "" { // share the installed app's instance
+		args = append(args, "--app", id)
+	}
+	if out, err := exec.Command(d.ConveyorBin, args...).CombinedOutput(); err != nil {
 		d.logf("review-webhook: %v: %s", err, out)
 	}
 }
