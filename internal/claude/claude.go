@@ -195,6 +195,8 @@ func WriteSettings(home, conveyorBin string) (string, error) {
 			"UserPromptSubmit": hook("UserPromptSubmit"),
 			"Stop":             hook("Stop"),
 			"Notification":     hook("Notification"),
+			// Recorded for the Stop completion check: did the session load the repo's CLAUDE.md.
+			"InstructionsLoaded": hook("InstructionsLoaded"),
 		},
 	}, "", "  ")
 	if err != nil {

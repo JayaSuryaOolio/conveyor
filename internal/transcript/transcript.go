@@ -168,3 +168,48 @@ func BackgroundPending(path, promptText string, now time.Time) (bool, error) {
 	}
 	return !apiErr && launched > done && now.Sub(lastLaunch) < maxPendingAge, nil
 }
+
+// ToolUse is one tool_use block: its tool name and the inputs the completion checks read.
+type ToolUse struct {
+	Name     string
+	Skill    string // Skill tool
+	FilePath string // Read tool
+}
+
+// ToolUses lists every tool_use block in the transcript (the whole session, all runs).
+func ToolUses(path string) ([]ToolUse, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("open transcript: %w", err)
+	}
+	defer f.Close()
+	var out []ToolUse
+	sc := bufio.NewScanner(f)
+	sc.Buffer(make([]byte, 1<<20), 64<<20)
+	for sc.Scan() {
+		var l line
+		if json.Unmarshal(sc.Bytes(), &l) != nil || l.Type != "assistant" {
+			continue
+		}
+		var blocks []struct {
+			Type  string `json:"type"`
+			Name  string `json:"name"`
+			Input struct {
+				Skill    string `json:"skill"`
+				FilePath string `json:"file_path"`
+			} `json:"input"`
+		}
+		if json.Unmarshal(l.Message.Content, &blocks) != nil {
+			continue
+		}
+		for _, b := range blocks {
+			if b.Type == "tool_use" {
+				out = append(out, ToolUse{b.Name, b.Input.Skill, b.Input.FilePath})
+			}
+		}
+	}
+	if err := sc.Err(); err != nil {
+		return nil, fmt.Errorf("read transcript: %w", err)
+	}
+	return out, nil
+}

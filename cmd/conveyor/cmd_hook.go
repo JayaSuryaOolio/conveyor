@@ -41,7 +41,7 @@ func runHook(home string, args []string) (err error) {
 }
 
 func doHook(home string, args []string, raw []byte) error {
-	if args[0] == "PreToolUse" { // the only hook that answers on stdout
+	if args[0] == "PreToolUse" { // answers on stdout, as does a Stop the completion check blocks
 		var openErr error
 		withDB := func(f func(db *sql.DB)) { // opened per use: only gh commands reach here
 			db, err := store.Open(core.DBPath(home))
@@ -68,7 +68,9 @@ func doHook(home string, args []string, raw []byte) error {
 		return err
 	}
 	defer db.Close()
-	return hook.Handle(db, home, args[0], raw)
+	res, err := hook.Handle(db, home, args[0], raw)
+	fmt.Fprint(out, res) // a blocked Stop's {"decision":"block"} answer
+	return err
 }
 
 func logHook(home string, args []string, raw []byte, err error) {
