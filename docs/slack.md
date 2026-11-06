@@ -98,7 +98,16 @@ message (rendered as Markdown via a Block Kit `markdown` block) and PR links, pl
 and **Open PR**. Buttons need *Interactivity* on: in the manifest add `settings.interactivity: {is_enabled: true}`
 (Socket Mode needs no request URL). Each task gets one
 thread: later notifications for it, and the agent's answers to your thread replies, post into it.
-Thread roots are kept in memory, so after a restart a task's next update starts a new thread.
+Thread links are stored in settings (`slack_thread:CHANNEL:TS` -> task key, `slack_task:KEY` -> `CHANNEL:TS`), so
+routing does not parse message text and survives restarts; only threads from before the links existed fall back to
+reading the thread (`conversations.replies`). Rows are never pruned.
+
+### Slack behaviours the bridge relies on (docs.slack.dev)
+- A message is identified by channel + `ts`; `thread_ts == ts` marks a thread root, replies carry the root's `thread_ts`.
+- Events not acked within 3s are redelivered (up to 3 times, ~1 and ~5 min later). The envelope is acked first, handling runs
+  on one ordered worker, and handled `channel/ts` are remembered in memory so a redelivery is ignored.
+- Our own posts come back as events (user token) and edits/deletes arrive as `message_changed` / `message_deleted`
+  subtypes; only plain, `file_share` and `thread_broadcast` messages are handled.
 
 ## Not done (add when needed)
 - Block Kit modals, channel mode, replying to an ephemeral `/conveyor` answer (Slack cannot thread them), token storage in

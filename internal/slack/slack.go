@@ -36,10 +36,33 @@ var api = "https://slack.com/api/"
 // message events from slack_user_id, so they must not be handled as commands.
 var mine sync.Map
 
-// threads maps a task key to the ts of its thread root, so later notifications and replies
-// for that task stay in one thread.
-// ponytail: in memory, so a restart starts a new thread per task; persist if that matters.
-var threads sync.Map
+// Thread <-> task links live in settings (no schema change; settings are never listed):
+// slack_thread:CHANNEL:ROOT_TS -> KEY routes a reply to its task, slack_task:KEY -> CHANNEL:ROOT_TS
+// keeps a task's notifications in one thread. Message text is only parsed (keyOf) for threads
+// that predate this.
+// ponytail: rows are never pruned (a few bytes per task); delete old ones if that matters.
+
+// link records that the thread rooted at ts in channel belongs to key.
+func (s *Slack) link(channel, ts, key string) {
+	if s.set == nil || channel == "" || ts == "" || key == "" {
+		return
+	}
+	s.set("slack_thread:"+channel+":"+ts, key)
+	if s.get("slack_task:"+key) == "" {
+		s.set("slack_task:"+key, channel+":"+ts)
+	}
+}
+
+// taskOf is the task linked to a thread, or "".
+func (s *Slack) taskOf(channel, ts string) string { return s.get("slack_thread:" + channel + ":" + ts) }
+
+// rootOf is the thread root ts linked to a task in channel, or "".
+func (s *Slack) rootOf(channel, key string) string {
+	if ch, ts, ok := strings.Cut(s.get("slack_task:"+key), ":"); ok && ch == channel {
+		return ts
+	}
+	return ""
+}
 
 // Slack is the transport; get reads settings.
 type Slack struct {
@@ -224,7 +247,8 @@ func blocks(m chat.Msg) []any {
 // and fallback; keyOf reads it back from the thread root.
 func (s *Slack) Send(m chat.Msg) error {
 	args := map[string]any{"channel": s.get("slack_user_id"), "text": message(m), "blocks": blocks(m)}
-	root, threaded := threads.Load(m.Key)
+	root := s.rootOf(s.get("slack_user_id"), m.Key)
+	threaded := root != ""
 	if threaded {
 		args["thread_ts"] = root
 	}
@@ -234,7 +258,7 @@ func (s *Slack) Send(m chat.Msg) error {
 		ts, err = s.post(args)
 	}
 	if err == nil && !threaded {
-		threads.Store(m.Key, ts)
+		s.link(s.get("slack_user_id"), ts, m.Key)
 	}
 	return err
 }
@@ -263,6 +287,16 @@ func (s *Slack) Listen(ctx context.Context, h func(chat.In) string) error {
 	// the Home tab keeps its content, so publishing the guide once per connection is enough
 	call(s.token(), "views.publish", map[string]any{"user_id": s.get("slack_user_id"), "view": map[string]any{"type": "home", "blocks": home}})
 	go func() { <-ctx.Done(); c.Close() }()
+	// Handling an event does Web API calls and downloads, so it runs on one worker (in order)
+	// instead of the read loop: Slack redelivers an envelope not acked within 3s and drops a
+	// connection that keeps missing acks.
+	work := make(chan func(), 64)
+	defer close(work)
+	go func() {
+		for f := range work {
+			f()
+		}
+	}()
 	for {
 		var e envelope
 		if err := c.ReadJSON(&e); err != nil {
@@ -273,10 +307,10 @@ func (s *Slack) Listen(ctx context.Context, h func(chat.In) string) error {
 			return nil // Slack asks for a fresh connection
 		case "events_api":
 			c.WriteJSON(map[string]any{"envelope_id": e.EnvelopeID})
-			s.event(e.Payload, h)
+			work <- func() { s.event(e.Payload, h) }
 		case "interactive": // button clicks
 			c.WriteJSON(map[string]any{"envelope_id": e.EnvelopeID})
-			s.interactive(e.Payload, h)
+			work <- func() { s.interactive(e.Payload, h) }
 		case "slash_commands":
 			var p struct {
 				UserID      string `json:"user_id"`
@@ -357,10 +391,11 @@ func (s *Slack) event(payload []byte, handle func(chat.In) string) {
 	// reply answers in thread (the command's own thread for a top-level DM) and keeps a created
 	// task's later notifications in that thread too
 	reply := func(thread, text string) {
-		if m := createdRe.FindStringSubmatch(text); m != nil {
-			threads.LoadOrStore(m[1], thread)
+		ts, _ := s.post(map[string]any{"channel": e.Channel, "thread_ts": thread, "text": text})
+		if m := createdRe.FindStringSubmatch(text); m != nil { // our own answer to "new"
+			s.link(e.Channel, thread, m[1])
+			s.link(e.Channel, ts, m[1]) // and the confirmation itself, should it be replied to as a root
 		}
-		s.post(map[string]any{"channel": e.Channel, "thread_ts": thread, "text": text})
 	}
 	if e.ThreadTS == "" { // a plain DM is a command, so /conveyor is optional
 		quote, files := content(raw.Event, false)
@@ -377,6 +412,11 @@ func (s *Slack) event(payload []byte, handle func(chat.In) string) {
 		reply(e.TS, handle(chat.In{Text: e.Text, Fwd: fwd}))
 		return
 	}
+	if key := s.taskOf(e.Channel, e.ThreadTS); key != "" { // the usual path: no API call, no parsing
+		reply(e.ThreadTS, ":speech_balloon: "+handle(chat.In{Key: key, Text: e.Text}))
+		return
+	}
+	// unlinked thread: a forward to run "new" under, or one from before links were stored
 	h, err := call(bot, "conversations.replies", map[string]any{"channel": e.Channel, "ts": e.ThreadTS, "limit": 200})
 	if err != nil {
 		log.Printf("chat: slack thread %s: %v", e.ThreadTS, err)
@@ -408,7 +448,7 @@ func (s *Slack) event(payload []byte, handle func(chat.In) string) {
 	if key == "" { // other chatter is ignored
 		return
 	}
-	threads.LoadOrStore(key, e.ThreadTS) // the agent's answer comes back into this thread
+	s.link(e.Channel, e.ThreadTS, key) // the agent's answer comes back into this thread
 	reply(e.ThreadTS, ":speech_balloon: "+handle(chat.In{Key: key, Text: e.Text}))
 }
 

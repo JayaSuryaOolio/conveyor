@@ -74,7 +74,8 @@ func TestSendThreadsPerTask(t *testing.T) {
 	}))
 	defer srv.Close()
 	api = srv.URL + "/"
-	s := &Slack{get: func(k string) string { return map[string]string{"slack_bot_token": "x", "slack_user_id": "U1"}[k] }}
+	cfg := map[string]string{"slack_bot_token": "x", "slack_user_id": "U1"}
+	s := &Slack{get: func(k string) string { return cfg[k] }, set: func(k, v string) error { cfg[k] = v; return nil }}
 	m := chat.Msg{Key: "CV-9", Title: "T", Status: "needs_you", Last: "**bold**"}
 	s.Send(m)
 	s.Send(m)
@@ -243,5 +244,33 @@ func TestReplyToCreatedConfirmation(t *testing.T) {
 	s.event([]byte(`{"event":{"type":"message","user":"U1","text":"list","channel":"D1","ts":"22.0"}}`), h)
 	if p := posts[len(posts)-1]; p["thread_ts"] != "22.0" {
 		t.Fatalf("top-level command not answered in its thread: %v", p)
+	}
+}
+
+// Thread->task links are stored, so routing needs neither message parsing nor an API read, and
+// survives a restart (a new Slack over the same settings).
+func TestThreadLinksPersist(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "conversations.replies") {
+			t.Error("linked thread must not read the thread")
+		}
+		fmt.Fprint(w, `{"ok":true,"ts":"50.0"}`)
+	}))
+	defer srv.Close()
+	api = srv.URL + "/"
+	cfg := map[string]string{"slack_bot_token": "x", "slack_user_id": "U1"}
+	mk := func() *Slack {
+		return &Slack{get: func(k string) string { return cfg[k] }, set: func(k, v string) error { cfg[k] = v; return nil }}
+	}
+	mk().event([]byte(`{"event":{"type":"message","user":"U1","text":"new B x","channel":"D1","ts":"40.0"}}`),
+		func(chat.In) string { return "created CV-8 x (backlog)" })
+	var got chat.In
+	mk().event([]byte(`{"event":{"type":"message","user":"U1","text":"more","channel":"D1","ts":"41.0","thread_ts":"40.0"}}`),
+		func(in chat.In) string { got = in; return "ok" })
+	if got.Key != "CV-8" || got.Text != "more" {
+		t.Fatalf("got %+v", got)
+	}
+	if mk().rootOf("D1", "CV-8") != "40.0" {
+		t.Fatalf("task not linked to its thread: %v", cfg)
 	}
 }
