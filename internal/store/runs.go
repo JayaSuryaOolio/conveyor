@@ -7,13 +7,13 @@ import (
 
 const runCols = `id, task_id, kind, mode, bg_id, session_id, status, prompt, block_status,
  summary, state, next, criteria, final_message, tokens_in, tokens_out, cache_read, cache_write,
- ctx_peak, api_calls, error, started_at, ended_at`
+ ctx_peak, api_calls, hook_denials, rereads, dup_bash, big_results, error, started_at, ended_at`
 
 func scanRun(r interface{ Scan(...any) error }) (Run, error) {
 	var x Run
 	err := r.Scan(&x.ID, &x.TaskID, &x.Kind, &x.Mode, &x.BgID, &x.SessionID, &x.Status, &x.Prompt, &x.BlockStatus,
 		&x.Summary, &x.State, &x.Next, &x.Criteria, &x.FinalMessage, &x.TokensIn, &x.TokensOut, &x.CacheRead, &x.CacheWrite,
-		&x.CtxPeak, &x.APICalls, &x.Error, &x.StartedAt, &x.EndedAt)
+		&x.CtxPeak, &x.APICalls, &x.HookDenials, &x.Rereads, &x.DupBash, &x.BigResults, &x.Error, &x.StartedAt, &x.EndedAt)
 	return x, err
 }
 
@@ -60,9 +60,11 @@ func GetRun(db *sql.DB, id int64) (Run, error) {
 // UpdateRun writes every mutable column of the run.
 func UpdateRun(db *sql.DB, r Run) error {
 	res, err := db.Exec(`UPDATE runs SET bg_id=?, session_id=?, status=?, prompt=?, block_status=?, summary=?, state=?, next=?,
- criteria=?, final_message=?, tokens_in=?, tokens_out=?, cache_read=?, cache_write=?, ctx_peak=?, api_calls=?, error=?, ended_at=? WHERE id=?`,
+ criteria=?, final_message=?, tokens_in=?, tokens_out=?, cache_read=?, cache_write=?, ctx_peak=?, api_calls=?,
+ hook_denials=?, rereads=?, dup_bash=?, big_results=?, error=?, ended_at=? WHERE id=?`,
 		r.BgID, r.SessionID, r.Status, r.Prompt, r.BlockStatus, r.Summary, r.State, r.Next,
-		r.Criteria, r.FinalMessage, r.TokensIn, r.TokensOut, r.CacheRead, r.CacheWrite, r.CtxPeak, r.APICalls, r.Error, r.EndedAt, r.ID)
+		r.Criteria, r.FinalMessage, r.TokensIn, r.TokensOut, r.CacheRead, r.CacheWrite, r.CtxPeak, r.APICalls,
+		r.HookDenials, r.Rereads, r.DupBash, r.BigResults, r.Error, r.EndedAt, r.ID)
 	if err != nil {
 		return fmt.Errorf("update run %d: %w", r.ID, err)
 	}

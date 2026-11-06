@@ -60,6 +60,8 @@ CREATE TABLE IF NOT EXISTS runs (
   cache_read INTEGER NOT NULL DEFAULT 0, cache_write INTEGER NOT NULL DEFAULT 0,
   ctx_peak INTEGER NOT NULL DEFAULT 0,
   api_calls INTEGER NOT NULL DEFAULT 0,
+  hook_denials INTEGER NOT NULL DEFAULT 0, rereads INTEGER NOT NULL DEFAULT 0,
+  dup_bash INTEGER NOT NULL DEFAULT 0, big_results INTEGER NOT NULL DEFAULT 0,
   error TEXT,
   started_at TEXT NOT NULL,
   ended_at TEXT
@@ -224,7 +226,26 @@ func Migrate(db *sql.DB) error {
 	if err := migrateAddCommentSource(db); err != nil {
 		return err
 	}
+	if err := migrateAddRunWaste(db); err != nil {
+		return err
+	}
 	return migrateAddAutomationOneShot(db)
+}
+
+// migrateAddRunWaste adds the runs waste counts; older runs read 0.
+func migrateAddRunWaste(db *sql.DB) error {
+	for _, col := range []string{"hook_denials", "rereads", "dup_bash", "big_results"} {
+		var n int
+		if err := db.QueryRow(`SELECT count(*) FROM pragma_table_info('runs') WHERE name=?`, col).Scan(&n); err != nil {
+			return fmt.Errorf("check runs.%s: %w", col, err)
+		}
+		if n == 0 {
+			if _, err := db.Exec(`ALTER TABLE runs ADD COLUMN ` + col + ` INTEGER NOT NULL DEFAULT 0`); err != nil {
+				return fmt.Errorf("add runs.%s: %w", col, err)
+			}
+		}
+	}
+	return nil
 }
 
 // migrateAddAutomationOneShot adds automations.run_at/task_id/flow_id.

@@ -144,6 +144,8 @@ CREATE TABLE runs (
   cache_read INTEGER NOT NULL DEFAULT 0, cache_write INTEGER NOT NULL DEFAULT 0,
   ctx_peak INTEGER NOT NULL DEFAULT 0,    -- max(input+cache_read+cache_write) of any single call
   api_calls INTEGER NOT NULL DEFAULT 0,
+  hook_denials INTEGER NOT NULL DEFAULT 0, rereads INTEGER NOT NULL DEFAULT 0,  -- waste counts from the
+  dup_bash INTEGER NOT NULL DEFAULT 0, big_results INTEGER NOT NULL DEFAULT 0,  -- transcript at Stop
   error TEXT,
   started_at TEXT NOT NULL,
   ended_at TEXT

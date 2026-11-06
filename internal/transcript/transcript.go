@@ -192,26 +192,112 @@ func ToolUses(path string) ([]ToolUse, error) {
 		if json.Unmarshal(sc.Bytes(), &l) != nil || l.Type != "assistant" {
 			continue
 		}
-		var blocks []struct {
-			Type  string `json:"type"`
-			Name  string `json:"name"`
-			Input struct {
-				Skill    string `json:"skill"`
-				FilePath string `json:"file_path"`
-				Command  string `json:"command"`
-			} `json:"input"`
-		}
-		if json.Unmarshal(l.Message.Content, &blocks) != nil {
-			continue
-		}
-		for _, b := range blocks {
-			if b.Type == "tool_use" {
-				out = append(out, ToolUse{b.Name, b.Input.Skill, b.Input.FilePath, b.Input.Command})
-			}
-		}
+		out = append(out, toolUses(l.Message.Content)...)
 	}
 	if err := sc.Err(); err != nil {
 		return nil, fmt.Errorf("read transcript: %w", err)
 	}
 	return out, nil
+}
+
+// toolUses returns the tool_use blocks of one assistant entry's content.
+func toolUses(raw json.RawMessage) []ToolUse {
+	var blocks []struct {
+		Type  string `json:"type"`
+		Name  string `json:"name"`
+		Input struct {
+			Skill    string `json:"skill"`
+			FilePath string `json:"file_path"`
+			Command  string `json:"command"`
+		} `json:"input"`
+	}
+	if json.Unmarshal(raw, &blocks) != nil {
+		return nil
+	}
+	var out []ToolUse
+	for _, b := range blocks {
+		if b.Type == "tool_use" {
+			out = append(out, ToolUse{b.Name, b.Input.Skill, b.Input.FilePath, b.Input.Command})
+		}
+	}
+	return out
+}
+
+// Waste counts avoidable work in one run, for the weekly review (conveyor-doctor).
+type Waste struct {
+	HookDenials int // tool results containing "hook error" (a hook refused the call)
+	Rereads     int // Read calls of a file_path the run already read
+	DupBash     int // Bash calls repeating a command the run already ran
+	BigResults  int // tool results over BigResult chars
+}
+
+// BigResult is the tool_result size (chars) that Waste counts as big.
+const BigResult = 20000
+
+// CountWaste scans the run's entries (after the last user entry equal to promptText, as Sum;
+// "" = the whole file) for the counts in Waste.
+func CountWaste(path, promptText string) (Waste, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return Waste{}, fmt.Errorf("open transcript: %w", err)
+	}
+	defer f.Close()
+	want := strings.TrimSpace(promptText)
+	var w Waste
+	var read, ran map[string]bool
+	reset := func() { w, read, ran = Waste{}, map[string]bool{}, map[string]bool{} }
+	reset()
+	sc := bufio.NewScanner(f)
+	sc.Buffer(make([]byte, 1<<20), 64<<20)
+	for sc.Scan() {
+		var l line
+		if json.Unmarshal(sc.Bytes(), &l) != nil {
+			continue
+		}
+		switch l.Type {
+		case "user":
+			if want != "" && strings.TrimSpace(userText(l.Message.Content)) == want {
+				reset()
+				continue
+			}
+			var blocks []struct {
+				Type    string          `json:"type"`
+				Content json.RawMessage `json:"content"`
+			}
+			if json.Unmarshal(l.Message.Content, &blocks) != nil {
+				continue
+			}
+			for _, b := range blocks {
+				if b.Type != "tool_result" {
+					continue
+				}
+				text := userText(b.Content)
+				if strings.Contains(text, "hook error") {
+					w.HookDenials++
+				}
+				if len(text) > BigResult {
+					w.BigResults++
+				}
+			}
+		case "assistant":
+			for _, u := range toolUses(l.Message.Content) {
+				switch {
+				case u.Name == "Read" && u.FilePath != "":
+					if read[u.FilePath] {
+						w.Rereads++
+					}
+					read[u.FilePath] = true
+				case u.Name == "Bash" && u.Command != "":
+					if ran[u.Command] {
+						w.DupBash++
+					}
+					ran[u.Command] = true
+				}
+			}
+		}
+	}
+	if err := sc.Err(); err != nil {
+		return Waste{}, fmt.Errorf("read transcript: %w", err)
+	}
+	return w, nil
 }

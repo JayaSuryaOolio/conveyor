@@ -165,6 +165,10 @@ func onStop(db *sql.DB, task store.Task, run store.Run, p payload) error {
 		} else {
 			store.RecordEvent(db, task.ID, "error", "transcript usage: "+err.Error())
 		}
+		if w, err := transcript.CountWaste(p.TranscriptPath, run.Prompt); err == nil {
+			run.HookDenials, run.Rereads = int64(w.HookDenials), int64(w.Rereads)
+			run.DupBash, run.BigResults = int64(w.DupBash), int64(w.BigResults)
+		} // a read error is already recorded by Sum above
 	}
 	run.FinalMessage = &final
 	ended := time.Now().UTC().Format(time.RFC3339)

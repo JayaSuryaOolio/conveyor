@@ -21,7 +21,8 @@ When asked to fix (`fix KEY`, or `fix` for every task), skip the review below. F
 ```
 conveyor task list --json                         # all tasks
 conveyor task show KEY --runs --thread --json     # runs: started_at, ended_at, status, block_status, error,
-                                                  # api_calls, ctx_peak, tokens_in/out, cache_read, mode, kind, summary
+                                                  # api_calls, ctx_peak, tokens_in/out, cache_read, mode, kind, summary,
+                                                  # hook_denials, rereads, dup_bash, big_results (waste counts)
 ```
 
 Take, without duplicates:
@@ -40,7 +41,7 @@ If there are fewer than 3 runs in the window, write a short report saying so and
 
 For each run, note:
 - **Outcome**: done / failed / needs_you, and whether the human agreed (later comments, PR merged?).
-- **Waste**: re-reading files the brief already summarised, exploring to find things the brief or CLAUDE.md could have named, repeated failing commands, long tool outputs, `ctx_peak` far above what the change needed.
+- **Waste**: start from the run's counts, not a transcript re-parse: `hook_denials` (tool calls a hook refused, then retried), `rereads` (extra Reads of a file already read), `dup_bash` (repeated identical Bash commands), `big_results` (tool results over 20k chars). Runs from before these columns show 0. Open the transcript only to see why a count is high. Also look for re-reading files the brief already summarised, exploring to find things the brief or CLAUDE.md could have named, repeated failing commands, long tool outputs, `ctx_peak` far above what the change needed.
 - **Missing context**: questions the agent asked, wrong assumptions, repo conventions it broke (tests, branch names, PR format), skills/commands it should have used but didn't.
 - **Unused context**: brief sections or rules the agent never needed across the sample (candidates to cut).
 

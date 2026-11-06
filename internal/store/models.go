@@ -78,6 +78,10 @@ type Run struct {
 	CacheWrite   int64   `json:"cache_write"`
 	CtxPeak      int64   `json:"ctx_peak"`
 	APICalls     int64   `json:"api_calls"`
+	HookDenials  int64   `json:"hook_denials"` // waste counts from the transcript at Stop (transcript.Waste)
+	Rereads      int64   `json:"rereads"`
+	DupBash      int64   `json:"dup_bash"`
+	BigResults   int64   `json:"big_results"`
 	Error        *string `json:"error"`
 	StartedAt    string  `json:"started_at"`
 	EndedAt      *string `json:"ended_at"`
