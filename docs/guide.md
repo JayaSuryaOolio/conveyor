@@ -34,6 +34,8 @@ The diagram does not yet show reviving a cancelled task (cancelled -> backlog / 
 - **running**: a session is working on it.
 - **needs_you**: the agent stopped without a final status block (it asked you something), or its session disappeared.
 - **review**: the agent said it is done. If there is a PR, Conveyor watches it.
+
+Before a `status: done` run can finish, the Stop hook's completion gate checks each changed repo is committed, pushed, has a PR (and a changeset where the repo uses them), that the brief's skills were loaded and that tests ran after the last code edit. Failures go back to the agent as its next prompt, once. Details and the ranked list of further checks: `docs/harness-checks.md`.
 - **failed**: repeated failures. Comment to retry.
 - **done**: finished, either by you or because every PR merged.
 - **cancelled**: only you can cancel, from any status except done. You can revive a cancelled task by moving it back to backlog or todo.

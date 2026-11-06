@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
+	"github.com/JayaSuryaOolio/conveyor/internal/transcript"
 )
 
 func gitT(t *testing.T, dir string, args ...string) {
@@ -117,5 +118,56 @@ func TestCompletionGapsSatisfied(t *testing.T) {
 	os.WriteFile(filepath.Join(wt, "dirty"), []byte("d"), 0o644)
 	if gaps, _ := completionGaps(e.db, e.status(t), r, p, true); len(gaps) != 0 {
 		t.Fatalf("failed run checked: %q", gaps)
+	}
+}
+
+func TestUntestedEdit(t *testing.T) {
+	edit, doc := transcript.ToolUse{Name: "Edit", FilePath: "/w/a.go"}, transcript.ToolUse{Name: "Write", FilePath: "/w/README.md"}
+	test, ls := transcript.ToolUse{Name: "Bash", Command: "go test ./..."}, transcript.ToolUse{Name: "Bash", Command: "ls"}
+	for _, c := range []struct {
+		uses []transcript.ToolUse
+		want string
+	}{
+		{[]transcript.ToolUse{edit, test}, ""},
+		{[]transcript.ToolUse{test, edit, ls}, "/w/a.go"},
+		{[]transcript.ToolUse{test, doc}, ""},
+		{nil, ""},
+	} {
+		if got := untestedEdit(c.uses); got != c.want {
+			t.Errorf("%v: got %q want %q", c.uses, got, c.want)
+		}
+	}
+}
+
+func TestCompletionGapsChangeset(t *testing.T) {
+	e := setup(t, store.StatusRunning)
+	wt, tr := e.worktree(t)
+	url := "https://github.com/o/a/pull/1"
+	tr.PRURL = &url
+	store.UpdateTaskRepo(e.db, tr)
+	commit := func(file string) {
+		os.MkdirAll(filepath.Dir(filepath.Join(wt, file)), 0o755)
+		os.WriteFile(filepath.Join(wt, file), []byte("x"), 0o644)
+		gitT(t, wt, "add", ".")
+		gitT(t, wt, "commit", "-qm", file)
+	}
+	gitT(t, wt, "checkout", "-q", "main")
+	commit(".changeset/config.json")
+	gitT(t, wt, "push", "-q", "origin", "main")
+	gitT(t, wt, "checkout", "-q", tr.Branch)
+	gitT(t, wt, "merge", "-q", "main")
+	commit("a.ts")
+	gitT(t, wt, "push", "-q", "-u", "origin", tr.Branch)
+	r := e.run(t, "auto", "running", "S1", "p")
+	md := filepath.Join(wt, "CLAUDE.md")
+	tp := writeTranscript(t, `{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read","input":{"file_path":"`+md+`"}}]}}`)
+	p := payload{LastAssistantMessage: doneMsg, TranscriptPath: tp}
+	if gaps, _ := completionGaps(e.db, e.status(t), r, p, true); len(gaps) != 1 || !strings.Contains(gaps[0], "no .changeset") {
+		t.Fatalf("want changeset gap: %q", gaps)
+	}
+	commit(".changeset/brave-cats.md")
+	gitT(t, wt, "push", "-q", "origin", tr.Branch)
+	if gaps, _ := completionGaps(e.db, e.status(t), r, p, true); len(gaps) != 0 {
+		t.Fatalf("gaps %q", gaps)
 	}
 }

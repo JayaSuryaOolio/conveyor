@@ -173,7 +173,8 @@ func BackgroundPending(path, promptText string, now time.Time) (bool, error) {
 type ToolUse struct {
 	Name     string
 	Skill    string // Skill tool
-	FilePath string // Read tool
+	FilePath string // Read, Edit, Write tools
+	Command  string // Bash tool
 }
 
 // ToolUses lists every tool_use block in the transcript (the whole session, all runs).
@@ -197,6 +198,7 @@ func ToolUses(path string) ([]ToolUse, error) {
 			Input struct {
 				Skill    string `json:"skill"`
 				FilePath string `json:"file_path"`
+				Command  string `json:"command"`
 			} `json:"input"`
 		}
 		if json.Unmarshal(l.Message.Content, &blocks) != nil {
@@ -204,7 +206,7 @@ func ToolUses(path string) ([]ToolUse, error) {
 		}
 		for _, b := range blocks {
 			if b.Type == "tool_use" {
-				out = append(out, ToolUse{b.Name, b.Input.Skill, b.Input.FilePath})
+				out = append(out, ToolUse{b.Name, b.Input.Skill, b.Input.FilePath, b.Input.Command})
 			}
 		}
 	}
