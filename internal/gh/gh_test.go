@@ -140,3 +140,17 @@ func TestMissingGH(t *testing.T) {
 		t.Fatalf("err %v", err)
 	}
 }
+
+// A task that adopted an existing PR ends its run in needs_you; the merge must still close it.
+func TestMergedFromNeedsYouDone(t *testing.T) {
+	dir := fakeGH(t)
+	db, tk := newTask(t, 1)
+	var err error
+	if tk, err = store.UpdateTaskStatus(db, tk.ID, store.StatusNeedsYou, store.ActorSystem); err != nil {
+		t.Fatal(err)
+	}
+	setPR(t, dir, tk.Repos[0].Branch, "MERGED")
+	if got := sync(t, db, tk); got.Status != store.StatusDone {
+		t.Fatalf("status %s", got.Status)
+	}
+}

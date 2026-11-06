@@ -60,7 +60,7 @@ var transitions = map[edge]actors{
 	{StatusTodo, StatusNeedsYou}:     byHuman, // the only queued comment was taken back
 	{StatusNeedsYou, StatusRunning}:  bySystem,
 	{StatusNeedsYou, StatusTodo}:     byAny,
-	{StatusNeedsYou, StatusDone}:     byHuman,
+	{StatusNeedsYou, StatusDone}:     byAny, // system: its PR merged
 	{StatusReview, StatusTodo}:       byAny,
 	{StatusReview, StatusNeedsYou}:   bySystem, // all PRs closed without merge
 	{StatusReview, StatusDone}:       byAny,

@@ -53,7 +53,7 @@ func FindPR(ctx context.Context, repoPath, branch string) (*PR, error) {
 }
 
 // SyncTask updates pr_url and pr_state for every task repo, then moves a task
-// in review to done (all PRs merged or closed, at least one merged) or to
+// in review or needs_you to done (all PRs merged or closed, at least one merged) or to
 // needs_you (every PR closed without merge).
 func SyncTask(ctx context.Context, db *sql.DB, task store.Task) error {
 	repos, err := store.ListRepos(db)
@@ -88,7 +88,7 @@ func SyncTask(ctx context.Context, db *sql.DB, task store.Task) error {
 			closed++
 		}
 	}
-	if task.Status != store.StatusReview || total == 0 {
+	if (task.Status != store.StatusReview && task.Status != store.StatusNeedsYou) || total == 0 {
 		return nil
 	}
 	switch {
@@ -97,7 +97,7 @@ func SyncTask(ctx context.Context, db *sql.DB, task store.Task) error {
 			return err
 		}
 		return store.RecordEvent(db, task.ID, "pr_merged", fmt.Sprintf("%d of %d PRs merged", merged, total))
-	case closed == total:
+	case closed == total && task.Status == store.StatusReview:
 		if _, err := store.AddComment(db, store.Comment{TaskID: task.ID, Author: store.AuthorSystem, Body: "PR closed without merge"}); err != nil {
 			return err
 		}
