@@ -63,16 +63,16 @@ func TestManifestSettingsValidation(t *testing.T) {
 
 func TestReviewWebhookEventsFollowSettings(t *testing.T) {
 	s := newSvc(t)
-	if got := s.EnabledReviewWebhookEvents(); !slices.Equal(got, ReviewWebhookEvents) {
+	if got := s.EnabledReviewWebhookEvents("review-webhooks"); !slices.Equal(got, ReviewWebhookEvents) {
 		t.Fatalf("not installed: %v", got)
 	}
 	if err := s.InstallExample("review-webhooks"); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.SaveAppSettings(ReviewWebhooksApp, map[string]string{"issue_comment": "false"}); err != nil {
+	if err := s.SaveAppSettings("Review webhooks", map[string]string{"issue_comment": "false"}); err != nil {
 		t.Fatal(err)
 	}
-	if got := s.EnabledReviewWebhookEvents(); !slices.Equal(got, ReviewWebhookEvents[:2]) {
+	if got := s.EnabledReviewWebhookEvents("review-webhooks"); !slices.Equal(got, ReviewWebhookEvents[:2]) {
 		t.Fatalf("issue_comment off: %v", got)
 	}
 }

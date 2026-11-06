@@ -5,5 +5,5 @@
    {"key":"issue_comment","type":"boolean","default":true,"description":"Forward comments on the PR conversation. Applies when the listener restarts."}],
  "actions":[{"id":"forward","label":"Review webhooks","places":["task_sidebar"],
    "confirm":"This turns on instant review checks for ALL tasks with an open PR, not just this one.",
-   "run":"conveyor review-webhook",
-   "services":{"task_sidebar":{"status":"conveyor review-webhook --status","stop":"conveyor review-webhook --stop"}}}]}
+   "run":"conveyor review-webhook --app ${{ app.id }}",
+   "services":{"task_sidebar":{"autostart":true,"status":"conveyor review-webhook --app ${{ app.id }} --status","stop":"conveyor review-webhook --app ${{ app.id }} --stop"}}}]}

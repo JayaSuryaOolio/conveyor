@@ -1,0 +1,38 @@
+package core
+
+import (
+	"io/fs"
+	"strings"
+
+	"github.com/JayaSuryaOolio/conveyor/examples"
+)
+
+// Example is a bundled example app (examples/*.json), offered but never auto-installed.
+type Example struct {
+	File        string `json:"file"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+// ExampleApps lists the bundled examples.
+func ExampleApps() []Example {
+	var out []Example
+	files, _ := fs.Glob(examples.FS, "*.json")
+	for _, f := range files {
+		raw, _ := examples.FS.ReadFile(f)
+		if m, err := ParseManifest(string(raw)); err == nil {
+			out = append(out, Example{strings.TrimSuffix(f, ".json"), m.Name, m.Description})
+		}
+	}
+	return out
+}
+
+// InstallExample installs a bundled example by its ExampleApps File (the same path as importing a manifest).
+func (s *Service) InstallExample(file string) error {
+	raw, err := examples.FS.ReadFile(file + ".json")
+	if err != nil {
+		return err
+	}
+	_, err = s.InstallManifest(string(raw), false)
+	return err
+}

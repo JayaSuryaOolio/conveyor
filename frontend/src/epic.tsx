@@ -122,7 +122,7 @@ function Header({g, nav, root}: {g: core.Graph; nav: Nav; root: core.GraphNode})
     const {data: apps, reload: reloadApps} = useData(ListApps, [])
     const epic = g.stage !== ''
     const hasPR = g.prs.some(p => p.pr_url)
-    const noHooks = !(apps ?? []).some(a => /review.?webhooks/i.test(a.name))
+    const noHooks = !(apps ?? []).some(a => a.manifest.includes('"autostart"'))
     return <Stack gap="xs">
         <Paper withBorder radius="md" px="sm" py={6}>
             <Group justify="space-between" wrap="wrap">
