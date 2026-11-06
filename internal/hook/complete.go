@@ -75,12 +75,18 @@ func completionGaps(db *sql.DB, task store.Task, run store.Run, p payload, prSyn
 				gaps = append(gaps, fmt.Sprintf("%s: branch %s is %d commit(s) ahead of %s but has no PR; open one", name, tr.Branch, ahead, def[tr.RepoID]))
 			}
 		}
+		if ahead > 0 && fileExists(filepath.Join(wt, ".changeset", "config.json")) && needsChangeset(wt, "origin/"+def[tr.RepoID]) {
+			gaps = append(gaps, fmt.Sprintf("%s: code changed but no .changeset/*.md was added; add one with the repo's changeset command, or say in the summary why it needs none", name))
+		}
 		md := filepath.Join(wt, "CLAUDE.md")
 		if _, err := os.Stat(md); err == nil && (dirty != "" || ahead > 0) && !mdLoaded(md, run, events, uses) {
 			gaps = append(gaps, fmt.Sprintf("%s: you changed this repo without loading its CLAUDE.md; read %s and check the work against it", name, md))
 		}
 	}
 	if usesOK {
+		if f := untestedEdit(uses); f != "" {
+			gaps = append(gaps, fmt.Sprintf("you edited %s after the last test/build/lint command; run the repo's checks again and fix what fails", f))
+		}
 		for _, s := range briefSkills(task) {
 			if !skillUsed(s, uses) {
 				gaps = append(gaps, fmt.Sprintf("the brief lists skill %q but no Skill tool call loaded it; load it and follow it", s))
@@ -127,6 +133,52 @@ func skillUsed(s string, uses []transcript.ToolUse) bool {
 	}
 	return false
 }
+
+// needsChangeset: the branch changes code files but adds no changeset.
+func needsChangeset(wt, base string) bool {
+	out, err := git(wt, "diff", "--name-only", "--diff-filter=AM", base+"...HEAD")
+	if err != nil {
+		return false
+	}
+	code := false
+	for _, f := range strings.Split(out, "\n") {
+		if strings.HasPrefix(f, ".changeset/") && strings.HasSuffix(f, ".md") {
+			return false
+		}
+		code = code || codeExt[filepath.Ext(f)]
+	}
+	return code
+}
+
+var codeExt = map[string]bool{".go": true, ".ts": true, ".tsx": true, ".js": true, ".jsx": true, ".mjs": true,
+	".py": true, ".rs": true, ".java": true, ".kt": true, ".swift": true, ".rb": true, ".cs": true, ".sql": true}
+
+// checkCmd matches a Bash command that plausibly ran the repo's tests, build or linters.
+// ponytail: keyword heuristic, not the repo's real test command; read it from repo config if it misfires.
+func checkCmd(c string) bool {
+	for _, k := range []string{"test", "build", "vet", "lint", "tsc", "check", "make"} {
+		if strings.Contains(c, k) {
+			return true
+		}
+	}
+	return false
+}
+
+// untestedEdit returns the last code file edited after the last check command, or "".
+func untestedEdit(uses []transcript.ToolUse) string {
+	last := ""
+	for _, u := range uses {
+		switch {
+		case u.Name == "Bash" && checkCmd(u.Command):
+			last = ""
+		case (u.Name == "Edit" || u.Name == "Write" || u.Name == "MultiEdit") && codeExt[filepath.Ext(u.FilePath)]:
+			last = u.FilePath
+		}
+	}
+	return last
+}
+
+func fileExists(p string) bool { _, err := os.Stat(p); return err == nil }
 
 // stopBlock is the Stop hook answer that keeps the session going with the gaps as its next prompt.
 func stopBlock(gaps []string) string {

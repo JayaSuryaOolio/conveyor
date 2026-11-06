@@ -69,7 +69,7 @@ Use a throwaway home for experiments: `conveyor --home $(mktemp -d) ...`. Never 
 | Domain ops shared by CLI + app | `internal/core` |
 | Schema, migrations, queries, status rules, links | `internal/store` (`schema.go`, `status.go`, `links.go`) |
 | Dispatch loop, reap, launch, model choice | `internal/dispatch` |
-| Hook events -> store | `internal/hook`; status block parser `internal/statusblock` |
+| Hook events -> store | `internal/hook` (Stop completion gate `complete.go`, see `docs/harness-checks.md`); status block parser `internal/statusblock` |
 | `claude` CLI wrapper, settings/hooks files | `internal/claude` |
 | BRIEF.md + launch prompts (golden test) | `internal/brief` (`testdata/brief.golden`) |
 | Worktrees | `internal/workspace`; PRs `internal/gh`; terminals `internal/term`, `internal/terminal` |
