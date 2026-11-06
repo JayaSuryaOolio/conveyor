@@ -87,6 +87,12 @@ func Log(path string, after int64) ([]Entry, int64, error) {
 							break
 						}
 					}
+					var qs []struct {
+						Question string `json:"question"`
+					}
+					if arg == "" && json.Unmarshal(p.Input["questions"], &qs) == nil && len(qs) > 0 { // AskUserQuestion
+						arg = qs[0].Question
+					}
 					out = append(out, Entry{"tool", strings.TrimSpace(p.Name + ": " + oneLine(arg)), l.Timestamp})
 				}
 			}
