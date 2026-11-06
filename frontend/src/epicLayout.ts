@@ -3,7 +3,7 @@ export type LNode = {key: string; parent: string}
 export type LLink = {from: string; to: string; kind: string}
 export type Placed = {key: string; x: number; y: number; w: number; h: number; group: boolean; parent?: string}
 
-// ponytail: fixed card height; a card with many labels/PR chips can overflow its row. Upgrade: measure nodes via useNodesInitialized and re-layout.
+// CARD.h is only the first-paint estimate; layout() takes measured heights (React Flow node.measured) and re-runs once they arrive.
 export const CARD = {w: 260, h: 112, gap: 20, pad: 16, head: 44}
 
 /** Column of each key within its group: the longest `blocks` path from a blocker in the same group. Cross-group edges never count. */
@@ -24,8 +24,8 @@ export function columns(keys: string[], links: LLink[]): Map<string, number> {
     return col
 }
 
-/** Positions every node: children sit inside their parent's group (positions relative to it), roots start at 0,0. */
-export function layout(nodes: LNode[], links: LLink[]): Placed[] {
+/** Positions every node: children sit inside their parent's group (positions relative to it), roots start at 0,0. `heights` are measured leaf-card heights by key; missing keys fall back to CARD.h. */
+export function layout(nodes: LNode[], links: LLink[], heights: ReadonlyMap<string, number> = new Map()): Placed[] {
     const kids = new Map<string, string[]>()
     const known = new Set(nodes.map(n => n.key))
     for (const n of nodes) {
@@ -43,7 +43,7 @@ export function layout(nodes: LNode[], links: LLink[]): Placed[] {
                 const have = out.length
                 const inner = kids.has(k) ? place(k, CARD.pad, CARD.head) : undefined
                 out.length = have // measuring only; positions are set below
-                size.set(k, inner ? {w: inner.w + 2 * CARD.pad, h: inner.h + CARD.head + CARD.pad} : {w: CARD.w, h: CARD.h})
+                size.set(k, inner ? {w: inner.w + 2 * CARD.pad, h: inner.h + CARD.head + CARD.pad} : {w: CARD.w, h: heights.get(k) ?? CARD.h})
             }
             return size.get(k)!
         }

@@ -20,6 +20,14 @@ test('children sit inside their parent group, rows ordered by key', () => {
     assert.ok(by.E.h >= by.E2.y + CARD.h)
 })
 
+test('measured heights drive row spacing and group height', () => {
+    const p = layout([{key: 'E', parent: ''}, {key: 'E1', parent: 'E'}, {key: 'E2', parent: 'E'}], [], new Map([['E1', 400]]))
+    const by = Object.fromEntries(p.map(n => [n.key, n]))
+    assert.equal(by.E1.h, 400)
+    assert.equal(by.E2.y - by.E1.y, 400 + CARD.gap)
+    assert.ok(by.E.h >= by.E2.y + CARD.h)
+})
+
 test('a lone task is one node', () => {
     assert.equal(layout([{key: 'T', parent: ''}], []).length, 1)
 })
