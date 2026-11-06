@@ -1,4 +1,4 @@
-// Package examples bundles the manifests Conveyor offers under "Detected apps". They double as templates for new apps.
+// Package examples bundles the manifests Conveyor offers under "Templates". They double as templates for new apps.
 package examples
 
 import "embed"

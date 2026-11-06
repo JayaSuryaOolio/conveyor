@@ -181,13 +181,19 @@ function AppList() {
                     </Table.Tbody>
                 </Table>
             )}
-            {(missing.length > 0 || offered.length > 0) && <>
+            {missing.length > 0 && <>
                 <Title order={5}>Detected on this Mac</Title>
                 <Group gap="xs">
                     {missing.map(p => (
                         <Button key={p.name} size="xs" variant="light" leftSection={<IconPlus size={14}/>} title={p.command}
                                 onClick={() => InstallPreset(p).then(reload, errMsg)}>{p.name}</Button>
                     ))}
+                </Group>
+            </>}
+            {offered.length > 0 && <>
+                <Title order={5}>Templates</Title>
+                <Text size="xs" c="dimmed">Bundled examples, not detected on this Mac. Install one to use it or as a starting point.</Text>
+                <Group gap="xs">
                     {offered.map(e => (
                         <Button key={e.file} size="xs" variant="light" leftSection={<IconPlus size={14}/>} title={e.description}
                                 onClick={() => InstallExample(e.file).then(reload, errMsg)}>{e.name}</Button>
