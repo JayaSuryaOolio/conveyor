@@ -69,6 +69,7 @@ func (s *Slack) openConn() (map[string]any, error) {
 	if err == nil || !strings.HasSuffix(err.Error(), "token_expired") || s.get("slack_app_refresh_token") == "" {
 		return r, err
 	}
+	log.Printf("chat: slack app token expired, refreshing")
 	id, secret := strings.TrimSpace(s.get("slack_client_id")), strings.TrimSpace(s.get("slack_client_secret"))
 	if id == "" || secret == "" {
 		return nil, fmt.Errorf("slack app token expired: set slack_client_id and slack_client_secret to refresh it")
@@ -102,6 +103,7 @@ func (s *Slack) openConn() (map[string]any, error) {
 	if err := s.set("slack_app_token", out.Token); err != nil {
 		return nil, err
 	}
+	log.Printf("chat: slack app token refreshed")
 	return call(out.Token, "apps.connections.open", struct{}{})
 }
 
