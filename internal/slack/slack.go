@@ -445,7 +445,8 @@ func (s *Slack) event(payload []byte, handle func(chat.In) string) {
 			}
 		}
 	}
-	if key == "" { // other chatter is ignored
+	if key == "" { // not a thread we can route: say so rather than leave only the :eyes:
+		reply(e.ThreadTS, "I can't tell which task this thread is about. Start the message with the task key (`CV-12 your comment`) or send a command like `list`.")
 		return
 	}
 	s.link(e.Channel, e.ThreadTS, key) // the agent's answer comes back into this thread

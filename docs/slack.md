@@ -102,6 +102,11 @@ Thread links are stored in settings (`slack_thread:CHANNEL:TS` -> task key, `sla
 routing does not parse message text and survives restarts; only threads from before the links existed fall back to
 reading the thread (`conversations.replies`). Rows are never pruned.
 
+Routing rules: a reply goes to the task linked to the thread it is in, so two threads about the same task (or two
+tasks) never mix. The whole text is the comment, so other task keys inside it are plain text. A top-level DM
+`CV-1 CV-2 text` comments on CV-1 only (the first word). A thread that is not linked and cannot be resolved gets a
+hint instead of silence.
+
 ### Slack behaviours the bridge relies on (docs.slack.dev)
 - A message is identified by channel + `ts`; `thread_ts == ts` marks a thread root, replies carry the root's `thread_ts`.
 - Events not acked within 3s are redelivered (up to 3 times, ~1 and ~5 min later). The envelope is acked first, handling runs
