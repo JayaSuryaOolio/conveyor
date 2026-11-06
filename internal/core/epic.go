@@ -19,7 +19,13 @@ func (s *Service) SetLabel(key, label string) error {
 	if err != nil {
 		return err
 	}
-	return store.SetPrefixedLabel(s.DB, t.ID, label)
+	if err := store.SetPrefixedLabel(s.DB, t.ID, label); err != nil || !strings.HasPrefix(label, store.PrefixStage) {
+		return err
+	}
+	if t, err = store.GetTask(s.DB, t.ID); err != nil {
+		return err
+	}
+	return store.EnsureFlow(s.DB, t)
 }
 
 func (s *Service) epicRoot(key string) (store.Task, error) {
@@ -51,7 +57,7 @@ func (s *Service) EpicApprove(key string) error {
 	return err
 }
 
-// EpicRestart abandons the active flow, cancels every open sub-task and starts the next flow at spec.
+// EpicRestart abandons the active flow (if any; with none it just starts the next one), cancels every open sub-task and starts the next flow at spec.
 // Only a human starts it: no code path calls this on its own.
 func (s *Service) EpicRestart(key, reason string) error {
 	if strings.TrimSpace(reason) == "" {
@@ -60,11 +66,6 @@ func (s *Service) EpicRestart(key, reason string) error {
 	t, err := s.epicRoot(key)
 	if err != nil {
 		return err
-	}
-	if f, err := store.ActiveFlow(s.DB, t.ID); err != nil {
-		return err
-	} else if f == nil {
-		return fmt.Errorf("%s has no active flow to restart", key)
 	}
 	kids, err := store.Descendants(s.DB, t.ID)
 	if err != nil {
@@ -209,6 +210,9 @@ func (s *Service) EpicStatus(key string, flow int) (EpicStatusView, error) {
 	}
 	v := EpicStatusView{Key: root.Key, Name: store.EpicName(root), Stage: store.EpicStage(root),
 		Gate: store.EpicGateOn(root), Status: string(root.Status), Tasks: []EpicTask{}, PRs: []store.FlowPR{}}
+	if err = store.EnsureFlow(s.DB, root); err != nil {
+		return v, err
+	}
 	if v.Flow, err = s.flowFor(root, flow); err != nil {
 		return v, err
 	}
@@ -309,6 +313,9 @@ func (s *Service) EpicCheck(key string, fix bool) ([]string, error) {
 		}
 	}
 	onFlow := map[string]bool{}
+	for _, t := range v.Tasks { // the task's own PR counts when the flow row lags behind it
+		onFlow[t.Key] = len(t.PRs) > 0
+	}
 	for _, p := range v.PRs {
 		if p.PRURL != nil && *p.PRURL != "" {
 			onFlow[p.TaskKey] = true
@@ -572,6 +579,9 @@ func grepFile(path, text string) []string {
 func (s *Service) Flows(key string) ([]store.EpicFlow, error) {
 	root, err := s.epicRoot(key)
 	if err != nil {
+		return nil, err
+	}
+	if err := store.EnsureFlow(s.DB, root); err != nil {
 		return nil, err
 	}
 	return store.ListFlows(s.DB, root.ID)

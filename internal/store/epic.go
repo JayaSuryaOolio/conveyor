@@ -185,6 +185,29 @@ func ListFlows(db *sql.DB, epicID int64) ([]EpicFlow, error) {
 	return out, rows.Err()
 }
 
+// EnsureFlow starts flow 1 for an epic past the chart stage that never had a flow (moved there by a label or
+// an import instead of `epic approve`). An epic whose flows have all ended is left alone.
+func EnsureFlow(db *sql.DB, t Task) error {
+	if !IsEpic(t) || EpicStage(t) == StageChart {
+		return nil
+	}
+	var f EpicFlow
+	started := false
+	err := inTx(db, func(tx *sql.Tx) (err error) {
+		var n int
+		if err = tx.QueryRow(`SELECT COUNT(*) FROM epic_flows WHERE epic_id=?`, t.ID).Scan(&n); err != nil || n > 0 {
+			return err
+		}
+		f, err = startFlow(tx, t.ID)
+		started = err == nil
+		return err
+	})
+	if started {
+		Audit("epic.flow.start", "task_id", t.ID, "flow", f.Attempt, "reason", "no flow")
+	}
+	return err
+}
+
 // ApproveEpic starts flow 1 and moves the epic to the decide stage. It fails once a flow exists.
 func ApproveEpic(db *sql.DB, epicID int64) (EpicFlow, error) {
 	var f EpicFlow
@@ -207,27 +230,30 @@ func ApproveEpic(db *sql.DB, epicID int64) (EpicFlow, error) {
 	return f, err
 }
 
-// RestartFlow ends the active flow as abandoned with reason and starts the next one at the spec stage.
+// RestartFlow ends the active flow, if any, as abandoned with reason and starts the next one at the spec stage.
 func RestartFlow(db *sql.DB, epicID int64, reason string) (EpicFlow, error) {
 	var f EpicFlow
+	ended := false
 	err := inTx(db, func(tx *sql.Tx) (err error) {
 		a, err := ActiveFlow(tx, epicID)
 		if err != nil {
 			return err
 		}
-		if a == nil {
-			return fmt.Errorf("epic has no active flow to restart")
-		}
-		if _, err = tx.Exec(`UPDATE epic_flows SET status=?, reason=?, ended_at=? WHERE id=?`, FlowAbandoned, reason, now(), a.ID); err != nil {
-			return fmt.Errorf("end flow: %w", err)
+		if a != nil {
+			ended = true
+			if _, err = tx.Exec(`UPDATE epic_flows SET status=?, reason=?, ended_at=? WHERE id=?`, FlowAbandoned, reason, now(), a.ID); err != nil {
+				return fmt.Errorf("end flow: %w", err)
+			}
 		}
 		if f, err = startFlow(tx, epicID); err != nil {
 			return err
 		}
 		return setPrefixed(tx, epicID, PrefixStage, PrefixStage+StageSpec)
 	})
-	if err == nil {
+	if err == nil && ended {
 		Audit("epic.flow.end", "task_id", epicID, "flow", f.Attempt-1, "status", FlowAbandoned, "reason", reason, "actor", "human")
+	}
+	if err == nil {
 		Audit("epic.flow.start", "task_id", epicID, "flow", f.Attempt)
 	}
 	return f, err
