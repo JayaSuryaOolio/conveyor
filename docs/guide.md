@@ -280,7 +280,7 @@ conveyor review-webhook [--status|--stop]      # opt-in review-webhooks app (see
 conveyor config list | get <key> | set <key> <value>
 conveyor state export [file] | import <file> [--repo A=name ...]
 conveyor --home <empty dir> mock seed          # mock repos, tasks, settings, apps, automations (fixtures: internal/core/mock.go)
-conveyor import jira --jql "..." --repo a      # needs acli: install it from the Apps page (Detected apps) after `brew install acli` and `acli jira auth login`
+conveyor import jira --jql "..." --repo a      # needs acli: install it from the Apps page (Templates) after `brew install acli` and `acli jira auth login`
 conveyor jira source EPIC [--key PROJ-1 --repo R --interval SEC --status-map JSON | --clear]   # attach/show/detach a Jira epic as the epic's source
 conveyor jira sync EPIC                  # pull now; the app also polls every source per its interval (default 300s)
 conveyor daemon                                # run the dispatcher in the foreground
