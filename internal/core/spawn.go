@@ -10,7 +10,7 @@ import (
 )
 
 // SpawnChildren creates a backlog child task per "title | description" line, with the parent's repos (same primary)
-// and parent_id set. A line without a description is skipped and reported in the error: the child's agent needs one.
+// and parent_id set, plus the parent's epic:<name> label when it is an epic member. A line without a description is skipped and reported in the error: the child's agent needs one.
 func SpawnChildren(db *sql.DB, parent store.Task, lines []string) ([]store.Task, error) {
 	var out []store.Task
 	var errs []error
@@ -32,6 +32,11 @@ func SpawnChildren(db *sql.DB, parent store.Task, lines []string) ([]store.Task,
 		if err != nil {
 			errs = append(errs, fmt.Errorf("spawn %q: %w", title, err))
 			continue
+		}
+		if name := store.EpicName(parent); name != "" {
+			if err := store.SetPrefixedLabel(db, t.ID, store.PrefixEpic+name); err != nil {
+				errs = append(errs, fmt.Errorf("spawn %q: epic label: %w", title, err))
+			}
 		}
 		out = append(out, t)
 	}

@@ -56,7 +56,7 @@ Run at the start and before the status block. `conveyor epic check ROOT` does th
 3. **Acceptance criteria.** The root's `## Acceptance criteria` is a numbered checklist (AC1, AC2, ...). Every AC is cited by at least one build task, and is ticked only with evidence.
 4. **PRs.** Every build task in `review` or `done` has a PR on the flow (`conveyor epic prs ROOT [--commits]`; `conveyor epic search ROOT <regex>` finds where something changed).
 5. **Sessions.** Recall why something was done with `conveyor epic sessions ROOT [--grep <text>]` instead of asking the human again.
-6. **Kinds.** Every ticket you add mid-run, including follow-ups, has an `epic_kind:<kind>` and its AC ids.
+6. **Kinds.** Every ticket you add mid-run, including follow-ups, has an `epic_kind:<kind>` and its AC ids. Children spawned by a member's `spawn:` lines join the epic automatically (`epic:<name>`) but have no `epic_kind`: on wake, reconcile each one. Assign `epic_kind` and AC ids, update the spec and AC map, add `blocks` links, and move it to `todo` if it should auto-start.
 7. **Order and agents.** No `epic_kind:build` task in `todo` lacks an agent, a repo or AC ids.
 8. **Audit.** Hooks record stage changes, tasks, labels, gates and restarts. Add the reason for a decision with `conveyor epic log ROOT "<why>"`.
 

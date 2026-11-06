@@ -139,8 +139,9 @@ Checklist, run at the start and before the status block (`conveyor epic check KE
 3. **Acceptance criteria.** The root's `## Acceptance criteria` is a numbered checklist (AC1, AC2, …). Every AC is covered by at least one build task that cites its id, and each AC is ticked only with evidence (PR, test, or commit).
 4. **PRs.** Every build task in `review` or `done` has a PR recorded on the flow. `conveyor epic prs KEY [--commits]` lists PRs and their commits. `conveyor epic search KEY <regex>` runs `git log -G` over the flow's PR branches to find where something changed.
 5. **Sessions.** `conveyor epic sessions KEY [--grep <text>]` lists each run's Claude session (task, run, transcript path) and searches the transcripts. Use it to recall why something was done instead of asking the human again.
-6. **Order and agents.** No `epic_kind:build` task in `todo` lacks an agent, a repo or AC ids. No `blocks` cycles (already refused).
-7. **Audit.** Every stage change, task created, label changed, gate passed and restart is in the audit log. Hooks write most records (§12); the skill only adds the reason with `conveyor epic log KEY "<why>"`.
+6. **Spawned children.** A child spawned from an epic member (`spawn:` line) inherits `epic:<name>` but has no `epic_kind`. When the root wakes it reconciles each such child: assign `epic_kind` and AC ids, update the spec and AC map, add `blocks` links, and move it to `todo` if it should auto-start.
+7. **Order and agents.** No `epic_kind:build` task in `todo` lacks an agent, a repo or AC ids. No `blocks` cycles (already refused).
+8. **Audit.** Every stage change, task created, label changed, gate passed and restart is in the audit log. Hooks write most records (§12); the skill only adds the reason with `conveyor epic log KEY "<why>"`.
 
 ## 3. Decisions (v3 questions)
 
