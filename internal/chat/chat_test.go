@@ -128,3 +128,11 @@ func TestMoveAcceptsTo(t *testing.T) {
 		t.Fatalf("status %s", got.Status)
 	}
 }
+
+func TestRetryDelayBacksOffAndCaps(t *testing.T) {
+	for fails, want := range map[int]time.Duration{0: 5 * time.Second, 1: 5 * time.Second, 2: 10 * time.Second, 7: 320 * time.Second, 8: 10 * time.Minute, 1000: 10 * time.Minute} {
+		if got := retryDelay(fails); got != want {
+			t.Fatalf("fails=%d: got %v want %v", fails, got, want)
+		}
+	}
+}
