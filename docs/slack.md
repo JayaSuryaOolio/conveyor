@@ -88,16 +88,32 @@ Open the Conveyor DM. Type a plain message, no slash needed:
   The description is your comment, the forwarded text with author and link, and its images
   (saved under `~/.conveyor/attachments`, needs `files:read`). REPO can be left out with one
   registered repo. Slash commands only work in the app's DM; `@app` mentions in channels are not wired.
-- Reply in a notification's thread - comments on that task.
+- Reply in a notification's thread, or to the `created KEY` answer to `new` - comments on that task.
+  `move done`, `move to done`, `show`, `list` or `help` typed there run as commands on that task instead.
+- DM commands are answered in their own thread; a task made by `new` gets its notifications in that thread.
+  Slack redeliveries are ignored, and "also send to conversation" thread replies count as replies.
 
 Notifications (needs_you, review, done, failed; pick which in settings) carry the agent's last
 message (rendered as Markdown via a Block Kit `markdown` block) and PR links, plus buttons: **Done** / **Requeue** (while it needs you, is in review or failed)
 and **Open PR**. Buttons need *Interactivity* on: in the manifest add `settings.interactivity: {is_enabled: true}`
 (Socket Mode needs no request URL). Each task gets one
 thread: later notifications for it, and the agent's answers to your thread replies, post into it.
-Thread roots are kept in memory, so after a restart a task's next update starts a new thread.
+Thread links are stored in settings (`slack_thread:CHANNEL:TS` -> task key, `slack_task:KEY` -> `CHANNEL:TS`), so
+routing does not parse message text and survives restarts; only threads from before the links existed fall back to
+reading the thread (`conversations.replies`). Rows are never pruned.
+
+Routing rules: a reply goes to the task linked to the thread it is in, so two threads about the same task (or two
+tasks) never mix. The whole text is the comment, so other task keys inside it are plain text. A top-level DM
+`CV-1 CV-2 text` comments on CV-1 only (the first word). A thread that is not linked and cannot be resolved gets a
+hint instead of silence.
+
+### Slack behaviours the bridge relies on (docs.slack.dev)
+- A message is identified by channel + `ts`; `thread_ts == ts` marks a thread root, replies carry the root's `thread_ts`.
+- Events not acked within 3s are redelivered (up to 3 times, ~1 and ~5 min later). The envelope is acked first, handling runs
+  on one ordered worker, and handled `channel/ts` are remembered in memory so a redelivery is ignored.
+- Our own posts come back as events (user token) and edits/deletes arrive as `message_changed` / `message_deleted`
+  subtypes; only plain, `file_share` and `thread_broadcast` messages are handled.
 
 ## Not done (add when needed)
-- Block Kit modals, channel mode, retry/dedupe
-  beyond the event cursor (`slack_cursor`), token storage in
+- Block Kit modals, channel mode, replying to an ephemeral `/conveyor` answer (Slack cannot thread them), token storage in
   Keychain (tokens sit in the local settings table like other settings).

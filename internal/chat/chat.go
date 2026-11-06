@@ -231,6 +231,9 @@ func (b *bridge) run(in In) string {
 	// "/conveyor" typed as text (a forward's comment can't run a slash command) is not a command word
 	in.Text = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(in.Text), "/conveyor"))
 	if in.Key != "" {
+		if c := threadCmd(in.Key, in.Text); c != "" {
+			return b.command(c)
+		}
 		return b.comment(in.Key, in.Text)
 	}
 	if f := strings.Fields(in.Text); len(f) > 0 && strings.EqualFold(f[0], "new") { // phones capitalise "New"
@@ -307,9 +310,38 @@ const Help = `*Conveyor commands* (send as a DM, or /conveyor …)
 • show KEY (or just KEY) — status, repos, PRs and the last agent message
 • move KEY todo|done|cancelled — change status
 • help — this guide
-Replying in a task's thread also comments on it.`
+Replying in a task's thread (or to my "created" reply) comments on it; "move done" or "show" typed there acts on that task.`
 
 var keyArg = regexp.MustCompile(`^[A-Za-z0-9]+-[A-Za-z0-9]+$`)
+
+// moveTo are the statuses a human can move a task to from chat.
+var moveTo = map[string]bool{"backlog": true, "todo": true, "done": true, "cancelled": true}
+
+// threadCmd turns an exact command typed in a task's thread ("move done", "move to done",
+// "move KEY done", "show", "list", "help") into one naming that task; anything else is a
+// comment and gets "".
+func threadCmd(key, text string) string {
+	f := strings.Fields(text)
+	if len(f) == 0 {
+		return ""
+	}
+	verb := strings.ToLower(f[0])
+	switch {
+	case len(f) == 1 && (verb == "help" || verb == "list"):
+		return verb
+	case len(f) == 1 && verb == "show":
+		return "show " + key
+	case verb == "show" && len(f) == 2 && keyArg.MatchString(f[1]):
+		return "show " + f[1]
+	case verb == "move" && len(f) == 2 && moveTo[strings.ToLower(f[1])]:
+		return "move " + key + " " + strings.ToLower(f[1])
+	case verb == "move" && len(f) == 3 && strings.EqualFold(f[1], "to") && moveTo[strings.ToLower(f[2])]:
+		return "move " + key + " " + strings.ToLower(f[2])
+	case verb == "move" && len(f) >= 3 && keyArg.MatchString(f[1]):
+		return "move " + strings.Join(f[1:], " ")
+	}
+	return ""
+}
 
 // show summarizes one task: status, repos with PRs, and the agent's last comment.
 func (b *bridge) show(key string) string {
@@ -341,7 +373,10 @@ func (b *bridge) show(key string) string {
 // command runs "help", "" or "list", "show KEY" (or bare KEY), "move KEY STATUS", or "KEY text".
 func (b *bridge) command(text string) string {
 	f := strings.Fields(text)
-	if len(f) == 4 && f[0] == "move" && f[2] == "to" { // "move KEY to done"
+	if len(f) > 0 && !keyArg.MatchString(f[0]) {
+		f[0] = strings.ToLower(f[0]) // phones capitalise "Move"; keys keep their case
+	}
+	if len(f) == 4 && f[0] == "move" && strings.EqualFold(f[2], "to") { // "move KEY to done"
 		f = []string{f[0], f[1], f[3]}
 	}
 	switch {
@@ -369,7 +404,7 @@ func (b *bridge) command(text string) string {
 		if err != nil {
 			return err.Error()
 		}
-		if _, err := store.UpdateTaskStatus(b.svc.DB, t.ID, store.Status(f[2]), store.ActorHuman); err != nil {
+		if _, err := store.UpdateTaskStatus(b.svc.DB, t.ID, store.Status(strings.ToLower(f[2])), store.ActorHuman); err != nil {
 			return "warning: " + err.Error()
 		}
 		return fmt.Sprintf("%s → %s", f[1], f[2])

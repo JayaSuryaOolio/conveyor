@@ -74,7 +74,8 @@ func TestSendThreadsPerTask(t *testing.T) {
 	}))
 	defer srv.Close()
 	api = srv.URL + "/"
-	s := &Slack{get: func(k string) string { return map[string]string{"slack_bot_token": "x", "slack_user_id": "U1"}[k] }}
+	cfg := map[string]string{"slack_bot_token": "x", "slack_user_id": "U1"}
+	s := &Slack{get: func(k string) string { return cfg[k] }, set: func(k, v string) error { cfg[k] = v; return nil }}
 	m := chat.Msg{Key: "CV-9", Title: "T", Status: "needs_you", Last: "**bold**"}
 	s.Send(m)
 	s.Send(m)
@@ -181,7 +182,7 @@ func TestLookBackForward(t *testing.T) {
 // A reply in the thread of a forward (no task key in the root) is a command about the forward.
 func TestThreadReplyUnderForward(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasSuffix(r.URL.Path, "conversations.history") {
+		if strings.HasSuffix(r.URL.Path, "conversations.replies") {
 			fmt.Fprint(w, `{"ok":true,"messages":[{"ts":"5.0","text":"/conveyor new x","attachments":[{"is_share":true,"text":"it crashes"}]}]}`)
 			return
 		}
@@ -205,4 +206,71 @@ func TestThreadReplyUnderForward(t *testing.T) {
 		t.Fatal("plain chatter in a thread must not run a command")
 		return ""
 	})
+}
+
+// CV-105: a reply to the "created KEY" confirmation (threaded under the user's "new" DM) comments
+// on KEY, even after a restart; a redelivered event is handled once; a top-level command is
+// answered in its own thread.
+func TestReplyToCreatedConfirmation(t *testing.T) {
+	var posts []map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var a map[string]any
+		json.NewDecoder(r.Body).Decode(&a)
+		switch {
+		case strings.HasSuffix(r.URL.Path, "conversations.replies"):
+			fmt.Fprint(w, `{"ok":true,"messages":[{"ts":"20.0","text":"new fix login"},{"ts":"20.1","text":"created CV-104 fix login (backlog; move CV-104 todo to start it)"}]}`)
+		case strings.HasSuffix(r.URL.Path, "chat.postMessage"):
+			posts = append(posts, a)
+			fmt.Fprint(w, `{"ok":true,"ts":"99.0"}`)
+		default:
+			fmt.Fprint(w, `{"ok":true}`)
+		}
+	}))
+	defer srv.Close()
+	api = srv.URL + "/"
+	s := &Slack{get: func(k string) string { return map[string]string{"slack_bot_token": "x", "slack_user_id": "U1"}[k] }}
+	var got []chat.In
+	h := func(in chat.In) string { got = append(got, in); return "comment added to CV-104" }
+	ev := []byte(`{"event":{"type":"message","user":"U1","text":"use the v2 API","channel":"D1","ts":"21.0","thread_ts":"20.0"}}`)
+	s.event(ev, h)
+	s.event(ev, h) // redelivered
+	if len(got) != 1 || got[0].Key != "CV-104" || got[0].Text != "use the v2 API" {
+		t.Fatalf("want one comment on CV-104, got %+v", got)
+	}
+	s.event([]byte(`{"event":{"type":"message","subtype":"thread_broadcast","user":"U1","text":"also this","channel":"D1","ts":"21.1","thread_ts":"20.0"}}`), h)
+	if len(got) != 2 || got[1].Key != "CV-104" {
+		t.Fatalf("thread_broadcast reply not a comment: %+v", got)
+	}
+	s.event([]byte(`{"event":{"type":"message","user":"U1","text":"list","channel":"D1","ts":"22.0"}}`), h)
+	if p := posts[len(posts)-1]; p["thread_ts"] != "22.0" {
+		t.Fatalf("top-level command not answered in its thread: %v", p)
+	}
+}
+
+// Thread->task links are stored, so routing needs neither message parsing nor an API read, and
+// survives a restart (a new Slack over the same settings).
+func TestThreadLinksPersist(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "conversations.replies") {
+			t.Error("linked thread must not read the thread")
+		}
+		fmt.Fprint(w, `{"ok":true,"ts":"50.0"}`)
+	}))
+	defer srv.Close()
+	api = srv.URL + "/"
+	cfg := map[string]string{"slack_bot_token": "x", "slack_user_id": "U1"}
+	mk := func() *Slack {
+		return &Slack{get: func(k string) string { return cfg[k] }, set: func(k, v string) error { cfg[k] = v; return nil }}
+	}
+	mk().event([]byte(`{"event":{"type":"message","user":"U1","text":"new B x","channel":"D1","ts":"40.0"}}`),
+		func(chat.In) string { return "created CV-8 x (backlog)" })
+	var got chat.In
+	mk().event([]byte(`{"event":{"type":"message","user":"U1","text":"more","channel":"D1","ts":"41.0","thread_ts":"40.0"}}`),
+		func(in chat.In) string { got = in; return "ok" })
+	if got.Key != "CV-8" || got.Text != "more" {
+		t.Fatalf("got %+v", got)
+	}
+	if mk().rootOf("D1", "CV-8") != "40.0" {
+		t.Fatalf("task not linked to its thread: %v", cfg)
+	}
 }
