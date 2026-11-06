@@ -13,7 +13,7 @@ No agent merges a PR, in any form, ever. The human always merges. (`gh pr merge`
 
 ## State
 
-You remember nothing between runs. **Start every run with `conveyor epic status ROOT --json`** (ROOT is the root key from your brief). That is the state: flow, stage, tasks, PRs, AC coverage and the recent audit tail. STATE.md in the workspace is only a scratchpad.
+You remember nothing between runs. **Start every run with `conveyor epic status ROOT --json`** (ROOT is the root key from your brief). If it shows no flow while the stage is `decide` or later, tell the human: `conveyor epic restart ROOT` starts flow 1. That is the state: flow, stage, tasks, PRs, AC coverage and the recent audit tail. STATE.md in the workspace is only a scratchpad.
 
 Then run `conveyor epic check ROOT` and fix what it prints (`--fix` repairs labels only). Run it again before your status block.
 
@@ -28,12 +28,12 @@ The stage is the root's `epic_stage:<stage>` label; none means `chart`. Move it 
 
 | Stage | Do | Move on when |
 |---|---|---|
-| `chart` | Grill the human on the destination and the acceptance criteria. Write the map into the root's description (`conveyor task set ROOT --desc ...`): Destination, `## Acceptance criteria` as AC1, AC2, ..., Decisions so far, Not yet specified, Out of scope. Create the decision tickets (`epic_kind:grilling`, `prototype` or `research`) and their `blocks` links. | Map and AC written. Then the **gate**. |
+| `chart` | Grill the human on the destination and the acceptance criteria. Write the map into the root's description (`conveyor task set ROOT --desc ...`): Destination, `## Acceptance criteria` as AC1, AC2, ..., Decisions so far, Not yet specified, Out of scope. Create the decision tickets (`epic_kind:grilling`, `prototype` or `research`) and their `blocks` links. Post your questions as a task comment (`conveyor task comment ROOT ...`): `AskUserQuestion` does not show in the thread of a background run. | Map and AC written. Then the **gate**. |
 | gate | End the run in `needs_you` with the plan summarised in the status block (omit the block to ask). The human approves with the Approve button, `approve` comment or `conveyor epic approve ROOT`, which moves the stage to `decide`. With `epic_gate:off` there is no stop: set `decide` yourself. | Approved |
 | `decide` | Move decision tickets to `todo`; the dispatcher runs the frontier. Read each resolution and add tickets it calls for. | No open grilling, prototype or research child |
 | `spec` | Write the spec (link it from the root). Create `epic_kind:build` sub-tasks: exactly one repo, `repo:<name>`, an agent, the AC ids they cover in the description, a link to the spec, `skill:<name>` labels if useful, `blocks` links for order. Move them to `todo`. | Build tickets exist |
 | `build` | Nothing to do while children run; you are woken when the last open child settles. Unstick failed or `needs_you` children by commenting on them. | Every build child done or cancelled |
-| `verify` | Check every AC against the merged work. Tick an AC only with evidence (PR, test or commit). Gaps become new build tickets and the stage goes back to `build`. | All AC met |
+| `verify` | Check every AC against the merged work. Tick an AC only with evidence (PR, test or commit). Record the evidence with `conveyor epic log ROOT "<AC: PR/test/commit>"`. Gaps become new build tickets and the stage goes back to `build`. | All AC met |
 | `done` | `conveyor task move ROOT done`. | |
 
 You do not run while any child is running or in `todo`; Conveyor wakes the root with a system comment naming its stage. Never restart a flow: only the human does (`conveyor epic restart`).
@@ -56,8 +56,9 @@ Run at the start and before the status block. `conveyor epic check ROOT` does th
 3. **Acceptance criteria.** The root's `## Acceptance criteria` is a numbered checklist (AC1, AC2, ...). Every AC is cited by at least one build task, and is ticked only with evidence.
 4. **PRs.** Every build task in `review` or `done` has a PR on the flow (`conveyor epic prs ROOT [--commits]`; `conveyor epic search ROOT <regex>` finds where something changed).
 5. **Sessions.** Recall why something was done with `conveyor epic sessions ROOT [--grep <text>]` instead of asking the human again.
-6. **Order and agents.** No `epic_kind:build` task in `todo` lacks an agent, a repo or AC ids.
-7. **Audit.** Hooks record stage changes, tasks, labels, gates and restarts. Add the reason for a decision with `conveyor epic log ROOT "<why>"`.
+6. **Kinds.** Every ticket you add mid-run, including follow-ups, has an `epic_kind:<kind>` and its AC ids.
+7. **Order and agents.** No `epic_kind:build` task in `todo` lacks an agent, a repo or AC ids.
+8. **Audit.** Hooks record stage changes, tasks, labels, gates and restarts. Add the reason for a decision with `conveyor epic log ROOT "<why>"`.
 
 ## Commands
 

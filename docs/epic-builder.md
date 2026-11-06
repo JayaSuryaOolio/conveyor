@@ -1,10 +1,12 @@
 # Epic Builder: PRD and tech spec
 
-Status: draft v4 (CV-4).
+Status: v5 (CV-4, dogfooded on CV-90).
 - v1 put an `epic_stage` column on tasks. Rejected.
 - v2 used labels and relations only, and planned with wayfinder labels.
 - v3 applies the answers to v2's questions: a default plan gate that `epic_gate:off` turns off, no auto-merge, an internal **epic flow** (one attempt at the epic) that holds PR state, React Flow with editable cards, and `epic:*` labels as an adapter over any planning skill. It also adds the `epic` skill and its checklist, event-driven review checks instead of polling, and audit logs you can query as OTel.
 - v4 applies the answers to v3's questions: the epic label is `epic:<name>` with any name (`epic:os-4`), and kinds move to `epic_kind:<kind>` (§2.1). Review webhooks ship as an opt-in **app** that Conveyor offers to add as a button (§10). Audit is plain JSONL, no OTel (§12). Restart is a button; the human decides, nothing proposes it (§2.3).
+
+- v5 folds in the dogfood run (CV-4A7, epic CV-90 Jira sync: 7 PRs merged, all 10 AC met). Findings are in §16.
 
 Decisions are in §3. There are no open questions.
 
@@ -357,7 +359,7 @@ conveyor task graph KEY [--json]
 | C | Audit log: `slog` JSON writer, records from hooks, store and dispatcher, `epic log/audit` (§12) | B |
 | D | `epic` skill + wayfinder planner adapter, installed with the hooks; agent template; brief lines (epic, kind, skills) + golden test (§2.1, §2.4, §8) | B |
 | E | Epic view on React Flow: editable cards (agent/model/skills/kind/repo/labels), edge editing, stage strip with Approve and Restart, icons (§11) | B (A for the review chips) |
-| F | Dogfood one real epic end to end, then fold findings into the skill and this doc | A–E |
+| F | Dogfood one real epic end to end, then fold findings into the skill and this doc (done, §16) | A–E |
 
 A, A2 and C are general features. Each gets its own PR, and neither is mixed into the Epic view PR.
 
@@ -371,3 +373,18 @@ A, A2 and C are general features. Each gets its own PR, and neither is mixed int
 - CLI: `epic check` flags a missing `epic:<name>` label, a `build` child without AC ids, a repo label mismatch, and an AC without a covering task.
 - Brief: golden test for an epic member with `epic_kind:build` and `skill:*` labels.
 - UI: `npm run build`; a manual check in `wails dev` with a tree seeded through the CLI: change an agent on a card, add a skill, change a kind, draw an edge, approve the plan, restart.
+
+## 16. Dogfood findings (CV-90, Jira sync)
+
+One real epic, run end to end: root CV-90 with a research task, four build tasks, two follow-ups the run added itself, and a fix for Conveyor. 7 PRs merged, AC1-AC10 ticked with evidence, `epic check` ok. The loop works. What got in the way:
+
+| # | Finding | Status |
+|---|---|---|
+| F1 | An epic reached `build` with no `epic_flows` row, so `epic restart` ("no active flow"), `epic prs` and `epic flows` were empty and `epic check` failed every done build task with "no PR on the flow". | Fixed in CV-90G (#215): a flow is created on entering decide/build; `check` falls back to task PRs. Epics created before that merge may still lack a flow. |
+| F2 | No `epic-builder` agent preset is installed, so the root was created with `sse`. | Open: ship the preset with the hooks, or have the skill say which agent to use. |
+| F3 | The chart agent asked its grilling questions with `AskUserQuestion`. In a background run they are invisible in the task thread (`task log` shows a bare `AskUserQuestion:`), so the human only sees them by opening the session. | Skill now says to post the questions as a task comment. Code fix is a separate task. |
+| F4 | `epic.run.start` is written twice in the same second per run. | Open, separate task. |
+| F5 | The human drove CV-90 to done by hand, outside the flow. The audit shows `build -> spec -> done` in 90 seconds with one verify log line, so the loop's own verify evidence was thin. | Skill: verify records each AC's evidence with `epic log`. |
+| F6 | Follow-up tickets created mid-run (CV-90E1, CV-90F, CV-90G) had no `epic_kind` and were not on the AC map. | Skill: every ticket in the tree gets an `epic_kind`. |
+
+Screenshots of the Epic view are under `docs/screenshots/CV-4A7/` when they could be captured (see the PR).
