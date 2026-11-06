@@ -1,4 +1,8 @@
-{"version":2,"name":"Review webhooks","description":"Instant PR review checks for epic tasks via gh webhook forward. Needs: gh extension install cli/gh-webhook",
+{"version":3,"name":"Review webhooks","description":"Instant PR review checks for epic tasks via gh webhook forward. Needs: gh extension install cli/gh-webhook",
+ "settings":[
+   {"key":"pull_request_review","type":"boolean","default":true,"description":"Forward PR reviews (approve, request changes, review summary). Applies when the listener restarts."},
+   {"key":"pull_request_review_comment","type":"boolean","default":true,"description":"Forward inline comments on a PR's diff. Applies when the listener restarts."},
+   {"key":"issue_comment","type":"boolean","default":true,"description":"Forward comments on the PR conversation. Applies when the listener restarts."}],
  "actions":[{"id":"forward","label":"Review webhooks","places":["task_sidebar"],
    "confirm":"This turns on instant review checks for ALL tasks with an open PR, not just this one.",
    "run":"conveyor review-webhook --app ${{ app.id }}",

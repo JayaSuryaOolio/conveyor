@@ -221,7 +221,9 @@ An action is a long-running **service** at a place when `services` has an entry 
     "board_card":   {"run": "cd ${{ worktree.path }} && make storybook &", "status": "lsof -ti :6006", "stop": "kill $(lsof -ti :6006)"}}}]}
 ```
 
-`conveyor app run APP ACTION [KEY] --place p` runs an action as shown at a place. Manifests carry a `version` (current: 2; absent means 1). Older versions keep working: a version 1 action's single `service` becomes the service at each of its places.
+`conveyor app run APP ACTION [KEY] --place p` runs an action as shown at a place. Manifests carry a `version` (current: 3; absent means 1). Older versions keep working: a version 1 action's single `service` becomes the service at each of its places.
+
+**App settings (v3).** A manifest may declare `settings`: `{key, type, default, description, options}` with `type` one of `string`, `boolean`, `number`, `enum` (`options` lists the choices); keys match `[a-z0-9_]+`. The Apps page shows a Settings icon for such apps that opens a modal to edit them; values are stored per app in the DB (`apps.settings`) and scripts read them as `${{ setting.key }}` (shell-quoted; booleans are `true`/`false`). Unsaved settings use the default. Uninstalling or replacing an app drops its values. The bundled Review webhooks app has one boolean per forwarded GitHub event; the listener reads them when it starts, so restart it after a change.
 
 Not yet: app hooks (an app reacting to task events). Later, Claude itself could be an app: the agent that works a task would come from a manifest, with other agents (Codex, Gemini CLI, ...) installed as alternative apps instead of being built in.
 

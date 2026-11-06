@@ -27,10 +27,22 @@ type Manifest struct {
 	ID          string `json:"id,omitempty"`
 	Description string `json:"description,omitempty"`
 	// Check is a sample-run script (`sh -c`, 30s); install fails, storing nothing, if it exits non-zero.
-	Check       string           `json:"check,omitempty"`
-	Actions     []ManifestAction `json:"actions,omitempty"`
-	Agents      []ManifestAgent  `json:"agents,omitempty"`
-	Automations []ManifestAuto   `json:"automations,omitempty"`
+	Check string `json:"check,omitempty"`
+	// Settings (v3) are user-editable values, shown in the app's settings modal and usable in scripts as ${{ setting.key }}.
+	Settings    []ManifestSetting `json:"settings,omitempty"`
+	Actions     []ManifestAction  `json:"actions,omitempty"`
+	Agents      []ManifestAgent   `json:"agents,omitempty"`
+	Automations []ManifestAuto    `json:"automations,omitempty"`
+}
+
+// ManifestSetting declares one setting, modelled on VS Code extension settings. Type is string,
+// boolean, number or enum (then Options lists the choices); Default is a JSON value of that type.
+type ManifestSetting struct {
+	Key         string   `json:"key"`
+	Type        string   `json:"type"`
+	Default     any      `json:"default"`
+	Description string   `json:"description,omitempty"`
+	Options     []string `json:"options,omitempty"`
 }
 
 // ManifestAction is one button. Output actions run to completion and toast their output.
@@ -84,17 +96,21 @@ type ManifestAuto struct {
 }
 
 // ManifestVersion is the schema version this build writes and understands.
-const ManifestVersion = 2
+const ManifestVersion = 3
 
 // migrateManifest upgrades m to ManifestVersion in place, so installed apps keep working.
 // When the schema changes, bump ManifestVersion and convert vN to vN+1 here.
 // v1 -> v2: an action's single `service` becomes `services` at each of its places.
+// v2 -> v3: adds `settings`; nothing to convert.
 func migrateManifest(m *Manifest) error {
 	if m.Version == 0 {
 		m.Version = 1
 	}
 	if m.Version > ManifestVersion {
 		return fmt.Errorf("manifest: version %d is newer than this Conveyor supports (%d)", m.Version, ManifestVersion)
+	}
+	if m.Version < 3 && len(m.Settings) > 0 {
+		return fmt.Errorf("manifest: settings needs \"version\": 3")
 	}
 	for i := range m.Actions {
 		a := &m.Actions[i]
@@ -124,6 +140,8 @@ var ManifestVars = []string{"app.name", "app.id", "task.key", "task.title", "tas
 var (
 	varRe = regexp.MustCompile(`\$\{\{\s*([\w.]+)\s*\}\}`)
 	idRe  = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*$`)
+	// settingKeyRe keeps keys usable as ${{ setting.key }}.
+	settingKeyRe = regexp.MustCompile(`^[a-z0-9_]+$`)
 )
 
 // AppID is the manifest's id, else its name as a slug ("Review webhooks" -> "review-webhooks").
@@ -153,6 +171,16 @@ func ParseManifest(raw string) (Manifest, error) {
 	}
 	if m.ID != "" && !idRe.MatchString(m.ID) {
 		return m, fmt.Errorf("manifest: id %q must match [a-z0-9-]+", m.ID)
+	}
+	keys := map[string]bool{}
+	for _, st := range m.Settings {
+		if !settingKeyRe.MatchString(st.Key) || keys[st.Key] {
+			return m, fmt.Errorf("manifest: setting key %q must be unique and match [a-z0-9_]+", st.Key)
+		}
+		keys[st.Key] = true
+		if err := st.check(fmt.Sprint(st.Default)); err != nil {
+			return m, fmt.Errorf("manifest: setting %q default: %w", st.Key, err)
+		}
 	}
 	seen := map[string]bool{}
 	for i, a := range m.Actions {
@@ -190,8 +218,8 @@ func ParseManifest(raw string) (Manifest, error) {
 			scripts += "\n" + sv.Run + "\n" + sv.Status + "\n" + sv.Stop
 		}
 		for _, v := range varRe.FindAllStringSubmatch(scripts, -1) {
-			if !contains(ManifestVars, v[1]) {
-				return m, fmt.Errorf("manifest: action %q: unknown variable %q (have %s)", a.ID, v[1], strings.Join(ManifestVars, ", "))
+			if k, ok := strings.CutPrefix(v[1], "setting."); !contains(ManifestVars, v[1]) && !(ok && keys[k]) {
+				return m, fmt.Errorf("manifest: action %q: unknown variable %q (have %s, setting.<key>)", a.ID, v[1], strings.Join(ManifestVars, ", "))
 			}
 		}
 	}
@@ -553,6 +581,13 @@ func (s *Service) resolveAction(app, id, key string) (*ManifestAction, map[strin
 		return nil, nil, "", fmt.Errorf("app %q has no action %q", app, id)
 	}
 	vars := map[string]string{"app.name": m.Name, "app.id": m.AppID()}
+	vals, err := s.settingValues(m, app)
+	if err != nil {
+		return nil, nil, "", err
+	}
+	for k, v := range vals {
+		vars["setting."+k] = v
+	}
 	cwd := ""
 	if key == "" {
 		if cwd, err = os.UserHomeDir(); err != nil {
