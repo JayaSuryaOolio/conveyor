@@ -53,7 +53,7 @@ Per run (transcript):
 | 2 | Completion gate: clean, pushed, PR, CLAUDE.md, skills | Stop | 3-4 git calls, only on `done` | low: skipped when it can't run, one round only | built (CV-84A) |
 | 3 | Tests after the last code edit | Stop (gate) | transcript scan, already read | medium: keyword heuristic; edits via `sed -i` are missed | built |
 | 4 | Changeset present | Stop (gate) | one `git diff` | medium: changes that need no release; the message says to explain in the summary | built |
-| 5 | Per-run waste metrics (hook denials, re-reads, duplicate commands, large results) saved on the run at Stop, shown by `task show --runs` and read by conveyor-doctor | Stop | transcript scan | none (measurement, never blocks) | sub-task |
+| 5 | Per-run waste metrics (hook denials, re-reads, duplicate commands, large results) saved on the run at Stop, shown by `task show --runs` and read by conveyor-doctor | Stop | transcript scan | none (measurement, never blocks) | built (CV-88A): runs `hook_denials`, `rereads`, `dup_bash`, `big_results` |
 | 6 | Edits outside the task's worktrees | PreToolUse on Edit/Write (deny, allow the scratchpad, `/tmp`, `~/.claude`) | path prefix check | low | sub-task |
 | 7 | Stuck loop: the same failing Bash command 3 times in a row | PreToolUse (Bash), state in a per-session file | small file read/write per call | low | sub-task |
 | 8 | PR body has the repo template's sections | Stop (gate), reads `.github/pull_request_template.md` headings | 1 gh call | medium: templates vary | later, after 5 shows it matters |

@@ -103,13 +103,16 @@ func TestStopDoneToReview(t *testing.T) {
 	r := e.run(t, "auto", "running", "S1", "do it")
 	tp := filepath.Join(t.TempDir(), "t.jsonl")
 	os.WriteFile(tp, []byte(`{"type":"user","message":{"content":"do it"}}`+"\n"+
-		`{"type":"assistant","message":{"id":"m","usage":{"input_tokens":5,"output_tokens":2,"cache_read_input_tokens":10,"cache_creation_input_tokens":1}}}`+"\n"), 0o644)
+		`{"type":"assistant","message":{"id":"m","usage":{"input_tokens":5,"output_tokens":2,"cache_read_input_tokens":10,"cache_creation_input_tokens":1}}}`+"\n"+
+		`{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Bash","input":{"command":"ls"}},{"type":"tool_use","name":"Bash","input":{"command":"ls"}}]}}`+"\n"+
+		`{"type":"user","message":{"content":[{"type":"tool_result","content":"Bash hook error: no"}]}}`+"\n"), 0o644)
 	if err := e.fire(t, "Stop", map[string]any{"session_id": "S1", "last_assistant_message": doneMsg, "transcript_path": tp}); err != nil {
 		t.Fatal(err)
 	}
 	got, _ := store.GetRun(e.db, r.ID)
 	if got.Status != "finished" || got.EndedAt == nil || *got.BlockStatus != "done" || *got.FinalMessage != "All good." ||
-		*got.Criteria != "- [x] AC1 — ok" || got.CtxPeak != 16 || got.APICalls != 1 || got.TokensOut != 2 {
+		*got.Criteria != "- [x] AC1 — ok" || got.CtxPeak != 16 || got.APICalls != 1 || got.TokensOut != 2 ||
+		got.DupBash != 1 || got.HookDenials != 1 || got.Rereads != 0 {
 		t.Fatalf("%+v", got)
 	}
 	if e.status(t).Status != store.StatusReview {
