@@ -195,7 +195,7 @@ func hookEntry(conveyorBin, home, ev string) map[string]any {
 func WriteSettings(home, conveyorBin string) (string, error) {
 	hook := func(ev string) []any { return []any{hookEntry(conveyorBin, home, ev)} }
 	pre := hook("PreToolUse")
-	pre[0].(map[string]any)["matcher"] = "Bash"
+	pre[0].(map[string]any)["matcher"] = "Bash|AskUserQuestion"
 	b, err := json.MarshalIndent(map[string]any{
 		"worktree":    map[string]any{"bgIsolation": "none"},
 		"permissions": writeScope(),

@@ -177,8 +177,8 @@ func TestWriteSettings(t *testing.T) {
 	if !slices.Contains(perm.Permissions.Allow, "Bash(git push --force-with-lease:*)") {
 		t.Fatalf("force-with-lease push must be allowed: %s", b)
 	}
-	if !strings.Contains(string(b), `"matcher": "Bash"`) {
-		t.Fatalf("PreToolUse needs a Bash matcher: %s", b)
+	if !strings.Contains(string(b), `"matcher": "Bash|AskUserQuestion"`) {
+		t.Fatalf("PreToolUse needs a Bash|AskUserQuestion matcher: %s", b)
 	}
 	want := "'/bin dir/conveyor' --home '" + home + "' hook Stop"
 	if got := m.Hooks["Stop"][0].Hooks[0].Command; got != want {

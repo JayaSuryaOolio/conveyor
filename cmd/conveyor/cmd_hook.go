@@ -41,6 +41,14 @@ func runHook(home string, args []string) (err error) {
 }
 
 func doHook(home string, args []string, raw []byte) error {
+	if args[0] == "PreToolUse" && hook.IsAsk(raw) { // allowed; its questions go to the task thread
+		db, err := store.Open(core.DBPath(home))
+		if err != nil {
+			return err
+		}
+		defer db.Close()
+		return hook.OnAsk(db, home, raw)
+	}
 	if args[0] == "PreToolUse" { // answers on stdout, as does a Stop the completion check blocks
 		var openErr error
 		withDB := func(f func(db *sql.DB)) { // opened per use: only gh commands reach here

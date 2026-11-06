@@ -350,6 +350,10 @@ func TestEpicAuditCLI(t *testing.T) {
 	if out := hookEvent("PreToolUse", pay(`,"tool_name":"Bash","tool_input":{"command":"gh pr merge 3"}`)); !strings.Contains(out, "deny") {
 		t.Fatalf("merge not denied: %s", out)
 	}
+	hookEvent("PreToolUse", pay(`,"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"Which DB?","options":[{"label":"sqlite","description":"local"},{"label":"pg"}]}]}`))
+	if th := cv(t, home, "task", "show", "CV-1A", "--thread"); !strings.Contains(th, "1. Which DB?") || !strings.Contains(th, "- sqlite: local") {
+		t.Fatalf("AskUserQuestion not posted to the thread:\n%s", th)
+	}
 	hookEvent("Stop", pay(`,"last_assistant_message":"<conveyor>\nstatus: done\nsummary: s\n</conveyor>"`))
 	cv(t, home, "epic", "log", "CV-1", "chose option B")
 	cv(t, home, "epic", "restart", "CV-1", "--reason", "wrong plan") // flow 2
