@@ -224,8 +224,8 @@ func (b *bridge) handle(in In) string {
 	if in.Key != "" {
 		return b.comment(in.Key, in.Text)
 	}
-	if f := strings.Fields(in.Text); len(f) > 0 && f[0] == "new" {
-		return b.create(strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(in.Text), "new")), in.Fwd)
+	if f := strings.Fields(in.Text); len(f) > 0 && strings.EqualFold(f[0], "new") { // phones capitalise "New"
+		return b.create(strings.TrimSpace(strings.TrimSpace(in.Text)[len(f[0]):]), in.Fwd)
 	}
 	return b.command(in.Text)
 }
@@ -241,12 +241,12 @@ func (b *bridge) create(text string, fwd func() (string, []File)) string {
 	repo := ""
 	for _, r := range repos {
 		names = append(names, r.Name)
-		if f := strings.Fields(text); len(f) > 0 && f[0] == r.Name {
+		if f := strings.Fields(text); len(f) > 0 && strings.EqualFold(f[0], r.Name) {
 			repo = r.Name
 		}
 	}
 	if repo != "" {
-		text = strings.TrimSpace(strings.TrimPrefix(text, repo))
+		text = strings.TrimSpace(text[len(repo):])
 	} else if len(names) == 1 {
 		repo = names[0]
 	} else {
@@ -269,6 +269,7 @@ func (b *bridge) create(text string, fwd func() (string, []File)) string {
 		}
 	}
 	title, _, _ := strings.Cut(strings.TrimSpace(strings.TrimLeft(cmp.Or(text, quote), "> ")), "\n")
+	title = strings.TrimSpace(strings.Trim(title, `"“”'‘’`))
 	if title == "" {
 		return "Usage: new [REPO] your comment (forward a message to me first to include it)"
 	}
