@@ -60,7 +60,7 @@ settings:
 2. **Basic Information → App-Level Tokens**: create one with `connections:write` (`xapp-…`).
    **Install App** to get the bot token (`xoxb-…`). Your member ID: profile → ⋮ → Copy member ID.
 3. In Conveyor: Apps → Integrations → Slack, paste both tokens and the member ID (or
-   `conveyor config set slack_bot_token|slack_user_token|slack_app_token|slack_app_refresh_token|slack_user_id …`). No restart.
+   `conveyor config set slack_bot_token|slack_user_token|slack_app_token|slack_app_refresh_token|slack_client_id|slack_client_secret|slack_user_id …`). No restart.
 
 **Bot or you.** By default Conveyor posts as the bot. If `slack_user_token` is filled it replaces the bot
 token for everything Conveyor does in Slack (task DMs, thread replies, command answers, reactions): add
@@ -69,8 +69,10 @@ reinstall and copy the *User OAuth Token*. Clear the field to go back to the bot
 your own self-DM and Slack does not notify you for messages you post yourself, so you get no push.
 
 **Rotating app token.** If Slack gave you an `xoxe.xapp-…` token (12h expiry) and an `xoxe-1-…` refresh token,
-put them in `slack_app_token` and `slack_app_refresh_token`. When the token expires Conveyor calls
-`tooling.tokens.rotate` and saves the new pair itself.
+put them in `slack_app_token` and `slack_app_refresh_token`, and the app's Client ID and Client Secret
+(Basic Information → App Credentials) in `slack_client_id` and `slack_client_secret`. When the token expires
+Conveyor calls `oauth.v2.access` (`grant_type=refresh_token`) and saves the new pair itself.
+(`tooling.tokens.rotate` only rotates app *configuration* tokens and answers `invalid_refresh_token` here.)
 
 Only `slack_user_id` is DMed and obeyed; everyone else is ignored.
 

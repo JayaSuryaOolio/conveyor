@@ -142,15 +142,15 @@ func TestOpenConnRotatesExpiredToken(t *testing.T) {
 		}
 		fmt.Fprint(w, `{"ok":false,"error":"token_expired"}`)
 	})
-	mux.HandleFunc("/tooling.tokens.rotate", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/oauth.v2.access", func(w http.ResponseWriter, r *http.Request) {
 		r.ParseForm()
-		if r.Form.Get("refresh_token") != "old-r" {
-			t.Errorf("refresh token = %q", r.Form.Get("refresh_token"))
+		if f := r.Form; f.Get("grant_type") != "refresh_token" || f.Get("refresh_token") != "old-r" || f.Get("client_id") != "cid" || f.Get("client_secret") != "cs" {
+			t.Errorf("form = %v", f)
 		}
-		fmt.Fprint(w, `{"ok":true,"token":"new","refresh_token":"new-r"}`)
+		fmt.Fprint(w, `{"ok":true,"access_token":"new","token_type":"app_level","refresh_token":"new-r"}`)
 	})
 	api = srv.URL + "/"
-	cfg := map[string]string{"slack_app_token": "old", "slack_app_refresh_token": "old-r"}
+	cfg := map[string]string{"slack_app_token": "old", "slack_app_refresh_token": "old-r", "slack_client_id": "cid", "slack_client_secret": "cs"}
 	s := &Slack{func(k string) string { return cfg[k] }, func(k, v string) error { cfg[k] = v; return nil }}
 	r, err := s.openConn()
 	if err != nil || r["url"] != "wss://x" || cfg["slack_app_token"] != "new" || cfg["slack_app_refresh_token"] != "new-r" {
