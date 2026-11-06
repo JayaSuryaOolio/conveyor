@@ -34,6 +34,10 @@ func TestWebhookSchedulesCheckNow(t *testing.T) {
 	if c := post(h, "pull_request_review_comment", `{"pull_request":{"html_url":"https://github.com/o/r/pull/7"}}`); c != 200 {
 		t.Fatalf("review event: %d", c)
 	}
+	// a plain PR conversation comment arrives as issue_comment, with the PR URL under issue
+	if c := post(h, "issue_comment", `{"issue":{"html_url":"https://github.com/o/r/pull/7"}}`); c != 200 {
+		t.Fatalf("issue_comment: %d", c)
+	}
 	as, _ := store.ListAutomations(svc.DB)
 	if len(as) != 1 || as[0].Name != "review-check:"+tk.Key || as[0].RunAt == nil {
 		t.Fatalf("want one review-check, got %+v", as)

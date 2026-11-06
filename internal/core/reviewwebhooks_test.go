@@ -20,8 +20,8 @@ func TestReviewWebhooksInstall(t *testing.T) {
 	if !s.ReviewWebhooksInstalled() {
 		t.Fatal("not installed")
 	}
-	if p, _ := s.PlacedActions("global_nav"); len(p) != 1 || !p[0].Service {
-		t.Fatalf("want one global_nav service button, got %+v", p)
+	if p, _ := s.PlacedActions("task_sidebar"); len(p) != 1 || !p[0].Service || p[0].Confirm == "" {
+		t.Fatalf("want one task_sidebar service button, got %+v", p)
 	}
 }
 
@@ -48,16 +48,16 @@ func TestDisabledAppIsInert(t *testing.T) {
 	if err := store.SetAppDisabled(s.DB, ReviewWebhooksApp, true); err != nil {
 		t.Fatal(err)
 	}
-	if p, _ := s.PlacedActions("global_nav"); len(p) != 0 || s.ReviewWebhooksInstalled() {
+	if p, _ := s.PlacedActions("task_sidebar"); len(p) != 0 || s.ReviewWebhooksInstalled() {
 		t.Fatalf("disabled app still active: %+v", p)
 	}
-	if _, err := s.RunAppAction(ReviewWebhooksApp, "review-webhooks", "global_nav", ""); err == nil {
+	if _, err := s.RunAppAction(ReviewWebhooksApp, "review-webhooks", "task_sidebar", ""); err == nil {
 		t.Fatal("disabled action ran")
 	}
 	if err := store.SetAppDisabled(s.DB, ReviewWebhooksApp, false); err != nil {
 		t.Fatal(err)
 	}
-	if p, _ := s.PlacedActions("global_nav"); len(p) != 1 || !s.ReviewWebhooksInstalled() {
+	if p, _ := s.PlacedActions("task_sidebar"); len(p) != 1 || !s.ReviewWebhooksInstalled() {
 		t.Fatal("re-enabled app not active")
 	}
 }

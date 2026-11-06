@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	webhookEvents = "pull_request_review,pull_request_review_comment"
+	webhookEvents = "pull_request_review,pull_request_review_comment,issue_comment"
 	rescanEvery   = time.Minute
 )
 
@@ -43,7 +43,7 @@ func CheckWebhookExt() error {
 func WebhookHandler(db *sql.DB) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ev := r.Header.Get("X-GitHub-Event")
-		if r.Method != http.MethodPost || (ev != "pull_request_review" && ev != "pull_request_review_comment") {
+		if r.Method != http.MethodPost || (ev != "pull_request_review" && ev != "pull_request_review_comment" && ev != "issue_comment") {
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
@@ -51,10 +51,18 @@ func WebhookHandler(db *sql.DB) http.Handler {
 			PullRequest struct {
 				URL string `json:"html_url"`
 			} `json:"pull_request"`
+			// Issue is the payload of issue_comment, whose html_url is the PR's when the comment is on a PR.
+			Issue struct {
+				URL string `json:"html_url"`
+			} `json:"issue"`
 		}
 		if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&p); err != nil {
 			http.Error(w, "bad payload", http.StatusBadRequest)
 			return
+		}
+		prURL := p.PullRequest.URL
+		if prURL == "" {
+			prURL = p.Issue.URL
 		}
 		tasks, err := openTasks(db)
 		if err != nil {
@@ -63,7 +71,7 @@ func WebhookHandler(db *sql.DB) http.Handler {
 		}
 		for _, t := range tasks {
 			for _, tr := range t.Repos {
-				if tr.PRURL != nil && *tr.PRURL == p.PullRequest.URL {
+				if tr.PRURL != nil && *tr.PRURL == prURL {
 					if err := ScheduleCheck(db, t, 0, 0); err != nil {
 						http.Error(w, err.Error(), http.StatusInternalServerError)
 						return
@@ -73,6 +81,7 @@ func WebhookHandler(db *sql.DB) http.Handler {
 				}
 			}
 		}
+		log.Printf("review webhook: %s on %s, no open task has that PR", ev, prURL)
 		w.WriteHeader(http.StatusNoContent)
 	})
 }
@@ -135,6 +144,7 @@ func RunWebhook(ctx context.Context, db *sql.DB) error {
 				continue
 			}
 			running[repo] = true
+			log.Printf("review webhook: forwarding %s", repo)
 			cmd := exec.CommandContext(ctx, "gh", "webhook", "forward", "--repo", repo, "--events="+webhookEvents, "--url", url)
 			go func() {
 				out, err := cmd.CombinedOutput()

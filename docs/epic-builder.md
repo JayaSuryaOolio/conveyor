@@ -259,7 +259,7 @@ There is no recurring review poll. A review check is a **one-shot automation** (
 |---|---|---|
 | PR opened, or the agent pushes to the PR branch | PreToolUse/Stop hook sees `gh pr create` or `git push`; the existing PR refresh notices a new head | now + 10 min (replaces any pending check for that task) |
 | A check found nothing new | the check itself | next step of the backoff: 30 min, 2 h, 8 h, then stop |
-| Review submitted, or review comment created | the opt-in review-webhooks app (below) | now |
+| Review submitted, review comment or PR comment created | the opt-in review-webhooks app (below) | now |
 | You click "check reviews" on the card | UI | now |
 
 At most one pending check exists per task. Scheduling replaces the old one by `(task_id, kind)`. After the backoff runs out, the PR goes quiet until the next push, webhook or click. This handles "human reviews two days later" without polling all the time.
@@ -268,14 +268,15 @@ At most one pending check exists per task. Scheduling replaces the old one by `(
 
 ```json
 {"name":"Review webhooks",
- "actions":[{"id":"forward","label":"Review webhooks","places":["global_nav"],
+ "actions":[{"id":"forward","label":"Review webhooks","places":["task_sidebar"],
+   "confirm":"This turns on instant review checks for ALL tasks with an open PR, not just this one.",
    "run":"conveyor review-webhook",
-   "service":{"status":"conveyor review-webhook --status","stop":"conveyor review-webhook --stop"}}]}
+   "services":{"task_sidebar":{"status":"conveyor review-webhook --status","stop":"conveyor review-webhook --stop"}}}]}
 ```
 
-- `conveyor review-webhook` listens on `127.0.0.1` (random port, pid file in `~/.conveyor/`) and starts one `gh webhook forward --repo <r> --events=pull_request_review,pull_request_review_comment --url <listener>` per repo that has an open epic PR. An event schedules that task's check for now. It exits with a clear message if the `gh webhook` extension is missing.
+- `conveyor review-webhook` listens on `127.0.0.1` (random port, pid file in `~/.conveyor/`) and starts one `gh webhook forward --repo <r> --events=pull_request_review,pull_request_review_comment,issue_comment --url <listener>` per repo that has an open epic PR. An event schedules that task's check for now. It exits with a clear message if the `gh webhook` extension is missing.
 - One forward per repo is a GitHub limit; a second Conveyor on the same repo just fails that repo's forward, and the backoff checks still run.
-- **Prompt to add it:** the Epic view shows **Add review webhooks** when the epic has a PR and the app is not installed. Clicking installs the bundled manifest (same path as importing an app), and the service button appears in the nav. Without it, everything works on push-triggered checks and backoff.
+- **Prompt to add it:** the Epic view shows **Add review webhooks** when the epic has a PR and the app is not installed. Clicking installs the bundled manifest (same path as importing an app), and the service button appears in the Apps section of each task's right sidebar and asks for confirmation before starting. Without it, everything works on push-triggered checks and backoff.
 
 **Cleanup:** when a task goes to `done` or `cancelled`, the store's status change deletes its automations. When the flow ends, `ON DELETE CASCADE` and an explicit delete do the same. Nothing lives in memory, so there is nothing to leak.
 
