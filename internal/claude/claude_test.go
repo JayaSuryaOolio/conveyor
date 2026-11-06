@@ -167,11 +167,15 @@ func TestWriteSettings(t *testing.T) {
 		Permissions struct {
 			BlockWritesOutsideWorkingDirectories bool
 			AdditionalDirectories                []string
+			Allow                                []string
 		}
 	}
 	json.Unmarshal(b, &perm)
 	if !perm.Permissions.BlockWritesOutsideWorkingDirectories || !slices.Contains(perm.Permissions.AdditionalDirectories, "/tmp") {
 		t.Fatalf("writes outside the worktrees must be blocked, /tmp allowed: %s", b)
+	}
+	if !slices.Contains(perm.Permissions.Allow, "Bash(git push --force-with-lease:*)") {
+		t.Fatalf("force-with-lease push must be allowed: %s", b)
 	}
 	if !strings.Contains(string(b), `"matcher": "Bash"`) {
 		t.Fatalf("PreToolUse needs a Bash matcher: %s", b)

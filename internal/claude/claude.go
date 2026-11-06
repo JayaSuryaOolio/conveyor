@@ -227,7 +227,10 @@ func writeScope() map[string]any {
 	if h, err := os.UserHomeDir(); err == nil {
 		dirs = append(dirs, filepath.Join(h, ".claude", "projects"), filepath.Join(h, ".claude", "plans"))
 	}
-	return map[string]any{"blockWritesOutsideWorkingDirectories": true, "additionalDirectories": dirs}
+	// Allow rules keep the auto-mode classifier from denying the push an agent needs after a rebase.
+	// ponytail: lease only (plain --force stays gated); the rtk-prefixed form is what agents here type.
+	allow := []string{"Bash(git push --force-with-lease:*)", "Bash(rtk git push --force-with-lease:*)"}
+	return map[string]any{"blockWritesOutsideWorkingDirectories": true, "additionalDirectories": dirs, "allow": allow}
 }
 
 // writeAtomic replaces path via a uniquely named temp file in the same directory,
