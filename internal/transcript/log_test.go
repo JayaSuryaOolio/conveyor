@@ -13,6 +13,7 @@ func TestLog(t *testing.T) {
 {"type":"assistant","timestamp":"t2","message":{"content":[{"type":"thinking"},{"type":"text","text":"On it."},{"type":"tool_use","name":"Bash","input":{"command":"go test ./...\nmore"}}]}}
 {"type":"user","message":{"content":[{"type":"tool_result","content":"ok"}]}}
 {"type":"assistant","message":{"content":[{"type":"tool_use","name":"Edit","input":{"file_path":"a/b.go"}}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","name":"AskUserQuestion","input":{"questions":[{"question":"Which DB?"},{"question":"Port?"}]}}]}}
 `
 	if err := os.WriteFile(p, []byte(lines+`{"type":"assis`), 0o644); err != nil {
 		t.Fatal(err)
@@ -21,7 +22,7 @@ func TestLog(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []Entry{{"user", "fix it", "t1"}, {"text", "On it.", "t2"}, {"tool", "Bash: go test ./... …", "t2"}, {"tool", "Edit: a/b.go", ""}}
+	want := []Entry{{"user", "fix it", "t1"}, {"text", "On it.", "t2"}, {"tool", "Bash: go test ./... …", "t2"}, {"tool", "Edit: a/b.go", ""}, {"tool", "AskUserQuestion: Which DB?", ""}}
 	if len(es) != len(want) {
 		t.Fatalf("got %+v", es)
 	}
