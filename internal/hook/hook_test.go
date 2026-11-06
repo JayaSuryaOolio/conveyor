@@ -155,6 +155,21 @@ func TestStopDoneToReview(t *testing.T) {
 	}
 }
 
+func TestStopSpawnInheritsEpicLabel(t *testing.T) {
+	e := setup(t, store.StatusRunning)
+	if err := store.AddLabel(e.db, e.task.ID, store.PrefixEpic+"os-4"); err != nil {
+		t.Fatal(err)
+	}
+	e.run(t, "auto", "running", "S1", "do it")
+	if err := e.fire(t, "Stop", map[string]any{"session_id": "S1", "last_assistant_message": doneMsg}); err != nil {
+		t.Fatal(err)
+	}
+	kids, _ := store.ListTasks(e.db, store.StatusBacklog)
+	if len(kids) != 1 || store.EpicName(kids[0]) != "os-4" || store.IsEpic(kids[0]) {
+		t.Fatalf("spawned child: %+v", kids)
+	}
+}
+
 func TestStopSpawnFailureStillTransitions(t *testing.T) {
 	e := setup(t, store.StatusRunning)
 	e.run(t, "auto", "running", "S1", "do it")

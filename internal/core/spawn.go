@@ -9,8 +9,8 @@ import (
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 )
 
-// SpawnChildren creates a backlog child task per "title | description" line, with the parent's repos (same primary)
-// and parent_id set. A line without a description is skipped and reported in the error: the child's agent needs one.
+// SpawnChildren creates a backlog child task per "title | description" line, with the parent's repos (same primary),
+// parent_id set and its epic:<name> label. A line without a description is skipped and reported in the error: the child's agent needs one.
 func SpawnChildren(db *sql.DB, parent store.Task, lines []string) ([]store.Task, error) {
 	var out []store.Task
 	var errs []error
@@ -32,6 +32,11 @@ func SpawnChildren(db *sql.DB, parent store.Task, lines []string) ([]store.Task,
 		if err != nil {
 			errs = append(errs, fmt.Errorf("spawn %q: %w", title, err))
 			continue
+		}
+		if name := store.EpicName(parent); name != "" { // follow-ups of an epic member stay in the epic
+			if err := store.AddLabel(db, t.ID, store.PrefixEpic+name); err != nil {
+				errs = append(errs, fmt.Errorf("spawn %q: %w", title, err))
+			}
 		}
 		out = append(out, t)
 	}
