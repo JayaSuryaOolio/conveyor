@@ -119,7 +119,7 @@ func resolveRun(db *sql.DB, task store.Task, session string) (store.Run, error) 
 	// with the old id, but Claude may run the resume as a copy under a new one (docs/session-identity.md).
 	for i := len(runs) - 1; i >= 0; i-- {
 		if r := runs[i]; r.Status == "launching" {
-			r.SessionID = sp
+			r.SessionID, r.Status = sp, "running" // running now, so onPrompt does not audit the start again
 			auditStart(task.ID, r)
 			return r, store.UpdateRun(db, r)
 		}
