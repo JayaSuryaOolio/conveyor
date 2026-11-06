@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"time"
 
@@ -28,7 +29,7 @@ func GetSource(svc *core.Service, epicKey string) (*store.JiraSource, error) {
 	return &s, err
 }
 
-// SetSource attaches or reconfigures the epic's source.
+// SetSource attaches or reconfigures the epic's source. The Jira epic must be assigned to the acli user.
 func SetSource(svc *core.Service, epicKey string, s store.JiraSource) error {
 	epic, err := store.GetTaskByKey(svc.DB, epicKey)
 	if err != nil {
@@ -37,6 +38,16 @@ func SetSource(svc *core.Service, epicKey string, s store.JiraSource) error {
 	var m map[string]string
 	if s.StatusMap != "" && json.Unmarshal([]byte(s.StatusMap), &m) != nil {
 		return errors.New(`status map must be a JSON object like {"review":"In Review"}`)
+	}
+	if !store.ValidJiraKey(s.JiraKey) { // checked before the key goes into JQL
+		return fmt.Errorf("invalid jira key %q (want PROJ-123)", s.JiraKey)
+	}
+	mine, err := search(context.Background(), "key = "+s.JiraKey+" AND assignee = currentUser()", "key")
+	if err != nil {
+		return err
+	}
+	if len(mine) == 0 {
+		return fmt.Errorf("jira epic %s is not assigned to the acli user (or does not exist)", s.JiraKey)
 	}
 	s.EpicID = epic.ID
 	return store.SetJiraSource(svc.DB, s)

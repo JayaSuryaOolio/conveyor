@@ -61,6 +61,8 @@ func TestPollerTick(t *testing.T) {
 
 // AC1: sources attach and detach by epic key.
 func TestSourceByKey(t *testing.T) {
+	dir := fakeAcli(t)
+	os.WriteFile(dir+"/mine", []byte("OS-9\n"), 0o644)
 	svc, epic := pullEnv(t, "a")
 	if err := ClearSource(svc, epic.Key); err != nil {
 		t.Fatal(err)
@@ -82,5 +84,36 @@ func TestSourceByKey(t *testing.T) {
 	}
 	if err := SetSource(svc, "NOPE-1", store.JiraSource{JiraKey: "OS-9"}); err == nil {
 		t.Fatal("unknown epic accepted")
+	}
+}
+
+// AC10: only an epic assigned to the acli user attaches; others and acli failures store nothing.
+func TestSourceAssignedOnly(t *testing.T) {
+	dir := fakeAcli(t)
+	os.WriteFile(dir+"/mine", []byte("OS-9\n"), 0o644)
+	svc, epic := pullEnv(t, "a")
+	ClearSource(svc, epic.Key)
+
+	err := SetSource(svc, epic.Key, store.JiraSource{JiraKey: "OS-8"}) // only child tasks assigned: not in the search
+	if err == nil || !strings.Contains(err.Error(), "not assigned") {
+		t.Fatalf("unassigned epic accepted: %v", err)
+	}
+	if s, _ := GetSource(svc, epic.Key); s != nil {
+		t.Fatalf("source stored: %+v", s)
+	}
+	if b, _ := os.ReadFile(dir + "/argv"); !strings.Contains(string(b), "key = OS-8 AND assignee = currentUser()") {
+		t.Fatalf("jql: %s", b)
+	}
+
+	os.WriteFile(dir+"/fail", nil, 0o644)
+	if err := SetSource(svc, epic.Key, store.JiraSource{JiraKey: "OS-9"}); err == nil || !strings.Contains(err.Error(), "acli failed") {
+		t.Fatalf("acli failure: %v", err)
+	}
+	if s, _ := GetSource(svc, epic.Key); s != nil {
+		t.Fatalf("source stored: %+v", s)
+	}
+	os.Remove(dir + "/fail")
+	if err := SetSource(svc, epic.Key, store.JiraSource{JiraKey: "OS-9"}); err != nil {
+		t.Fatal(err)
 	}
 }

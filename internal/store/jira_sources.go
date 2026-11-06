@@ -8,6 +8,9 @@ import (
 
 var jiraKeyRe = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]*-[0-9]+$`)
 
+// ValidJiraKey reports whether k is a PROJ-123 key, safe to interpolate into JQL.
+func ValidJiraKey(k string) bool { return jiraKeyRe.MatchString(k) }
+
 // JiraSource attaches a Jira epic to a Conveyor epic root. Auth stays in acli.
 type JiraSource struct {
 	EpicID      int64   `json:"epic_id"`
@@ -40,7 +43,7 @@ func GetJiraSource(db *sql.DB, epicID int64) (JiraSource, error) {
 // SetJiraSource creates or reconfigures the epic's source (key, default repo, interval, status map).
 // Changing the Jira key resets sync state; a zero interval means 300s.
 func SetJiraSource(db *sql.DB, s JiraSource) error {
-	if !jiraKeyRe.MatchString(s.JiraKey) { // the key is interpolated into JQL
+	if !ValidJiraKey(s.JiraKey) {
 		return fmt.Errorf("invalid jira key %q (want PROJ-123)", s.JiraKey)
 	}
 	if s.IntervalSec <= 0 {
