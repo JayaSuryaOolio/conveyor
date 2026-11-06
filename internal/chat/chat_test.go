@@ -158,11 +158,21 @@ func TestNewTaskFromForward(t *testing.T) {
 	if r := b.handle(In{Text: "new b", Fwd: fwd}); !strings.HasPrefix(r, "created ") {
 		t.Fatal(r)
 	}
+	// phone keyboards: capitalised "New", repo in other case, smart quotes
+	if r := b.handle(In{Text: "New B “bump sdk”"}); !strings.HasPrefix(r, "created ") || !strings.Contains(r, " bump sdk (") {
+		t.Fatal(r)
+	}
 	ts, _ := store.ListTasks(db)
-	if len(ts) != 2 {
-		t.Fatalf("want 2 tasks, got %d", len(ts))
+	if len(ts) != 3 {
+		t.Fatalf("want 3 tasks, got %d", len(ts))
 	}
 	for _, tk := range ts {
+		if tk.Title == "bump sdk" {
+			if len(tk.Repos) == 0 || tk.Repos[0].RepoName != "b" {
+				t.Fatalf("repo %v", tk.Repos)
+			}
+			continue
+		}
 		if !strings.Contains(tk.Description, "> it crashes") || !strings.Contains(tk.Description, "![shot.png]("+home) {
 			t.Fatalf("description lacks quote or image:\n%s", tk.Description)
 		}
