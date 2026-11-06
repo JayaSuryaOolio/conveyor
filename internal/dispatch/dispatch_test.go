@@ -187,6 +187,32 @@ func TestBlockedTaskWaits(t *testing.T) {
 	}
 }
 
+func TestBacklogTaskStartsWhenBlockersClear(t *testing.T) {
+	e := setup(t)
+	a, b := e.task(t, "a", 0), e.task(t, "b", 0)
+	waiting := e.task(t, "waiting", 0)
+	for _, id := range []int64{a.ID, b.ID} {
+		if err := store.AddLink(e.db, id, waiting.ID, store.LinkBlocks); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := store.UpdateTaskStatus(e.db, waiting.ID, store.StatusBacklog, store.ActorHuman); err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []int64{a.ID, b.ID} {
+		if _, err := store.UpdateTaskStatus(e.db, id, store.StatusCancelled, store.ActorHuman); err != nil {
+			t.Fatal(err)
+		}
+		if id == a.ID && e.get(t, waiting.ID).Status != store.StatusBacklog {
+			t.Fatal("promoted while another blocker is open")
+		}
+	}
+	e.tick(t)
+	if e.get(t, waiting.ID).Status != store.StatusRunning {
+		t.Fatalf("task is %s, want running", e.get(t, waiting.ID).Status)
+	}
+}
+
 func TestDebounce(t *testing.T) {
 	e := setup(t)
 	tk := e.task(t, "t", 0)
