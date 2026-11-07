@@ -140,7 +140,11 @@ func (s *Service) Actions(key string) ([]Action, error) {
 	switch {
 	case err != nil:
 	case isActive(run) && run.BgID != nil:
-		out = append(out, Action{"Attach to session", primary, cwd, bgRunner.AttachCommand(*run.BgID), "attach"})
+		cmd := bgRunner.AttachCommand(*run.BgID)
+		if run.SessionID != nil && *run.SessionID != "" {
+			cmd = bgRunner.ResumeCommand(*run.SessionID, settings, workspace.OtherPaths(t))
+		}
+		out = append(out, Action{"Attach to session", primary, cwd, cmd, "attach"})
 	case !isActive(run) && run.SessionID != nil:
 		out = append(out, Action{"Resume in terminal", primary, cwd, bgRunner.ResumeCommand(*run.SessionID, settings, workspace.OtherPaths(t)), "resume"})
 	}
@@ -167,7 +171,11 @@ func (s *Service) Actions(key string) ([]Action, error) {
 		case !isActive(r):
 			out = append(out, Action{fmt.Sprintf("Resume run #%d", i+1), primary, cwd, bgRunner.ResumeCommand(*r.SessionID, settings, workspace.OtherPaths(t)), "resume:" + id})
 		case r.BgID != nil: // a run that is not the latest, e.g. blocked on a question, still needs its attach icon
-			out = append(out, Action{fmt.Sprintf("Attach to run #%d", i+1), primary, cwd, bgRunner.AttachCommand(*r.BgID), "attach:" + id})
+			cmd := bgRunner.AttachCommand(*r.BgID)
+			if r.SessionID != nil && *r.SessionID != "" {
+				cmd = bgRunner.ResumeCommand(*r.SessionID, settings, workspace.OtherPaths(t))
+			}
+			out = append(out, Action{fmt.Sprintf("Attach to run #%d", i+1), primary, cwd, cmd, "attach:" + id})
 		}
 	}
 	return out, nil
@@ -278,7 +286,7 @@ type RunLog struct {
 	Next    int64              `json:"next"`
 }
 
-// RunLog reads the run's Claude transcript from byte offset after.
+// RunLog reads the run's Claude or Antigravity transcript from byte offset after.
 // A run without a session or transcript yet returns no entries.
 func (s *Service) RunLog(runID, after int64) (RunLog, error) {
 	r, err := store.GetRun(s.DB, runID)
@@ -286,14 +294,23 @@ func (s *Service) RunLog(runID, after int64) (RunLog, error) {
 		return RunLog{}, err
 	}
 	out := RunLog{Entries: []transcript.Entry{}, Next: after}
-	if r.SessionID == nil {
+	if r.SessionID == nil || *r.SessionID == "" {
 		return out, nil
 	}
+	var transcriptFile string
 	files, _ := filepath.Glob(filepath.Join(s.projectsDir(), "*", *r.SessionID+".jsonl"))
-	if len(files) == 0 {
+	if len(files) > 0 {
+		transcriptFile = files[0]
+	} else if h, err := os.UserHomeDir(); err == nil {
+		agyPath := filepath.Join(h, ".gemini", "antigravity-cli", "brain", *r.SessionID, ".system_generated", "logs", "transcript.jsonl")
+		if _, err := os.Stat(agyPath); err == nil {
+			transcriptFile = agyPath
+		}
+	}
+	if transcriptFile == "" {
 		return out, nil
 	}
-	es, next, err := transcript.Log(files[0], after)
+	es, next, err := transcript.Log(transcriptFile, after)
 	if err != nil {
 		return out, err
 	}

@@ -275,9 +275,21 @@ func (d *Dispatcher) reapAgy(ctx context.Context, r store.Run, task store.Task, 
 	}
 	// If the PID is still alive (or within the grace period), leave it.
 	if runner.IsPIDRunning(*r.BgID) {
+		updated := false
+		if (r.SessionID == nil || *r.SessionID == "") && r.BgID != nil {
+			if pid, err := strconv.Atoi(*r.BgID); err == nil {
+				if convID := runner.DetectConversationID(pid); convID != "" {
+					r.SessionID = &convID
+					updated = true
+				}
+			}
+		}
 		// Still running: if the run was "launching", promote to "running".
 		if r.Status == "launching" {
 			r.Status = "running"
+			updated = true
+		}
+		if updated {
 			return store.UpdateRun(d.DB, r)
 		}
 		return nil

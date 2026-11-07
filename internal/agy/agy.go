@@ -24,6 +24,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 )
 
 var (
@@ -115,7 +116,52 @@ func Launch(ctx context.Context, conveyorHome string, s LaunchSpec) (bgID string
 	}
 	pid := strconv.Itoa(cmd.Process.Pid)
 	go func() { _ = cmd.Wait() }()
-	return pid, "", nil
+	convID := DetectConversationID(cmd.Process.Pid)
+	return pid, convID, nil
+}
+
+// DetectConversationID polls for the agy conversation UUID by inspecting the process's open file descriptors.
+func DetectConversationID(pid int) string {
+	convRe := regexp.MustCompile(`[0-9a-f-]{36}`)
+	fdDir := fmt.Sprintf("/proc/%d/fd", pid)
+	for i := 0; i < 20; i++ {
+		time.Sleep(50 * time.Millisecond)
+		entries, err := os.ReadDir(fdDir)
+		if err == nil {
+			for _, e := range entries {
+				target, err := os.Readlink(filepath.Join(fdDir, e.Name()))
+				if err != nil {
+					continue
+				}
+				if (strings.Contains(target, "conversations") && strings.HasSuffix(target, ".db")) ||
+					(strings.Contains(target, "presence") && strings.HasSuffix(target, ".lock")) {
+					if m := convRe.FindString(target); m != "" {
+						return m
+					}
+				}
+			}
+		}
+	}
+	// Fallback: check ~/.gemini/antigravity-cli/presence for recent locks
+	if h, err := os.UserHomeDir(); err == nil {
+		presenceDir := filepath.Join(h, ".gemini", "antigravity-cli", "presence")
+		if files, err := os.ReadDir(presenceDir); err == nil {
+			var newest string
+			var newestTime time.Time
+			for _, f := range files {
+				if strings.HasSuffix(f.Name(), ".lock") {
+					if info, err := f.Info(); err == nil && info.ModTime().After(newestTime) {
+						newestTime = info.ModTime()
+						newest = strings.TrimSuffix(f.Name(), ".lock")
+					}
+				}
+			}
+			if time.Since(newestTime) < 10*time.Second {
+				return newest
+			}
+		}
+	}
+	return ""
 }
 
 // bgLogPath returns the log file path for a bg agy run.

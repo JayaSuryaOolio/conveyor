@@ -84,6 +84,11 @@ func IsPIDRunning(bgID string) bool {
 	return agy.IsPIDRunning(pid)
 }
 
+// DetectConversationID polls for the agy conversation UUID by inspecting the process's open file descriptors.
+func DetectConversationID(pid int) string {
+	return agy.DetectConversationID(pid)
+}
+
 // BgLogPath returns the path to the agy background session log for a task.
 func BgLogPath(home, taskKey string) string {
 	return filepath.Join(home, "agy-logs", taskKey+".log")
