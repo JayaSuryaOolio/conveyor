@@ -47,6 +47,11 @@ func userAgentsDir() string {
 	return filepath.Join(h, ".claude", "agents")
 }
 
+func geminiAgentsDir() string {
+	h, _ := os.UserHomeDir()
+	return filepath.Join(h, ".gemini", "config", "agents")
+}
+
 // ListAgents returns the subagents of the named repos' main checkouts, then the user's.
 func (s *Service) ListAgents(repos []string) ([]Agent, error) {
 	out := []Agent{}
@@ -63,7 +68,19 @@ func (s *Service) ListAgents(repos []string) ([]Agent, error) {
 		out = append(out, scanAgents(filepath.Join(r.Path, ".claude", "agents"), n)...)
 	}
 	sort.SliceStable(out, func(i, j int) bool { return out[i].Name < out[j].Name })
-	return append(out, scanAgents(userAgentsDir(), "user")...), nil
+
+	userAgents := scanAgents(userAgentsDir(), "user")
+	userSeen := map[string]bool{}
+	for _, a := range userAgents {
+		userSeen[a.Name] = true
+	}
+	for _, a := range scanAgents(geminiAgentsDir(), "user") {
+		if !userSeen[a.Name] {
+			userSeen[a.Name] = true
+			userAgents = append(userAgents, a)
+		}
+	}
+	return append(out, userAgents...), nil
 }
 
 // AddAgent writes <repo>/.claude/agents/<name>.md (scope = repo name) or ~/.claude/agents (scope "user").
@@ -97,6 +114,14 @@ func (s *Service) AddAgent(name, description, prompt, scope, model string) error
 		model = "model: " + model + "\n"
 	}
 	_, err = fmt.Fprintf(f, "---\nname: %s\ndescription: %q\n%s---\n\n%s\n", name, strings.TrimSpace(description), model, strings.TrimSpace(prompt))
+	if err == nil && scope == "user" {
+		gdir := geminiAgentsDir()
+		if _, serr := os.Stat(filepath.Dir(filepath.Dir(gdir))); serr == nil { // ~/.gemini exists
+			_ = os.MkdirAll(gdir, 0o755)
+			content := fmt.Sprintf("---\nname: %s\ndescription: %q\n%s---\n\n%s\n", name, strings.TrimSpace(description), model, strings.TrimSpace(prompt))
+			_ = os.WriteFile(filepath.Join(gdir, name+".md"), []byte(content), 0o644)
+		}
+	}
 	return err
 }
 

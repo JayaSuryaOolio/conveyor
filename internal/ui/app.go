@@ -23,6 +23,7 @@ import (
 	"github.com/JayaSuryaOolio/conveyor/internal/gh"
 	"github.com/JayaSuryaOolio/conveyor/internal/jira"
 	"github.com/JayaSuryaOolio/conveyor/internal/learning"
+	"github.com/JayaSuryaOolio/conveyor/internal/runner"
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 	"github.com/JayaSuryaOolio/conveyor/internal/term"
 	"github.com/JayaSuryaOolio/conveyor/internal/workspace"
@@ -66,6 +67,7 @@ func (a *App) Startup(ctx context.Context) {
 		runtime.LogFatalf(ctx, "open db: %v", err)
 		return
 	}
+	_, _, _ = runner.AutoConfigureDefaultRunner(db)
 	a.svc = &core.Service{DB: db, Home: home, Bin: conveyorBin()}
 	jira.Attach(a.svc)
 	a.startTerms()
@@ -215,6 +217,7 @@ type TaskCard struct {
 	Labels      []string `json:"labels"`
 	LastSummary string   `json:"lastSummary"`
 	CtxPeak     int64    `json:"ctxPeak"`
+	Runner      string   `json:"runner"`
 	UpdatedAt   string   `json:"updatedAt"`
 	LastMsgAt   string   `json:"lastMsgAt"` // newest comment (human or agent); "" when none
 	LastMsgBy   string   `json:"lastMsgBy"` // its author: human, agent or system
@@ -242,6 +245,9 @@ func (a *App) ListTasks() ([]TaskCard, error) {
 	}
 	for _, t := range tasks {
 		c := TaskCard{Key: t.Key, Title: t.Title, Status: string(t.Status), Priority: t.Priority, Repos: []string{}, Labels: t.Labels, UpdatedAt: t.UpdatedAt}
+		if t.Runner != nil {
+			c.Runner = *t.Runner
+		}
 		if t.ParentID != nil {
 			c.Parent = keys[*t.ParentID]
 		}
@@ -326,9 +332,19 @@ func (a *App) SetParent(key, parent string) error { return a.svc.SetParent(key, 
 // CreateTask creates a task and returns its key.
 func (a *App) CreateTask(in core.NewTaskInput) (string, error) {
 	in.AgentSet = true // the dialog prefills the parent's agent; a cleared field means none
+	in.RunnerSet = true
 	t, err := a.svc.CreateTask(in)
 	return t.Key, err
 }
+
+// SetTaskRunner changes the task's runner override ("" clears it).
+func (a *App) SetTaskRunner(key, runner string) error { return a.svc.SetTaskRunner(key, runner) }
+
+// CLIAgent represents a detected CLI runner.
+type CLIAgent = runner.CLIAgent
+
+// ListCLIAgents lists detected CLI runners on the system.
+func (a *App) ListCLIAgents() []CLIAgent { return runner.DetectRunners() }
 
 // EpicGraph returns the task tree around key with its links and the epic flow's PRs.
 func (a *App) EpicGraph(key string) (core.Graph, error) { return a.svc.TaskGraph(key) }
@@ -569,6 +585,10 @@ func (a *App) Learnings() ([]LearningRow, error) {
 		row := LearningRow{Learning: l}
 		if l.RepoID != nil {
 			row.Repo = names[*l.RepoID]
+		}
+		if row.Target == nil || *row.Target == "" {
+			t := learning.TargetForRepo(a.svc.DB, l.RepoID)
+			row.Target = &t
 		}
 		out = append(out, row)
 	}

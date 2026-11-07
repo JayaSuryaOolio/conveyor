@@ -13,17 +13,24 @@ import (
 var pathRe = regexp.MustCompile(`__CONVEYOR_PATH__(.*?)__CONVEYOR_PATH__`)
 
 // loadShellPATH adds the login shell's PATH entries to this process's PATH. An app opened from
-// the Dock or Finder gets only /usr/bin:/bin:/usr/sbin:/sbin, so `claude`, `gh` and `conveyor`
-// would not be found. It is a no-op when `claude` is already on PATH.
+// the Dock or Finder gets only /usr/bin:/bin:/usr/sbin:/sbin, so `claude`, `agy`, `gh` and `conveyor`
+// would not be found. It is a no-op when `claude` or `agy` is already on PATH.
 func loadShellPATH() {
 	if _, err := exec.LookPath("claude"); err == nil {
+		return
+	}
+	if _, err := exec.LookPath("agy"); err == nil {
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	sh := os.Getenv("SHELL")
 	if sh == "" {
-		sh = "/bin/zsh"
+		if _, err := exec.LookPath("bash"); err == nil {
+			sh = "bash"
+		} else {
+			sh = "/bin/sh"
+		}
 	}
 	// -i as well as -l: PATH is often set in .zshrc. The markers skip any noise the rc files print.
 	out, err := exec.CommandContext(ctx, sh, "-ilc", `printf __CONVEYOR_PATH__%s__CONVEYOR_PATH__ "$PATH"`).Output()
