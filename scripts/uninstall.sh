@@ -17,6 +17,7 @@ if [ -x "$cv" ]; then
 fi
 for d in skills/*/; do
 	rm -rf "$HOME/.claude/skills/$(basename "$d")"
+	rm -rf "$HOME/.gemini/config/skills/$(basename "$d")"
 done
 rm -rf "$APP_DIR/Conveyor.app" "$cv"
 echo "uninstalled; data kept in ${CONVEYOR_HOME:-$HOME/.conveyor}"

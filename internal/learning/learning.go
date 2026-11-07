@@ -9,12 +9,43 @@ import (
 	"strings"
 
 	"github.com/JayaSuryaOolio/conveyor/internal/core"
+	"github.com/JayaSuryaOolio/conveyor/internal/runner"
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 	"github.com/JayaSuryaOolio/conveyor/internal/workspace"
 )
 
 // DefaultTarget is the file an accepted repo-file learning goes to when Apply runs.
 const DefaultTarget = "CLAUDE.md"
+
+// DefaultTargetForRunner returns the instruction filename for a runner.
+func DefaultTargetForRunner(r string) string {
+	return runner.InstructionFileForRunner(r)
+}
+
+// TargetForRepo determines the target documentation file for a repo based on disk files
+// and the configured runner.
+func TargetForRepo(db *sql.DB, repoID *int64) string {
+	if repoID != nil {
+		r, err := store.GetRepo(db, *repoID)
+		if err == nil && r.Path != "" {
+			hasAgents := fileExists(filepath.Join(r.Path, "AGENTS.md"))
+			hasClaude := fileExists(filepath.Join(r.Path, "CLAUDE.md"))
+			if hasAgents && !hasClaude {
+				return "AGENTS.md"
+			}
+			if hasClaude && !hasAgents {
+				return "CLAUDE.md"
+			}
+		}
+	}
+	r := store.GetSetting(db, "default_runner")
+	return DefaultTargetForRunner(r)
+}
+
+func fileExists(p string) bool {
+	fi, err := os.Stat(p)
+	return err == nil && !fi.IsDir()
+}
 
 // Local is the target that keeps a repo's learning in Conveyor's data folder (workspace.LearningsFile) instead of
 // the repo: committing to the repo is a team decision, so it is the default for repo learnings.
@@ -143,8 +174,8 @@ func Apply(svc *core.Service, repo string) ([]string, error) {
 					src = t.Key
 				}
 			}
-			target := DefaultTarget
-			if l.Target != nil {
+			target := TargetForRepo(svc.DB, l.RepoID)
+			if l.Target != nil && *l.Target != "" {
 				target = *l.Target
 			}
 			fmt.Fprintf(&sb, "- %s (target: %s, from %s)\n", l.Body, target, src)
@@ -156,8 +187,9 @@ func Apply(svc *core.Service, repo string) ([]string, error) {
 			return keys, err
 		}
 		if !found {
+			defRunner := store.GetSetting(svc.DB, "default_runner")
 			if t, err = svc.CreateTask(core.NewTaskInput{
-				Title: title, Description: sb.String(), Repos: []string{r.Name}, Start: true, Source: "learning", CreatedBy: "learning",
+				Title: title, Description: sb.String(), Repos: []string{r.Name}, Start: true, Source: "learning", CreatedBy: "learning", Runner: defRunner,
 			}); err != nil {
 				return keys, err
 			}

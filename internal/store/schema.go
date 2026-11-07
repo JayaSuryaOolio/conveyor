@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   priority INTEGER NOT NULL DEFAULT 0,
   model TEXT,
   agent TEXT,
+  runner TEXT,
   source TEXT NOT NULL DEFAULT 'manual',
   external_key TEXT UNIQUE,
   external_url TEXT,
@@ -224,6 +225,9 @@ func Migrate(db *sql.DB) error {
 	if err := migrateAddTaskCreatedBy(db); err != nil {
 		return err
 	}
+	if err := migrateAddTaskRunner(db); err != nil {
+		return err
+	}
 	if err := migrateAddRepoSetupScript(db); err != nil {
 		return err
 	}
@@ -310,6 +314,20 @@ func migrateAddTaskCreatedBy(db *sql.DB) error {
 	if n == 0 {
 		if _, err := db.Exec(`ALTER TABLE tasks ADD COLUMN created_by TEXT`); err != nil {
 			return fmt.Errorf("add tasks.created_by: %w", err)
+		}
+	}
+	return nil
+}
+
+// migrateAddTaskRunner adds tasks.runner to databases created before it existed.
+func migrateAddTaskRunner(db *sql.DB) error {
+	var n int
+	if err := db.QueryRow(`SELECT count(*) FROM pragma_table_info('tasks') WHERE name='runner'`).Scan(&n); err != nil {
+		return fmt.Errorf("check tasks.runner: %w", err)
+	}
+	if n == 0 {
+		if _, err := db.Exec(`ALTER TABLE tasks ADD COLUMN runner TEXT`); err != nil {
+			return fmt.Errorf("add tasks.runner: %w", err)
 		}
 	}
 	return nil

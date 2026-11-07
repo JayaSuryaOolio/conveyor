@@ -47,13 +47,14 @@ func shq(s string) string { return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'
 
 func isActive(r store.Run) bool { return r.Status == "launching" || r.Status == "running" }
 
-// settingsPath makes sure claude-settings.json exists and returns its path.
-func (s *Service) settingsPath() (string, error) {
+// settingsPath makes sure the runner's settings file exists and returns its path.
+func (s *Service) settingsPath(t store.Task) (string, error) {
 	bin, err := s.bin()
 	if err != nil {
 		return "", err
 	}
-	return claude.WriteSettings(s.Home, bin)
+	r := s.RunnerForTask(t)
+	return r.WriteSettings(s.Home, bin)
 }
 
 // bin is the conveyor CLI the hooks call: Bin if set, else this executable.
@@ -120,7 +121,8 @@ func (s *Service) Actions(key string) ([]Action, error) {
 	if cwd == "" {
 		return []Action{}, nil
 	}
-	settings, err := s.settingsPath()
+	bgRunner := s.RunnerForTask(t)
+	settings, err := s.settingsPath(t)
 	if err != nil {
 		return nil, err
 	}
@@ -138,15 +140,15 @@ func (s *Service) Actions(key string) ([]Action, error) {
 	switch {
 	case err != nil:
 	case isActive(run) && run.BgID != nil:
-		out = append(out, Action{"Attach to session", primary, cwd, claude.AttachCommand(*run.BgID), "attach"})
+		out = append(out, Action{"Attach to session", primary, cwd, bgRunner.AttachCommand(*run.BgID), "attach"})
 	case !isActive(run) && run.SessionID != nil:
-		out = append(out, Action{"Resume in terminal", primary, cwd, claude.ResumeCommand(*run.SessionID, settings, workspace.OtherPaths(t)), "resume"})
+		out = append(out, Action{"Resume in terminal", primary, cwd, bgRunner.ResumeCommand(*run.SessionID, settings, workspace.OtherPaths(t)), "resume"})
 	}
 	briefPath, err := brief.Render(s.DB, s.Home, t)
 	if err != nil {
 		return nil, err
 	}
-	out = append(out, Action{"New session from brief", primary, cwd, claude.FreshCommand(settings, briefPath, workspace.OtherPaths(t)), "fresh"})
+	out = append(out, Action{"New session from brief", primary, cwd, bgRunner.FreshCommand(settings, briefPath, workspace.OtherPaths(t)), "fresh"})
 	for _, r := range t.Repos {
 		if r.WorktreePath == nil {
 			continue
@@ -163,9 +165,9 @@ func (s *Service) Actions(key string) ([]Action, error) {
 		switch {
 		case r.SessionID == nil:
 		case !isActive(r):
-			out = append(out, Action{fmt.Sprintf("Resume run #%d", i+1), primary, cwd, claude.ResumeCommand(*r.SessionID, settings, workspace.OtherPaths(t)), "resume:" + id})
+			out = append(out, Action{fmt.Sprintf("Resume run #%d", i+1), primary, cwd, bgRunner.ResumeCommand(*r.SessionID, settings, workspace.OtherPaths(t)), "resume:" + id})
 		case r.BgID != nil: // a run that is not the latest, e.g. blocked on a question, still needs its attach icon
-			out = append(out, Action{fmt.Sprintf("Attach to run #%d", i+1), primary, cwd, claude.AttachCommand(*r.BgID), "attach:" + id})
+			out = append(out, Action{fmt.Sprintf("Attach to run #%d", i+1), primary, cwd, bgRunner.AttachCommand(*r.BgID), "attach:" + id})
 		}
 	}
 	return out, nil
@@ -236,10 +238,11 @@ func (s *Service) Sessions(key string) ([]Session, error) {
 			known[*r.SessionID] = true
 		}
 	}
-	settings, err := s.settingsPath()
+	settings, err := s.settingsPath(t)
 	if err != nil {
 		return nil, err
 	}
+	bgRunner := s.RunnerForTask(t)
 	out := []Session{}
 	for _, r := range t.Repos {
 		if r.WorktreePath == nil {
@@ -261,7 +264,7 @@ func (s *Service) Sessions(key string) ([]Session, error) {
 			}
 			out = append(out, Session{
 				ID: id, Repo: r.RepoName, MTime: fi.ModTime().UTC().Format(time.RFC3339), Prompt: firstPrompt(f),
-				Action: Action{"Resume " + id[:min(8, len(id))], r.RepoName, *r.WorktreePath, claude.ResumeCommand(id, settings, others), "resume"},
+				Action: Action{"Resume " + id[:min(8, len(id))], r.RepoName, *r.WorktreePath, bgRunner.ResumeCommand(id, settings, others), "resume"},
 			})
 		}
 	}

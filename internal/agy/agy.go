@@ -1,0 +1,303 @@
+// Package agy wraps the `agy` CLI (Antigravity) as an agent runner backend.
+// Because agy does not have a built-in background-session mode analogous to
+// `claude --bg`, Conveyor runs `agy --print --dangerously-skip-permissions`
+// as a regular OS process detached from the dispatcher's lifetime (via
+// os.StartProcess / exec.Cmd with SysProcAttr Setpgid). The OS PID (as a
+// decimal string) serves as the bg-id. Reaping is done by checking whether
+// that PID is still running.
+//
+// For session resume, agy uses `--conversation <id>` where the id is the
+// conversation UUID. agy accepts session-specific configuration via the
+// `--settings <settingsPath>` flag, mirroring the claude runner.
+package agy
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"regexp"
+	"strconv"
+	"strings"
+	"syscall"
+)
+
+var (
+	// ErrNotFound means the agy binary is not on PATH.
+	ErrNotFound = errors.New("agy CLI not found")
+	// ErrUntrusted means the workspace is not trusted by Antigravity.
+	ErrUntrusted = errors.New("workspace not trusted by Antigravity")
+)
+
+var execCommand = exec.CommandContext // swapped in tests
+
+// LaunchSpec describes a fresh agy background launch.
+type LaunchSpec struct {
+	Cwd          string
+	AddDirs      []string
+	Prompt       string
+	Name         string // task key, used as the conversation label and log name
+	SettingsPath string // path to agy-settings.json
+	Model        string
+	Agent        string
+	MCPConfig    string
+	Bypass       bool // dangerously-skip-permissions
+}
+
+func (s LaunchSpec) args() []string {
+	a := []string{"--print", s.Prompt, "--output-format", "text"}
+	if s.SettingsPath != "" {
+		a = append(a, "--settings", s.SettingsPath)
+	}
+	if s.Bypass {
+		a = append(a, "--dangerously-skip-permissions")
+	}
+	if s.Model != "" {
+		a = append(a, "--model", s.Model)
+	}
+	if s.Agent != "" {
+		ensureAgyAgentAvailable(s.Agent)
+		a = append(a, "--agent", s.Agent)
+	}
+	for _, d := range s.AddDirs {
+		a = append(a, "--add-dir", d)
+	}
+	return a
+}
+
+// ensureAgyAgentAvailable ensures that an agent defined in ~/.claude/agents/<name>.md
+// is also available in ~/.gemini/config/agents/<name>.md for agy.
+func ensureAgyAgentAvailable(name string) {
+	h, err := os.UserHomeDir()
+	if err != nil {
+		return
+	}
+	geminiAgent := filepath.Join(h, ".gemini", "config", "agents", name+".md")
+	if _, err := os.Stat(geminiAgent); err == nil {
+		return // already present
+	}
+	claudeAgent := filepath.Join(h, ".claude", "agents", name+".md")
+	b, err := os.ReadFile(claudeAgent)
+	if err != nil {
+		return
+	}
+	_ = os.MkdirAll(filepath.Dir(geminiAgent), 0o755)
+	_ = os.WriteFile(geminiAgent, b, 0o644)
+}
+
+// Launch starts `agy --print ...` as a detached OS process, writing its output to
+// a log file under conveyorHome, and returns the PID as the bg-id string.
+func Launch(ctx context.Context, conveyorHome string, s LaunchSpec) (bgID string, conversationID string, err error) {
+	logPath := bgLogPath(conveyorHome, s.Name)
+	if err := os.MkdirAll(filepath.Dir(logPath), 0o755); err != nil {
+		return "", "", fmt.Errorf("agy log dir: %w", err)
+	}
+	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
+	if err != nil {
+		return "", "", fmt.Errorf("agy log file: %w", err)
+	}
+	defer logFile.Close()
+
+	cmd := execCommand(ctx, "agy", s.args()...)
+	cmd.Dir = s.Cwd
+	cmd.Stdout = logFile
+	cmd.Stderr = logFile
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true} // detach from our process group
+	if err := cmd.Start(); err != nil {
+		if errors.Is(err, exec.ErrNotFound) {
+			return "", "", ErrNotFound
+		}
+		return "", "", fmt.Errorf("agy launch: %w", err)
+	}
+	pid := strconv.Itoa(cmd.Process.Pid)
+	go func() { _ = cmd.Wait() }()
+	return pid, "", nil
+}
+
+// bgLogPath returns the log file path for a bg agy run.
+func bgLogPath(home, name string) string {
+	return filepath.Join(home, "agy-logs", name+".log")
+}
+
+// BgLogPath exports bgLogPath for use by the runner package.
+func BgLogPath(home, name string) string {
+	return bgLogPath(home, name)
+}
+
+var conversationRe = regexp.MustCompile(`(?i)conversation(?:\s+id)?:\s*([0-9a-f-]{36})`)
+
+// ExtractConversationID parses the conversation UUID from agy print output.
+func ExtractConversationID(out string) string {
+	if m := conversationRe.FindStringSubmatch(out); m != nil {
+		return m[1]
+	}
+	return ""
+}
+
+// IsPIDRunning reports whether the process with the given PID is still alive.
+func IsPIDRunning(pid int) bool {
+	p, err := os.FindProcess(pid)
+	if err != nil {
+		return false
+	}
+	err = p.Signal(syscall.Signal(0))
+	return err == nil
+}
+
+// Stop sends SIGTERM to the process identified by bgID (a PID string).
+func Stop(_ context.Context, bgID string) error {
+	pid, err := strconv.Atoi(bgID)
+	if err != nil {
+		return fmt.Errorf("agy stop: invalid bg id %q: %w", bgID, err)
+	}
+	p, err := os.FindProcess(pid)
+	if err != nil {
+		return nil // already gone
+	}
+	if err := p.Signal(syscall.SIGTERM); err != nil && !errors.Is(err, os.ErrProcessDone) {
+		return fmt.Errorf("agy stop signal: %w", err)
+	}
+	return nil
+}
+
+func q(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+}
+
+// AttachCommand returns a shell message since agy does not support terminal attachment.
+func AttachCommand(bgID string) string {
+	return "echo 'Conveyor: agy runner does not support session attach (PID " + bgID + " is running in background)'"
+}
+
+// ResumeCommand returns the agy command to resume a conversation interactively.
+func ResumeCommand(sessionID, settingsPath string, addDirs []string) string {
+	c := "agy"
+	if settingsPath != "" {
+		c += " --settings " + q(settingsPath)
+	}
+	c += " --conversation " + q(sessionID)
+	for _, d := range addDirs {
+		c += " --add-dir " + q(d)
+	}
+	return c
+}
+
+// FreshCommand returns the agy command to start a fresh interactive session primed with the brief.
+func FreshCommand(settingsPath, briefPath string, addDirs []string) string {
+	c := "agy"
+	if settingsPath != "" {
+		c += " --settings " + q(settingsPath)
+	}
+	c += " --prompt-interactive " + q("Read "+briefPath+" first, then wait for my instructions.")
+	for _, d := range addDirs {
+		c += " --add-dir " + q(d)
+	}
+	return c
+}
+
+// WriteSettings writes <home>/agy-settings.json atomically and returns its path.
+// It loads base settings from ~/.gemini/antigravity-cli/settings.json if present to inherit user preferences
+// and adds Conveyor task configuration.
+func WriteSettings(home, conveyorBin string) (string, error) {
+	cfg := map[string]any{}
+	if h, err := os.UserHomeDir(); err == nil {
+		basePath := filepath.Join(h, ".gemini", "antigravity-cli", "settings.json")
+		if b, err := os.ReadFile(basePath); err == nil {
+			_ = json.Unmarshal(b, &cfg)
+		}
+	}
+	delete(cfg, "ide")
+
+	b, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("marshal agy settings: %w", err)
+	}
+
+	path := filepath.Join(home, "agy-settings.json")
+	if err := writeAtomic(path, append(b, '\n'), 0o644); err != nil {
+		return "", fmt.Errorf("write agy settings: %w", err)
+	}
+	return path, nil
+}
+
+// writeAtomic writes b to path via a temp file in the same directory.
+func writeAtomic(path string, b []byte, mode os.FileMode) error {
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	f, err := os.CreateTemp(dir, filepath.Base(path)+".*.tmp")
+	if err != nil {
+		return err
+	}
+	_, err = f.Write(b)
+	if cerr := f.Close(); err == nil {
+		err = cerr
+	}
+	if err == nil {
+		err = os.Chmod(f.Name(), mode)
+	}
+	if err == nil {
+		err = os.Rename(f.Name(), path)
+	}
+	if err != nil {
+		os.Remove(f.Name())
+	}
+	return err
+}
+
+// Resume resumes an agy conversation (stops bgID first if running, then starts a new
+// --print process with --conversation <sessionID> and --settings <settingsPath>).
+func Resume(ctx context.Context, conveyorHome, cwd, bgID, conversationID, settingsPath, prompt string, addDirs []string, s LaunchSpec) (string, error) {
+	_ = Stop(ctx, bgID)
+
+	logPath := bgLogPath(conveyorHome, s.Name)
+	if err := os.MkdirAll(filepath.Dir(logPath), 0o755); err != nil {
+		return "", fmt.Errorf("agy log dir: %w", err)
+	}
+	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		return "", fmt.Errorf("agy log file: %w", err)
+	}
+	defer logFile.Close()
+
+	args := []string{"--print", prompt, "--conversation", conversationID, "--output-format", "text"}
+	if settingsPath != "" {
+		args = append(args, "--settings", settingsPath)
+	}
+	if s.Bypass {
+		args = append(args, "--dangerously-skip-permissions")
+	}
+	if s.Model != "" {
+		args = append(args, "--model", s.Model)
+	}
+	if s.Agent != "" {
+		ensureAgyAgentAvailable(s.Agent)
+		args = append(args, "--agent", s.Agent)
+	}
+	for _, d := range addDirs {
+		args = append(args, "--add-dir", d)
+	}
+
+	cmd := execCommand(ctx, "agy", args...)
+	cmd.Dir = cwd
+	cmd.Stdout = logFile
+	cmd.Stderr = logFile
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	if err := cmd.Start(); err != nil {
+		if errors.Is(err, exec.ErrNotFound) {
+			return "", ErrNotFound
+		}
+		return "", fmt.Errorf("agy resume: %w", err)
+	}
+	pid := strconv.Itoa(cmd.Process.Pid)
+	go func() { _ = cmd.Wait() }()
+	return pid, nil
+}
+
+// EnsureReader is a helper for test mocks.
+var _ io.Reader = (*os.File)(nil)
