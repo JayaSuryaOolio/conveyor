@@ -19,8 +19,8 @@ func NewAgyRunner(home string) Runner { return &AgyRunner{ConveyorHome: home} }
 
 func (a *AgyRunner) Name() string { return "agy" }
 
-func (a *AgyRunner) Launch(ctx context.Context, s LaunchSpec) (string, error) {
-	bgID, _, err := agy.Launch(ctx, a.ConveyorHome, agy.LaunchSpec{
+func (a *AgyRunner) Launch(ctx context.Context, s LaunchSpec) (string, string, error) {
+	bgID, convID, err := agy.Launch(ctx, a.ConveyorHome, agy.LaunchSpec{
 		Cwd:          s.Cwd,
 		AddDirs:      s.AddDirs,
 		Prompt:       s.Prompt,
@@ -30,7 +30,7 @@ func (a *AgyRunner) Launch(ctx context.Context, s LaunchSpec) (string, error) {
 		Agent:        s.Agent,
 		Bypass:       s.Bypass,
 	})
-	return bgID, err
+	return bgID, convID, err
 }
 
 func (a *AgyRunner) Resume(ctx context.Context, cwd, bgID, sessionID, settingsPath, prompt string, addDirs []string) (string, error) {

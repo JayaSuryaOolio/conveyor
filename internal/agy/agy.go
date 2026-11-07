@@ -214,9 +214,14 @@ func q(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
-// AttachCommand returns a shell message since agy does not support terminal attachment.
+// AttachCommand returns a command to stop the background process and attach interactively.
 func AttachCommand(bgID string) string {
-	return "echo 'Conveyor: agy runner does not support session attach (PID " + bgID + " is running in background)'"
+	if pid, err := strconv.Atoi(bgID); err == nil {
+		if convID := DetectConversationID(pid); convID != "" {
+			return "kill -TERM " + bgID + " 2>/dev/null; agy --conversation " + q(convID)
+		}
+	}
+	return "echo 'Conveyor: agy runner (PID " + bgID + ") attach not available'"
 }
 
 // ResumeCommand returns the agy command to resume a conversation interactively.

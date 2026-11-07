@@ -143,6 +143,9 @@ func (s *Service) Actions(key string) ([]Action, error) {
 		cmd := bgRunner.AttachCommand(*run.BgID)
 		if run.SessionID != nil && *run.SessionID != "" {
 			cmd = bgRunner.ResumeCommand(*run.SessionID, settings, workspace.OtherPaths(t))
+			if bgRunner.Name() == "agy" {
+				cmd = "kill -TERM " + *run.BgID + " 2>/dev/null; " + cmd
+			}
 		}
 		out = append(out, Action{"Attach to session", primary, cwd, cmd, "attach"})
 	case !isActive(run) && run.SessionID != nil:
@@ -174,6 +177,9 @@ func (s *Service) Actions(key string) ([]Action, error) {
 			cmd := bgRunner.AttachCommand(*r.BgID)
 			if r.SessionID != nil && *r.SessionID != "" {
 				cmd = bgRunner.ResumeCommand(*r.SessionID, settings, workspace.OtherPaths(t))
+				if bgRunner.Name() == "agy" {
+					cmd = "kill -TERM " + *r.BgID + " 2>/dev/null; " + cmd
+				}
 			}
 			out = append(out, Action{fmt.Sprintf("Attach to run #%d", i+1), primary, cwd, cmd, "attach:" + id})
 		}
