@@ -200,16 +200,17 @@ func FreshCommand(settingsPath, briefPath string, addDirs []string) string {
 }
 
 // WriteSettings writes <home>/agy-settings.json atomically and returns its path.
-// It loads base settings from ~/.gemini/settings.json if present to inherit user preferences
-// (e.g. auth and ide configuration) and adds Conveyor task configuration.
+// It loads base settings from ~/.gemini/antigravity-cli/settings.json if present to inherit user preferences
+// and adds Conveyor task configuration.
 func WriteSettings(home, conveyorBin string) (string, error) {
 	cfg := map[string]any{}
 	if h, err := os.UserHomeDir(); err == nil {
-		basePath := filepath.Join(h, ".gemini", "settings.json")
+		basePath := filepath.Join(h, ".gemini", "antigravity-cli", "settings.json")
 		if b, err := os.ReadFile(basePath); err == nil {
 			_ = json.Unmarshal(b, &cfg)
 		}
 	}
+	delete(cfg, "ide")
 
 	b, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
