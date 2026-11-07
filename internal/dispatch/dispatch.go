@@ -275,9 +275,21 @@ func (d *Dispatcher) reapAgy(ctx context.Context, r store.Run, task store.Task, 
 	}
 	// If the PID is still alive (or within the grace period), leave it.
 	if runner.IsPIDRunning(*r.BgID) {
+		updated := false
+		if (r.SessionID == nil || *r.SessionID == "") && r.BgID != nil {
+			if pid, err := strconv.Atoi(*r.BgID); err == nil {
+				if convID := runner.DetectConversationID(pid); convID != "" {
+					r.SessionID = &convID
+					updated = true
+				}
+			}
+		}
 		// Still running: if the run was "launching", promote to "running".
 		if r.Status == "launching" {
 			r.Status = "running"
+			updated = true
+		}
+		if updated {
 			return store.UpdateRun(d.DB, r)
 		}
 		return nil
@@ -501,11 +513,12 @@ func (d *Dispatcher) start(ctx context.Context, task store.Task, delta []store.C
 		d.unconsume(run) // the run never started
 		return run, err
 	}
-	var bg string
+	var bg, sessionID string
 	if prev != nil {
 		bg, err = bgRunner.Resume(ctx, cwd, deref(prev.BgID), deref(prev.SessionID), settings, run.Prompt, workspace.OtherPaths(task))
+		sessionID = deref(prev.SessionID)
 	} else {
-		bg, err = bgRunner.Launch(ctx, d.spec(task, cwd, settings, run.Prompt))
+		bg, sessionID, err = bgRunner.Launch(ctx, d.spec(task, cwd, settings, run.Prompt))
 	}
 	if err != nil {
 		d.unconsume(run) // the run never started
@@ -516,6 +529,10 @@ func (d *Dispatcher) start(ctx context.Context, task store.Task, delta []store.C
 		return run, err
 	}
 	run.BgID = &bg
+	if sessionID != "" && run.SessionID == nil {
+		run.SessionID = &sessionID
+		run.Status = "running"
+	}
 	if err := store.UpdateRun(d.DB, run); err != nil {
 		return run, err
 	}

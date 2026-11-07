@@ -14,8 +14,8 @@ func NewClaudeRunner() Runner { return &ClaudeRunner{} }
 
 func (c *ClaudeRunner) Name() string { return "claude" }
 
-func (c *ClaudeRunner) Launch(ctx context.Context, s LaunchSpec) (string, error) {
-	return claude.Launch(ctx, claude.LaunchSpec{
+func (c *ClaudeRunner) Launch(ctx context.Context, s LaunchSpec) (string, string, error) {
+	bgID, err := claude.Launch(ctx, claude.LaunchSpec{
 		Cwd:          s.Cwd,
 		AddDirs:      s.AddDirs,
 		Prompt:       s.Prompt,
@@ -26,6 +26,7 @@ func (c *ClaudeRunner) Launch(ctx context.Context, s LaunchSpec) (string, error)
 		MCPConfig:    s.MCPConfig,
 		Bypass:       s.Bypass,
 	})
+	return bgID, "", err
 }
 
 func (c *ClaudeRunner) Resume(ctx context.Context, cwd, bgID, sessionID, settingsPath, prompt string, addDirs []string) (string, error) {
