@@ -1,0 +1,18 @@
+{
+  "version": 3,
+  "name": "Visual Studio Code",
+  "id": "vscode",
+  "description": "Open the task worktree in Visual Studio Code",
+  "check": "code --version",
+  "actions": [
+    {
+      "id": "open",
+      "label": "Visual Studio Code",
+      "places": [
+        "task_sidebar"
+      ],
+      "run": "code ${{ worktree.path }}",
+      "icon": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAMAAABg3Am1AAAB0VBMVEVHcEwAAAAAAAAAAAAAAAAAAAASlt0erPgAM3QACxAABwkAca8Re7YAhcsXmNwAdrEWfrcARGoAAABBs/AAb6wAAAAAa6QABQgAX5MAjdkbp/AXm98Tl9wAAAAWmd0AIDAYmd8ACAgAgMMXjswYgbgAgscgkM8Yf7cXi8kXi80Ymd0Xf7gXmd0AAAAAL0kAhs4AKUQSjtAAcK0AAgYTfrcALEMACREATHQAi9QAjNcUcKMdpOwPhsYdrPcQico0o98AYZYWl90UfbYAdrYYebYAfL0AXY8XgLgUfbYYl98XmN0Ae70Ymt0AWYoYgbkYf7cVld0XfrgzpN4AIjMQb6IXfrYDdrYXmd0Yf7gYmd0osPgWfrcYmdw1pOINk9o+tPMAcKkVl90Yf7cHdrEAaqMYpPAALUM+r+sYmd4Yg8EYgbgFaKAAh88xod0XmN4jkMo6q+gAY5k9sewAiNE0peAAaKEWo+0Tld4zr/EWoOoAYpgNda0HYpYAP2IAUHkAY5kASHEAjNYAjtoAcrAerPgBlbUJd7MBc7EOldwOerUJktwEkNsDdLIosPgCj9o/uPkGkdsAa6UTkdUEebcAaKEUj9EPiswAcKwtsvgJgcIAbajdwEpoAAAAgnRSTlMACwgCGwT9/gEqJvz8yOwEsGEO9ukRyyOa/vZZ+RhsMHYgsi19vAhUOBvRckcVQNA0DewwhkM1a+b4W9uc+6COnuf3mRWlkrrtIMSml4mSpzxlRjz51rXbn5775YmU89qJ88v1wfQ56H1KYaTUd7Tl/afx3GN98OX86XJ6a0ld4VHvMzeUhAAAAhRJREFUSMfd1WdT2zAYB3A5OK6cpKRNGyCsMlpWCy1ltHTvvSd77733tH0kOBASNnxaHNuRTJAHr7jjefec/7+zLFkSABe/eoaGu8bPkO91rW8fbI4OWM3fdvE8Lwgbm9eeW4nD8jVeBjJpgGZ59/dVPgZk8ss4X/peyatAIk2G+Tetah4BodYoX/h3nY8HgkE+tw7lySAtsahA0xZ8wHkiyGRCwfRM1Oa/8uO889JpkBXgpArU5CntTxeO89evEkAjJ5dY9DHa3VzT5Nt/UwRwWQG+YOIdAL9p8s4Uhx0QwL27iuBCTP2VVe1waOkpASTcUN8hfcgunp+kEgqQAUhgb8VEeGtbMxw9AKAjJyaCzCEeji4AMPszh4a15+eTKihgCACg/yEhbvWxdmAG8v/4kQhL82sGpN24s49EiOmGxkBe3p0jH/6QwVID4K5WljcSwUL8n6sL8tDyRpaqkAi2pOkBlHemVC6uIMExX9xk0Kbm7z+gIbX8EAvxUyERvFD/nQqP1NgWNCL88gcJ0O+i+RF1sWwlY1iE0rNIs5Tx1RkdjtrZO/ux4ALEdSiuLPPgzo42SLTIxww8cXJqNogeiCvNBrEGAEzOOQWeGp/12W/jwWOT455+fRKkPjK7IDKafRikPmNtpldQ8YRPBR1PWK+VS8s7W8WJgjBZ7vBYvBW981PTM3PJlPV718OWnSV+LnUMX36vOcV8N5UAAAAASUVORK5CYII="
+    }
+  ]
+}

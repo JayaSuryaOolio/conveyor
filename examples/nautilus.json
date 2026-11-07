@@ -1,0 +1,18 @@
+{
+  "version": 3,
+  "name": "Nautilus",
+  "id": "nautilus",
+  "description": "Open the task worktree in Nautilus",
+  "check": "nautilus --version",
+  "actions": [
+    {
+      "id": "open",
+      "label": "Nautilus",
+      "places": [
+        "task_sidebar"
+      ],
+      "run": "nautilus ${{ worktree.path }}",
+      "icon": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAACXBIWXMAAA7DAAAOwwHHb6hkAAAAGXRFWHRTb2Z0d2FyZQB3d3cuaW5rc2NhcGUub3Jnm+48GgAAAiJJREFUaIHtmD1rFFEUhp+zZmYT1nVRMYSsiJ1YWFhaiGBjYWUj+AN0GyGNYp3KQlAwRTDaCyksLFLYCAq2gvhBGoOaqAkq2VWzmd07cy1ECLPzcWczuzOJ85SXc+e+75zzMh9QUPB/I6aFxx81b++BqwjWIAWh6Xoid99e2HfNpNzYwNH5prOhtK37l2aEAGMj4ny4WBs1qS+ZXngY4gE00Fa6bFo/YlBTBSru+te+RfXJBPAb+BlVFDtCp57emrGqexsiMtjZ96G17qrWr9kXZ69PRdXFdqBTsa+01IY1jPHZioA1WrUbQKSB2Axsemoos+9HA5uuis1CVAeqQKX7rZWaqD6JzEJoBr48OzGzv2Y1SqXhzr4fz9PdH+tqdvLMq8BRCjXgvDzmoNv232ZmiYCMOeWTi4HPhfAM5EI8gAbdDs1CRIjzIP4f4Vp6RujGnQfnRfQ9kPpANSVnWUQ3bk5dXti6GNABPZdD8QCHPU/P+Rd7DIjI5HD0JEek1HNjjV/m8kphIGsKA1lTGMiaHW/A5Js4lkvnTlM/dDDRnpW17zx88nzbZ6fSgaTiAerjyfcEseNHKBUDS8ufk+/5tJLG0elk4P78YzqOk2iPXS5zYHxi22enYiANIf1SZCBrCgNZUxjImsJA1uw+A65Sa1kIMcF11ap/rcfA0uLr6TyacF21+v7dm2n/etDv9RpwBLAHrioZHeAj0MxaSMGu4g/5mZDbPghfcgAAAABJRU5ErkJggg=="
+    }
+  ]
+}
