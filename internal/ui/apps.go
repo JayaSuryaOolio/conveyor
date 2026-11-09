@@ -106,7 +106,7 @@ func (a *App) ConvertApp(name string) error { return a.svc.ConvertApp(name) }
 
 // InstallPreset adds a detected app as a manifest app.
 func (a *App) InstallPreset(x store.App) error {
-	_, err := a.svc.InstallLegacy(x)
+	_, err := a.svc.InstallPreset(x)
 	return err
 }
 

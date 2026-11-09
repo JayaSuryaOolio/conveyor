@@ -94,7 +94,7 @@ func runApp(home string, args []string) error {
 			// presets install as manifest apps, like the UI; --command stays a plain app
 			var err error
 			if preset {
-				_, err = s.InstallLegacy(a)
+				_, err = s.InstallPreset(a)
 			} else {
 				_, err = store.CreateApp(s.DB, a)
 			}

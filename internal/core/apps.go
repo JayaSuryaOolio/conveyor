@@ -137,8 +137,8 @@ func (s *Service) UninstallApp(name string) error {
 	return store.DeleteApp(s.DB, name)
 }
 
-// InstallLegacy installs a plain command app (e.g. a detected preset) as a manifest app.
-func (s *Service) InstallLegacy(a store.App) (store.App, error) {
+// InstallPreset installs a preset (or any plain command app) as a manifest app.
+func (s *Service) InstallPreset(a store.App) (store.App, error) {
 	raw, err := apps.LegacyManifest(a)
 	if err != nil {
 		return store.App{}, err

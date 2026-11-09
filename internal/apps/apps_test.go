@@ -120,7 +120,7 @@ func TestManifestIconFromApp(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
-	// a preset converts with its icon (core's InstallLegacy runs the same LegacyManifest + icon path)
+	// a preset converts with its icon (core's InstallPreset runs the same LegacyManifest + icon path)
 	if _, err := store.CreateApp(db, store.App{Name: "Zed", Command: "open -a Zed {cwd}"}); err != nil {
 		t.Fatal(err)
 	}
