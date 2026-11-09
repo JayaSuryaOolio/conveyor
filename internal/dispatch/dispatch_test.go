@@ -1,6 +1,7 @@
 package dispatch
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"io"
@@ -832,5 +833,24 @@ func TestRunKeepsRunnerAgyToClaude(t *testing.T) {
 	got, _ := store.GetRun(e.db, run.ID)
 	if got.Status != "finished" || got.Summary == nil || *got.Summary != "agy done" { // claude would fail it as vanished
 		t.Fatalf("run %+v", got)
+	}
+}
+
+func TestRunStartsJiraPoller(t *testing.T) {
+	e := setup(t)
+	started := make(chan *core.Service, 1)
+	old := pollJira
+	pollJira = func(_ context.Context, svc *core.Service) { started <- svc }
+	t.Cleanup(func() { pollJira = old })
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go e.d.Run(ctx)
+	select {
+	case svc := <-started:
+		if svc.DB != e.db {
+			t.Fatal("poller got the wrong DB")
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("dispatcher did not start the Jira poller")
 	}
 }
