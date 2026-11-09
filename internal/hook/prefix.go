@@ -43,9 +43,7 @@ func deny(reason string) []byte {
 // missesPrefix reports whether any gh invocation in cmd posts an inspectable body without the prefix.
 func missesPrefix(cmd, prefix string) bool {
 	for _, seg := range tokenize(cmd) {
-		for len(seg) > 0 && strings.Contains(seg[0], "=") && !strings.HasPrefix(seg[0], "-") { // FOO=bar gh ...
-			seg = seg[1:]
-		}
+		seg = stripEnv(seg)
 		if len(seg) == 0 || filepath.Base(seg[0]) != "gh" {
 			continue
 		}
@@ -132,6 +130,14 @@ func apiBody(args []string) (string, bool) {
 		return "", false
 	}
 	return body, true
+}
+
+// stripEnv drops leading VAR=value words (FOO=bar gh ...).
+func stripEnv(seg []string) []string {
+	for len(seg) > 0 && strings.Contains(seg[0], "=") && !strings.HasPrefix(seg[0], "-") {
+		seg = seg[1:]
+	}
+	return seg
 }
 
 // tokenize splits a shell command into segments (at ; & | newline) of quote-aware words.

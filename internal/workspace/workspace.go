@@ -27,17 +27,22 @@ func LearningsFile(home, repo string) string {
 	return filepath.Join(home, "repos", repo, "LEARNINGS.md")
 }
 
-func git(dir string, args ...string) (string, error) {
-	out, err := exec.Command("git", append([]string{"-C", dir}, args...)...).CombinedOutput()
+// Git runs git -C dir args and returns trimmed stdout; a failure carries git's stderr.
+func Git(dir string, args ...string) (string, error) {
+	out, err := exec.Command("git", append([]string{"-C", dir}, args...)...).Output()
 	s := strings.TrimSpace(string(out))
 	if err != nil {
-		return s, fmt.Errorf("git %s: %w: %s", strings.Join(args, " "), err, s)
+		var ee *exec.ExitError
+		if errors.As(err, &ee) {
+			return s, fmt.Errorf("git %s: %w: %s", strings.Join(args, " "), err, strings.TrimSpace(string(ee.Stderr)))
+		}
+		return s, fmt.Errorf("git %s: %w", strings.Join(args, " "), err)
 	}
 	return s, nil
 }
 
 func commonDir(dir string) string {
-	out, err := git(dir, "rev-parse", "--path-format=absolute", "--git-common-dir")
+	out, err := Git(dir, "rev-parse", "--path-format=absolute", "--git-common-dir")
 	if err != nil {
 		return ""
 	}
@@ -124,25 +129,25 @@ func checkAdoptable(repo store.Repo, branch, path string) error {
 	if commonDir(path) == "" || commonDir(path) != commonDir(repo.Path) {
 		return fmt.Errorf("%s exists but is not a worktree of %s", path, repo.Name)
 	}
-	if b, _ := git(path, "rev-parse", "--abbrev-ref", "HEAD"); b != branch {
+	if b, _ := Git(path, "rev-parse", "--abbrev-ref", "HEAD"); b != branch {
 		return fmt.Errorf("%s is on branch %q, want %q", path, b, branch)
 	}
 	return nil
 }
 
 func addWorktree(repo store.Repo, branch, path string) error {
-	if _, err := git(repo.Path, "rev-parse", "--verify", "--quiet", "refs/heads/"+branch); err == nil {
-		_, err = git(repo.Path, "worktree", "add", path, branch)
+	if _, err := Git(repo.Path, "rev-parse", "--verify", "--quiet", "refs/heads/"+branch); err == nil {
+		_, err = Git(repo.Path, "worktree", "add", path, branch)
 		return err
 	}
-	if _, err := git(repo.Path, "fetch", "origin", repo.DefaultBranch); err != nil {
+	if _, err := Git(repo.Path, "fetch", "origin", repo.DefaultBranch); err != nil {
 		log.Printf("workspace: %v", err)
 	}
 	base := repo.DefaultBranch
-	if _, err := git(repo.Path, "rev-parse", "--verify", "--quiet", "refs/remotes/origin/"+base); err == nil {
+	if _, err := Git(repo.Path, "rev-parse", "--verify", "--quiet", "refs/remotes/origin/"+base); err == nil {
 		base = "origin/" + base
 	}
-	_, err := git(repo.Path, "worktree", "add", path, "-b", branch, base)
+	_, err := Git(repo.Path, "worktree", "add", path, "-b", branch, base)
 	return err
 }
 
@@ -187,7 +192,7 @@ func Remove(db *sql.DB, home string, task store.Task, force bool) error {
 			if _, err := os.Stat(*tr.WorktreePath); err != nil {
 				continue
 			}
-			out, err := git(*tr.WorktreePath, "status", "--porcelain")
+			out, err := Git(*tr.WorktreePath, "status", "--porcelain")
 			if err != nil {
 				return err
 			}
@@ -209,7 +214,7 @@ func Remove(db *sql.DB, home string, task store.Task, force bool) error {
 			if force {
 				args = append(args, "--force")
 			}
-			if _, err := git(repo.Path, append(args, *tr.WorktreePath)...); err != nil {
+			if _, err := Git(repo.Path, append(args, *tr.WorktreePath)...); err != nil {
 				return err
 			}
 		}

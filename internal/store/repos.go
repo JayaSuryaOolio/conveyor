@@ -108,3 +108,16 @@ func RemoveTaskRepo(db *sql.DB, taskID, repoID int64) error {
 		return nil
 	})
 }
+
+// RepoMap maps each repo's id to field(repo), e.g. its path or default branch.
+func RepoMap(db *sql.DB, field func(Repo) string) (map[int64]string, error) {
+	repos, err := ListRepos(db)
+	if err != nil {
+		return nil, err
+	}
+	m := make(map[int64]string, len(repos))
+	for _, r := range repos {
+		m[r.ID] = field(r)
+	}
+	return m, nil
+}

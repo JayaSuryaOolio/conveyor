@@ -64,7 +64,7 @@ func TestEnsureIdempotent(t *testing.T) {
 		if r.WorktreePath == nil || *r.WorktreePath != filepath.Join(Dir(home, tk.Key), r.RepoName) {
 			t.Fatalf("bad path %v", r.WorktreePath)
 		}
-		br, _ := git(*r.WorktreePath, "rev-parse", "--abbrev-ref", "HEAD")
+		br, _ := Git(*r.WorktreePath, "rev-parse", "--abbrev-ref", "HEAD")
 		if br != r.Branch {
 			t.Fatalf("branch %q want %q", br, r.Branch)
 		}

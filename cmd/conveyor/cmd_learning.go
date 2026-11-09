@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"strconv"
@@ -18,7 +19,7 @@ func init() {
 func runLearning(home string, args []string) error {
 	const usage = "usage: conveyor learning list [--status s] | accept ID [--target f] | reject ID | edit ID <body> | apply [--repo r]"
 	if len(args) == 0 {
-		return fmt.Errorf(usage)
+		return errors.New(usage)
 	}
 	fs := flag.NewFlagSet("learning "+args[0], flag.ContinueOnError)
 	status := fs.String("status", "", "list: filter by status")
@@ -30,7 +31,7 @@ func runLearning(home string, args []string) error {
 	}
 	id := func(n int) (int64, error) {
 		if len(pos) != n {
-			return 0, fmt.Errorf(usage)
+			return 0, errors.New(usage)
 		}
 		return strconv.ParseInt(pos[0], 10, 64)
 	}

@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
@@ -88,18 +87,7 @@ func parsePR(url string) (owner, repo string, n int, err error) {
 }
 
 func api(ctx context.Context, dir string, args ...string) ([]byte, error) {
-	bin, err := exec.LookPath("gh")
-	if err != nil {
-		return nil, ErrNotFound
-	}
-	cmd := exec.CommandContext(ctx, bin, append([]string{"api"}, args...)...)
-	cmd.Dir = dir
-	out, err := cmd.Output()
-	var ee *exec.ExitError
-	if errors.As(err, &ee) {
-		return nil, fmt.Errorf("gh api %s: %w: %s", args[0], err, ee.Stderr)
-	}
-	return out, err
+	return run(ctx, dir, "gh api "+args[0], append([]string{"api"}, args...)...)
 }
 
 const threadsQuery = `query($o:String!,$r:String!,$n:Int!){repository(owner:$o,name:$r){pullRequest(number:$n){
@@ -116,13 +104,9 @@ func ReviewCheck(ctx context.Context, svc *core.Service, key string, step int) (
 		return "", err
 	}
 	store.Audit("epic.review_check", "task_id", t.ID, "step", step)
-	repos, err := store.ListRepos(svc.DB)
+	paths, err := store.RepoMap(svc.DB, func(r store.Repo) string { return r.Path })
 	if err != nil {
 		return "", err
-	}
-	paths := map[int64]string{}
-	for _, r := range repos {
-		paths[r.ID] = r.Path
 	}
 	var body strings.Builder
 	var errs []error

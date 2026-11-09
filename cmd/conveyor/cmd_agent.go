@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"os"
 	"text/tabwriter"
 
 	"github.com/JayaSuryaOolio/conveyor/internal/core"
@@ -76,11 +75,9 @@ func runAgent(home string, args []string) error {
 		}
 		p := *prompt
 		if *promptFile != "" {
-			b, err := os.ReadFile(*promptFile)
-			if err != nil {
+			if p, err = readText(*promptFile); err != nil {
 				return fmt.Errorf("read prompt file: %w", err)
 			}
-			p = string(b)
 		}
 		scope := *repo
 		if scope == "" {

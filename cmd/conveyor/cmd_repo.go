@@ -2,8 +2,6 @@ package main
 
 import (
 	"fmt"
-	"io"
-	"os"
 	"text/tabwriter"
 
 	"flag"
@@ -76,11 +74,10 @@ func runRepo(home string, args []string) error {
 			}
 			script := args[2]
 			if script == "-" {
-				b, err := io.ReadAll(os.Stdin)
-				if err != nil {
+				var err error
+				if script, err = readText("-"); err != nil {
 					return err
 				}
-				script = string(b)
 			}
 			if err := store.SetRepoSetupScript(s.DB, args[1], script); err != nil {
 				return err

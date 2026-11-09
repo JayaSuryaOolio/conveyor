@@ -14,7 +14,6 @@ import {JiraSource} from './jiraSource'
 import {TaskPage} from './views'
 
 const STAGES = ['chart', 'decide', 'spec', 'build', 'verify', 'done']
-const KINDS = ['grilling', 'prototype', 'research', 'build']
 const KIND_COLOR: Record<string, string> = {grilling: 'orange', prototype: 'grape', research: 'teal', build: 'blue'}
 const NO_RUN = new Set(['running', 'done'])
 
