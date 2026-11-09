@@ -173,6 +173,35 @@ func (a *App) AppVersion() string { return Version }
 // ShellPATHError says why the login shell's PATH could not be loaded at startup; empty on success.
 func (a *App) ShellPATHError() string { return a.pathErr }
 
+// Requirement is an external tool Conveyor shells out to and whether it is on PATH.
+type Requirement struct {
+	Name     string `json:"name"`
+	Purpose  string `json:"purpose"`
+	Path     string `json:"path"`
+	Found    bool   `json:"found"`
+	Optional bool   `json:"optional"`
+}
+
+// Requirements checks each external tool on the app's PATH (after the login-shell PATH merge).
+func (a *App) Requirements() []Requirement {
+	reqs := []Requirement{
+		{Name: "git", Purpose: "worktrees, branches and diffs"},
+		{Name: "gh", Purpose: "pull requests and webhooks"},
+		{Name: "conveyor", Purpose: "CLI that agent hooks call back"},
+	}
+	for _, r := range runner.KnownRunners() {
+		reqs = append(reqs, Requirement{Name: r.Command, Purpose: r.Name + " runner"})
+	}
+	reqs = append(reqs,
+		Requirement{Name: "acli", Purpose: "Jira sync", Optional: true},
+		Requirement{Name: "graft", Purpose: "run apps from a worktree", Optional: true})
+	for i := range reqs {
+		p, err := exec.LookPath(reqs[i].Name)
+		reqs[i].Path, reqs[i].Found = p, err == nil
+	}
+	return reqs
+}
+
 // DispatcherState says whether this app is dispatching or only showing the UI.
 func (a *App) DispatcherState() string {
 	if a.dispatcher.Load() {
