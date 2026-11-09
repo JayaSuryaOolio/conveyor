@@ -9,6 +9,12 @@
 // For session resume, agy uses `--conversation <id>` where the id is the
 // conversation UUID. agy accepts session-specific configuration via the
 // `--settings <settingsPath>` flag, mirroring the claude runner.
+//
+// agy has no hooks, so Conveyor installs none for it. The dispatcher's reaper
+// stands in for the Claude hooks: it promotes the run on PID liveness, reads
+// the conversation id from the files the process has open, and on exit runs
+// the Stop handling over the log's <conveyor> block. Not covered: live
+// per-tool activity and permission/idle notifications mid-run.
 package agy
 
 import (
@@ -16,7 +22,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -24,7 +29,6 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
-	"time"
 )
 
 var (
@@ -97,7 +101,7 @@ func Launch(conveyorHome string, s LaunchSpec) (bgID string, conversationID stri
 	if err != nil {
 		return "", "", err
 	}
-	return strconv.Itoa(pid), DetectConversationID(pid), nil
+	return strconv.Itoa(pid), "", nil // the reaper fills the conversation id once agy opens it
 }
 
 // Resume stops bgID (errors ignored) and continues conversationID with a new
@@ -140,48 +144,42 @@ func start(conveyorHome string, s LaunchSpec, mode int, args []string) (int, err
 	return cmd.Process.Pid, nil
 }
 
-// DetectConversationID polls for the agy conversation UUID by inspecting the process's open file descriptors.
+// DetectConversationID returns the conversation UUID of the agy process pid, read from the
+// conversations/<id>.db or presence/<id>.lock file it has open, or "" if it has none open yet.
+// It checks once without waiting: the reaper calls it again each tick until it finds one.
 func DetectConversationID(pid int) string {
-	convRe := regexp.MustCompile(`[0-9a-f-]{36}`)
-	fdDir := fmt.Sprintf("/proc/%d/fd", pid)
-	for i := 0; i < 20; i++ {
-		time.Sleep(50 * time.Millisecond)
-		entries, err := os.ReadDir(fdDir)
-		if err == nil {
-			for _, e := range entries {
-				target, err := os.Readlink(filepath.Join(fdDir, e.Name()))
-				if err != nil {
-					continue
-				}
-				if (strings.Contains(target, "conversations") && strings.HasSuffix(target, ".db")) ||
-					(strings.Contains(target, "presence") && strings.HasSuffix(target, ".lock")) {
-					if m := convRe.FindString(target); m != "" {
-						return m
-					}
-				}
-			}
-		}
-	}
-	// Fallback: check ~/.gemini/antigravity-cli/presence for recent locks
-	if h, err := os.UserHomeDir(); err == nil {
-		presenceDir := filepath.Join(h, ".gemini", "antigravity-cli", "presence")
-		if files, err := os.ReadDir(presenceDir); err == nil {
-			var newest string
-			var newestTime time.Time
-			for _, f := range files {
-				if strings.HasSuffix(f.Name(), ".lock") {
-					if info, err := f.Info(); err == nil && info.ModTime().After(newestTime) {
-						newestTime = info.ModTime()
-						newest = strings.TrimSuffix(f.Name(), ".lock")
-					}
-				}
-			}
-			if time.Since(newestTime) < 10*time.Second {
-				return newest
+	for _, f := range openFiles(pid) {
+		if (strings.Contains(f, "conversations") && strings.HasSuffix(f, ".db")) ||
+			(strings.Contains(f, "presence") && strings.HasSuffix(f, ".lock")) {
+			if m := convRe.FindString(filepath.Base(f)); m != "" {
+				return m
 			}
 		}
 	}
 	return ""
+}
+
+var convRe = regexp.MustCompile(`[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`)
+
+// openFiles lists the paths process pid has open: /proc on Linux, lsof elsewhere (macOS).
+func openFiles(pid int) []string {
+	var out []string
+	fdDir := fmt.Sprintf("/proc/%d/fd", pid)
+	if entries, err := os.ReadDir(fdDir); err == nil {
+		for _, e := range entries {
+			if t, err := os.Readlink(filepath.Join(fdDir, e.Name())); err == nil {
+				out = append(out, t)
+			}
+		}
+		return out
+	}
+	b, _ := exec.Command("lsof", "-n", "-P", "-Fn", "-p", strconv.Itoa(pid)).Output() // exits 1 on partial results; use what it printed
+	for _, l := range strings.Split(string(b), "\n") {
+		if strings.HasPrefix(l, "n") {
+			out = append(out, l[1:])
+		}
+	}
+	return out
 }
 
 // bgLogPath returns the log file path for a bg agy run.
@@ -192,16 +190,6 @@ func bgLogPath(home, name string) string {
 // BgLogPath exports bgLogPath for use by the runner package.
 func BgLogPath(home, name string) string {
 	return bgLogPath(home, name)
-}
-
-var conversationRe = regexp.MustCompile(`(?i)conversation(?:\s+id)?:\s*([0-9a-f-]{36})`)
-
-// ExtractConversationID parses the conversation UUID from agy print output.
-func ExtractConversationID(out string) string {
-	if m := conversationRe.FindStringSubmatch(out); m != nil {
-		return m[1]
-	}
-	return ""
 }
 
 // IsPIDRunning reports whether the process with the given PID is still alive.
@@ -320,6 +308,3 @@ func writeAtomic(path string, b []byte, mode os.FileMode) error {
 	}
 	return err
 }
-
-// EnsureReader is a helper for test mocks.
-var _ io.Reader = (*os.File)(nil)

@@ -49,12 +49,6 @@ func (a *AgyRunner) Stop(ctx context.Context, bgID string) error {
 
 func (a *AgyRunner) Remove(_ context.Context, _ string) error { return nil }
 
-func (a *AgyRunner) Agents(_ context.Context) ([]Agent, error) {
-	// agy has no session-list command; return empty. The dispatcher uses
-	// IsPIDRunning for agy reaping (see dispatch/dispatch.go).
-	return nil, nil
-}
-
 func (a *AgyRunner) AttachCommand(bgID string) string {
 	return agy.AttachCommand(bgID)
 }
@@ -80,7 +74,7 @@ func IsPIDRunning(bgID string) bool {
 	return agy.IsPIDRunning(pid)
 }
 
-// DetectConversationID polls for the agy conversation UUID by inspecting the process's open file descriptors.
+// DetectConversationID returns the agy conversation UUID process pid has open, or "".
 func DetectConversationID(pid int) string {
 	return agy.DetectConversationID(pid)
 }

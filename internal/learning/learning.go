@@ -17,11 +17,6 @@ import (
 // DefaultTarget is the file an accepted repo-file learning goes to when Apply runs.
 const DefaultTarget = "CLAUDE.md"
 
-// DefaultTargetForRunner returns the instruction filename for a runner.
-func DefaultTargetForRunner(r string) string {
-	return runner.InstructionFileForRunner(r)
-}
-
 // TargetForRepo determines the target documentation file for a repo based on disk files
 // and the configured runner.
 func TargetForRepo(db *sql.DB, repoID *int64) string {
@@ -39,7 +34,7 @@ func TargetForRepo(db *sql.DB, repoID *int64) string {
 		}
 	}
 	r := store.GetSetting(db, "default_runner")
-	return DefaultTargetForRunner(r)
+	return runner.InstructionFileForRunner(r)
 }
 
 func fileExists(p string) bool {

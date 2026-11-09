@@ -198,14 +198,11 @@ func Build(db *sql.DB, task store.Task) (string, error) {
 		}
 	}
 	fmt.Fprintf(&b, "\n## Acceptance criteria\n\n%s\n", criteria(runs, "see description"))
-	if w := workflows(db, task); w != "" {
-		runnerName := authorityRunner(db, task)
-		runnerTitle := "Claude Code"
-		doc := "CLAUDE.md"
-		if runnerName == "agy" {
-			runnerTitle = "Antigravity"
-			doc = "AGENTS.md"
-		}
+	runnerTitle, doc := "Claude Code", "CLAUDE.md"
+	if authorityRunner(db, task) == "agy" {
+		runnerTitle, doc = "Antigravity", "AGENTS.md"
+	}
+	if w := workflows(db, task, doc); w != "" {
 		fmt.Fprintf(&b, "\n## Other repos' context\n\n%s loaded only the primary repo's %s, skills, commands and agents. For these repos, read the files named here (`.claude/commands/<name>.md`, `.claude/skills/<name>/SKILL.md`, `.claude/agents/<name>.md`) when the work touches them.\n\n%s", runnerTitle, doc, w)
 	}
 	history(&b, "##", runs, comments)

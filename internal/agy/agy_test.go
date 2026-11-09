@@ -10,19 +10,26 @@ import (
 	"testing"
 )
 
-func TestExtractConversationID(t *testing.T) {
-	out := `Some header
-Conversation ID: 12345678-1234-1234-1234-123456789abc
-Model: gemini-pro`
-	if got := ExtractConversationID(out); got != "12345678-1234-1234-1234-123456789abc" {
-		t.Errorf("got %q", got)
+func TestDetectConversationID(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "conversations")
+	os.MkdirAll(dir, 0o755)
+	id := "12345678-1234-1234-1234-123456789abc"
+	f := filepath.Join(dir, id+".db")
+	os.WriteFile(f, nil, 0o644)
+	cmd := exec.Command("sh", "-c", "exec 3<\"$0\"; sleep 30", f)
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
 	}
-	out2 := "conversation: abcdef01-2345-6789-abcd-ef0123456789"
-	if got := ExtractConversationID(out2); got != "abcdef01-2345-6789-abcd-ef0123456789" {
-		t.Errorf("got %q", got)
+	t.Cleanup(func() { cmd.Process.Kill(); cmd.Wait() })
+	var got string
+	for i := 0; i < 50 && got == ""; i++ { // the shell opens the file just after it starts
+		got = DetectConversationID(cmd.Process.Pid)
 	}
-	if got := ExtractConversationID("no conversation here"); got != "" {
-		t.Errorf("expected empty, got %q", got)
+	if got != id {
+		t.Errorf("got %q, want %q", got, id)
+	}
+	if got := DetectConversationID(os.Getpid()); got != "" {
+		t.Errorf("expected empty for a process without agy files, got %q", got)
 	}
 }
 
