@@ -14,12 +14,9 @@ var pathRe = regexp.MustCompile(`__CONVEYOR_PATH__(.*?)__CONVEYOR_PATH__`)
 
 // loadShellPATH adds the login shell's PATH entries to this process's PATH. An app opened from
 // the Dock or Finder gets only /usr/bin:/bin:/usr/sbin:/sbin, so `claude`, `agy`, `gh` and `conveyor`
-// would not be found. It is a no-op when `claude` or `agy` is already on PATH.
+// would not be found. It is a no-op when `claude` is already on PATH.
 func loadShellPATH() {
 	if _, err := exec.LookPath("claude"); err == nil {
-		return
-	}
-	if _, err := exec.LookPath("agy"); err == nil {
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

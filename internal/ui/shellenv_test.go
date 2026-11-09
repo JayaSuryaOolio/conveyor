@@ -32,3 +32,24 @@ func TestLoadShellPATH(t *testing.T) {
 		t.Fatalf("claude not found after loadShellPATH: %v %q", err, os.Getenv("PATH"))
 	}
 }
+
+// agy on the inherited PATH must not stop the shell PATH from loading: claude, gh etc. live there.
+func TestLoadShellPATHWithAgy(t *testing.T) {
+	dir := t.TempDir()
+	bin, agyDir := filepath.Join(dir, "bin"), filepath.Join(dir, "agy")
+	os.Mkdir(bin, 0o755)
+	os.Mkdir(agyDir, 0o755)
+	os.WriteFile(filepath.Join(bin, "claude"), []byte("#!/bin/sh\n"), 0o755)
+	os.WriteFile(filepath.Join(agyDir, "agy"), []byte("#!/bin/sh\n"), 0o755)
+	sh := filepath.Join(dir, "fakesh")
+	os.WriteFile(sh, []byte("#!/bin/sh\nprintf '__CONVEYOR_PATH__%s:/usr/bin__CONVEYOR_PATH__' '"+bin+"'\n"), 0o755)
+	t.Setenv("SHELL", sh)
+	t.Setenv("PATH", agyDir+":/usr/bin:/bin")
+	if _, err := exec.LookPath("claude"); err == nil {
+		t.Skip("claude already on the minimal PATH")
+	}
+	loadShellPATH()
+	if p, err := exec.LookPath("claude"); err != nil || !strings.HasPrefix(p, bin) {
+		t.Fatalf("claude not found after loadShellPATH with agy on PATH: %v %q", err, os.Getenv("PATH"))
+	}
+}
