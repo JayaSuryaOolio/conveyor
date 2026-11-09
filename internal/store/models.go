@@ -21,14 +21,14 @@ type Repo struct {
 
 // Task is a kanban task. Repos is filled by GetTask, GetTaskByKey and ListTasks.
 type Task struct {
-	ID                  int64   `json:"id"`
-	Key                 string  `json:"key"`
-	Title               string  `json:"title"`
-	Description         string  `json:"description"`
-	Status              Status  `json:"status"`
-	Priority            int     `json:"priority"`
-	Model               *string `json:"model"`
-	Agent               *string `json:"agent"`
+	ID          int64   `json:"id"`
+	Key         string  `json:"key"`
+	Title       string  `json:"title"`
+	Description string  `json:"description"`
+	Status      Status  `json:"status"`
+	Priority    int     `json:"priority"`
+	Model       *string `json:"model"`
+	Agent       *string `json:"agent"`
 	// Runner overrides the default_runner setting for this task ("claude" or "agy"; nil = default).
 	Runner              *string `json:"runner"`
 	Source              string  `json:"source"`
