@@ -107,6 +107,17 @@ func TestUpdateTaskStatus(t *testing.T) {
 	if len(evs) != 1 || evs[0].Kind != "status_changed" {
 		t.Fatalf("events = %+v", evs)
 	}
+	ses, err := StatusEventsAfter(db, 0)
+	if err != nil || len(ses) != 1 || ses[0].TaskID != tk.ID || ses[0].To != StatusTodo || ses[0].Actor != ActorHuman || ses[0].At.IsZero() {
+		t.Fatalf("status events = %+v %v", ses, err)
+	}
+	if later, _ := HasLaterStatusEvent(db, tk.ID, ses[0].ID); later {
+		t.Fatal("no later status event yet")
+	}
+	UpdateTaskStatus(db, tk.ID, StatusBacklog, ActorHuman)
+	if later, _ := HasLaterStatusEvent(db, tk.ID, ses[0].ID); !later {
+		t.Fatal("later status event not seen")
+	}
 }
 
 func TestCreateTaskKeysAndPrimary(t *testing.T) {

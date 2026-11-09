@@ -201,7 +201,7 @@ func UpdateTaskStatus(db *sql.DB, id int64, to Status, actor Actor) (Task, error
 				return fmt.Errorf("delete task automations: %w", err)
 			}
 		}
-		return recordEvent(tx, id, "status_changed", fmt.Sprintf("%s -> %s (%s)", from, to, actor))
+		return recordEvent(tx, id, "status_changed", fmt.Sprintf(statusDetail, from, to, actor))
 	})
 	if err != nil {
 		return Task{}, err
