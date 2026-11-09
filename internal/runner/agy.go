@@ -19,8 +19,19 @@ func NewAgyRunner(home string) Runner { return &AgyRunner{ConveyorHome: home} }
 
 func (a *AgyRunner) Name() string { return "agy" }
 
-func (a *AgyRunner) Launch(ctx context.Context, s LaunchSpec) (string, string, error) {
-	bgID, convID, err := agy.Launch(ctx, a.ConveyorHome, agy.LaunchSpec{
+// Launch ignores ctx: the agy process must outlive Conveyor.
+func (a *AgyRunner) Launch(_ context.Context, s LaunchSpec) (string, string, error) {
+	return agy.Launch(a.ConveyorHome, toAgy(s))
+}
+
+// Resume ignores ctx: the agy process must outlive Conveyor.
+func (a *AgyRunner) Resume(_ context.Context, bgID, sessionID string, s LaunchSpec) (string, error) {
+	return agy.Resume(a.ConveyorHome, bgID, sessionID, toAgy(s))
+}
+
+// toAgy maps s to agy's spec; Name is the task key, which names the log the reaper reads.
+func toAgy(s LaunchSpec) agy.LaunchSpec {
+	return agy.LaunchSpec{
 		Cwd:          s.Cwd,
 		AddDirs:      s.AddDirs,
 		Prompt:       s.Prompt,
@@ -29,22 +40,7 @@ func (a *AgyRunner) Launch(ctx context.Context, s LaunchSpec) (string, string, e
 		Model:        s.Model,
 		Agent:        s.Agent,
 		Bypass:       s.Bypass,
-	})
-	return bgID, convID, err
-}
-
-func (a *AgyRunner) Resume(ctx context.Context, cwd, bgID, sessionID, settingsPath, prompt string, addDirs []string) (string, error) {
-	return agy.Resume(ctx, a.ConveyorHome, cwd, bgID, sessionID, settingsPath, prompt, addDirs, agy.LaunchSpec{
-		Cwd:          cwd,
-		Name:         taskKeyFromBgID(bgID),
-		SettingsPath: settingsPath,
-		Bypass:       true,
-	})
-}
-
-// taskKeyFromBgID extracts the task key from a bg log path — best-effort fallback.
-func taskKeyFromBgID(bgID string) string {
-	return "task-" + bgID
+	}
 }
 
 func (a *AgyRunner) Stop(ctx context.Context, bgID string) error {

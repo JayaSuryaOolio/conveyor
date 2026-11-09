@@ -44,3 +44,11 @@ func TestBgLogPath(t *testing.T) {
 		t.Errorf("got %s, want %s", got, want)
 	}
 }
+
+// The agy log is named by Name; it must be the task key the reaper reads, on launch and resume.
+func TestToAgyKeepsTaskKeyModelAgent(t *testing.T) {
+	a := toAgy(LaunchSpec{TaskKey: "CV-1", Model: "m", Agent: "sse"})
+	if a.Name != "CV-1" || a.Model != "m" || a.Agent != "sse" {
+		t.Errorf("got %+v", a)
+	}
+}

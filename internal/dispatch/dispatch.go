@@ -514,11 +514,12 @@ func (d *Dispatcher) start(ctx context.Context, task store.Task, delta []store.C
 		return run, err
 	}
 	var bg, sessionID string
+	spec := d.spec(task, cwd, settings, run.Prompt)
 	if prev != nil {
-		bg, err = bgRunner.Resume(ctx, cwd, deref(prev.BgID), deref(prev.SessionID), settings, run.Prompt, workspace.OtherPaths(task))
+		bg, err = bgRunner.Resume(ctx, deref(prev.BgID), deref(prev.SessionID), spec)
 		sessionID = deref(prev.SessionID)
 	} else {
-		bg, sessionID, err = bgRunner.Launch(ctx, d.spec(task, cwd, settings, run.Prompt))
+		bg, sessionID, err = bgRunner.Launch(ctx, spec)
 	}
 	if err != nil {
 		d.unconsume(run) // the run never started

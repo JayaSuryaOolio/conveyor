@@ -1,8 +1,8 @@
 // Package agy wraps the `agy` CLI (Antigravity) as an agent runner backend.
 // Because agy does not have a built-in background-session mode analogous to
 // `claude --bg`, Conveyor runs `agy --print --dangerously-skip-permissions`
-// as a regular OS process detached from the dispatcher's lifetime (via
-// os.StartProcess / exec.Cmd with SysProcAttr Setpgid). The OS PID (as a
+// as a regular OS process detached from the dispatcher's lifetime (own
+// session via SysProcAttr Setsid, no context). The OS PID (as a
 // decimal string) serves as the bg-id. Reaping is done by checking whether
 // that PID is still running.
 //
@@ -34,7 +34,7 @@ var (
 	ErrUntrusted = errors.New("workspace not trusted by Antigravity")
 )
 
-var execCommand = exec.CommandContext // swapped in tests
+var execCommand = exec.Command // swapped in tests
 
 // LaunchSpec describes a fresh agy background launch.
 type LaunchSpec struct {
@@ -91,33 +91,53 @@ func ensureAgyAgentAvailable(name string) {
 }
 
 // Launch starts `agy --print ...` as a detached OS process, writing its output to
-// a log file under conveyorHome, and returns the PID as the bg-id string.
-func Launch(ctx context.Context, conveyorHome string, s LaunchSpec) (bgID string, conversationID string, err error) {
+// <conveyorHome>/agy-logs/<Name>.log, and returns the PID as the bg-id string.
+func Launch(conveyorHome string, s LaunchSpec) (bgID string, conversationID string, err error) {
+	pid, err := start(conveyorHome, s, os.O_TRUNC, s.args())
+	if err != nil {
+		return "", "", err
+	}
+	return strconv.Itoa(pid), DetectConversationID(pid), nil
+}
+
+// Resume stops bgID (errors ignored) and continues conversationID with a new
+// detached `agy --print` that appends to the same <Name>.log the reaper reads,
+// keeping the task's model and agent.
+func Resume(conveyorHome, bgID, conversationID string, s LaunchSpec) (string, error) {
+	_ = Stop(context.Background(), bgID)
+	pid, err := start(conveyorHome, s, os.O_APPEND, append([]string{"--conversation", conversationID}, s.args()...))
+	if err != nil {
+		return "", err
+	}
+	return strconv.Itoa(pid), nil
+}
+
+// start runs agy in its own session with no context, so quitting Conveyor
+// does not kill it (a claude --bg session survives the same way).
+func start(conveyorHome string, s LaunchSpec, mode int, args []string) (int, error) {
 	logPath := bgLogPath(conveyorHome, s.Name)
 	if err := os.MkdirAll(filepath.Dir(logPath), 0o755); err != nil {
-		return "", "", fmt.Errorf("agy log dir: %w", err)
+		return 0, fmt.Errorf("agy log dir: %w", err)
 	}
-	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
+	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|mode, 0o644)
 	if err != nil {
-		return "", "", fmt.Errorf("agy log file: %w", err)
+		return 0, fmt.Errorf("agy log file: %w", err)
 	}
 	defer logFile.Close()
 
-	cmd := execCommand(ctx, "agy", s.args()...)
+	cmd := execCommand("agy", args...)
 	cmd.Dir = s.Cwd
 	cmd.Stdout = logFile
 	cmd.Stderr = logFile
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true} // detach from our process group
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true} // own session and process group
 	if err := cmd.Start(); err != nil {
 		if errors.Is(err, exec.ErrNotFound) {
-			return "", "", ErrNotFound
+			return 0, ErrNotFound
 		}
-		return "", "", fmt.Errorf("agy launch: %w", err)
+		return 0, fmt.Errorf("agy start: %w", err)
 	}
-	pid := strconv.Itoa(cmd.Process.Pid)
-	go func() { _ = cmd.Wait() }()
-	convID := DetectConversationID(cmd.Process.Pid)
-	return pid, convID, nil
+	go func() { _ = cmd.Wait() }() // reap while Conveyor runs
+	return cmd.Process.Pid, nil
 }
 
 // DetectConversationID polls for the agy conversation UUID by inspecting the process's open file descriptors.
@@ -299,55 +319,6 @@ func writeAtomic(path string, b []byte, mode os.FileMode) error {
 		os.Remove(f.Name())
 	}
 	return err
-}
-
-// Resume resumes an agy conversation (stops bgID first if running, then starts a new
-// --print process with --conversation <sessionID> and --settings <settingsPath>).
-func Resume(ctx context.Context, conveyorHome, cwd, bgID, conversationID, settingsPath, prompt string, addDirs []string, s LaunchSpec) (string, error) {
-	_ = Stop(ctx, bgID)
-
-	logPath := bgLogPath(conveyorHome, s.Name)
-	if err := os.MkdirAll(filepath.Dir(logPath), 0o755); err != nil {
-		return "", fmt.Errorf("agy log dir: %w", err)
-	}
-	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
-	if err != nil {
-		return "", fmt.Errorf("agy log file: %w", err)
-	}
-	defer logFile.Close()
-
-	args := []string{"--print", prompt, "--conversation", conversationID, "--output-format", "text"}
-	if settingsPath != "" {
-		args = append(args, "--settings", settingsPath)
-	}
-	if s.Bypass {
-		args = append(args, "--dangerously-skip-permissions")
-	}
-	if s.Model != "" {
-		args = append(args, "--model", s.Model)
-	}
-	if s.Agent != "" {
-		ensureAgyAgentAvailable(s.Agent)
-		args = append(args, "--agent", s.Agent)
-	}
-	for _, d := range addDirs {
-		args = append(args, "--add-dir", d)
-	}
-
-	cmd := execCommand(ctx, "agy", args...)
-	cmd.Dir = cwd
-	cmd.Stdout = logFile
-	cmd.Stderr = logFile
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	if err := cmd.Start(); err != nil {
-		if errors.Is(err, exec.ErrNotFound) {
-			return "", ErrNotFound
-		}
-		return "", fmt.Errorf("agy resume: %w", err)
-	}
-	pid := strconv.Itoa(cmd.Process.Pid)
-	go func() { _ = cmd.Wait() }()
-	return pid, nil
 }
 
 // EnsureReader is a helper for test mocks.
