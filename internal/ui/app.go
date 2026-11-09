@@ -362,9 +362,6 @@ func (a *App) SetTaskSkills(key string, skills []string) error {
 
 // AddComment posts a human comment; after ("", "ask" or "note") applies once a PR of the task is merged.
 func (a *App) AddComment(key, body, after string) error {
-	if body == "" {
-		return fmt.Errorf("comment is empty")
-	}
 	_, err := a.svc.AddComment(key, store.AuthorHuman, body, core.AfterMerge(after))
 	return err
 }

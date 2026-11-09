@@ -383,3 +383,14 @@ func TestAddRemoveTaskRepo(t *testing.T) {
 		t.Fatalf("%+v", tk.Repos)
 	}
 }
+
+func TestAddCommentRejectsEmpty(t *testing.T) {
+	s := newSvc(t)
+	tk, err := s.CreateTask(NewTaskInput{Title: "t", Repos: []string{"a"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.AddCommentVia(tk.Key, store.AuthorHuman, "slack", "  \n", FollowUp); err == nil {
+		t.Fatal("empty comment accepted")
+	}
+}

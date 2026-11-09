@@ -338,9 +338,6 @@ func taskComment(s *core.Service, args []string) error {
 		}
 		body = strings.TrimSpace(string(b))
 	}
-	if body == "" {
-		return fmt.Errorf("comment is empty")
-	}
 	_, err = s.AddComment(args[0], store.AuthorHuman, body, after)
 	return err
 }
