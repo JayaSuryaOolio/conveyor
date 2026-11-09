@@ -41,7 +41,7 @@ func runDaemon(home string, args []string) error {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
-	d := &dispatch.Dispatcher{DB: db, Home: home, ConveyorBin: bin, Log: log.New(w, "dispatcher: ", log.LstdFlags)}
+	d := &dispatch.Dispatcher{Svc: &core.Service{DB: db, Home: home, Bin: bin}, Log: log.New(w, "dispatcher: ", log.LstdFlags)}
 	d.Log.Printf("started (daemon)")
 	err = d.Run(ctx)
 	if errors.Is(err, context.Canceled) {

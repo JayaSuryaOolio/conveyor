@@ -3,7 +3,6 @@ package dispatch
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"log"
@@ -38,11 +37,9 @@ const (
 
 // Dispatcher launches and supervises auto runs. Run it from one process at a time (see Lock).
 type Dispatcher struct {
-	DB          *sql.DB
-	Home        string
-	ConveyorBin string
-	Now         func() time.Time // injectable; defaults to time.Now
-	Log         *log.Logger      // defaults to log.Default()
+	Svc *core.Service    // DB, home and CLI binary; every dispatcher call goes through this one
+	Now func() time.Time // injectable; defaults to time.Now
+	Log *log.Logger      // defaults to log.Default()
 
 	lastPoll time.Time
 	lastAuto time.Time
@@ -66,7 +63,7 @@ func (d *Dispatcher) logf(format string, a ...any) {
 }
 
 func (d *Dispatcher) intSetting(key string) int {
-	n, err := strconv.Atoi(store.GetSetting(d.DB, key))
+	n, err := strconv.Atoi(store.GetSetting(d.Svc.DB, key))
 	if err != nil {
 		n, _ = strconv.Atoi(store.Defaults[key])
 	}
@@ -79,9 +76,8 @@ var pollJira = func(ctx context.Context, svc *core.Service) { (&jira.Poller{}).R
 // Run ticks every 2s until ctx is done. It also starts the chat bridge and the Jira poller,
 // so they run once, under the dispatcher lock, in the app and in `conveyor daemon` alike.
 func (d *Dispatcher) Run(ctx context.Context) error {
-	svc := &core.Service{DB: d.DB, Home: d.Home, Bin: d.ConveyorBin}
-	go chat.Run(ctx, svc, d.logf, map[string]chat.Factory{"slack": slack.New})
-	go pollJira(ctx, svc)
+	go chat.Run(ctx, d.Svc, d.logf, map[string]chat.Factory{"slack": slack.New})
+	go pollJira(ctx, d.Svc)
 	t := time.NewTicker(tickEvery)
 	defer t.Stop()
 	for {
@@ -111,15 +107,14 @@ func (d *Dispatcher) Tick(ctx context.Context) error {
 // wakeEpics requeues epic roots whose sub-tasks have all settled (docs/epic-builder.md §9).
 // It only wakes: restarting a flow is always a human decision.
 func (d *Dispatcher) wakeEpics() {
-	epics, err := store.EpicsToWake(d.DB)
+	epics, err := store.EpicsToWake(d.Svc.DB)
 	if err != nil {
 		d.logf("wake epics: %v", err)
 		return
 	}
-	svc := &core.Service{DB: d.DB, Home: d.Home, Bin: d.ConveyorBin}
 	for _, e := range epics {
 		stage := store.EpicStage(e)
-		if _, err := svc.AddComment(e.Key, store.AuthorSystem, fmt.Sprintf("all sub-tasks settled (stage %s)", stage), core.Ask); err != nil {
+		if _, err := d.Svc.AddComment(e.Key, store.AuthorSystem, fmt.Sprintf("all sub-tasks settled (stage %s)", stage), core.Ask); err != nil {
 			d.logf("wake %s: %v", e.Key, err)
 			continue
 		}
@@ -133,13 +128,10 @@ func (d *Dispatcher) tickAutomations(ctx context.Context) {
 		return
 	}
 	d.lastAuto = d.now()
-	if d.ConveyorBin != "" {
-		automation.Bin = d.ConveyorBin
-	}
 	now := d.now()
 	go func() {
 		defer d.autoBusy.Store(false)
-		if err := automation.Tick(ctx, &core.Service{DB: d.DB, Home: d.Home, Bin: d.ConveyorBin}, now); err != nil {
+		if err := automation.Tick(ctx, d.Svc, now); err != nil {
 			d.logf("automations: %v", err)
 		}
 	}()
@@ -162,14 +154,14 @@ func deref(s *string) string {
 // reap fails active auto runs whose background session no longer exists, or that never got one,
 // and finishes interactive runs whose session is gone from the agents list.
 func (d *Dispatcher) reap(ctx context.Context) error {
-	runs, err := store.ActiveRuns(d.DB)
+	runs, err := store.ActiveRuns(d.Svc.DB)
 	if err != nil {
 		return err
 	}
 	var cand []store.Run
 	needClaudeAgents := false
 	for _, r := range runs {
-		task, _ := store.GetTask(d.DB, r.TaskID)
+		task, _ := store.GetTask(d.Svc.DB, r.TaskID)
 		bgRunner := d.runnerForRun(r, task)
 		if r.Kind == "interactive" {
 			if r.SessionID != nil { // without a session id there is nothing to match
@@ -211,7 +203,7 @@ func (d *Dispatcher) reap(ctx context.Context) error {
 		}
 
 		// Determine which backend this run uses.
-		task, taskErr := store.GetTask(d.DB, r.TaskID)
+		task, taskErr := store.GetTask(d.Svc.DB, r.TaskID)
 		bgRunner := d.runnerForRun(r, task)
 
 		if bgRunner.Name() == "agy" {
@@ -228,7 +220,7 @@ func (d *Dispatcher) reap(ctx context.Context) error {
 		// a resume ran as a copy under a new id, so the run's later hooks (its Stop) still find it.
 		if ok && !failed && a.SessionID != "" && (r.Status == "launching" || deref(r.SessionID) != a.SessionID) {
 			r.SessionID, r.Status = &a.SessionID, "running"
-			if err := store.UpdateRun(d.DB, r); err != nil {
+			if err := store.UpdateRun(d.Svc.DB, r); err != nil {
 				return err
 			}
 			continue
@@ -245,20 +237,20 @@ func (d *Dispatcher) reap(ctx context.Context) error {
 		d.logf("reap run %d (task %d, bg %s, session %s, status %s): %s", r.ID, r.TaskID, deref(r.BgID), deref(r.SessionID), r.Status, reason)
 		ended := d.now().UTC().Format(time.RFC3339)
 		r.Status, r.Error, r.EndedAt = "failed", ptr(reason), &ended
-		if err := store.UpdateRun(d.DB, r); err != nil {
+		if err := store.UpdateRun(d.Svc.DB, r); err != nil {
 			return err
 		}
-		task, err := store.GetTask(d.DB, r.TaskID)
+		task, err := store.GetTask(d.Svc.DB, r.TaskID)
 		if err != nil {
 			return err
 		}
 		if task.Status != store.StatusRunning {
 			continue
 		}
-		if _, err := store.AddComment(d.DB, store.Comment{TaskID: task.ID, Author: store.AuthorSystem, Body: note}); err != nil {
+		if _, err := store.AddComment(d.Svc.DB, store.Comment{TaskID: task.ID, Author: store.AuthorSystem, Body: note}); err != nil {
 			return err
 		}
-		if _, err := store.UpdateTaskStatus(d.DB, task.ID, store.StatusNeedsYou, store.ActorSystem); err != nil {
+		if _, err := store.UpdateTaskStatus(d.Svc.DB, task.ID, store.StatusNeedsYou, store.ActorSystem); err != nil {
 			return err
 		}
 	}
@@ -274,7 +266,7 @@ func (d *Dispatcher) reapAgy(ctx context.Context, r store.Run, task store.Task, 
 			}
 			ended := d.now().UTC().Format(time.RFC3339)
 			r.Status, r.Error, r.EndedAt = "failed", ptr("launch interrupted"), &ended
-			if err := store.UpdateRun(d.DB, r); err != nil {
+			if err := store.UpdateRun(d.Svc.DB, r); err != nil {
 				return err
 			}
 		}
@@ -297,7 +289,7 @@ func (d *Dispatcher) reapAgy(ctx context.Context, r store.Run, task store.Task, 
 			updated = true
 		}
 		if updated {
-			return store.UpdateRun(d.DB, r)
+			return store.UpdateRun(d.Svc.DB, r)
 		}
 		return nil
 	}
@@ -312,11 +304,11 @@ func (d *Dispatcher) reapAgy(ctx context.Context, r store.Run, task store.Task, 
 	if taskErr != nil {
 		ended := d.now().UTC().Format(time.RFC3339)
 		r.Status, r.EndedAt = "finished", &ended
-		return store.UpdateRun(d.DB, r)
+		return store.UpdateRun(d.Svc.DB, r)
 	}
 
 	// Read the session log if present to extract the assistant response / <conveyor> status block.
-	logPath := runner.BgLogPath(d.Home, task.Key)
+	logPath := runner.BgLogPath(d.Svc.Home, task.Key)
 	var logOutput string
 	if b, err := os.ReadFile(logPath); err == nil {
 		logOutput = string(b)
@@ -324,24 +316,24 @@ func (d *Dispatcher) reapAgy(ctx context.Context, r store.Run, task store.Task, 
 
 	// If there is log output, run ProcessStop which extracts the <conveyor> block and handles transitions.
 	if logOutput != "" {
-		if err := hook.ProcessStop(d.DB, task, r, logOutput, ""); err == nil {
+		if err := hook.ProcessStop(d.Svc.DB, task, r, logOutput, ""); err == nil {
 			return nil
 		}
 	}
 
 	ended := d.now().UTC().Format(time.RFC3339)
 	r.Status, r.EndedAt = "finished", &ended
-	if err := store.UpdateRun(d.DB, r); err != nil {
+	if err := store.UpdateRun(d.Svc.DB, r); err != nil {
 		return err
 	}
 	if task.Status != store.StatusRunning {
 		return nil
 	}
 	note := "The agy session exited without a status block."
-	if _, err := store.AddComment(d.DB, store.Comment{TaskID: task.ID, Author: store.AuthorSystem, Body: note}); err != nil {
+	if _, err := store.AddComment(d.Svc.DB, store.Comment{TaskID: task.ID, Author: store.AuthorSystem, Body: note}); err != nil {
 		return err
 	}
-	_, err := store.UpdateTaskStatus(d.DB, task.ID, store.StatusNeedsYou, store.ActorSystem)
+	_, err := store.UpdateTaskStatus(d.Svc.DB, task.ID, store.StatusNeedsYou, store.ActorSystem)
 	return err
 }
 
@@ -355,14 +347,14 @@ func (d *Dispatcher) reapInteractive(r store.Run, alive bool) error {
 	ended := d.now().UTC().Format(time.RFC3339)
 	d.logf("reap interactive run %d (task %d, session %s): session ended", r.ID, r.TaskID, deref(r.SessionID))
 	r.Status, r.EndedAt = "finished", &ended
-	if err := store.UpdateRun(d.DB, r); err != nil {
+	if err := store.UpdateRun(d.Svc.DB, r); err != nil {
 		return err
 	}
-	task, err := store.GetTask(d.DB, r.TaskID)
+	task, err := store.GetTask(d.Svc.DB, r.TaskID)
 	if err != nil || task.Status != store.StatusRunning {
 		return err
 	}
-	if active, err := store.ActiveRuns(d.DB); err != nil {
+	if active, err := store.ActiveRuns(d.Svc.DB); err != nil {
 		return err
 	} else {
 		for _, o := range active {
@@ -371,10 +363,10 @@ func (d *Dispatcher) reapInteractive(r store.Run, alive bool) error {
 			}
 		}
 	}
-	if _, err := store.AddComment(d.DB, store.Comment{TaskID: task.ID, Author: store.AuthorSystem, Body: "The manual Claude session ended."}); err != nil {
+	if _, err := store.AddComment(d.Svc.DB, store.Comment{TaskID: task.ID, Author: store.AuthorSystem, Body: "The manual Claude session ended."}); err != nil {
 		return err
 	}
-	_, err = store.UpdateTaskStatus(d.DB, task.ID, store.StatusNeedsYou, store.ActorSystem)
+	_, err = store.UpdateTaskStatus(d.Svc.DB, task.ID, store.StatusNeedsYou, store.ActorSystem)
 	return err
 }
 
@@ -384,17 +376,17 @@ func (d *Dispatcher) pollPRs(ctx context.Context) {
 		return
 	}
 	d.lastPoll = d.now()
-	tasks, err := store.ListTasks(d.DB, store.StatusRunning, store.StatusNeedsYou, store.StatusReview)
+	tasks, err := store.ListTasks(d.Svc.DB, store.StatusRunning, store.StatusNeedsYou, store.StatusReview)
 	if err != nil {
 		d.logf("pr poll: %v", err)
 		return
 	}
 	for _, t := range tasks {
-		if err := gh.SyncTask(ctx, d.DB, t); err != nil {
+		if err := gh.SyncTask(ctx, d.Svc.DB, t); err != nil {
 			d.logf("pr poll %s: %v", t.Key, err)
 		}
-		if got, err := store.GetTask(d.DB, t.ID); err == nil && got.Status == store.StatusDone {
-			(&core.Service{DB: d.DB}).CleanupSessions(t.ID)
+		if got, err := store.GetTask(d.Svc.DB, t.ID); err == nil && got.Status == store.StatusDone {
+			d.Svc.CleanupSessions(t.ID)
 		}
 	}
 }
@@ -402,28 +394,27 @@ func (d *Dispatcher) pollPRs(ctx context.Context) {
 // ensureWebhook keeps services running: every enabled app's autostart service, and the built-in
 // review-webhook listener (under the installed app's id) while an epic is open (no-ops when running; without the gh extension tasks keep backoff checks).
 func (d *Dispatcher) ensureWebhook() {
-	if d.ConveyorBin == "" || !d.lastHook.IsZero() && d.now().Sub(d.lastHook) < time.Minute {
+	if d.Svc.Bin == "" || !d.lastHook.IsZero() && d.now().Sub(d.lastHook) < time.Minute {
 		return
 	}
 	d.lastHook = d.now()
-	svc := &core.Service{DB: d.DB}
-	if err := svc.EnsureServices(); err != nil {
+	if err := d.Svc.EnsureServices(); err != nil {
 		d.logf("app services: %v", err)
 	}
-	if !svc.HasOpenEpic() {
+	if !d.Svc.HasOpenEpic() {
 		return
 	}
-	args := []string{"--home", d.Home, "review-webhook"}
-	if id := svc.ReviewWebhookAppID(); id != "" { // share the installed app's instance
+	args := []string{"--home", d.Svc.Home, "review-webhook"}
+	if id := d.Svc.ReviewWebhookAppID(); id != "" { // share the installed app's instance
 		args = append(args, "--app", id)
 	}
-	if out, err := exec.Command(d.ConveyorBin, args...).CombinedOutput(); err != nil {
+	if out, err := exec.Command(d.Svc.Bin, args...).CombinedOutput(); err != nil {
 		d.logf("review-webhook: %v: %s", err, out)
 	}
 }
 
 func (d *Dispatcher) launchTodo(ctx context.Context) error {
-	runs, err := store.ActiveRuns(d.DB)
+	runs, err := store.ActiveRuns(d.Svc.DB)
 	if err != nil {
 		return err
 	}
@@ -434,7 +425,7 @@ func (d *Dispatcher) launchTodo(ctx context.Context) error {
 			auto++
 		}
 	}
-	tasks, err := store.ListTasks(d.DB, store.StatusTodo) // priority desc
+	tasks, err := store.ListTasks(d.Svc.DB, store.StatusTodo) // priority desc
 	if err != nil {
 		return err
 	}
@@ -448,18 +439,18 @@ func (d *Dispatcher) launchTodo(ctx context.Context) error {
 			continue
 		}
 		if store.IsEpic(t) { // an epic waits while its sub-tasks run (R6)
-			if wait, err := store.EpicHasActiveChildren(d.DB, t); err != nil {
+			if wait, err := store.EpicHasActiveChildren(d.Svc.DB, t); err != nil {
 				return err
 			} else if wait {
 				continue
 			}
 		}
-		if blockers, err := store.OpenBlockers(d.DB, t.ID); err != nil {
+		if blockers, err := store.OpenBlockers(d.Svc.DB, t.ID); err != nil {
 			return err
 		} else if len(blockers) > 0 {
 			continue
 		}
-		pending, err := store.UnconsumedComments(d.DB, t.ID)
+		pending, err := store.UnconsumedComments(d.Svc.DB, t.ID)
 		if err != nil {
 			return err
 		}
@@ -481,16 +472,16 @@ func (d *Dispatcher) launchTodo(ctx context.Context) error {
 
 // start launches one run. On error the returned run is the launching row if one was created.
 func (d *Dispatcher) start(ctx context.Context, task store.Task, delta []store.Comment) (store.Run, error) {
-	task, err := workspace.Ensure(d.DB, d.Home, task)
+	task, err := workspace.Ensure(d.Svc.DB, d.Svc.Home, task)
 	if err != nil {
 		return store.Run{}, err
 	}
 	bgRunner := d.runnerForTask(task)
-	settings, err := bgRunner.WriteSettings(d.Home, d.ConveyorBin)
+	settings, err := bgRunner.WriteSettings(d.Svc.Home, d.Svc.Bin)
 	if err != nil {
 		return store.Run{}, err
 	}
-	briefPath, err := brief.Render(d.DB, d.Home, task)
+	briefPath, err := brief.Render(d.Svc.DB, d.Svc.Home, task)
 	if err != nil {
 		return store.Run{}, err
 	}
@@ -505,21 +496,21 @@ func (d *Dispatcher) start(ctx context.Context, task store.Task, delta []store.C
 	run := store.Run{TaskID: task.ID, Kind: "auto", Mode: "fresh", Status: "launching", Runner: bgRunner.Name()}
 	if prev != nil {
 		run.Mode, run.SessionID = "resume", prev.SessionID // the hook matches resumed sessions by id
-		run.Prompt = brief.ResumePrompt(task, briefPath, delta, store.GetSetting(d.DB, "prompt_resume"))
+		run.Prompt = brief.ResumePrompt(task, briefPath, delta, store.GetSetting(d.Svc.DB, "prompt_resume"))
 	} else {
-		run.Prompt = brief.FreshPrompt(task, briefPath, delta, store.GetSetting(d.DB, "prompt_fresh"))
+		run.Prompt = brief.FreshPrompt(task, briefPath, delta, store.GetSetting(d.Svc.DB, "prompt_fresh"))
 	}
-	if run, err = store.CreateRun(d.DB, run); err != nil {
+	if run, err = store.CreateRun(d.Svc.DB, run); err != nil {
 		return store.Run{}, err
 	}
 	ids := make([]int64, len(delta))
 	for i, c := range delta {
 		ids[i] = c.ID
 	}
-	if err := store.ConsumeComments(d.DB, ids, run.ID); err != nil {
+	if err := store.ConsumeComments(d.Svc.DB, ids, run.ID); err != nil {
 		return run, err
 	}
-	if _, err := store.UpdateTaskStatus(d.DB, task.ID, store.StatusRunning, store.ActorSystem); err != nil {
+	if _, err := store.UpdateTaskStatus(d.Svc.DB, task.ID, store.StatusRunning, store.ActorSystem); err != nil {
 		d.unconsume(run) // the run never started
 		return run, err
 	}
@@ -536,7 +527,7 @@ func (d *Dispatcher) start(ctx context.Context, task store.Task, delta []store.C
 		return run, err
 	}
 	// Re-read: a hook may have adopted the run (session id) while we launched.
-	if run, err = store.GetRun(d.DB, run.ID); err != nil {
+	if run, err = store.GetRun(d.Svc.DB, run.ID); err != nil {
 		return run, err
 	}
 	run.BgID = &bg
@@ -544,17 +535,17 @@ func (d *Dispatcher) start(ctx context.Context, task store.Task, delta []store.C
 		run.SessionID = &sessionID
 		run.Status = "running"
 	}
-	if err := store.UpdateRun(d.DB, run); err != nil {
+	if err := store.UpdateRun(d.Svc.DB, run); err != nil {
 		return run, err
 	}
 	d.logf("launch %s: run %d (%s/%s) bg %s", task.Key, run.ID, bgRunner.Name(), run.Mode, bg)
-	store.RecordEvent(d.DB, task.ID, "run_started", fmt.Sprintf("run %d (%s/%s) bg %s", run.ID, bgRunner.Name(), run.Mode, bg))
+	store.RecordEvent(d.Svc.DB, task.ID, "run_started", fmt.Sprintf("run %d (%s/%s) bg %s", run.ID, bgRunner.Name(), run.Mode, bg))
 	return run, nil
 }
 
 // unconsume gives a never-started run's comments back so the retry's prompt carries them.
 func (d *Dispatcher) unconsume(run store.Run) {
-	if err := store.UnconsumeComments(d.DB, run.ID); err != nil {
+	if err := store.UnconsumeComments(d.Svc.DB, run.ID); err != nil {
 		d.logf("unconsume comments for run %d: %v", run.ID, err)
 	}
 }
@@ -577,14 +568,14 @@ func (d *Dispatcher) runnerForTask(task store.Task) runner.Runner {
 	if task.Runner != nil {
 		taskRunner = *task.Runner
 	}
-	return runner.ForTask(taskRunner, store.GetSetting(d.DB, "default_runner"), d.Home)
+	return runner.ForTask(taskRunner, store.GetSetting(d.Svc.DB, "default_runner"), d.Svc.Home)
 }
 
 // runnerForRun returns the Runner a run was started with, falling back to the task's for runs from
 // before runs stored it. Changing the task's runner or default_runner must not affect a live run.
 func (d *Dispatcher) runnerForRun(r store.Run, task store.Task) runner.Runner {
 	if r.Runner != "" {
-		return runner.ForTask(r.Runner, "", d.Home)
+		return runner.ForTask(r.Runner, "", d.Svc.Home)
 	}
 	return d.runnerForTask(task)
 }
@@ -600,7 +591,7 @@ func (d *Dispatcher) model(task store.Task) string {
 			if r.WorktreePath != nil {
 				dirs = append(dirs, *r.WorktreePath)
 			}
-			if repo, err := store.GetRepoByName(d.DB, r.RepoName); err == nil {
+			if repo, err := store.GetRepoByName(d.Svc.DB, r.RepoName); err == nil {
 				dirs = append(dirs, repo.Path)
 			}
 		}
@@ -608,7 +599,7 @@ func (d *Dispatcher) model(task store.Task) string {
 			return ""
 		}
 	}
-	return store.GetSetting(d.DB, "default_model")
+	return store.GetSetting(d.Svc.DB, "default_model")
 }
 
 func fileExists(p string) bool { _, err := os.Stat(p); return err == nil }
@@ -638,7 +629,7 @@ func (d *Dispatcher) resumable(task store.Task, directive string) (*store.Run, e
 	if directive == "fresh" {
 		return nil, nil
 	}
-	runs, err := store.ListRuns(d.DB, task.ID)
+	runs, err := store.ListRuns(d.Svc.DB, task.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -661,23 +652,23 @@ func (d *Dispatcher) fail(task store.Task, run store.Run, cause error) error {
 	if run.ID != 0 {
 		ended := d.now().UTC().Format(time.RFC3339)
 		run.Status, run.Error, run.EndedAt = "failed", ptr(cause.Error()), &ended
-		if err := store.UpdateRun(d.DB, run); err != nil {
+		if err := store.UpdateRun(d.Svc.DB, run); err != nil {
 			return err
 		}
-	} else if err := store.RecordEvent(d.DB, task.ID, "error", "launch: "+cause.Error()); err != nil {
+	} else if err := store.RecordEvent(d.Svc.DB, task.ID, "error", "launch: "+cause.Error()); err != nil {
 		return err
 	}
-	t, err := store.GetTask(d.DB, task.ID)
+	t, err := store.GetTask(d.Svc.DB, task.ID)
 	if err != nil {
 		return err
 	}
 	t.ConsecutiveFailures++
-	if err := store.UpdateTask(d.DB, t); err != nil {
+	if err := store.UpdateTask(d.Svc.DB, t); err != nil {
 		return err
 	}
 	if t.ConsecutiveFailures < d.intSetting("max_consecutive_failures") {
 		if t.Status == store.StatusRunning {
-			_, err = store.UpdateTaskStatus(d.DB, t.ID, store.StatusTodo, store.ActorSystem)
+			_, err = store.UpdateTaskStatus(d.Svc.DB, t.ID, store.StatusTodo, store.ActorSystem)
 		}
 		return err
 	}
@@ -685,20 +676,20 @@ func (d *Dispatcher) fail(task store.Task, run store.Run, cause error) error {
 	if errors.Is(cause, claude.ErrUntrusted) {
 		for _, r := range t.Repos {
 			if r.IsPrimary {
-				if repo, e := store.GetRepoByName(d.DB, r.RepoName); e == nil {
+				if repo, e := store.GetRepoByName(d.Svc.DB, r.RepoName); e == nil {
 					body += fmt.Sprintf("\nHint: open %s in Claude once to trust it.", repo.Path)
 				}
 			}
 		}
 	}
-	if _, err := store.AddComment(d.DB, store.Comment{TaskID: t.ID, Author: store.AuthorSystem, Body: body}); err != nil {
+	if _, err := store.AddComment(d.Svc.DB, store.Comment{TaskID: t.ID, Author: store.AuthorSystem, Body: body}); err != nil {
 		return err
 	}
 	if t.Status == store.StatusTodo { // todo -> failed is not an edge; go through running
-		if _, err := store.UpdateTaskStatus(d.DB, t.ID, store.StatusRunning, store.ActorSystem); err != nil {
+		if _, err := store.UpdateTaskStatus(d.Svc.DB, t.ID, store.StatusRunning, store.ActorSystem); err != nil {
 			return err
 		}
 	}
-	_, err = store.UpdateTaskStatus(d.DB, t.ID, store.StatusFailed, store.ActorSystem)
+	_, err = store.UpdateTaskStatus(d.Svc.DB, t.ID, store.StatusFailed, store.ActorSystem)
 	return err
 }

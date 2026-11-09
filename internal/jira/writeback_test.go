@@ -50,8 +50,8 @@ func wbEnv(t *testing.T, statusMap string) (*core.Service, store.Task, string) {
 		t.Fatal(err)
 	}
 	os.Remove(filepath.Join(dir, "argv"))
-	Attach(svc)
-	t.Cleanup(func() { Wait(); store.OnTaskChange = nil })
+	detach := Attach(svc)
+	t.Cleanup(func() { Wait(); detach() })
 	return svc, epic, dir
 }
 

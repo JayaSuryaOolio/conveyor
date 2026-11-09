@@ -26,9 +26,9 @@ var (
 )
 
 // Attach writes task status moves and branch/PR changes back to Jira, asynchronously.
-// Failures go to the source's last_error, never to the caller.
-func Attach(svc *core.Service) {
-	store.OnTaskChange = func(id int64) {
+// Failures go to the source's last_error, never to the caller. It returns the detach func.
+func Attach(svc *core.Service) (detach func()) {
+	return store.OnTaskChange(func(id int64) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -38,7 +38,7 @@ func Attach(svc *core.Service) {
 				Complete(ctx, svc, epic)
 			}
 		}()
-	}
+	})
 }
 
 // Wait blocks until pending write-backs finish (short-lived CLI processes call it before exit).
