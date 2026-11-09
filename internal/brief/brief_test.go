@@ -169,4 +169,3 @@ func TestAgyRulesAndContext(t *testing.T) {
 		t.Errorf("brief should mention AGENTS.md for agy runner:\n%s", got)
 	}
 }
-
