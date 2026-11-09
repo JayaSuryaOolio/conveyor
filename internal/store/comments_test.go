@@ -42,3 +42,20 @@ func TestReleaseIfNothingQueued(t *testing.T) {
 		t.Fatalf("after take-back = %s", got.Status)
 	}
 }
+
+func TestLatestRunsAndComments(t *testing.T) {
+	db := openTest(t)
+	a, b := mkTask(t, db, StatusTodo), mkTask(t, db, StatusTodo)
+	CreateRun(db, Run{TaskID: a.ID, Kind: "auto", Mode: "fresh", Status: "finished"})
+	last, _ := CreateRun(db, Run{TaskID: a.ID, Kind: "auto", Mode: "fresh", Status: "finished"})
+	AddComment(db, Comment{TaskID: b.ID, Author: AuthorHuman, Body: "old"})
+	AddComment(db, Comment{TaskID: b.ID, Author: AuthorAgent, Body: "new"})
+	runs, err := LatestRuns(db)
+	if err != nil || len(runs) != 1 || runs[a.ID].ID != last.ID {
+		t.Fatalf("runs = %+v %v", runs, err)
+	}
+	msgs, err := LatestComments(db)
+	if err != nil || len(msgs) != 1 || msgs[b.ID].Body != "new" {
+		t.Fatalf("comments = %+v %v", msgs, err)
+	}
+}

@@ -46,7 +46,7 @@ export default function App() {
     const [mini, setMini] = useLocalStorage({key: 'nav-collapsed', defaultValue: false})
     const {data: learnings} = useData(Learnings, [])
     const proposed = learnings?.filter(l => l.status === 'proposed').length ?? 0
-    const {data: version} = useData(AppVersion, [])
+    const {data: version} = useData(AppVersion, [], {static: true})
     const nav: Nav = v => setView(v)
     const viewRef = useRef({view, path: ''})
     viewRef.current = {view, path: loc.pathname + loc.search}

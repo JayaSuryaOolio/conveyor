@@ -104,3 +104,16 @@ func ListRuns(db *sql.DB, taskID int64) ([]Run, error) {
 func ActiveRuns(db *sql.DB) ([]Run, error) {
 	return queryRuns(db, `status IN ('launching','running') ORDER BY id`)
 }
+
+// LatestRuns returns every task's newest run, keyed by task id; tasks without runs are absent.
+func LatestRuns(db *sql.DB) (map[int64]Run, error) {
+	rs, err := queryRuns(db, `id IN (SELECT MAX(id) FROM runs GROUP BY task_id)`)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[int64]Run, len(rs))
+	for _, r := range rs {
+		out[r.TaskID] = r
+	}
+	return out, nil
+}

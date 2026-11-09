@@ -1,15 +1,54 @@
 import {useCallback, useEffect, useRef, useState} from 'react'
 import {EventsOn} from '../wailsjs/runtime/runtime'
+import {ListTasks} from '../wailsjs/go/ui/App'
 
-/** Loads data with fn and reloads when the DB changes or deps change. */
-export function useData<T>(fn: () => Promise<T>, deps: unknown[]): {data?: T; error?: string; reload: () => void} {
+// One db:changed listener for the whole app. Wails calls listeners newest first, so a separate
+// cache-invalidating listener could run after the hooks that refetch; bumping dbVersion here first avoids that.
+let dbVersion = 0
+let subs: Set<() => void> | undefined
+function dbSubs() {
+    if (!subs) {
+        const s = subs = new Set()
+        EventsOn('db:changed', () => { dbVersion++; s.forEach(f => f()) })
+    }
+    return subs
+}
+
+/** Calls f after every DB change; returns the unsubscribe. */
+export function onDbChanged(f: () => void): () => void {
+    const s = dbSubs()
+    s.add(f)
+    return () => { s.delete(f) }
+}
+
+/** Wraps fn so every caller between two DB changes shares one call (and its in-flight promise). */
+export function perDbVersion<T>(fn: () => Promise<T>): () => Promise<T> {
+    let cached: {v: number; p: Promise<T>} | undefined
+    return () => {
+        dbSubs()
+        if (cached?.v !== dbVersion) {
+            const c = cached = {v: dbVersion, p: fn()}
+            c.p.catch(() => { if (cached === c) cached = undefined }) // retry on the next call
+        }
+        return cached.p
+    }
+}
+
+/** ListTasks, fetched once per DB change however many components show it. */
+export const listTasks = perDbVersion(ListTasks)
+
+/** Loads data with fn and reloads when deps change and, unless static, when the DB changes. Responses to superseded loads are dropped. */
+export function useData<T>(fn: () => Promise<T>, deps: unknown[], opts?: {static?: boolean}): {data?: T; error?: string; reload: () => void} {
     const [data, setData] = useState<T>()
     const [error, setError] = useState<string>()
+    const seq = useRef(0)
     const reload = useCallback(() => {
-        fn().then(d => { setData(d); setError(undefined) }, e => setError(String(e)))
+        const n = ++seq.current
+        fn().then(d => { if (n === seq.current) { setData(d); setError(undefined) } },
+            e => { if (n === seq.current) setError(String(e)) })
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, deps)
-    useEffect(() => { reload(); return EventsOn('db:changed', reload) }, [reload])
+    useEffect(() => { reload(); return opts?.static ? undefined : onDbChanged(reload) }, [reload]) // eslint-disable-line react-hooks/exhaustive-deps
     return {data, error, reload}
 }
 

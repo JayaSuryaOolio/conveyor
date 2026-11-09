@@ -2,13 +2,13 @@ import {lazy, Ref, Suspense, useEffect, useRef, useState} from 'react'
 import {ActionIcon, Anchor, Badge, Box, Breadcrumbs, Button, CloseButton, Code, CopyButton, Divider, Group, Kbd, Paper, Popover, Stack, Text, TextInput, Timeline, Title, Tooltip} from '@mantine/core'
 import {useLocalStorage} from '@mantine/hooks'
 import {IconAbc, IconSitemap, IconArrowDown, IconArrowUp, IconClock, IconFlame, IconHash, IconPencil, IconSearch, IconTerminal, IconX, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconMessage, IconPlayerPlay} from '@tabler/icons-react'
-import {Actions, GetTask, ListTasks, RunLog, SetTaskDescription, Stop, TakeQueuedComment, TermStart} from '../wailsjs/go/ui/App'
+import {Actions, GetTask, RunLog, SetTaskDescription, Stop, TakeQueuedComment, TermStart} from '../wailsjs/go/ui/App'
 import {core, store, ui} from '../wailsjs/go/models'
 import {Card, CommentBox, Message, Nav, StatusBadge, Time, View, errMsg} from './components'
 import {Markdown, MarkdownEditor, TaskKey} from './markdown'
 import {Relations} from './relations'
 import {TaskSidebar} from './workspace'
-import {fmtDuration, fmtK, useData} from './util'
+import {fmtDuration, fmtK, listTasks, useData} from './util'
 
 const TermDock = lazy(() => import('./terminals'))
 
@@ -30,7 +30,7 @@ const SORTS: {by: string; label: string; icon: typeof IconClock; desc: boolean; 
 const REPO_COLORS = ['blue', 'grape', 'teal', 'orange', 'pink', 'cyan', 'lime', 'violet', 'red', 'indigo']
 
 export function Board({nav, q, setQ, search, link}: {nav: Nav; q: string; setQ: (q: string) => void; search: Ref<HTMLInputElement>; link: View}) {
-    const {data, error} = useData(ListTasks, [])
+    const {data, error} = useData(listTasks, [])
     const [open, setOpen] = useState<string[]>([])
     const [sort, setSort] = useLocalStorage({key: 'board-sort', defaultValue: {by: 'priority', desc: true}})
     const [picked, setPicked] = useLocalStorage<string[]>({key: 'board-repos', defaultValue: []})
@@ -140,7 +140,7 @@ export function Board({nav, q, setQ, search, link}: {nav: Nav; q: string; setQ: 
 }
 
 export function Focus({nav}: {nav: Nav}) {
-    const {data, error, reload} = useData(ListTasks, [])
+    const {data, error, reload} = useData(listTasks, [])
     if (error) return <Text c="red">{error}</Text>
     const rows = (data ?? [])
         .filter(c => FOCUS_ORDER.includes(c.status))

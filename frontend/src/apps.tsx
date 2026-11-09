@@ -10,7 +10,7 @@ import {useData} from './util'
 function AppForm({initial, onClose}: {initial: store.App; onClose: (saved: boolean) => void}) {
     const [f, setF] = useState(initial)
     const [preview, setPreview] = useState('')
-    const {data: home} = useData(Home, [])
+    const {data: home} = useData(Home, [], {static: true})
     const sample = (home ?? '~/.conveyor') + '/workspaces/CV-1/my repo'
     useEffect(() => { RenderApp(f.command, sample, 'CV-1').then(setPreview, errMsg) }, [f.command, sample])
     const ready = f.name.trim() && f.command.trim()
@@ -54,7 +54,7 @@ function ManifestForm({onClose}: {onClose: (saved: boolean) => void}) {
     const [problem, setProblem] = useState('')
     const [replace, setReplace] = useState(false)
     const ref = useRef<HTMLTextAreaElement>(null)
-    const {data: schema} = useData(ManifestSchema, [])
+    const {data: schema} = useData(ManifestSchema, [], {static: true})
     useEffect(() => {
         if (!text.trim()) { setProblem(''); return }
         const t = setTimeout(() => ValidateManifest(text).then(setProblem, errMsg), 250)
@@ -173,8 +173,8 @@ function AgentHooks() {
 
 function AppList() {
     const {data, error, reload} = useData(ListApps, [])
-    const {data: presets} = useData(AppPresets, [])
-    const {data: examples} = useData(ExampleApps, [])
+    const {data: presets} = useData(AppPresets, [], {static: true})
+    const {data: examples} = useData(ExampleApps, [], {static: true})
     const {data: icons} = useData(AppIcons, [])
     const [form, setForm] = useState<store.App>()
     const [importing, setImporting] = useState(false)
