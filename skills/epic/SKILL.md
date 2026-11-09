@@ -5,7 +5,7 @@ description: Run a Conveyor epic or one of its steps - the stage loop (chart, ga
 
 # Epic
 
-An epic is a root task labelled `epic` and `epic:<name>`; every task in its tree carries `epic:<name>` too. The design is `docs/epic-builder.md` in the Conveyor repo. This skill is installed and removed with Conveyor's hooks (`conveyor hooks install`).
+An epic is a root task labelled `epic` and `epic:<name>`; every task in its tree carries `epic:<name>` too. The design is `docs/epic-builder.md` in the Conveyor repo. This skill is installed and removed with the Conveyor plugin (`conveyor plugin install`).
 
 ## Never merge
 

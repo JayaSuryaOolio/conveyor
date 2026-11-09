@@ -79,7 +79,7 @@ func TestEpicRootDefaultAgent(t *testing.T) {
 	if got := agent(NewTaskInput{Title: "e0", EpicName: "e0"}); got != "" {
 		t.Fatalf("no preset installed: agent %q", got)
 	}
-	if _, err := s.UserHooks("install"); err != nil {
+	if _, err := s.Plugin("claude", "install"); err != nil {
 		t.Fatal(err)
 	}
 	if got := agent(NewTaskInput{Title: "e1", EpicName: "e1"}); got != "epic-builder" {

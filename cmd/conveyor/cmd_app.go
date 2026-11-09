@@ -15,7 +15,8 @@ import (
 
 func init() {
 	register("app", runApp, "open worktrees in external apps, run quick actions (list|presets|add|install|export|run|enable|disable|rm|open)")
-	register("hooks", runHooks, "Claude Code hooks in ~/.claude/settings.json (status|install|uninstall)")
+	register("plugin", runPlugin, "Conveyor plugin, hooks + skills, per tool (status|install|uninstall [tool])")
+	register("hooks", runPlugin, "alias of plugin")
 }
 
 const appUsage = `usage: conveyor app list [--json] | presets [--json] | add NAME [--command CMD] [--output] | add --from-app NAME [--replace]
@@ -173,15 +174,21 @@ func printApps(as []store.App) error {
 	return tw.Flush()
 }
 
-func runHooks(home string, args []string) error {
-	if len(args) != 1 {
-		return errors.New("usage: conveyor hooks status|install|uninstall")
+func runPlugin(home string, args []string) error {
+	if len(args) < 1 || len(args) > 2 {
+		return errors.New("usage: conveyor plugin status|install|uninstall [claude|agy]")
+	}
+	tool := ""
+	if len(args) == 2 {
+		tool = args[1]
 	}
 	return withService(home, func(s *core.Service) error {
-		st, err := s.UserHooks(args[0])
-		if err == nil {
-			fmt.Fprintln(out, st)
+		sts, err := s.Plugin(tool, args[0])
+		tw := tabwriter.NewWriter(out, 0, 4, 2, ' ', 0)
+		for _, st := range sts {
+			fmt.Fprintf(tw, "%s\t%s\t%s\n", st.Tool, st.Status, st.Note)
 		}
+		tw.Flush()
 		return err
 	})
 }

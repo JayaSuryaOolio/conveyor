@@ -7,6 +7,7 @@ package runner
 import (
 	"context"
 	"fmt"
+	"io/fs"
 )
 
 // Runner abstracts the agent CLI backend (Claude Code or Antigravity).
@@ -30,7 +31,30 @@ type Runner interface {
 	WriteSettings(home, conveyorBin string) (string, error)
 	// Name returns the short name of the backend ("claude" or "agy").
 	Name() string
+	// Plugin reports ("status") or changes ("install", "uninstall") the Conveyor plugin, the hooks and
+	// skills that make sessions the user starts in a task worktree report to Conveyor, in the tool's
+	// user config. A tool that can't take it returns "not supported" and changes nothing.
+	Plugin(action string, p PluginSpec) (PluginStatus, error)
 }
+
+// PluginSpec is what a tool's Conveyor plugin is built from.
+type PluginSpec struct {
+	Home        string // conveyor home the hooks report to
+	ConveyorBin string // conveyor CLI the hooks call
+	Skills      fs.FS  // skills to install, one directory each
+}
+
+// PluginStatus is a tool's plugin install state: "installed", "outdated", "not installed" or
+// "not supported"; Path is where it lives, Note says what the tool can't take.
+type PluginStatus struct {
+	Tool   string `json:"tool"`
+	Status string `json:"status"`
+	Path   string `json:"path"`
+	Note   string `json:"note"`
+}
+
+// All returns every backend, for per-tool plugin installs.
+func All(home string) []Runner { return []Runner{NewClaudeRunner(), NewAgyRunner(home)} }
 
 // LaunchSpec describes a fresh background launch, backend-agnostic.
 type LaunchSpec struct {

@@ -20,6 +20,9 @@ func init() { register("hook", runHook, "handle a Claude Code hook event (intern
 // runHook never returns an error: Claude Code must not be blocked. Failures go to logs/hook.log.
 // Every event but PreToolUse (one per tool call, too noisy) leaves a line, so "no Stop for that session" is checkable.
 func runHook(home string, args []string) (err error) {
+	if pluginCopy() {
+		return nil
+	}
 	var raw []byte
 	defer func() {
 		if r := recover(); r != nil { // a panic would otherwise vanish into Claude Code's hook output
@@ -38,6 +41,12 @@ func runHook(home string, args []string) (err error) {
 		return fmt.Errorf("read stdin: %w", err)
 	}
 	return doHook(home, args, raw)
+}
+
+// pluginCopy reports a plugin hook in a session whose --settings (claude.WriteSettings) runs the same
+// hook: Claude Code runs both, so the plugin's copy stands down.
+func pluginCopy() bool {
+	return os.Getenv("CLAUDE_PLUGIN_ROOT") != "" && os.Getenv("CONVEYOR_HOOKS") != ""
 }
 
 func doHook(home string, args []string, raw []byte) error {
