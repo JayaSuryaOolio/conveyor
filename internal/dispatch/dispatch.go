@@ -624,9 +624,10 @@ func sessionDirective(delta []store.Comment) string {
 }
 
 // resumable returns the latest auto run if it can be resumed: finished, with session and bg ids, and a small
-// context. directive "fresh" never resumes; "resume" ignores resume_threshold.
+// context. directive "fresh" never resumes; "resume" ignores resume_threshold. After a failed run
+// (ConsecutiveFailures > 0) only "resume" resumes: the failed context tends to repeat its mistake.
 func (d *Dispatcher) resumable(task store.Task, directive string) (*store.Run, error) {
-	if directive == "fresh" {
+	if directive == "fresh" || (task.ConsecutiveFailures > 0 && directive != "resume") {
 		return nil, nil
 	}
 	runs, err := store.ListRuns(d.Svc.DB, task.ID)

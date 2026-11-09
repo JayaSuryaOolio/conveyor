@@ -121,8 +121,8 @@ Once one of a task's PRs is merged, a comment on it no longer simply reopens it:
 
 When the dispatcher launches a task that already has runs, it chooses between:
 
-- **Resume**: stop the old background session and run `claude --bg --resume <session>` with only the new comments as the prompt. Used when the latest auto run finished, its session is known, and its peak context was below `resume_threshold` (default 60000 tokens).
-- **Fresh**: a new session that reads `BRIEF.md`, which carries the summaries of recent runs and your comments. Used otherwise.
+- **Resume**: stop the old background session and run `claude --bg --resume <session>` with only the new comments as the prompt. Used when the latest auto run finished, its session is known, and its peak context was below `resume_threshold` (default 60000 tokens) and the task has no consecutive failures.
+- **Fresh**: a new session that reads `BRIEF.md`, which carries the summaries of recent runs and your comments. Used otherwise, including after a failed run (a failed context tends to repeat its mistake).
 
 To choose yourself, start a comment with `#fresh` or `#resume` (CLI, app or Slack; the latest pending one wins). `#fresh` always starts a new session; `#resume` resumes regardless of `resume_threshold`, as long as the last auto run finished with a known session.
 

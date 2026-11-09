@@ -240,9 +240,15 @@ func TestResumeVsFresh(t *testing.T) {
 		peak   int64
 		body   string
 		resume bool
-	}{{1000, "more", true}, {100000, "more", false}, {1000, "#fresh\nstart over", false}, {100000, "#resume please", true}} {
+		fails  int
+	}{{1000, "more", true, 0}, {100000, "more", false, 0}, {1000, "#fresh\nstart over", false, 0}, {100000, "#resume please", true, 0},
+		{1000, "retry", false, 1}, {1000, "#resume retry", true, 1}} {
 		e := setup(t)
 		tk := e.task(t, "t", 0)
+		tk.ConsecutiveFailures = tc.fails
+		if err := store.UpdateTask(e.db, tk); err != nil {
+			t.Fatal(err)
+		}
 		r, _ := store.CreateRun(e.db, store.Run{TaskID: tk.ID, Kind: "auto", Mode: "fresh", Status: "launching"})
 		sess, bg := "sess-1", "oldbg001"
 		r.SessionID, r.BgID, r.Status, r.CtxPeak = &sess, &bg, "finished", tc.peak
