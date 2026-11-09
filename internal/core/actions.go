@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/JayaSuryaOolio/conveyor/internal/claude"
+	"github.com/JayaSuryaOolio/conveyor/internal/runner"
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 	"github.com/JayaSuryaOolio/conveyor/internal/terminal"
 	"github.com/JayaSuryaOolio/conveyor/internal/transcript"
@@ -140,14 +141,7 @@ func (s *Service) Actions(key string) ([]Action, error) {
 	switch {
 	case err != nil:
 	case isActive(run) && run.BgID != nil:
-		cmd := bgRunner.AttachCommand(*run.BgID)
-		if run.SessionID != nil && *run.SessionID != "" {
-			cmd = bgRunner.ResumeCommand(*run.SessionID, settings, workspace.OtherPaths(t))
-			if bgRunner.Name() == "agy" {
-				cmd = "kill -TERM " + *run.BgID + " 2>/dev/null; " + cmd
-			}
-		}
-		out = append(out, Action{"Attach to session", primary, cwd, cmd, "attach"})
+		out = append(out, Action{"Attach to session", primary, cwd, attachCommand(bgRunner, run, settings, workspace.OtherPaths(t)), "attach"})
 	case !isActive(run) && run.SessionID != nil:
 		out = append(out, Action{"Resume in terminal", primary, cwd, bgRunner.ResumeCommand(*run.SessionID, settings, workspace.OtherPaths(t)), "resume"})
 	}
@@ -174,17 +168,20 @@ func (s *Service) Actions(key string) ([]Action, error) {
 		case !isActive(r):
 			out = append(out, Action{fmt.Sprintf("Resume run #%d", i+1), primary, cwd, bgRunner.ResumeCommand(*r.SessionID, settings, workspace.OtherPaths(t)), "resume:" + id})
 		case r.BgID != nil: // a run that is not the latest, e.g. blocked on a question, still needs its attach icon
-			cmd := bgRunner.AttachCommand(*r.BgID)
-			if r.SessionID != nil && *r.SessionID != "" {
-				cmd = bgRunner.ResumeCommand(*r.SessionID, settings, workspace.OtherPaths(t))
-				if bgRunner.Name() == "agy" {
-					cmd = "kill -TERM " + *r.BgID + " 2>/dev/null; " + cmd
-				}
-			}
-			out = append(out, Action{fmt.Sprintf("Attach to run #%d", i+1), primary, cwd, cmd, "attach:" + id})
+			out = append(out, Action{fmt.Sprintf("Attach to run #%d", i+1), primary, cwd, attachCommand(bgRunner, r, settings, workspace.OtherPaths(t)), "attach:" + id})
 		}
 	}
 	return out, nil
+}
+
+// attachCommand attaches to a live background run. Claude attaches to the bg session itself (resuming
+// it would start a second process on a live session); agy cannot attach, so it stops the bg process
+// and resumes its conversation interactively.
+func attachCommand(r runner.Runner, run store.Run, settings string, others []string) string {
+	if r.Name() != "agy" || run.SessionID == nil || *run.SessionID == "" {
+		return r.AttachCommand(*run.BgID)
+	}
+	return "kill -TERM " + *run.BgID + " 2>/dev/null; " + r.ResumeCommand(*run.SessionID, settings, others)
 }
 
 var nonAlnumPath = regexp.MustCompile(`[^a-zA-Z0-9]`)

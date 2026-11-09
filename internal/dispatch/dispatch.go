@@ -185,14 +185,14 @@ func (d *Dispatcher) reap(ctx context.Context) error {
 	}
 	alive, sessions := map[string]claude.Agent{}, map[string]bool{}
 	if needClaudeAgents {
+		// An error must abort the reap: an empty alive map would fail every live Claude run as vanished.
 		agents, err := claude.Agents(ctx)
-		if err == nil {
-			for _, a := range agents {
-				alive[a.ID] = a
-				sessions[a.SessionID] = true
-			}
-		} else {
-			log.Printf("reap: claude agents check failed: %v", err)
+		if err != nil {
+			return err
+		}
+		for _, a := range agents {
+			alive[a.ID] = a
+			sessions[a.SessionID] = true
 		}
 	}
 	for _, r := range cand {
