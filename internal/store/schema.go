@@ -192,8 +192,6 @@ CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS apps (
   id INTEGER PRIMARY KEY,
   name TEXT NOT NULL UNIQUE,
-  command TEXT NOT NULL,
-  output INTEGER NOT NULL DEFAULT 0,
   manifest TEXT NOT NULL DEFAULT '',
   disabled INTEGER NOT NULL DEFAULT 0,
   settings TEXT NOT NULL DEFAULT '{}'
@@ -370,13 +368,6 @@ func migrateAppColumns(db *sql.DB) error {
 	has := func(col string) (n int, err error) {
 		err = db.QueryRow(`SELECT count(*) FROM pragma_table_info('apps') WHERE name=?`, col).Scan(&n)
 		return n, err
-	}
-	if n, err := has("output"); err != nil {
-		return fmt.Errorf("check apps.output: %w", err)
-	} else if n == 0 {
-		if _, err := db.Exec(`ALTER TABLE apps ADD COLUMN output INTEGER NOT NULL DEFAULT 0`); err != nil {
-			return fmt.Errorf("add apps.output: %w", err)
-		}
 	}
 	if n, err := has("global"); err != nil {
 		return fmt.Errorf("check apps.global: %w", err)

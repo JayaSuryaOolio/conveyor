@@ -10,12 +10,6 @@ import (
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 )
 
-func TestRenderApp(t *testing.T) {
-	if got := RenderApp("open -a Zed {cwd} && echo {cwd} {key}", "/a b/it's", "CV-1"); got != `open -a Zed '/a b/it'\''s' && echo '/a b/it'\''s' 'CV-1'` {
-		t.Fatal(got)
-	}
-}
-
 func TestAppPresets(t *testing.T) {
 	dir := t.TempDir()
 	os.Mkdir(filepath.Join(dir, "Zed.app"), 0o755)
@@ -23,7 +17,7 @@ func TestAppPresets(t *testing.T) {
 	appDirs = func() []string { return []string{dir} }
 	t.Cleanup(func() { appDirs = old })
 	ps := AppPresets()
-	if ps[0].Name != "Finder" || ps[1] != (store.App{Name: "Zed", Command: "open -a 'Zed' {cwd}"}) {
+	if ps[0].Name != "Finder" || ps[1].Name != "Zed" || !strings.Contains(ps[1].Manifest, "open -a 'Zed' ${{ worktree.path }}") {
 		t.Fatal(ps)
 	}
 	for _, p := range ps {
@@ -120,12 +114,14 @@ func TestManifestIconFromApp(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
-	// a preset converts with its icon (core's InstallLegacy runs the same LegacyManifest + icon path)
-	if _, err := store.CreateApp(db, store.App{Name: "Zed", Command: "open -a Zed {cwd}"}); err != nil {
+	// a legacy plain app migrates to a manifest app with its icon, and the columns go
+	if _, err := db.Exec(`ALTER TABLE apps ADD COLUMN command TEXT NOT NULL DEFAULT ''; ALTER TABLE apps ADD COLUMN output INTEGER NOT NULL DEFAULT 0; INSERT INTO apps (name, command) VALUES ('Zed', 'open -a Zed {cwd}')`); err != nil {
 		t.Fatal(err)
 	}
-	if err := ConvertApp(db, t.TempDir(), "Zed"); err != nil {
-		t.Fatal(err)
+	for i := 0; i < 2; i++ { // second run is a no-op
+		if err := MigratePlain(db, t.TempDir()); err != nil {
+			t.Fatal(err)
+		}
 	}
 	if p, _ := PlacedActions(db, "task_sidebar"); len(p) != 1 || !strings.HasPrefix(p[0].Icon, "data:image/png") {
 		t.Fatal(p)

@@ -65,7 +65,7 @@ func (a *App) Startup(ctx context.Context) {
 	if a.pathErr != "" {
 		log.Printf("app start: %s", a.pathErr)
 	}
-	db, err := store.Open(core.DBPath(home))
+	db, err := core.OpenDB(home)
 	if err != nil {
 		log.Printf("open db: %v", err) // LogFatalf writes only to the Wails logger
 		runtime.LogFatalf(ctx, "open db: %v", err)

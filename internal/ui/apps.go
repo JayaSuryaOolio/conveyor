@@ -20,28 +20,13 @@ func (a *App) ListApps() ([]store.App, error) { return store.ListApps(a.svc.DB) 
 // AppPresets returns the apps detected on this Mac that can be added in one click.
 func (a *App) AppPresets() []store.App { return apps.AppPresets() }
 
-func validApp(x store.App) error {
-	if strings.TrimSpace(x.Name) == "" || strings.TrimSpace(x.Command) == "" {
+// AddApp installs a shell command ({cwd}/{key} placeholders) as a manifest app; output makes it a quick action.
+func (a *App) AddApp(name, command string, output bool) error {
+	if strings.TrimSpace(name) == "" || strings.TrimSpace(command) == "" {
 		return errors.New("name and command are required")
 	}
-	return nil
-}
-
-// AddApp creates an app.
-func (a *App) AddApp(x store.App) error {
-	if err := validApp(x); err != nil {
-		return err
-	}
-	_, err := store.CreateApp(a.svc.DB, x)
+	_, err := a.svc.InstallCommand(name, command, output)
 	return err
-}
-
-// UpdateApp edits the app with x.ID.
-func (a *App) UpdateApp(x store.App) error {
-	if err := validApp(x); err != nil {
-		return err
-	}
-	return store.UpdateApp(a.svc.DB, x)
 }
 
 // DeleteApp removes an app.
@@ -101,12 +86,9 @@ func (a *App) SaveAppSettings(name string, vals map[string]string) error {
 	return a.svc.SaveAppSettings(name, vals)
 }
 
-// ConvertApp turns a plain command app into a manifest app.
-func (a *App) ConvertApp(name string) error { return a.svc.ConvertApp(name) }
-
 // InstallPreset adds a detected app as a manifest app.
 func (a *App) InstallPreset(x store.App) error {
-	_, err := a.svc.InstallLegacy(x)
+	_, err := a.svc.InstallManifest(x.Manifest, false)
 	return err
 }
 
@@ -136,19 +118,7 @@ func (a *App) StopAppService(app, id, place, key string) error {
 	return err
 }
 
-// RenderApp previews command for cwd and task key.
-func (a *App) RenderApp(command, cwd, key string) string { return apps.RenderApp(command, cwd, key) }
-
-// TestApp runs app x (saved or not) on the user's home directory with no task key.
-func (a *App) TestApp(x store.App) (string, error) {
-	h, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-	return apps.RunApp(x, h, "")
-}
-
-// OpenApp runs the named app in the task repo's worktree ("" repo = primary); an output app returns its output.
+// OpenApp runs the named app in the task repo's worktree ("" repo = primary); an output action returns its output.
 func (a *App) OpenApp(name, key, repo string) (string, error) {
 	out, err := a.svc.OpenApp(name, key, repo)
 	if err != nil {
@@ -163,7 +133,7 @@ func (a *App) AppIcons() (map[string]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	return apps.AppIcons(a.svc.Home, list), nil
+	return apps.AppIcons(list), nil
 }
 
 // GraftRoot returns the root checkout graft mirrors worktree into, "" when inactive for it.

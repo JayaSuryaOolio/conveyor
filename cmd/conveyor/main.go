@@ -14,7 +14,6 @@ import (
 	"github.com/JayaSuryaOolio/conveyor/internal/audit"
 	"github.com/JayaSuryaOolio/conveyor/internal/core"
 	"github.com/JayaSuryaOolio/conveyor/internal/jira"
-	"github.com/JayaSuryaOolio/conveyor/internal/store"
 )
 
 // cmdFunc runs a command group with the resolved home and the args after its name.
@@ -85,7 +84,7 @@ var out io.Writer = os.Stdout
 
 // openService opens the DB under home.
 func openService(home string) (*core.Service, error) {
-	db, err := store.Open(core.DBPath(home))
+	db, err := core.OpenDB(home)
 	if err != nil {
 		return nil, err
 	}

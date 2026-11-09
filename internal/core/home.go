@@ -2,9 +2,13 @@
 package core
 
 import (
+	"database/sql"
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/JayaSuryaOolio/conveyor/internal/apps"
+	"github.com/JayaSuryaOolio/conveyor/internal/store"
 )
 
 // Home resolves CONVEYOR_HOME: the flag value, else $CONVEYOR_HOME, else
@@ -33,6 +37,19 @@ func Home(flagVal string) (string, error) {
 
 // DBPath is the SQLite file under home.
 func DBPath(home string) string { return filepath.Join(home, "conveyor.db") }
+
+// OpenDB opens the database under home and converts legacy plain command apps to manifest apps.
+func OpenDB(home string) (*sql.DB, error) {
+	db, err := store.Open(DBPath(home))
+	if err != nil {
+		return nil, err
+	}
+	if err := apps.MigratePlain(db, home); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("migrate apps: %w", err)
+	}
+	return db, nil
+}
 
 // WorkspacesDir holds the per-task workspace folders under home.
 func WorkspacesDir(home string) string { return filepath.Join(home, "workspaces") }

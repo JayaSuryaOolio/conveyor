@@ -1,7 +1,6 @@
 package apps
 
 import (
-	"encoding/base64"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -48,31 +47,12 @@ func bundleIcns(app string) string {
 	return ""
 }
 
-// AppIcons maps app name to a PNG data: URL of its macOS icon; apps without one are omitted.
-// PNGs are cached under <home>/icons.
-func AppIcons(home string, apps []store.App) map[string]string {
+// AppIcons maps app name to the icon (data: URL) of its manifest; apps without one are omitted.
+func AppIcons(apps []store.App) map[string]string {
 	out := map[string]string{}
-	dir := filepath.Join(home, "icons")
 	for _, a := range apps {
-		if a.Manifest != "" {
-			if u := manifestIcon(a.Manifest); u != "" {
-				out[a.Name] = u
-			}
-			continue
-		}
-		app := appBundle(a.Command)
-		if app == "" {
-			continue
-		}
-		png := filepath.Join(dir, strings.TrimSuffix(filepath.Base(app), ".app")+".png")
-		if !exists(png) {
-			icns := bundleIcns(app)
-			if icns == "" || os.MkdirAll(dir, 0o755) != nil || exec.Command("sips", "-s", "format", "png", "-Z", "64", icns, "--out", png).Run() != nil {
-				continue
-			}
-		}
-		if b, err := os.ReadFile(png); err == nil {
-			out[a.Name] = "data:image/png;base64," + base64.StdEncoding.EncodeToString(b)
+		if u := manifestIcon(a.Manifest); u != "" {
+			out[a.Name] = u
 		}
 	}
 	return out

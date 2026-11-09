@@ -26,9 +26,10 @@ type State struct {
 }
 
 type StateApp struct {
-	Name    string `json:"name"`
-	Command string `json:"command"`
-	Output  bool   `json:"output"`
+	Name string `json:"name"`
+	// Command and Output only appear in exports from before manifest-only apps; imported as a command manifest.
+	Command string `json:"command,omitempty"`
+	Output  bool   `json:"output,omitempty"`
 	// Disabled apps stay installed but inactive.
 	Disabled bool `json:"disabled,omitempty"`
 	// Manifest is the app's portable manifest JSON (icons inlined); set for manifest apps.
@@ -101,11 +102,9 @@ func (s *Service) ExportState() (State, error) {
 		return st, err
 	}
 	for _, a := range list {
-		sa := StateApp{Name: a.Name, Command: a.Command, Output: a.Output, Disabled: a.Disabled}
-		if a.Manifest != "" {
-			if sa.Manifest, err = apps.PortableManifest(a.Manifest); err != nil {
-				return st, fmt.Errorf("app %q: %w", a.Name, err)
-			}
+		sa := StateApp{Name: a.Name, Disabled: a.Disabled}
+		if sa.Manifest, err = apps.PortableManifest(a.Manifest); err != nil {
+			return st, fmt.Errorf("app %q: %w", a.Name, err)
 		}
 		st.Apps = append(st.Apps, sa)
 	}
@@ -174,14 +173,15 @@ func (s *Service) ImportState(st State, repoMap map[string]string) ([]string, er
 			out = append(out, "skipped app "+a.Name+": exists")
 			continue
 		}
-		// agents and automations a manifest declares travel in their own state sections
-		if a.Manifest != "" {
-			if _, err := apps.ParseManifest(a.Manifest); err != nil {
-				out = append(out, "skipped app "+a.Name+": "+err.Error())
-				continue
-			}
+		if a.Manifest == "" {
+			a.Manifest = apps.CommandManifest(a.Name, a.Command, a.Output)
 		}
-		if _, err := store.CreateApp(s.DB, store.App{Name: a.Name, Command: a.Command, Output: a.Output, Manifest: a.Manifest, Disabled: a.Disabled}); err != nil {
+		// agents and automations a manifest declares travel in their own state sections
+		if _, err := apps.ParseManifest(a.Manifest); err != nil {
+			out = append(out, "skipped app "+a.Name+": "+err.Error())
+			continue
+		}
+		if _, err := store.CreateApp(s.DB, store.App{Name: a.Name, Manifest: a.Manifest, Disabled: a.Disabled}); err != nil {
 			return out, err
 		}
 		out = append(out, "added app "+a.Name)

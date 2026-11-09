@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"text/tabwriter"
 
@@ -15,17 +14,17 @@ import (
 )
 
 func init() {
-	register("app", runApp, "open worktrees in external apps, run quick actions (list|presets|add|install|export|convert|run|output|enable|disable|rm|open)")
+	register("app", runApp, "open worktrees in external apps, run quick actions (list|presets|add|install|export|run|enable|disable|rm|open)")
 	register("hooks", runHooks, "Claude Code hooks in ~/.claude/settings.json (status|install|uninstall)")
 }
 
 const appUsage = `usage: conveyor app list [--json] | presets [--json] | add NAME [--command CMD] [--output] | add --from-app NAME [--replace]
-       conveyor app install FILE|- [--replace] (manifest JSON; - reads stdin) | export NAME [FILE] | convert NAME | run APP ACTION [KEY] [--place p]
-       conveyor app output NAME on|off | enable NAME | disable NAME | rm NAME
-       conveyor app open NAME [KEY|DIR] [--repo r] [--print]
-CMD is a shell command; {cwd} becomes the quoted worktree path and {key} the task key ('' without one).
+       conveyor app install FILE|- [--replace] (manifest JSON; - reads stdin) | export NAME [FILE] | run APP ACTION [KEY] [--place p]
+       conveyor app enable NAME | disable NAME | rm NAME
+       conveyor app open NAME KEY [--repo r]
+add --command installs CMD, a shell command, as a manifest app: {cwd} becomes ${{ worktree.path }} and {key} ${{ task.key }}.
 add without --command uses the preset of that name.
-An output app is a quick action: it runs to completion in {cwd} and its output is shown (a toast in the app).
+An --output app is a quick action: it runs to completion in the worktree and its output is shown (a toast in the app).
 Scripts can use conveyor task sessions KEY [--json] for the task's Claude session ids.`
 
 func runApp(home string, args []string) error {
@@ -40,7 +39,6 @@ func runApp(home string, args []string) error {
 	replace := fs.Bool("replace", false, "install over an app of the same name")
 	fromApp := fs.String("from-app", "", "add: build a manifest app from an installed .app (e.g. \"Visual Studio Code\")")
 	repo := fs.String("repo", "", "repo of the task (default primary)")
-	print := fs.Bool("print", false, "print the command instead of running it")
 	place := fs.String("place", "", "run the action as shown at this place (its service there may override run)")
 	pos, err := parseArgs(fs, rest)
 	if err != nil {
@@ -79,32 +77,24 @@ func runApp(home string, args []string) error {
 				}
 				return err
 			}
-			a := store.App{Name: pos[0], Command: *command, Output: *output}
-			if a.Command == "" {
-				for _, p := range apps.AppPresets() {
-					if p.Name == a.Name {
-						a.Command = p.Command
+			name := pos[0]
+			if *command != "" {
+				a, err := s.InstallCommand(name, *command, *output)
+				if err == nil {
+					fmt.Fprintf(out, "added %s\n", a.Name)
+				}
+				return err
+			}
+			for _, p := range apps.AppPresets() {
+				if p.Name == name {
+					a, err := s.InstallManifest(p.Manifest, false)
+					if err == nil {
+						fmt.Fprintf(out, "added %s\n", a.Name)
 					}
-				}
-				if a.Command == "" {
-					return fmt.Errorf("no installed preset %q; pass --command (see conveyor app presets)", a.Name)
+					return err
 				}
 			}
-			if _, err := store.CreateApp(s.DB, a); err != nil {
-				return err
-			}
-			fmt.Fprintf(out, "added %s: %s\n", a.Name, a.Command)
-			return nil
-		case "output":
-			if len(pos) != 2 || pos[1] != "on" && pos[1] != "off" {
-				return errors.New(appUsage)
-			}
-			a, err := store.GetApp(s.DB, pos[0])
-			if err != nil {
-				return err
-			}
-			a.Output = pos[1] == "on"
-			return store.UpdateApp(s.DB, a)
+			return fmt.Errorf("no installed preset %q; pass --command (see conveyor app presets)", name)
 		case "enable", "disable":
 			if len(pos) != 1 {
 				return errors.New(appUsage)
@@ -115,11 +105,6 @@ func runApp(home string, args []string) error {
 				return errors.New(appUsage)
 			}
 			return s.UninstallApp(pos[0])
-		case "convert": // plain command app -> manifest app
-			if len(pos) != 1 {
-				return errors.New(appUsage)
-			}
-			return s.ConvertApp(pos[0])
 		case "install":
 			if len(pos) != 1 {
 				return errors.New(appUsage)
@@ -156,22 +141,10 @@ func runApp(home string, args []string) error {
 			}
 			return err
 		case "open":
-			if len(pos) < 1 || len(pos) > 2 {
+			if len(pos) != 2 {
 				return errors.New(appUsage)
 			}
-			a, err := store.GetApp(s.DB, pos[0])
-			if err != nil {
-				return err
-			}
-			cwd, key, err := appCwd(s, a, pos[1:], *repo)
-			if err != nil {
-				return err
-			}
-			if *print {
-				fmt.Fprintln(out, apps.RenderApp(a.Command, cwd, key))
-				return nil
-			}
-			res, err := apps.RunApp(a, cwd, key)
+			res, err := s.OpenApp(pos[0], pos[1], *repo)
 			if res != "" {
 				fmt.Fprintln(out, res)
 			}
@@ -181,31 +154,21 @@ func runApp(home string, args []string) error {
 	})
 }
 
-// appCwd resolves where an app opens: a directory, or a task key's worktree.
-// key is the task key when one was given.
-func appCwd(s *core.Service, a store.App, arg []string, repo string) (cwd, key string, err error) {
-	if len(arg) == 0 {
-		return "", "", fmt.Errorf("pass a task KEY or DIR to open %s", a.Name)
-	}
-	if fi, err := os.Stat(arg[0]); err == nil && fi.IsDir() {
-		cwd, err = filepath.Abs(arg[0])
-		return cwd, "", err
-	}
-	cwd, err = s.WorktreePath(arg[0], repo)
-	return cwd, arg[0], err
-}
-
 func printApps(as []store.App) error {
 	tw := tabwriter.NewWriter(out, 0, 4, 2, ' ', 0)
-	fmt.Fprintln(tw, "NAME\tOUTPUT\tCOMMAND")
+	fmt.Fprintln(tw, "NAME\tACTIONS")
 	for _, a := range as {
-		if a.Manifest != "" {
-			a.Command = "(manifest)"
+		var acts []string
+		if m, err := apps.ParseManifest(a.Manifest); err == nil {
+			for _, x := range m.Actions {
+				acts = append(acts, x.ID)
+			}
 		}
+		name := a.Name
 		if a.Disabled {
-			a.Command += " (disabled)"
+			name += " (disabled)"
 		}
-		fmt.Fprintf(tw, "%s\t%v\t%s\n", a.Name, a.Output, a.Command)
+		fmt.Fprintf(tw, "%s\t%s\n", name, strings.Join(acts, ","))
 	}
 	return tw.Flush()
 }

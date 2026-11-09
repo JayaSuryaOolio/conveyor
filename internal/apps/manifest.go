@@ -428,7 +428,15 @@ func PlacedActions(db *sql.DB, place string) ([]Placed, error) {
 // "" = the action's own Run). key "" means no task (worktree.path is then the home directory).
 // Returns an output action's output.
 func RunAppAction(db *sql.DB, app, id, place, key string) (string, error) {
-	act, vars, cwd, err := resolveAction(db, app, id, key)
+	return runAppAction(db, app, id, place, key, "")
+}
+
+// appTimeout bounds an output action (a quick action); launching actions return at once.
+var appTimeout = 2 * time.Minute
+
+// runAppAction is RunAppAction in the worktree of the task's repo ("" = primary).
+func runAppAction(db *sql.DB, app, id, place, key, repo string) (string, error) {
+	act, vars, cwd, err := resolveAction(db, app, id, key, repo)
 	if err != nil {
 		return "", err
 	}
@@ -436,12 +444,28 @@ func RunAppAction(db *sql.DB, app, id, place, key string) (string, error) {
 	if sv := act.Services[place]; sv.Run != "" {
 		run = sv.Run
 	}
-	return RunApp(store.App{Name: act.Label, Command: RenderManifest(run, vars), Output: act.Output}, cwd, key)
+	cmd := RenderManifest(run, vars)
+	if !act.Output {
+		return "", runShell("open app", cmd)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), appTimeout)
+	defer cancel()
+	c := exec.CommandContext(ctx, "sh", "-c", cmd)
+	c.Dir = cwd
+	b, err := c.CombinedOutput()
+	out := strings.TrimSpace(string(b))
+	if len(out) > 4096 {
+		out = out[:4096] + "…"
+	}
+	if err != nil {
+		return "", fmt.Errorf("%s: %w: %s", act.Label, err, out)
+	}
+	return out, nil
 }
 
 // AppServiceRunning reports whether the action's service at place has its status script exit 0.
 func AppServiceRunning(db *sql.DB, app, id, place, key string) (bool, error) {
-	act, vars, cwd, err := resolveAction(db, app, id, key)
+	act, vars, cwd, err := resolveAction(db, app, id, key, "")
 	if err != nil {
 		return false, err
 	}
@@ -458,7 +482,7 @@ func AppServiceRunning(db *sql.DB, app, id, place, key string) (bool, error) {
 
 // StopAppService runs the stop script of the action's service at place.
 func StopAppService(db *sql.DB, app, id, place, key string) error {
-	act, vars, _, err := resolveAction(db, app, id, key)
+	act, vars, _, err := resolveAction(db, app, id, key, "")
 	if err != nil {
 		return err
 	}
@@ -469,8 +493,8 @@ func StopAppService(db *sql.DB, app, id, place, key string) error {
 	return runShell("stop "+act.Label, RenderManifest(sv.Stop, vars))
 }
 
-// resolveAction finds the action and the variables and directory its scripts run with.
-func resolveAction(db *sql.DB, app, id, key string) (*ManifestAction, map[string]string, string, error) {
+// resolveAction finds the action and the variables and directory its scripts run with (the worktree of repo, "" = primary).
+func resolveAction(db *sql.DB, app, id, key, repo string) (*ManifestAction, map[string]string, string, error) {
 	a, err := store.GetApp(db, app)
 	if err != nil {
 		return nil, nil, "", err
@@ -509,7 +533,7 @@ func resolveAction(db *sql.DB, app, id, key string) (*ManifestAction, map[string
 		if err != nil {
 			return nil, nil, "", err
 		}
-		if cwd, err = WorktreePath(db, key, ""); err != nil {
+		if cwd, err = WorktreePath(db, key, repo); err != nil {
 			return nil, nil, "", err
 		}
 		vars["task.key"], vars["task.title"], vars["task.status"] = t.Key, t.Title, string(t.Status)
@@ -531,50 +555,81 @@ func graftService() ManifestService {
 	return ManifestService{Status: root + " | grep -q .", Stop: `r=$(` + root + `); [ -n "$r" ] && ` + bin + ` stop "$r"`}
 }
 
-// LegacyManifest expresses a plain command app (the old {cwd}/{key} template) as a manifest:
-// one action in the task sidebar, with the icon of the .app it opens. Unlike the legacy sidebar icons, the
-// action runs in the task's primary worktree only.
-func LegacyManifest(a store.App) (string, error) {
+// CommandManifest expresses a shell command ({cwd} and {key} placeholders) as a manifest app:
+// one action in the task sidebar, with the icon of the .app it opens. output makes it a quick
+// action. The action runs in the task's primary worktree only.
+func CommandManifest(name, command string, output bool) string {
 	place := "task_sidebar"
-	run := strings.NewReplacer("{cwd}", "${{ worktree.path }}", "{key}", "${{ task.key }}").Replace(a.Command)
-	act := ManifestAction{ID: "open", Label: a.Name, Run: run, Places: []string{place}, Output: a.Output, IconPath: appBundle(a.Command)}
-	if a.Name == "Graft" && !a.Output {
+	run := strings.NewReplacer("{cwd}", "${{ worktree.path }}", "{key}", "${{ task.key }}").Replace(command)
+	act := ManifestAction{ID: "open", Label: name, Run: run, Places: []string{place}, Output: output, IconPath: appBundle(command)}
+	if name == "Graft" && !output {
 		act.Services = map[string]ManifestService{place: graftService()}
 	}
-	b, err := json.MarshalIndent(Manifest{Version: ManifestVersion, Name: a.Name, Actions: []ManifestAction{act}}, "", "  ")
-	return string(b), err
+	b, _ := json.MarshalIndent(Manifest{Version: ManifestVersion, Name: name, Actions: []ManifestAction{act}}, "", "  ")
+	return string(b)
 }
 
-// ConvertApp turns the plain command app into a manifest app in place.
-func ConvertApp(db *sql.DB, home, name string) error {
-	a, err := store.GetApp(db, name)
+// MigratePlain converts the legacy plain command apps (apps.command/output columns) into
+// manifest apps, then drops the columns. Idempotent; run once at startup.
+func MigratePlain(db *sql.DB, home string) error {
+	var n int
+	if err := db.QueryRow(`SELECT count(*) FROM pragma_table_info('apps') WHERE name='command'`).Scan(&n); err != nil || n == 0 {
+		return err
+	}
+	out := "0"
+	if err := db.QueryRow(`SELECT count(*) FROM pragma_table_info('apps') WHERE name='output'`).Scan(&n); err != nil {
+		return err
+	} else if n > 0 {
+		out = "output"
+	}
+	rows, err := db.Query(`SELECT id, name, command, ` + out + ` FROM apps WHERE manifest=''`)
 	if err != nil {
 		return err
 	}
-	if a.Manifest != "" {
-		return fmt.Errorf("app %q is already a manifest app", name)
+	type plain struct {
+		id            int64
+		name, command string
+		output        bool
 	}
-	raw, err := LegacyManifest(a)
-	if err != nil {
+	var todo []plain
+	for rows.Next() {
+		var p plain
+		if err := rows.Scan(&p.id, &p.name, &p.command, &p.output); err != nil {
+			rows.Close()
+			return err
+		}
+		todo = append(todo, p)
+	}
+	rows.Close()
+	for _, p := range todo {
+		raw, err := withIcons(home, CommandManifest(p.name, p.command, p.output))
+		if err != nil {
+			return fmt.Errorf("migrate app %q: %w", p.name, err)
+		}
+		if _, err := db.Exec(`UPDATE apps SET manifest=? WHERE id=?`, raw, p.id); err != nil {
+			return err
+		}
+	}
+	if _, err := db.Exec(`ALTER TABLE apps DROP COLUMN command`); err != nil {
 		return err
 	}
-	return setManifest(db, home, a, raw)
+	if out == "output" {
+		_, err = db.Exec(`ALTER TABLE apps DROP COLUMN output`)
+	}
+	return err
 }
 
-// setManifest validates raw, extracts its icons and stores it as a's manifest.
-func setManifest(db *sql.DB, home string, a store.App, raw string) error {
+// withIcons copies the icons raw's actions point at under home and returns the manifest pointing at the copies.
+func withIcons(home, raw string) (string, error) {
 	m, err := ParseManifest(raw)
 	if err != nil {
-		return err
+		return "", err
 	}
 	icons, err := ReadIcons(m)
 	if err != nil {
-		return err
+		return "", err
 	}
-	if raw, err = WriteIcons(home, &m, icons, raw); err != nil {
-		return err
-	}
-	return store.UpdateApp(db, store.App{ID: a.ID, Name: a.Name, Manifest: raw})
+	return WriteIcons(home, &m, icons, raw)
 }
 
 // ExportApp returns the manifest JSON of a manifest app, ready for InstallManifest elsewhere.
@@ -582,9 +637,6 @@ func ExportApp(db *sql.DB, name string) (string, error) {
 	a, err := store.GetApp(db, name)
 	if err != nil {
 		return "", err
-	}
-	if a.Manifest == "" {
-		return "", fmt.Errorf("app %q is not a manifest app; convert it first", name)
 	}
 	return PortableManifest(a.Manifest)
 }
@@ -598,7 +650,7 @@ func EnsureServices(db *sql.DB) error {
 	var errs []error
 	for _, a := range apps {
 		m, perr := ParseManifest(a.Manifest)
-		if a.Manifest == "" || a.Disabled || perr != nil {
+		if a.Disabled || perr != nil {
 			continue
 		}
 		for _, x := range m.Actions {

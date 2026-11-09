@@ -192,16 +192,16 @@ conveyor automation list | enable NAME | disable NAME | run NAME | rm NAME
 
 ## Apps
 
-An app is a name plus a shell command in which `{cwd}` is replaced by the quoted worktree path and `{key}` by the task key. The Apps page offers presets detected on your Mac (editors, terminals, git clients, Finder). Apps show up as a row of icons on each repo of the task page; hover for the name. A launched icon flashes a check or a cross, and Graft shows a green dot while it runs for that worktree (click again to stop it).
+Every app is a manifest app. `app add --command` (and the New app form) wraps a shell command in a one-action manifest, replacing `{cwd}` with the quoted worktree path and `{key}` with the task key; apps from older versions are converted on start. The Apps page offers presets detected on your Mac (editors, terminals, git clients, Finder). Apps show up as a row of icons on each repo of the task page; hover for the name. A launched icon flashes a check or a cross, and Graft shows a green dot while it runs for that worktree (click again to stop it).
 
 ```
 conveyor app presets
 conveyor app add Cursor                        # preset
 conveyor app add Zed --command 'zed {cwd}'
-conveyor app open Zed CV-12 [--repo r] [--print]
+conveyor app open Zed CV-12 [--repo r]
 ```
 
-**Quick actions.** An app with the Quick action switch on (`--output`, or `conveyor app output NAME on|off`) is not an opener: it runs to completion in the task's primary worktree, and its output shows as a toast (or is printed by `conveyor app open`). It appears as a button in the task sidebar. There are no special variables beyond `{cwd}` and `{key}`; scripts get anything else from the CLI, for example `conveyor task sessions KEY [--json]`, which lists the task's Claude session ids (Conveyor runs plus sessions you started in its worktrees). A task's Claude cost through [ccusage](https://github.com/ryoppippi/ccusage) (needs `npx` and `jq`, takes a few seconds):
+**Quick actions.** An app with the Quick action switch on (`--output`) is not an opener: it runs to completion in the task's primary worktree, and its output shows as a toast (or is printed by `conveyor app open`). It appears as a button in the task sidebar. There are no special variables beyond `{cwd}` and `{key}`; scripts get anything else from the CLI, for example `conveyor task sessions KEY [--json]`, which lists the task's Claude session ids (Conveyor runs plus sessions you started in its worktrees). A task's Claude cost through [ccusage](https://github.com/ryoppippi/ccusage) (needs `npx` and `jq`, takes a few seconds):
 
 ```
 conveyor app add Usage --output --command 'ids=$(conveyor task sessions {key} --json) && npx -y ccusage session --json --offline | jq -r --argjson ids "$ids" '"'"'[.session[] | select(.period as $p | $ids | index($p))] | "Claude usage: $\((map(.totalCost) | add // 0) * 100 | round / 100) across \(length) of \($ids | length) sessions"'"'"

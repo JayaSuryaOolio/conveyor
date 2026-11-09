@@ -12,7 +12,6 @@ import (
 
 	"github.com/JayaSuryaOolio/conveyor/internal/core"
 	"github.com/JayaSuryaOolio/conveyor/internal/dispatch"
-	"github.com/JayaSuryaOolio/conveyor/internal/store"
 )
 
 func init() { register("daemon", runDaemon, "run the dispatcher in the foreground") }
@@ -30,7 +29,7 @@ func runDaemon(home string, args []string) error {
 	} else {
 		fmt.Fprintf(os.Stderr, "dispatcher log: %v\n", err)
 	}
-	db, err := store.Open(core.DBPath(home))
+	db, err := core.OpenDB(home)
 	if err != nil {
 		return err
 	}
