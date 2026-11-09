@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/JayaSuryaOolio/conveyor/internal/apps"
 	"github.com/JayaSuryaOolio/conveyor/internal/claude"
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 )
@@ -144,13 +145,13 @@ func (s *Service) FileOpeners(key, ref string) ([]string, error) {
 	if _, err := s.resolveRef(key, ref); err != nil {
 		return nil, err
 	}
-	apps, err := store.ListApps(s.DB)
+	list, err := store.ListApps(s.DB)
 	if err != nil {
 		return nil, err
 	}
 	out := []string{}
-	for _, a := range apps {
-		if !a.Disabled && slices.Contains(editorApps, a.Name) {
+	for _, a := range list {
+		if !a.Disabled && slices.Contains(apps.EditorApps, a.Name) {
 			out = append(out, a.Name)
 		}
 	}

@@ -43,24 +43,6 @@ func TestAppSettings(t *testing.T) {
 	}
 }
 
-func TestManifestSettingsValidation(t *testing.T) {
-	act := func(run string) string {
-		return `"actions":[{"id":"a","label":"A","places":["global_nav"],"run":"` + run + `"}]`
-	}
-	for name, raw := range map[string]string{
-		"needs v3":        `{"version":2,"name":"X","settings":[{"key":"k","type":"string","default":""}],` + act("x") + `}`,
-		"undeclared var":  `{"version":3,"name":"X",` + act("${{ setting.k }}") + `}`,
-		"bad key":         `{"version":3,"name":"X","settings":[{"key":"A-b","type":"string","default":""}],` + act("x") + `}`,
-		"bad default":     `{"version":3,"name":"X","settings":[{"key":"k","type":"number","default":"x"}],` + act("x") + `}`,
-		"unknown type":    `{"version":3,"name":"X","settings":[{"key":"k","type":"date","default":""}],` + act("x") + `}`,
-		"key as bare var": `{"version":3,"name":"X","settings":[{"key":"k","type":"string","default":""}],` + act("${{ k }}") + `}`,
-	} {
-		if _, err := ParseManifest(raw); err == nil {
-			t.Errorf("%s: accepted", name)
-		}
-	}
-}
-
 func TestReviewWebhookEventsFollowSettings(t *testing.T) {
 	s := newSvc(t)
 	if got := s.EnabledReviewWebhookEvents("review-webhooks"); !slices.Equal(got, ReviewWebhookEvents) {

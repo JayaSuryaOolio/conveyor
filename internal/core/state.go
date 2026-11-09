@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/JayaSuryaOolio/conveyor/internal/apps"
 	"github.com/JayaSuryaOolio/conveyor/internal/claude"
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 )
@@ -95,14 +96,14 @@ func (s *Service) ExportState() (State, error) {
 		st.Settings[k] = v
 	}
 	rows.Close()
-	apps, err := store.ListApps(s.DB)
+	list, err := store.ListApps(s.DB)
 	if err != nil {
 		return st, err
 	}
-	for _, a := range apps {
+	for _, a := range list {
 		sa := StateApp{Name: a.Name, Command: a.Command, Output: a.Output, Disabled: a.Disabled}
 		if a.Manifest != "" {
-			if sa.Manifest, err = portableManifest(a.Manifest); err != nil {
+			if sa.Manifest, err = apps.PortableManifest(a.Manifest); err != nil {
 				return st, fmt.Errorf("app %q: %w", a.Name, err)
 			}
 		}
@@ -175,7 +176,7 @@ func (s *Service) ImportState(st State, repoMap map[string]string) ([]string, er
 		}
 		// agents and automations a manifest declares travel in their own state sections
 		if a.Manifest != "" {
-			if _, err := ParseManifest(a.Manifest); err != nil {
+			if _, err := apps.ParseManifest(a.Manifest); err != nil {
 				out = append(out, "skipped app "+a.Name+": "+err.Error())
 				continue
 			}

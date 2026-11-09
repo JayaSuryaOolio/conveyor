@@ -1,7 +1,8 @@
-package core
+package apps
 
 import (
 	"context"
+	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -10,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -209,7 +211,7 @@ func ParseManifest(raw string) (Manifest, error) {
 		}
 		scripts := a.Run
 		for p, sv := range a.Services {
-			if !contains(a.Places, p) {
+			if !slices.Contains(a.Places, p) {
 				return m, fmt.Errorf("manifest: action %q: service for %q, which is not in its places", a.ID, p)
 			}
 			if a.Output || strings.TrimSpace(sv.Status) == "" || strings.TrimSpace(sv.Stop) == "" {
@@ -218,7 +220,7 @@ func ParseManifest(raw string) (Manifest, error) {
 			scripts += "\n" + sv.Run + "\n" + sv.Status + "\n" + sv.Stop
 		}
 		for _, v := range varRe.FindAllStringSubmatch(scripts, -1) {
-			if k, ok := strings.CutPrefix(v[1], "setting."); !contains(ManifestVars, v[1]) && !(ok && keys[k]) {
+			if k, ok := strings.CutPrefix(v[1], "setting."); !slices.Contains(ManifestVars, v[1]) && !(ok && keys[k]) {
 				return m, fmt.Errorf("manifest: action %q: unknown variable %q (have %s, setting.<key>)", a.ID, v[1], strings.Join(ManifestVars, ", "))
 			}
 		}
@@ -282,8 +284,8 @@ func icnsPNG(icns string) ([]byte, error) {
 	return os.ReadFile(tmp)
 }
 
-// portableManifest inlines iconPath files as icon data URLs, so the manifest works on another machine.
-func portableManifest(raw string) (string, error) {
+// PortableManifest inlines iconPath files as icon data URLs, so the manifest works on another machine.
+func PortableManifest(raw string) (string, error) {
 	m, err := ParseManifest(raw)
 	if err != nil {
 		return "", err
@@ -326,16 +328,8 @@ func ManifestFromApp(name string) (string, error) {
 	return string(b), err
 }
 
-func (s *Service) iconsDir() string { return filepath.Join(s.Home, "app-icons") }
-
-func contains(l []string, s string) bool {
-	for _, x := range l {
-		if x == s {
-			return true
-		}
-	}
-	return false
-}
+// IconsDir is where installed manifests' icon copies live.
+func IconsDir(home string) string { return filepath.Join(home, "app-icons") }
 
 // RenderManifest fills ${{ var }} placeholders in a run script with shell-quoted values.
 func RenderManifest(run string, vars map[string]string) string {
@@ -344,8 +338,8 @@ func RenderManifest(run string, vars map[string]string) string {
 	})
 }
 
-// readIcons renders each action's iconPath (by action index) as image bytes.
-func readIcons(m Manifest) (map[int][]byte, error) {
+// ReadIcons renders each action's iconPath (by action index) as image bytes.
+func ReadIcons(m Manifest) (map[int][]byte, error) {
 	icons := map[int][]byte{}
 	for i, a := range m.Actions {
 		if a.IconPath == "" {
@@ -369,18 +363,18 @@ func readIcons(m Manifest) (map[int][]byte, error) {
 	return icons, nil
 }
 
-// writeIcons copies icons into <home>/app-icons, points m's iconPaths at the copies and returns
+// WriteIcons copies icons into <home>/app-icons, points m's iconPaths at the copies and returns
 // the manifest JSON; with no icons it returns raw unchanged.
-func (s *Service) writeIcons(m *Manifest, icons map[int][]byte, raw string) (string, error) {
+func WriteIcons(home string, m *Manifest, icons map[int][]byte, raw string) (string, error) {
 	if len(icons) == 0 {
 		return raw, nil
 	}
-	if err := os.MkdirAll(s.iconsDir(), 0o755); err != nil {
+	if err := os.MkdirAll(IconsDir(home), 0o755); err != nil {
 		return "", err
 	}
 	for i, b := range icons {
 		x := &m.Actions[i]
-		p := filepath.Join(s.iconsDir(), nonAlnumPath.ReplaceAllString(m.Name, "-")+"-"+x.ID+iconExt(x.IconPath))
+		p := filepath.Join(IconsDir(home), nonAlnumPath.ReplaceAllString(m.Name, "-")+"-"+x.ID+iconExt(x.IconPath))
 		if err := os.WriteFile(p, b, 0o644); err != nil {
 			return "", err
 		}
@@ -388,89 +382,6 @@ func (s *Service) writeIcons(m *Manifest, icons map[int][]byte, raw string) (str
 	}
 	out, err := json.MarshalIndent(m, "", "  ")
 	return string(out), err
-}
-
-// InstallManifest validates raw, stores the app and creates its agents (user scope) and
-// automations (disabled until the user enables them). A failure rolls the app back.
-// An app of the same name is an error unless replace, which uninstalls it first.
-func (s *Service) InstallManifest(raw string, replace bool) (store.App, error) {
-	m, err := ParseManifest(raw)
-	if err != nil {
-		return store.App{}, err
-	}
-	if m.Check != "" {
-		if err := runCheck(m.Check); err != nil {
-			return store.App{}, fmt.Errorf("%s: sample run failed (is the tool installed and on PATH?): %w", m.Name, err)
-		}
-	}
-	// read icons before a replace uninstalls the copies an exported manifest points at
-	icons, err := readIcons(m)
-	if err != nil {
-		return store.App{}, err
-	}
-	if _, err := store.GetApp(s.DB, m.Name); err == nil && replace {
-		// ponytail: not atomic; a failed install after this leaves the old app gone
-		if err := s.UninstallApp(m.Name); err != nil {
-			return store.App{}, err
-		}
-	}
-	if raw, err = s.writeIcons(&m, icons, raw); err != nil {
-		return store.App{}, err
-	}
-	a, err := store.CreateApp(s.DB, store.App{Name: m.Name, Manifest: raw})
-	if err != nil {
-		return a, err
-	}
-	for _, g := range m.Agents {
-		if err = s.AddAgent(g.Name, g.Description, g.Prompt, "user", g.Model); err != nil {
-			break
-		}
-	}
-	if err == nil {
-		for _, x := range m.Automations {
-			if _, err = store.CreateAutomation(s.DB, store.Automation{Name: x.Name, Schedule: x.Schedule, Precheck: x.Precheck, ActionKind: x.ActionKind, ActionArg: x.ActionArg}); err != nil {
-				break
-			}
-		}
-	}
-	if err != nil {
-		_ = s.UninstallApp(m.Name)
-		return store.App{}, err
-	}
-	return a, nil
-}
-
-func runCheck(script string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	if out, err := exec.CommandContext(ctx, "sh", "-c", script).CombinedOutput(); err != nil {
-		return fmt.Errorf("%w: %s", err, strings.TrimSpace(string(out)))
-	}
-	return nil
-}
-
-// UninstallApp deletes the app; a manifest app's automations and agents go with it.
-func (s *Service) UninstallApp(name string) error {
-	a, err := store.GetApp(s.DB, name)
-	if err != nil {
-		return err
-	}
-	if a.Manifest != "" {
-		if m, err := ParseManifest(a.Manifest); err == nil {
-			for _, x := range m.Automations {
-				_ = store.DeleteAutomation(s.DB, x.Name)
-			}
-			for _, x := range m.Actions {
-				if x.IconPath != "" && filepath.Dir(x.IconPath) == s.iconsDir() {
-					_ = os.Remove(x.IconPath)
-				}
-			}
-			for _, g := range m.Agents {
-				_ = os.Remove(userAgentsDir() + "/" + g.Name + ".md")
-			}
-		}
-	}
-	return store.DeleteApp(s.DB, name)
 }
 
 // Placed is one manifest action ready to show in a UI slot.
@@ -485,8 +396,8 @@ type Placed struct {
 }
 
 // PlacedActions lists the manifest actions that asked for place.
-func (s *Service) PlacedActions(place string) ([]Placed, error) {
-	apps, err := store.ListApps(s.DB)
+func PlacedActions(db *sql.DB, place string) ([]Placed, error) {
+	apps, err := store.ListApps(db)
 	if err != nil {
 		return nil, err
 	}
@@ -500,7 +411,7 @@ func (s *Service) PlacedActions(place string) ([]Placed, error) {
 			continue
 		}
 		for _, x := range m.Actions {
-			if contains(x.Places, place) {
+			if slices.Contains(x.Places, place) {
 				_, svc := x.Services[place]
 				icon := x.Icon
 				if x.IconPath != "" {
@@ -516,8 +427,8 @@ func (s *Service) PlacedActions(place string) ([]Placed, error) {
 // RunAppAction runs one manifest action as shown at place (whose service may override Run;
 // "" = the action's own Run). key "" means no task (worktree.path is then the home directory).
 // Returns an output action's output.
-func (s *Service) RunAppAction(app, id, place, key string) (string, error) {
-	act, vars, cwd, err := s.resolveAction(app, id, key)
+func RunAppAction(db *sql.DB, app, id, place, key string) (string, error) {
+	act, vars, cwd, err := resolveAction(db, app, id, key)
 	if err != nil {
 		return "", err
 	}
@@ -529,8 +440,8 @@ func (s *Service) RunAppAction(app, id, place, key string) (string, error) {
 }
 
 // AppServiceRunning reports whether the action's service at place has its status script exit 0.
-func (s *Service) AppServiceRunning(app, id, place, key string) (bool, error) {
-	act, vars, cwd, err := s.resolveAction(app, id, key)
+func AppServiceRunning(db *sql.DB, app, id, place, key string) (bool, error) {
+	act, vars, cwd, err := resolveAction(db, app, id, key)
 	if err != nil {
 		return false, err
 	}
@@ -546,8 +457,8 @@ func (s *Service) AppServiceRunning(app, id, place, key string) (bool, error) {
 }
 
 // StopAppService runs the stop script of the action's service at place.
-func (s *Service) StopAppService(app, id, place, key string) error {
-	act, vars, _, err := s.resolveAction(app, id, key)
+func StopAppService(db *sql.DB, app, id, place, key string) error {
+	act, vars, _, err := resolveAction(db, app, id, key)
 	if err != nil {
 		return err
 	}
@@ -559,8 +470,8 @@ func (s *Service) StopAppService(app, id, place, key string) error {
 }
 
 // resolveAction finds the action and the variables and directory its scripts run with.
-func (s *Service) resolveAction(app, id, key string) (*ManifestAction, map[string]string, string, error) {
-	a, err := store.GetApp(s.DB, app)
+func resolveAction(db *sql.DB, app, id, key string) (*ManifestAction, map[string]string, string, error) {
+	a, err := store.GetApp(db, app)
 	if err != nil {
 		return nil, nil, "", err
 	}
@@ -581,7 +492,7 @@ func (s *Service) resolveAction(app, id, key string) (*ManifestAction, map[strin
 		return nil, nil, "", fmt.Errorf("app %q has no action %q", app, id)
 	}
 	vars := map[string]string{"app.name": m.Name, "app.id": m.AppID()}
-	vals, err := s.settingValues(m, app)
+	vals, err := settingValues(db, m, app)
 	if err != nil {
 		return nil, nil, "", err
 	}
@@ -594,11 +505,11 @@ func (s *Service) resolveAction(app, id, key string) (*ManifestAction, map[strin
 			return nil, nil, "", err
 		}
 	} else {
-		t, err := store.GetTaskByKey(s.DB, key)
+		t, err := store.GetTaskByKey(db, key)
 		if err != nil {
 			return nil, nil, "", err
 		}
-		if cwd, err = s.WorktreePath(key, ""); err != nil {
+		if cwd, err = WorktreePath(db, key, ""); err != nil {
 			return nil, nil, "", err
 		}
 		vars["task.key"], vars["task.title"], vars["task.status"] = t.Key, t.Title, string(t.Status)
@@ -615,7 +526,7 @@ func (s *Service) resolveAction(app, id, key string) (*ManifestAction, map[strin
 // graftService detects and stops the graft instance mirroring ${{ worktree.path }}:
 // `graft list` prints "ROOT  <-  WORKTREE  (pid N)" and stop takes the root.
 func graftService() ManifestService {
-	bin := shq(graftBin())
+	bin := shq(GraftBin())
 	root := bin + ` list | awk -v w=${{ worktree.path }} -F '  <-  ' '{sub(/  \(pid [0-9]+\)$/, "", $2); if ($2 == w) print $1}'`
 	return ManifestService{Status: root + " | grep -q .", Stop: `r=$(` + root + `); [ -n "$r" ] && ` + bin + ` stop "$r"`}
 }
@@ -635,8 +546,8 @@ func LegacyManifest(a store.App) (string, error) {
 }
 
 // ConvertApp turns the plain command app into a manifest app in place.
-func (s *Service) ConvertApp(name string) error {
-	a, err := store.GetApp(s.DB, name)
+func ConvertApp(db *sql.DB, home, name string) error {
+	a, err := store.GetApp(db, name)
 	if err != nil {
 		return err
 	}
@@ -647,49 +558,40 @@ func (s *Service) ConvertApp(name string) error {
 	if err != nil {
 		return err
 	}
-	return s.setManifest(a, raw)
+	return setManifest(db, home, a, raw)
 }
 
 // setManifest validates raw, extracts its icons and stores it as a's manifest.
-func (s *Service) setManifest(a store.App, raw string) error {
+func setManifest(db *sql.DB, home string, a store.App, raw string) error {
 	m, err := ParseManifest(raw)
 	if err != nil {
 		return err
 	}
-	icons, err := readIcons(m)
+	icons, err := ReadIcons(m)
 	if err != nil {
 		return err
 	}
-	if raw, err = s.writeIcons(&m, icons, raw); err != nil {
+	if raw, err = WriteIcons(home, &m, icons, raw); err != nil {
 		return err
 	}
-	return store.UpdateApp(s.DB, store.App{ID: a.ID, Name: a.Name, Manifest: raw})
-}
-
-// InstallLegacy installs a plain command app (e.g. a detected preset) as a manifest app.
-func (s *Service) InstallLegacy(a store.App) (store.App, error) {
-	raw, err := LegacyManifest(a)
-	if err != nil {
-		return store.App{}, err
-	}
-	return s.InstallManifest(raw, false)
+	return store.UpdateApp(db, store.App{ID: a.ID, Name: a.Name, Manifest: raw})
 }
 
 // ExportApp returns the manifest JSON of a manifest app, ready for InstallManifest elsewhere.
-func (s *Service) ExportApp(name string) (string, error) {
-	a, err := store.GetApp(s.DB, name)
+func ExportApp(db *sql.DB, name string) (string, error) {
+	a, err := store.GetApp(db, name)
 	if err != nil {
 		return "", err
 	}
 	if a.Manifest == "" {
 		return "", fmt.Errorf("app %q is not a manifest app; convert it first", name)
 	}
-	return portableManifest(a.Manifest)
+	return PortableManifest(a.Manifest)
 }
 
 // EnsureServices starts every enabled app's autostart service that is not running; errors are returned together.
-func (s *Service) EnsureServices() error {
-	apps, err := store.ListApps(s.DB)
+func EnsureServices(db *sql.DB) error {
+	apps, err := store.ListApps(db)
 	if err != nil {
 		return err
 	}
@@ -704,10 +606,10 @@ func (s *Service) EnsureServices() error {
 				if !sv.Autostart {
 					continue
 				}
-				if up, _ := s.AppServiceRunning(a.Name, x.ID, place, ""); up {
+				if up, _ := AppServiceRunning(db, a.Name, x.ID, place, ""); up {
 					continue
 				}
-				if _, err := s.RunAppAction(a.Name, x.ID, place, ""); err != nil {
+				if _, err := RunAppAction(db, a.Name, x.ID, place, ""); err != nil {
 					errs = append(errs, err)
 				}
 			}
