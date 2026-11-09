@@ -80,7 +80,8 @@ func runApp(home string, args []string) error {
 				return err
 			}
 			a := store.App{Name: pos[0], Command: *command, Output: *output}
-			if a.Command == "" {
+			preset := a.Command == ""
+			if preset {
 				for _, p := range apps.AppPresets() {
 					if p.Name == a.Name {
 						a.Command = p.Command
@@ -90,7 +91,14 @@ func runApp(home string, args []string) error {
 					return fmt.Errorf("no installed preset %q; pass --command (see conveyor app presets)", a.Name)
 				}
 			}
-			if _, err := store.CreateApp(s.DB, a); err != nil {
+			// presets install as manifest apps, like the UI; --command stays a plain app
+			var err error
+			if preset {
+				_, err = s.InstallLegacy(a)
+			} else {
+				_, err = store.CreateApp(s.DB, a)
+			}
+			if err != nil {
 				return err
 			}
 			fmt.Fprintf(out, "added %s: %s\n", a.Name, a.Command)

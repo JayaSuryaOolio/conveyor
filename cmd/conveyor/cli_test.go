@@ -585,3 +585,16 @@ cat ` + dir + `/$k.json 2>/dev/null || echo '[]'
 		t.Fatal(s)
 	}
 }
+
+// A preset added via the CLI becomes a manifest app (as in the UI); --command stays plain.
+func TestAppAddPresetCLI(t *testing.T) {
+	home := t.TempDir()
+	cv(t, home, "app", "add", "Finder")
+	if out := cv(t, home, "app", "export", "Finder"); !strings.Contains(out, `"open"`) {
+		t.Fatalf("Finder not a manifest app: %s", out)
+	}
+	cv(t, home, "app", "add", "Plain", "--command", "true")
+	if out := cvFail(t, home, "app", "export", "Plain"); out == "" {
+		t.Fatal("plain app should not export")
+	}
+}
