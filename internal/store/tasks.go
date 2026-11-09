@@ -223,18 +223,6 @@ func UpdateTask(db *sql.DB, t Task) error {
 	return nil
 }
 
-// SetTaskRunner sets (or with "" clears) the task's runner override.
-func SetTaskRunner(db *sql.DB, id int64, runner *string) error {
-	res, err := db.Exec(`UPDATE tasks SET runner=?, updated_at=? WHERE id=?`, runner, now(), id)
-	if err != nil {
-		return fmt.Errorf("set task runner: %w", err)
-	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		return fmt.Errorf("task %d: %w", id, sql.ErrNoRows)
-	}
-	return nil
-}
-
 // UpdateTaskRepo writes branch, worktree_path, pr_url and pr_state of one link.
 func UpdateTaskRepo(db *sql.DB, r TaskRepo) error {
 	res, err := db.Exec(`UPDATE task_repos SET branch=?, worktree_path=?, pr_url=?, pr_state=? WHERE task_id=? AND repo_id=?`,

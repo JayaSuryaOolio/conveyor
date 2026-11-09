@@ -98,6 +98,9 @@ func (s *Service) CreateTask(in NewTaskInput) (store.Task, error) {
 	if in.Agent == "" && !in.AgentSet && parent != nil && parent.Agent != nil {
 		in.Agent = *parent.Agent // like repos: a sub-task starts with its parent's agent
 	}
+	if err := runner.ValidateRunner(in.Runner); err != nil {
+		return store.Task{}, err
+	}
 	if in.Runner == "" && !in.RunnerSet && parent != nil && parent.Runner != nil {
 		in.Runner = *parent.Runner // sub-task starts with parent's runner
 	}

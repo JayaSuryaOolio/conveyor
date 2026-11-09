@@ -72,7 +72,7 @@ func TestWorkflowsSkill(t *testing.T) {
 	os.WriteFile(filepath.Join(d, ".claude", "skills", "backend", "SKILL.md"), []byte("---\nname: backend\ndescription: Backend conventions\n---\nSECRET\n"), 0o644)
 	os.MkdirAll(filepath.Join(d, ".claude", "agents"), 0o755)
 	os.WriteFile(filepath.Join(d, ".claude", "agents", "reviewer.md"), []byte("---\nname: reviewer\ndescription: Reviews diffs\n---\nSECRET\n"), 0o644)
-	got := workflows(nil, store.Task{Repos: []store.TaskRepo{{RepoName: "api", WorktreePath: &d}}})
+	got := workflows(nil, store.Task{Repos: []store.TaskRepo{{RepoName: "api", WorktreePath: &d}}}, "CLAUDE.md")
 	if want := "api:\n- skill `backend`: Backend conventions\n- agent `reviewer`: Reviews diffs\n"; got != want {
 		t.Errorf("got %q want %q", got, want)
 	}

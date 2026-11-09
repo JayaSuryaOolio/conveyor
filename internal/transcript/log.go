@@ -16,7 +16,7 @@ type Entry struct {
 }
 
 // toolArgs are the input fields that best summarize a tool call, in preference order.
-var toolArgs = []string{"command", "CommandLine", "file_path", "Path", "path", "pattern", "url", "query", "description", "prompt", "Target"}
+var toolArgs = []string{"command", "CommandLine", "file_path", "pattern", "Path", "path", "url", "query", "description", "prompt", "Target"}
 
 func oneLine(s string) string {
 	s = strings.TrimSpace(s)

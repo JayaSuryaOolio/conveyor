@@ -85,10 +85,6 @@ export function RunnerSelect({value, onChange, size, label}: {value: string; onC
     return <Select size={size} label={label} placeholder="Runner: default" aria-label="Agent runner" clearable data={options} value={value || null} onChange={v => onChange(v ?? '')}/>
 }
 
-export function TaskRunner({k, runner}: {k: string; runner: string}) {
-    return <RunnerSelect size="xs" value={runner} onChange={r => SetTaskRunner(k, r).catch(errMsg)}/>
-}
-
 export function RunnerSettingSelect({value, onChange, ...rest}: {value: string; onChange: (r: string) => void} & Omit<SelectProps, 'value' | 'onChange' | 'data'>) {
     const {data: agents} = useData(ListCLIAgents, [])
     const runners = (agents ?? []).map(a => ({

@@ -36,6 +36,7 @@ func TestCreateTask(t *testing.T) {
 		{Title: "x"},
 		{Title: "x", Repos: []string{"nope"}},
 		{Title: "x", Repos: []string{"a"}, Primary: "b"},
+		{Title: "x", Repos: []string{"a"}, Runner: "nope"},
 	} {
 		if _, err := s.CreateTask(in); err == nil {
 			t.Errorf("%+v should fail", in)

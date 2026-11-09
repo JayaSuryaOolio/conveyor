@@ -41,18 +41,6 @@ func (c *ClaudeRunner) Remove(ctx context.Context, bgID string) error {
 	return claude.Remove(ctx, bgID)
 }
 
-func (c *ClaudeRunner) Agents(ctx context.Context) ([]Agent, error) {
-	cas, err := claude.Agents(ctx)
-	if err != nil {
-		return nil, err
-	}
-	out := make([]Agent, len(cas))
-	for i, a := range cas {
-		out[i] = Agent{ID: a.ID, Name: a.Name, Cwd: a.Cwd, State: a.State, Status: a.Status, SessionID: a.SessionID, PID: a.PID}
-	}
-	return out, nil
-}
-
 func (c *ClaudeRunner) AttachCommand(bgID string) string {
 	return claude.AttachCommand(bgID)
 }

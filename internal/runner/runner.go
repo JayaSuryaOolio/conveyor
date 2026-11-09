@@ -1,24 +1,13 @@
 // Package runner defines the Runner interface that abstracts agent backends
 // (Claude Code and Antigravity/agy). Both backends implement the same lifecycle:
 // Launch (fresh background session), Resume (continue an earlier session), Stop,
-// Remove, Agents (list live sessions), and terminal command helpers.
+// Remove, and terminal command helpers.
 package runner
 
 import (
 	"context"
 	"fmt"
 )
-
-// Agent is a live background session reported by the runner's process list.
-type Agent struct {
-	ID        string // background / session handle used to Stop/Remove
-	Name      string // task key
-	Cwd       string
-	State     string
-	Status    string
-	SessionID string // transcript ID used for resume
-	PID       int
-}
 
 // Runner abstracts the agent CLI backend (Claude Code or Antigravity).
 type Runner interface {
@@ -30,8 +19,6 @@ type Runner interface {
 	Stop(ctx context.Context, bgID string) error
 	// Remove removes / cleans up the background session record.
 	Remove(ctx context.Context, bgID string) error
-	// Agents returns all live background sessions (used for reaping).
-	Agents(ctx context.Context) ([]Agent, error)
 	// AttachCommand returns the shell command to attach to a running bg session.
 	AttachCommand(bgID string) string
 	// ResumeCommand returns the shell command to resume a finished session interactively.

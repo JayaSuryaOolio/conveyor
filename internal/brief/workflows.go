@@ -56,7 +56,8 @@ func entry(file, kind, fallbackName string) (string, bool) {
 // workflows indexes the non-primary task repos' CLAUDE.md, .claude commands, skills and agents
 // (names and one-liners, no bodies). Claude Code loads the primary repo's natively (it is the cwd),
 // but not these: --add-dir directories get neither their CLAUDE.md nor their commands and agents.
-func workflows(db *sql.DB, task store.Task) string {
+// doc is the runner's instruction file (CLAUDE.md or AGENTS.md), named in preference to the other.
+func workflows(db *sql.DB, task store.Task, doc string) string {
 	var b strings.Builder
 	for _, r := range task.Repos {
 		if r.IsPrimary {
@@ -71,9 +72,13 @@ func workflows(db *sql.DB, task store.Task) string {
 			root = repo.Path
 		}
 		var lines []string
-		for _, doc := range []string{"AGENTS.md", "CLAUDE.md"} {
-			if _, err := os.Stat(filepath.Join(root, doc)); err == nil {
-				lines = append(lines, fmt.Sprintf("- Read `%s` before changing this repo", filepath.Join(root, doc)))
+		other := "AGENTS.md" // the runner's own instruction file first, else the other one
+		if doc == "AGENTS.md" {
+			other = "CLAUDE.md"
+		}
+		for _, d := range []string{doc, other} {
+			if _, err := os.Stat(filepath.Join(root, d)); err == nil {
+				lines = append(lines, fmt.Sprintf("- Read `%s` before changing this repo", filepath.Join(root, d)))
 				break
 			}
 		}
