@@ -3,7 +3,6 @@ package ui
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -247,6 +246,14 @@ func (a *App) ListTasks() ([]TaskCard, error) {
 	if err != nil {
 		return nil, err
 	}
+	runs, err := store.LatestRuns(a.svc.DB)
+	if err != nil {
+		return nil, err
+	}
+	msgs, err := store.LatestComments(a.svc.DB)
+	if err != nil {
+		return nil, err
+	}
 	cards := make([]TaskCard, 0, len(tasks))
 	keys := map[int64]string{}
 	for _, t := range tasks {
@@ -264,20 +271,14 @@ func (a *App) ListTasks() ([]TaskCard, error) {
 			c.Repos = append(c.Repos, r.RepoName)
 			c.OpenPR = c.OpenPR || (r.PRState != nil && *r.PRState == "OPEN")
 		}
-		switch r, err := store.LatestRun(a.svc.DB, t.ID); {
-		case err == nil:
+		if r, ok := runs[t.ID]; ok {
 			c.CtxPeak = r.CtxPeak
 			if r.Summary != nil {
 				c.LastSummary = *r.Summary
 			}
-		case !errors.Is(err, sql.ErrNoRows):
-			return nil, err
 		}
-		switch m, err := store.LatestComment(a.svc.DB, t.ID); {
-		case err == nil:
+		if m, ok := msgs[t.ID]; ok {
 			c.LastMsgAt, c.LastMsgBy = m.CreatedAt, string(m.Author)
-		case !errors.Is(err, sql.ErrNoRows):
-			return nil, err
 		}
 		cards = append(cards, c)
 	}

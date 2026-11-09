@@ -87,7 +87,6 @@ function TaskRef({children}: {children?: React.ReactNode}) {
     const key = String(children)
     const [title, setTitle] = useState<string>()
     useEffect(() => { load(false).then(r => setTitle(r.titles?.[key]), () => {}) }, [key])
-    // refactor: a task created after the daily cache load stays plain text until reload; see paletteCache
     if (!title) return <span>{children}</span>
     return (
         <Tooltip label={title} withinPortal>

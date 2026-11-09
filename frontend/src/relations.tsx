@@ -1,10 +1,10 @@
 import {useState} from 'react'
 import {ActionIcon, Anchor, Badge, Group, Select, Stack, Text, Title, Tooltip} from '@mantine/core'
 import {IconChevronDown, IconChevronRight, IconPlus, IconTrash} from '@tabler/icons-react'
-import {AdoptChild, Link, ListTasks, SetParent, Unlink} from '../wailsjs/go/ui/App'
+import {AdoptChild, Link, SetParent, Unlink} from '../wailsjs/go/ui/App'
 import {store, ui} from '../wailsjs/go/models'
 import {Nav, StatusBadge, errMsg} from './components'
-import {useData} from './util'
+import {listTasks, useData} from './util'
 
 // Choices as seen from this task: [value, label, kind, this task is the link's from side (blocker / parent)].
 const CHOICES: [string, string, string, boolean][] = [
@@ -63,7 +63,7 @@ function Row({task, nav, kids, onRemove}: {task: store.TaskRef; nav: Nav; kids: 
 
 /** Parent, sub-tasks and links of a task, with add / remove. */
 export function Relations({k, status, rel, nav, reload}: {k: string; status: string; rel: store.Relations; nav: Nav; reload: () => void}) {
-    const {data: tasks} = useData(ListTasks, [])
+    const {data: tasks} = useData(listTasks, [])
     const [choice, setChoice] = useState('blocks')
     const [other, setOther] = useState<string | null>(null)
     const open = (s: string) => s !== 'done' && s !== 'cancelled'

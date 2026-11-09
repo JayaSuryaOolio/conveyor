@@ -106,14 +106,15 @@ func ReleaseIfNothingQueued(db *sql.DB, taskID int64) error {
 	return err
 }
 
-// LatestComment returns the task's newest comment (sql.ErrNoRows when it has none).
-func LatestComment(db *sql.DB, taskID int64) (Comment, error) {
-	cs, err := queryComments(db, `task_id=? AND id=(SELECT MAX(id) FROM comments WHERE task_id=?)`, taskID, taskID)
+// LatestComments returns every task's newest comment, keyed by task id; tasks without comments are absent.
+func LatestComments(db *sql.DB) (map[int64]Comment, error) {
+	cs, err := queryComments(db, `id IN (SELECT MAX(id) FROM comments GROUP BY task_id)`)
 	if err != nil {
-		return Comment{}, err
+		return nil, err
 	}
-	if len(cs) == 0 {
-		return Comment{}, sql.ErrNoRows
+	out := make(map[int64]Comment, len(cs))
+	for _, c := range cs {
+		out[c.TaskID] = c
 	}
-	return cs[0], nil
+	return out, nil
 }

@@ -1,15 +1,15 @@
 import {useState} from 'react'
 import {ActionIcon, Button, Checkbox, Code, Group, Modal, MultiSelect, PasswordInput, ScrollArea, SegmentedControl, Select, SelectProps, Stack, Table, Tabs, Text, TextInput, Textarea, Title, Tooltip} from '@mantine/core'
 import {IconAdjustments} from '@tabler/icons-react'
-import {AddRepo, CreateTask, ExportState, GetPromptDefaults, GetTask, GetSettings, ImportState, ListAgents, ListCLIAgents, ListModels, ListRepos, ListTasks, PreviewBrief, SetRepoSetupScript, SetSetting, SetTaskAgent, SetTaskModel, SetTaskRunner} from '../wailsjs/go/ui/App'
+import {AddRepo, CreateTask, ExportState, GetPromptDefaults, GetTask, GetSettings, ImportState, ListAgents, ListCLIAgents, ListModels, ListRepos, PreviewBrief, SetRepoSetupScript, SetSetting, SetTaskAgent, SetTaskModel, SetTaskRunner} from '../wailsjs/go/ui/App'
 import {core, store} from '../wailsjs/go/models'
 import {Nav, errMsg} from './components'
 import {Markdown, MarkdownEditor} from './markdown'
-import {useData, useDraft} from './util'
+import {listTasks, useData, useDraft} from './util'
 
 export function NewTask({nav, close}: {nav: Nav; close: () => void}) {
     const {data: repos} = useData(ListRepos, [])
-    const {data: tasks} = useData(ListTasks, [])
+    const {data: tasks} = useData(listTasks, [])
     const [parent, setParent] = useState('')
     const [title, setTitle] = useDraft('new-task:title')
     const [desc, setDesc] = useDraft('new-task:desc')
@@ -103,7 +103,7 @@ const listModels = () => modelsP ??= ListModels()
 
 /** Model choice; "" means the default (task: the agent's or default_model setting). A value not in the list is kept as an option. */
 export function ModelSelect({value, onChange, ...rest}: {value: string; onChange: (m: string) => void} & Omit<SelectProps, 'value' | 'onChange' | 'data'>) {
-    const {data: ml} = useData(listModels, [])
+    const {data: ml} = useData(listModels, [], {static: true})
     const ms = ml?.models ?? []
     const known = !value || ms.some(m => m.id === value || m.id.replace(/-\d{8}$/, '') === value || (m.latest && m.tier === value))
     const data = [{value: '', label: 'Default'},
@@ -255,7 +255,7 @@ export function SettingRow({f, v, ph, reload}: {f: Field; v: string; ph?: string
 
 /** What the agent receives: the built-in protocol (read-only) and a live preview of a task brief. */
 function PromptsInfo({settings, protocol}: {settings: Record<string, string>; protocol: string}) {
-    const {data: tasks} = useData(ListTasks, [])
+    const {data: tasks} = useData(listTasks, [])
     const [key, setKey] = useState<string | null>(null)
     const [raw, setRaw] = useState("rendered")
     const sig = JSON.stringify(settings) // refetch when any setting is saved
