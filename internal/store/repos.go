@@ -93,10 +93,18 @@ func AddTaskRepo(db *sql.DB, taskID, repoID int64, branch string) error {
 	return nil
 }
 
-// RemoveTaskRepo unlinks a repo from a task.
+// RemoveTaskRepo unlinks a repo from a task. If that leaves the task without a
+// primary, the first remaining repo by name becomes primary in the same transaction.
 func RemoveTaskRepo(db *sql.DB, taskID, repoID int64) error {
-	if _, err := db.Exec(`DELETE FROM task_repos WHERE task_id=? AND repo_id=?`, taskID, repoID); err != nil {
-		return fmt.Errorf("remove task repo: %w", err)
-	}
-	return nil
+	return inTx(db, func(tx *sql.Tx) error {
+		if _, err := tx.Exec(`DELETE FROM task_repos WHERE task_id=? AND repo_id=?`, taskID, repoID); err != nil {
+			return fmt.Errorf("remove task repo: %w", err)
+		}
+		if _, err := tx.Exec(`UPDATE task_repos SET is_primary=1 WHERE task_id=?1
+ AND NOT EXISTS (SELECT 1 FROM task_repos WHERE task_id=?1 AND is_primary=1)
+ AND repo_id=(SELECT tr.repo_id FROM task_repos tr JOIN repos r ON r.id=tr.repo_id WHERE tr.task_id=?1 ORDER BY r.name LIMIT 1)`, taskID); err != nil {
+			return fmt.Errorf("promote primary repo: %w", err)
+		}
+		return nil
+	})
 }
