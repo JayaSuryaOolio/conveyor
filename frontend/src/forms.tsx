@@ -1,7 +1,7 @@
 import {useState} from 'react'
 import {ActionIcon, Button, Checkbox, Code, Group, Modal, MultiSelect, PasswordInput, ScrollArea, SegmentedControl, Select, SelectProps, Stack, Table, Tabs, Text, TextInput, Textarea, Title, Tooltip} from '@mantine/core'
 import {IconAdjustments} from '@tabler/icons-react'
-import {AddRepo, CreateTask, ExportState, GetPromptDefaults, GetTask, GetSettings, ImportState, ListAgents, ListModels, ListRepos, ListTasks, PreviewBrief, SetRepoSetupScript, SetSetting, SetTaskAgent, SetTaskModel} from '../wailsjs/go/ui/App'
+import {AddRepo, CreateTask, ExportState, GetPromptDefaults, GetTask, GetSettings, ImportState, ListAgents, ListCLIAgents, ListModels, ListRepos, ListTasks, PreviewBrief, SetRepoSetupScript, SetSetting, SetTaskAgent, SetTaskModel, SetTaskRunner} from '../wailsjs/go/ui/App'
 import {core, store} from '../wailsjs/go/models'
 import {Nav, errMsg} from './components'
 import {Markdown, MarkdownEditor} from './markdown'
@@ -17,6 +17,7 @@ export function NewTask({nav, close}: {nav: Nav; close: () => void}) {
     const [primary, setPrimary] = useState('')
     const [model, setModel] = useState('')
     const [agent, setAgent] = useState('')
+    const [runner, setRunner] = useState('')
     const [start, setStart] = useState(false)
     const [epic, setEpic] = useState(false)
     const [epicName, setEpicName] = useState('')
@@ -24,15 +25,16 @@ export function NewTask({nav, close}: {nav: Nav; close: () => void}) {
     const submit = () =>
         CreateTask(core.NewTaskInput.createFrom({
             Title: title, Description: desc, Repos: sel, Primary: prim,
-            Start: start, Model: model, Agent: agent, ParentKey: parent, Epic: epic, EpicName: epicName.trim(),
+            Start: start, Model: model, Agent: agent, Runner: runner, ParentKey: parent, Epic: epic, EpicName: epicName.trim(),
         })).then(key => { setTitle(''); setDesc(''); close(); nav({name: 'task', key}) }, errMsg)
-    // Picking a parent prefills repos, primary and agent from it; they stay editable. Clearing leaves them.
+    // Picking a parent prefills repos, primary, agent and runner from it; they stay editable. Clearing leaves them.
     const pickParent = (key: string | null) => {
         setParent(key ?? '')
         if (key) GetTask(key).then(d => {
             setSel(d.task.repos?.map(r => r.repo_name) ?? [])
             setPrimary(d.task.repos?.find(r => r.is_primary)?.repo_name ?? '')
             setAgent(d.task.agent ?? '')
+            setRunner(d.task.runner ?? '')
         }, errMsg)
     }
     return (
@@ -47,6 +49,7 @@ export function NewTask({nav, close}: {nav: Nav; close: () => void}) {
                 {sel.length > 1 && <Select label="Primary repo" allowDeselect={false} data={sel} value={prim} onChange={v => setPrimary(v ?? '')}/>}
                 <ModelSelect value={model} onChange={setModel}/>
                 <AgentSelect repos={sel} value={agent} onChange={setAgent}/>
+                <RunnerSelect value={runner} onChange={setRunner}/>
                 <Checkbox label="Start now (todo)" checked={start} onChange={e => setStart(e.currentTarget.checked)}/>
                 <Checkbox label="Epic" checked={epic} onChange={e => setEpic(e.currentTarget.checked)}/>
                 {epic && <TextInput label="Epic name" placeholder="default: the lower-cased task key" value={epicName} onChange={e => setEpicName(e.target.value)}/>}
@@ -71,6 +74,30 @@ export function TaskAgent({k, repos, agent}: {k: string; repos: string[]; agent:
     return <AgentSelect size="xs" repos={repos} value={agent} onChange={a => SetTaskAgent(k, a).catch(errMsg)}/>
 }
 
+/** Select of CLI agent runners (claude, agy); "" means default. */
+export function RunnerSelect({value, onChange, size, label}: {value: string; onChange: (r: string) => void; size?: string; label?: string}) {
+    const {data: agents} = useData(ListCLIAgents, [])
+    const runners = (agents ?? []).map(a => ({
+        value: a.id,
+        label: a.name + (a.installed ? '' : ' (not installed)')
+    }))
+    const options = [{value: '', label: 'Default runner'}, ...runners]
+    return <Select size={size} label={label} placeholder="Runner: default" aria-label="Agent runner" clearable data={options} value={value || null} onChange={v => onChange(v ?? '')}/>
+}
+
+export function TaskRunner({k, runner}: {k: string; runner: string}) {
+    return <RunnerSelect size="xs" value={runner} onChange={r => SetTaskRunner(k, r).catch(errMsg)}/>
+}
+
+export function RunnerSettingSelect({value, onChange, ...rest}: {value: string; onChange: (r: string) => void} & Omit<SelectProps, 'value' | 'onChange' | 'data'>) {
+    const {data: agents} = useData(ListCLIAgents, [])
+    const runners = (agents ?? []).map(a => ({
+        value: a.id,
+        label: a.name + (a.installed ? '' : ' (not installed)')
+    }))
+    return <Select aria-label="Default runner" allowDeselect={false} {...rest} value={value} onChange={v => onChange(v ?? '')} data={runners}/>
+}
+
 let modelsP: Promise<core.ModelList> | undefined
 const listModels = () => modelsP ??= ListModels()
 
@@ -86,15 +113,19 @@ export function ModelSelect({value, onChange, ...rest}: {value: string; onChange
     return <Select aria-label="Model" allowDeselect={false} searchable {...rest} value={value} onChange={v => onChange(v ?? '')} data={data}/>
 }
 
-export function TaskSettings({k, model, reload}: {k: string; model: string; reload: () => void}) {
+export function TaskSettings({k, model, runner, reload}: {k: string; model: string; runner?: string; reload: () => void}) {
     const [open, setOpen] = useState(false)
     return <>
         <Tooltip label="More settings">
             <ActionIcon variant="subtle" color="gray" aria-label="More settings" onClick={() => setOpen(true)}><IconAdjustments size={16}/></ActionIcon>
         </Tooltip>
         <Modal opened={open} onClose={() => setOpen(false)} title={`${k} settings`} size="sm">
-            <ModelSelect label="Model" value={model} onChange={m => SetTaskModel(k, m).then(reload, errMsg)}/>
-            <Text size="xs" c="dimmed" mt={4}>Used from the next run. Default: the agent's model, else the default_model setting.</Text>
+            <Stack gap="sm">
+                <ModelSelect label="Model" value={model} onChange={m => SetTaskModel(k, m).then(reload, errMsg)}/>
+                <Text size="xs" c="dimmed">Used from the next run. Default: the agent's model, else the default_model setting.</Text>
+                <RunnerSelect label="Runner" value={runner ?? ''} onChange={r => SetTaskRunner(k, r).then(reload, errMsg)}/>
+                <Text size="xs" c="dimmed">Used from the next run. Default: the default_runner setting.</Text>
+            </Stack>
         </Modal>
     </>
 }
@@ -130,13 +161,14 @@ function RepoRow({r, reload}: {r: store.Repo; reload: () => void}) {
     )
 }
 
-export type Field = {k: string; label: string; desc: string; kind?: "area" | "md" | "model" | "secret"}
+export type Field = {k: string; label: string; desc: string; kind?: "area" | "md" | "model" | "runner" | "secret"}
 
 const TABS: {name: string; fields: Field[]}[] = [
     {name: "General", fields: [
         {k: "user_name", label: "Your name", desc: "Shown as the creator of tasks you create. Empty shows \"human\"."},
         {k: "key_prefix", label: "Task key prefix", desc: "Prefix for new task keys, e.g. CV gives CV-12."},
         {k: "default_model", label: "Default model", desc: "Model for runs that do not set one. Default uses the Claude Code default.", kind: "model"},
+        {k: "default_runner", label: "Default runner", desc: "Runner backend for tasks that do not set one (claude, agy).", kind: "runner"},
     ]},
     {name: "Dispatch", fields: [
         {k: "max_parallel", label: "Max parallel runs", desc: "How many tasks run at once."},
@@ -145,7 +177,7 @@ const TABS: {name: string; fields: Field[]}[] = [
         {k: "max_consecutive_failures", label: "Max consecutive failures", desc: "After this many failed runs in a row the task is marked failed."},
     ]},
     {name: "External terminal", fields: [
-        {k: "terminal_template", label: "External terminal command", desc: `Run by the external terminal button (terminal icon) on the Shell, Resume and New session rows of a task. {cwd} is the folder and {cmd} the command to run. The default opens macOS Terminal. iTerm: osascript -e 'tell application "iTerm" to create window with default profile command "cd {cwd} && {cmd}"'. Ghostty: open -na Ghostty --args --working-directory={cwd} -e sh -c "{cmd}". (The internal terminal icon runs inside Conveyor and ignores this.)`, kind: "area"},
+        {k: "terminal_template", label: "External terminal command", desc: `Run by the external terminal button (terminal icon) on the Shell, Resume and New session rows of a task. {cwd} is the folder and {cmd} the command to run. Platform defaults: macOS (Terminal.app via osascript), Linux (x-terminal-emulator), Windows (wt). macOS iTerm: osascript -e 'tell application "iTerm" to create window with default profile command "cd {cwd} && {cmd}"'. Ghostty: open -na Ghostty --args --working-directory={cwd} -e sh -c "{cmd}". (The internal terminal icon runs inside Conveyor and ignores this.)`, kind: "area"},
     ]},
     {name: "Prompts", fields: [
         {k: "pr_comment_prefix", label: "PR comment prefix", desc: "Every PR or issue comment the agent posts must start with this. Added to the brief and enforced by a hook. Empty disables both."},
@@ -212,6 +244,7 @@ export function SettingRow({f, v, ph, reload}: {f: Field; v: string; ph?: string
                 <MarkdownEditor minRows={4} value={val} onChange={setVal}/>
             </Stack>
                 : f.kind === "model" ? <ModelSelect {...props} value={val} onChange={setVal}/>
+                : f.kind === "runner" ? <RunnerSettingSelect {...props} value={val} onChange={setVal}/>
                 : f.kind === "secret" ? <PasswordInput {...props} value={val} onChange={e => setVal(e.target.value)}/>
                 : f.kind === "area" ? <Textarea {...props} autosize minRows={2} maxRows={10} value={val} onChange={e => setVal(e.target.value)}/>
                 : <TextInput {...props} value={val} onChange={e => setVal(e.target.value)}/>}

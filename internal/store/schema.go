@@ -3,6 +3,7 @@ package store
 import (
 	"database/sql"
 	"fmt"
+	"runtime"
 )
 
 const schema = `
@@ -24,6 +25,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   priority INTEGER NOT NULL DEFAULT 0,
   model TEXT,
   agent TEXT,
+  runner TEXT,
   source TEXT NOT NULL DEFAULT 'manual',
   external_key TEXT UNIQUE,
   external_url TEXT,
@@ -224,6 +226,9 @@ func Migrate(db *sql.DB) error {
 	if err := migrateAddTaskCreatedBy(db); err != nil {
 		return err
 	}
+	if err := migrateAddTaskRunner(db); err != nil {
+		return err
+	}
 	if err := migrateAddRepoSetupScript(db); err != nil {
 		return err
 	}
@@ -233,7 +238,20 @@ func Migrate(db *sql.DB) error {
 	if err := migrateAddRunWaste(db); err != nil {
 		return err
 	}
+	if err := migrateTerminalTemplate(db); err != nil {
+		return err
+	}
 	return migrateAddAutomationOneShot(db)
+}
+
+// migrateTerminalTemplate replaces hardcoded macOS osascript templates with the OS default on non-macOS systems.
+func migrateTerminalTemplate(db *sql.DB) error {
+	if runtime.GOOS == "darwin" {
+		return nil
+	}
+	macTemplate := `osascript -e 'tell application "Terminal" to do script "cd {cwd} && {cmd}"' -e 'tell application "Terminal" to activate'`
+	_, err := db.Exec(`UPDATE settings SET value=? WHERE key='terminal_template' AND value=?`, DefaultTerminalTemplate(), macTemplate)
+	return err
 }
 
 // migrateAddRunWaste adds the runs waste counts; older runs read 0.
@@ -310,6 +328,20 @@ func migrateAddTaskCreatedBy(db *sql.DB) error {
 	if n == 0 {
 		if _, err := db.Exec(`ALTER TABLE tasks ADD COLUMN created_by TEXT`); err != nil {
 			return fmt.Errorf("add tasks.created_by: %w", err)
+		}
+	}
+	return nil
+}
+
+// migrateAddTaskRunner adds tasks.runner to databases created before it existed.
+func migrateAddTaskRunner(db *sql.DB) error {
+	var n int
+	if err := db.QueryRow(`SELECT count(*) FROM pragma_table_info('tasks') WHERE name='runner'`).Scan(&n); err != nil {
+		return fmt.Errorf("check tasks.runner: %w", err)
+	}
+	if n == 0 {
+		if _, err := db.Exec(`ALTER TABLE tasks ADD COLUMN runner TEXT`); err != nil {
+			return fmt.Errorf("add tasks.runner: %w", err)
 		}
 	}
 	return nil

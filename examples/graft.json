@@ -1,0 +1,23 @@
+{
+  "version": 3,
+  "name": "Graft",
+  "id": "graft",
+  "description": "Mirror task worktree into its root repo checkout via graft",
+  "check": "command -v graft || [ -x ~/.local/bin/graft ]",
+  "actions": [
+    {
+      "id": "open",
+      "label": "Graft",
+      "places": [
+        "task_sidebar"
+      ],
+      "run": "cd ${{ worktree.path }} && PATH=\"$HOME/.local/bin:$PATH\" graft start",
+      "services": {
+        "task_sidebar": {
+          "status": "PATH=\"$HOME/.local/bin:$PATH\" graft list | awk -v w=${{ worktree.path }} -F '  <-  ' '{sub(/  \\(pid [0-9]+\\)$/, \"\", $2); if ($2 == w) print $1}' | grep -q .",
+          "stop": "r=$(PATH=\"$HOME/.local/bin:$PATH\" graft list | awk -v w=${{ worktree.path }} -F '  <-  ' '{sub(/  \\(pid [0-9]+\\)$/, \"\", $2); if ($2 == w) print $1}'); [ -n \"$r\" ] && PATH=\"$HOME/.local/bin:$PATH\" graft stop \"$r\""
+        }
+      }
+    }
+  ]
+}
