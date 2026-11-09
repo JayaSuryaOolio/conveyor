@@ -202,3 +202,14 @@ func TestOneShotFiresOnceIgnoringSchedule(t *testing.T) {
 		t.Fatalf("not deleted: %+v", as)
 	}
 }
+
+func TestAddRejectsDuplicateName(t *testing.T) {
+	svc, _ := env(t)
+	a := mk(t, "cli", `{"args":["task","list"]}`, "")
+	if err := Add(svc, a); err != nil {
+		t.Fatal(err)
+	}
+	if err := Add(svc, a); err == nil || !strings.Contains(err.Error(), "already exists") {
+		t.Fatalf("second Add: %v, want already exists", err)
+	}
+}

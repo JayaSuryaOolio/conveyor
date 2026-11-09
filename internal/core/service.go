@@ -181,6 +181,9 @@ func (s *Service) AddComment(key, author, body string, after AfterMerge) (store.
 
 // AddCommentVia is AddComment recording where the comment came from (e.g. "slack").
 func (s *Service) AddCommentVia(key, author, source, body string, after AfterMerge) (store.Comment, error) {
+	if strings.TrimSpace(body) == "" {
+		return store.Comment{}, fmt.Errorf("comment is empty")
+	}
 	t, err := store.GetTaskByKey(s.DB, key)
 	if err != nil {
 		return store.Comment{}, err

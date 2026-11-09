@@ -2,12 +2,10 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"flag"
 	"fmt"
 	"text/tabwriter"
-	"time"
 
 	"github.com/JayaSuryaOolio/conveyor/internal/automation"
 	"github.com/JayaSuryaOolio/conveyor/internal/core"
@@ -49,23 +47,12 @@ func runAutomation(home string, args []string) error {
 			if cmd == "rm" {
 				return store.DeleteAutomation(s.DB, rest[0])
 			}
-			a, err := store.GetAutomation(s.DB, rest[0])
-			if err != nil {
-				return err
-			}
 			if cmd == "run" {
-				res, err := automation.RunOne(context.Background(), s, a)
-				if err != nil {
-					res = "error: " + err.Error()
-				}
-				if rerr := automation.Record(s, a, res, time.Now()); rerr != nil {
-					return rerr
-				}
+				res, err := automation.Run(context.Background(), s, rest[0])
 				fmt.Fprintln(out, res)
 				return err
 			}
-			a.Enabled = cmd == "enable"
-			return store.UpdateAutomation(s.DB, a)
+			return automation.SetEnabled(s, rest[0], cmd == "enable")
 		}
 		return fmt.Errorf("unknown automation command %q\n%s", cmd, automationUsage)
 	})
@@ -97,15 +84,7 @@ func automationAdd(s *core.Service, args []string) error {
 	} else if len(pos) > 1 || a.Name == "" {
 		return errors.New(automationUsage)
 	}
-	if err := automation.Validate(a); err != nil {
-		return err
-	}
-	if _, err := store.GetAutomation(s.DB, a.Name); err == nil {
-		return fmt.Errorf("automation %q already exists", a.Name)
-	} else if !errors.Is(err, sql.ErrNoRows) {
-		return err
-	}
-	if _, err := store.CreateAutomation(s.DB, a); err != nil {
+	if err := automation.Add(s, a); err != nil {
 		return err
 	}
 	fmt.Fprintf(out, "added %s (%s)\n", a.Name, a.Schedule)

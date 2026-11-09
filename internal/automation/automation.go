@@ -5,6 +5,7 @@ package automation
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -259,6 +260,48 @@ func Record(svc *core.Service, a store.Automation, result string, now time.Time)
 	ts := now.UTC().Format(time.RFC3339)
 	a.LastRunAt, a.LastResult = &ts, &result
 	return store.UpdateAutomation(svc.DB, a)
+}
+
+// Run runs the named automation now (ignoring its schedule) and records the result.
+func Run(ctx context.Context, svc *core.Service, name string) (string, error) {
+	a, err := store.GetAutomation(svc.DB, name)
+	if err != nil {
+		return "", err
+	}
+	res, runErr := RunOne(ctx, svc, a)
+	if runErr != nil {
+		res = "error: " + runErr.Error()
+	}
+	if err := Record(svc, a, res, time.Now()); err != nil {
+		return res, fmt.Errorf("record result: %w", err)
+	}
+	return res, runErr
+}
+
+// SetEnabled enables or disables the named automation.
+func SetEnabled(svc *core.Service, name string, enabled bool) error {
+	a, err := store.GetAutomation(svc.DB, name)
+	if err != nil {
+		return err
+	}
+	a.Enabled = enabled
+	return store.UpdateAutomation(svc.DB, a)
+}
+
+// Add validates a and creates it enabled with no run history; a taken name is an error.
+func Add(svc *core.Service, a store.Automation) error {
+	a.Enabled = true
+	a.LastRunAt, a.LastResult = nil, nil
+	if err := Validate(a); err != nil {
+		return err
+	}
+	if _, err := store.GetAutomation(svc.DB, a.Name); err == nil {
+		return fmt.Errorf("automation %q already exists", a.Name)
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+	_, err := store.CreateAutomation(svc.DB, a)
+	return err
 }
 
 // Templates are the built-in automations installed by `automation add --template`.
