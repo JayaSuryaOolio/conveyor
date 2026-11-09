@@ -280,7 +280,7 @@ func (s *Service) AddTaskRepo(key, repo string) error {
 }
 
 // RemoveTaskRepo drops a repo from a task unless it has a PR or is the only repo.
-// An existing worktree is left on disk. A removed primary hands over to the first remaining repo.
+// An existing worktree is left on disk. A removed primary hands over to the first remaining repo by name.
 func (s *Service) RemoveTaskRepo(key, repo string) error {
 	t, err := store.GetTaskByKey(s.DB, key)
 	if err != nil {
@@ -296,18 +296,7 @@ func (s *Service) RemoveTaskRepo(key, repo string) error {
 		if tr.PRURL != nil && *tr.PRURL != "" {
 			return fmt.Errorf("%s has a PR in %q; it cannot be removed", key, repo)
 		}
-		if err := store.RemoveTaskRepo(s.DB, t.ID, tr.RepoID); err != nil {
-			return err
-		}
-		if tr.IsPrimary {
-			for _, o := range t.Repos {
-				if o.RepoID != tr.RepoID {
-					_, err := s.DB.Exec(`UPDATE task_repos SET is_primary=1 WHERE task_id=? AND repo_id=?`, t.ID, o.RepoID)
-					return err
-				}
-			}
-		}
-		return nil
+		return store.RemoveTaskRepo(s.DB, t.ID, tr.RepoID)
 	}
 	return fmt.Errorf("%s has no repo %q", key, repo)
 }

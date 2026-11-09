@@ -328,3 +328,31 @@ func TestSlackTokenPrefix(t *testing.T) {
 		t.Error(err)
 	}
 }
+
+func TestRemoveTaskRepoHandsOverPrimaryAtomically(t *testing.T) {
+	db := openTest(t)
+	tk := mkTask(t, db, StatusTodo)
+	for _, n := range []string{"c", "b"} {
+		if err := AddTaskRepo(db, tk.ID, mkRepo(t, db, n).ID, "t"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	a, _ := GetRepoByName(db, "a")
+	// A failing promotion must roll back the delete, so the task never loses its primary.
+	if _, err := db.Exec(`CREATE TRIGGER no_promote BEFORE UPDATE ON task_repos BEGIN SELECT RAISE(ABORT, 'boom'); END`); err != nil {
+		t.Fatal(err)
+	}
+	if RemoveTaskRepo(db, tk.ID, a.ID) == nil {
+		t.Fatal("want promotion error")
+	}
+	if got, _ := GetTask(db, tk.ID); len(got.Repos) != 3 || got.Repos[0].RepoName != "a" || !got.Repos[0].IsPrimary {
+		t.Fatalf("delete not rolled back: %+v", got.Repos)
+	}
+	db.Exec(`DROP TRIGGER no_promote`)
+	if err := RemoveTaskRepo(db, tk.ID, a.ID); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := GetTask(db, tk.ID); len(got.Repos) != 2 || got.Repos[0].RepoName != "b" || !got.Repos[0].IsPrimary || got.Repos[1].IsPrimary {
+		t.Fatalf("want b primary: %+v", got.Repos)
+	}
+}
