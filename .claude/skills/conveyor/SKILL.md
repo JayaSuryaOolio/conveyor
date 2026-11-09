@@ -44,7 +44,7 @@ conveyor state export [FILE] | import FILE [--repo A=name]   # settings/apps/aut
 conveyor hooks status|install|uninstall   # install/uninstall also copy/remove skills/epic -> ~/.claude/skills/epic
 conveyor epic review-check KEY [--step N]   # one PR review check: new feedback -> one system comment (requeues); none -> next backoff (30m, 2h, 8h, stop). Scheduled as a one-shot automation (run_at) 10m after a new PR head, or now via the task page button
 conveyor review-webhook [--status|--stop]   # opt-in app (examples/review-webhooks.json, embedded in package examples): loopback listener + `gh webhook forward` per repo with an open PR; a review event schedules that task's check now. Starts detached (re-execs `--serve`), pid `<home>/apps/<app-id>.pid`, log `logs/app/<app-id>.log` (`--app`, default `review-webhooks`)
-conveyor jira source|sync EPIC ...      # Jira epic source (internal/jira): app poller ticks 30s, pulls sources past interval_sec; errors land on the source's last_error
+conveyor jira source|sync EPIC ...      # Jira epic source (internal/jira): dispatcher poller (app or daemon) ticks 30s, pulls sources past interval_sec; errors land on the source's last_error
 conveyor daemon                       # dispatcher in the foreground
 ```
 

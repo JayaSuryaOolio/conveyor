@@ -80,7 +80,6 @@ func (a *App) Startup(ctx context.Context) {
 	ctx, a.cancel = context.WithCancel(ctx)
 	go pollDataVersion(ctx, core.DBPath(home), pollEvery, func() { runtime.EventsEmit(ctx, "db:changed") })
 	go a.startDispatcher(ctx)
-	go (&jira.Poller{}).Run(ctx, a.svc)
 }
 
 // Shutdown stops background work and closes the DB.

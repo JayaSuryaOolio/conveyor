@@ -22,6 +22,7 @@ import (
 	"github.com/JayaSuryaOolio/conveyor/internal/core"
 	"github.com/JayaSuryaOolio/conveyor/internal/gh"
 	"github.com/JayaSuryaOolio/conveyor/internal/hook"
+	"github.com/JayaSuryaOolio/conveyor/internal/jira"
 	"github.com/JayaSuryaOolio/conveyor/internal/runner"
 	"github.com/JayaSuryaOolio/conveyor/internal/slack"
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
@@ -72,9 +73,15 @@ func (d *Dispatcher) intSetting(key string) int {
 	return n
 }
 
-// Run ticks every 2s until ctx is done.
+// pollJira runs the Jira source poller; a var so tests can see the dispatcher start it.
+var pollJira = func(ctx context.Context, svc *core.Service) { (&jira.Poller{}).Run(ctx, svc) }
+
+// Run ticks every 2s until ctx is done. It also starts the chat bridge and the Jira poller,
+// so they run once, under the dispatcher lock, in the app and in `conveyor daemon` alike.
 func (d *Dispatcher) Run(ctx context.Context) error {
-	go chat.Run(ctx, &core.Service{DB: d.DB, Home: d.Home, Bin: d.ConveyorBin}, d.logf, map[string]chat.Factory{"slack": slack.New})
+	svc := &core.Service{DB: d.DB, Home: d.Home, Bin: d.ConveyorBin}
+	go chat.Run(ctx, svc, d.logf, map[string]chat.Factory{"slack": slack.New})
+	go pollJira(ctx, svc)
 	t := time.NewTicker(tickEvery)
 	defer t.Stop()
 	for {
