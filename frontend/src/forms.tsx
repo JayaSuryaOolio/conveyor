@@ -1,7 +1,7 @@
 import {useState} from 'react'
 import {ActionIcon, Button, Checkbox, Code, Group, Modal, MultiSelect, PasswordInput, ScrollArea, SegmentedControl, Select, SelectProps, Stack, Table, Tabs, Text, TextInput, Textarea, Title, Tooltip} from '@mantine/core'
 import {IconAdjustments} from '@tabler/icons-react'
-import {AddRepo, CreateTask, ExportState, GetPromptDefaults, GetTask, GetSettings, ImportState, ListAgents, ListCLIAgents, ListModels, ListRepos, PreviewBrief, SetRepoSetupScript, SetSetting, SetTaskAgent, SetTaskModel, SetTaskRunner} from '../wailsjs/go/ui/App'
+import {AddRepo, CreateTask, ExportState, GetPromptDefaults, GetTask, GetSettings, ImportState, ListAgents, ListCLIAgents, ListModels, ListRepos, PreviewBrief, Requirements, ShellPATHError, SetRepoSetupScript, SetSetting, SetTaskAgent, SetTaskModel, SetTaskRunner} from '../wailsjs/go/ui/App'
 import {core, store} from '../wailsjs/go/models'
 import {Nav, errMsg} from './components'
 import {Markdown, MarkdownEditor} from './markdown'
@@ -201,7 +201,7 @@ export function Settings() {
             {error && <Text c="red">{error}</Text>}
             {data && (
                 <Tabs defaultValue="General" keepMounted={false}>
-                    <Tabs.List mb="md">{TABS.map(t => <Tabs.Tab key={t.name} value={t.name}>{t.name}</Tabs.Tab>)}<Tabs.Tab value="Repos">Repos</Tabs.Tab></Tabs.List>
+                    <Tabs.List mb="md">{TABS.map(t => <Tabs.Tab key={t.name} value={t.name}>{t.name}</Tabs.Tab>)}<Tabs.Tab value="Repos">Repos</Tabs.Tab><Tabs.Tab value="Requirements">Requirements</Tabs.Tab></Tabs.List>
                     {TABS.map(t => (
                         <Tabs.Panel key={t.name} value={t.name}>
                             <Stack>
@@ -212,8 +212,31 @@ export function Settings() {
                         </Tabs.Panel>
                     ))}
                     <Tabs.Panel value="Repos"><Repos/></Tabs.Panel>
+                    <Tabs.Panel value="Requirements"><RequirementsList/></Tabs.Panel>
                 </Tabs>
             )}
+        </Stack>
+    )
+}
+
+/** External tools Conveyor shells out to, and whether each is on the app's PATH. */
+function RequirementsList() {
+    const {data: reqs} = useData(Requirements, [])
+    const {data: pathErr} = useData(ShellPATHError, [])
+    return (
+        <Stack gap="xs">
+            <Text size="xs" c="dimmed">{pathErr ? `Login-shell PATH not loaded (${pathErr}); only the app's own PATH is searched.` : "Searched on the app's PATH, including your login shell's."}</Text>
+            <Table>
+                <Table.Tbody>
+                    {reqs?.map(r => (
+                        <Table.Tr key={r.name}>
+                            <Table.Td><Code>{r.name}</Code></Table.Td>
+                            <Table.Td>{r.purpose}{r.optional && " (optional)"}</Table.Td>
+                            <Table.Td c={r.found ? "green" : r.optional ? "yellow" : "red"}>{r.found ? r.path : "missing"}</Table.Td>
+                        </Table.Tr>
+                    ))}
+                </Table.Tbody>
+            </Table>
         </Stack>
     )
 }
