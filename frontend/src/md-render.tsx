@@ -1,10 +1,10 @@
-import {useContext, useEffect, useState} from 'react'
+import {useContext, useEffect, useMemo, useState} from 'react'
 import {Menu, Modal, Tooltip} from '@mantine/core'
 import Md from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import {FileOpeners, Home, OpenFile, ShowError} from '../wailsjs/go/ui/App'
 import {NavContext, TaskKey} from './markdown'
-import {load} from './paletteCache'
+import {escapeRe, load, useKeyPrefix} from './paletteCache'
 import {BrowserOpenURL} from '../wailsjs/runtime/runtime'
 
 let homeP: Promise<string> | undefined
@@ -32,8 +32,6 @@ function Img({src, alt}: {src?: string; alt?: string}) {
 /** @file and /command tokens (after a space or line start), as typed in the editor's autocomplete. */
 const REF = /(^|\s)(@[\w./-]*[\w/-]|\/[a-z][\w:-]*)(?=$|[\s,;:!?)]|\.(?:\s|$))/g
 
-/** CV-* task keys (Conveyor's fixed key prefix); empty group 1 matches wrapText's (prefix)(token) shape. */
-const TASK = /()(\bCV-[0-9A-Z]+\b)/g
 
 type Node = {type: string; value?: string; children?: Node[]; data?: object}
 /** Wraps `re` matches (group 1 = leading context to keep, group 2 = token) in text nodes (not in code or links) in <span class=cls(token)>. */
@@ -59,7 +57,8 @@ const wrapText = (re: RegExp, cls: (tok: string) => string) => () => (tree: Node
     walk(tree)
 }
 const remarkRefs = wrapText(REF, tok => 'md-ref md-ref-' + (tok[0] === '@' ? 'file' : 'cmd'))
-const remarkTaskKeys = wrapText(TASK, () => 'md-ref md-ref-task')
+/** Task keys with the key_prefix setting (e.g. CV-12A1); empty group 1 matches wrapText's (prefix)(token) shape. */
+const remarkTaskKeys = (keyPrefix: string) => wrapText(new RegExp(`()(\\b${escapeRe(keyPrefix)}[0-9A-Z]+\\b)`, 'g'), () => 'md-ref md-ref-task')
 
 /** An @file mention inside a task: click to open it in a configured editor or reveal it in Finder. */
 function FileRef({children}: {children?: React.ReactNode}) {
@@ -81,7 +80,7 @@ function FileRef({children}: {children?: React.ReactNode}) {
     )
 }
 
-/** A CV-* key: a link to the task with its title as tooltip when the key is known; plain text otherwise (unknown key, cache not loaded). */
+/** A task key: a link to the task with its title as tooltip when the key is known; plain text otherwise (unknown key, cache not loaded). */
 function TaskRef({children}: {children?: React.ReactNode}) {
     const nav = useContext(NavContext)
     const key = String(children)
@@ -95,7 +94,6 @@ function TaskRef({children}: {children?: React.ReactNode}) {
     )
 }
 
-const plugins = [remarkGfm, remarkRefs, remarkTaskKeys]
 const components = {
     // Never navigate the webview: hand links to the system browser.
     a: ({href, children}: {href?: string; children?: React.ReactNode}) => (
@@ -109,5 +107,7 @@ const components = {
 }
 
 export default function MdRender({children}: {children: string}) {
+    const keyPrefix = useKeyPrefix()
+    const plugins = useMemo(() => keyPrefix ? [remarkGfm, remarkRefs, remarkTaskKeys(keyPrefix)] : [remarkGfm, remarkRefs], [keyPrefix])
     return <Md remarkPlugins={plugins} components={components}>{children}</Md>
 }

@@ -134,3 +134,28 @@ func TestSetLabelSwapsPrefixOnly(t *testing.T) {
 		t.Fatal("empty value accepted")
 	}
 }
+
+func TestCreator(t *testing.T) {
+	s := func(v string) *string { return &v }
+	p := &store.TaskRef{Key: "CV-1A"}
+	for _, c := range []struct {
+		t      store.Task
+		parent *store.TaskRef
+		user   string
+		want   string
+	}{
+		{store.Task{CreatedBy: s("human")}, nil, "", "human"},
+		{store.Task{CreatedBy: s("human")}, nil, "Ann", "Ann"},
+		{store.Task{CreatedBy: s("agent:CV-1A")}, p, "", "agent · CV-1A"},
+		{store.Task{CreatedBy: s("automation:nightly:x")}, nil, "", "automation · nightly:x"},
+		{store.Task{CreatedBy: s("jira")}, nil, "", "jira"},
+		{store.Task{Key: "XY-1A1", Source: "manual"}, p, "", "agent · CV-1A"}, // legacy row: nested child, real parent
+		{store.Task{Key: "XY-1A1", Source: "followup"}, p, "", "follow-up of CV-1A"},
+		{store.Task{Key: "XY-1", Source: "jira"}, nil, "", "jira"},
+		{store.Task{Key: "XY-1", Source: "manual"}, nil, "Ann", "Ann"},
+	} {
+		if got := creator(c.t, c.parent, c.user); got != c.want {
+			t.Errorf("creator(%+v) = %q, want %q", c.t, got, c.want)
+		}
+	}
+}
