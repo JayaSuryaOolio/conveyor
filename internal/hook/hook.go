@@ -132,7 +132,8 @@ func resolveRun(db *sql.DB, task store.Task, session string) (store.Run, error) 
 			return r, store.UpdateRun(db, r)
 		}
 	}
-	r, err := store.CreateRun(db, store.Run{TaskID: task.ID, Kind: "interactive", Mode: "fresh", Status: "running", SessionID: sp})
+	// Only Claude calls hooks, so a run they create is a Claude run.
+	r, err := store.CreateRun(db, store.Run{TaskID: task.ID, Kind: "interactive", Mode: "fresh", Status: "running", SessionID: sp, Runner: "claude"})
 	if err == nil {
 		auditStart(task.ID, r)
 	}

@@ -39,11 +39,19 @@ func DetectRunners() []CLIAgent {
 	return agents
 }
 
-// AutoConfigureDefaultRunner inspects the system for installed runner CLIs.
-// If default_runner is unset, or if it points to a runner that is not installed
-// while another detected runner is installed, it updates default_runner in settings.
+// AutoConfigureDefaultRunner sets default_runner from the installed runner CLIs, only while it is
+// unset (no stored row): a stored value, the user's or an earlier pick, is never rewritten. When the
+// default (claude) is not installed but agy is, it stores agy.
 // Returns the active runner, whether a change was made, and any error.
 func AutoConfigureDefaultRunner(db *sql.DB) (string, bool, error) {
+	cur := store.GetSetting(db, "default_runner")
+	var n int
+	if err := db.QueryRow(`SELECT count(*) FROM settings WHERE key='default_runner'`).Scan(&n); err != nil {
+		return cur, false, err
+	}
+	if n > 0 {
+		return cur, false, nil
+	}
 	agents := DetectRunners()
 	installed := map[string]string{}
 	for _, a := range agents {
@@ -51,8 +59,6 @@ func AutoConfigureDefaultRunner(db *sql.DB) (string, bool, error) {
 			installed[a.ID] = a.Path
 		}
 	}
-
-	cur := store.GetSetting(db, "default_runner")
 
 	// If the current runner is installed, keep it.
 	if _, ok := installed[cur]; ok {

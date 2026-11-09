@@ -349,33 +349,20 @@ func (s *Service) endRuns(runs []store.Run) error {
 		}
 	}
 	for _, r := range runs {
-		if r.BgID != nil {
-			t, err := store.GetTask(s.DB, r.TaskID)
-			var bgRunner runner.Runner
-			if err == nil {
-				bgRunner = s.RunnerForTask(t)
-			} else {
-				bgRunner = runner.NewClaudeRunner()
-			}
-			bgRunner.Stop(context.Background(), *r.BgID)
-			bgRunner.Remove(context.Background(), *r.BgID)
-		}
+		s.endSession(r)
 	}
 	return nil
 }
 
-// bgIDs returns the bg ids of the task's runs, each once.
-func (s *Service) bgIDs(taskID int64) []string {
-	runs, _ := store.ListRuns(s.DB, taskID)
-	seen := map[string]bool{}
-	var ids []string
-	for _, r := range runs {
-		if r.BgID != nil && !seen[*r.BgID] {
-			seen[*r.BgID] = true
-			ids = append(ids, *r.BgID)
-		}
+// endSession stops and removes the run's background session (best effort) with the runner it started with.
+func (s *Service) endSession(r store.Run) {
+	if r.BgID == nil {
+		return
 	}
-	return ids
+	t, _ := store.GetTask(s.DB, r.TaskID)
+	bgRunner := s.RunnerForRun(r, t)
+	bgRunner.Stop(context.Background(), *r.BgID)
+	bgRunner.Remove(context.Background(), *r.BgID)
 }
 
 // RunnerForTask returns the appropriate runner backend for a task.
@@ -385,6 +372,15 @@ func (s *Service) RunnerForTask(t store.Task) runner.Runner {
 		taskRunner = *t.Runner
 	}
 	return runner.ForTask(taskRunner, store.GetSetting(s.DB, "default_runner"), s.Home)
+}
+
+// RunnerForRun returns the runner the run was started with, falling back to the task's for runs from
+// before runs stored it. Changing the task's runner or default_runner must not affect a live run.
+func (s *Service) RunnerForRun(r store.Run, t store.Task) runner.Runner {
+	if r.Runner != "" {
+		return runner.ForTask(r.Runner, "", s.Home)
+	}
+	return s.RunnerForTask(t)
 }
 
 // SetTaskRunner sets (or with "" clears) the task's runner override.
@@ -402,16 +398,13 @@ func (s *Service) SetTaskRunner(key, runnerName string) error {
 
 // CleanupSessions stops and removes the task's background sessions (best effort).
 func (s *Service) CleanupSessions(taskID int64) {
-	t, err := store.GetTask(s.DB, taskID)
-	var bgRunner runner.Runner
-	if err == nil {
-		bgRunner = s.RunnerForTask(t)
-	} else {
-		bgRunner = runner.NewClaudeRunner()
-	}
-	for _, id := range s.bgIDs(taskID) {
-		bgRunner.Stop(context.Background(), id)
-		bgRunner.Remove(context.Background(), id)
+	runs, _ := store.ListRuns(s.DB, taskID)
+	seen := map[string]bool{} // resumes can share a bg id
+	for _, r := range runs {
+		if r.BgID != nil && !seen[*r.BgID] {
+			seen[*r.BgID] = true
+			s.endSession(r)
+		}
 	}
 }
 

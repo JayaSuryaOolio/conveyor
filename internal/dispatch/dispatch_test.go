@@ -15,6 +15,7 @@ import (
 	"github.com/JayaSuryaOolio/conveyor/internal/core"
 	"github.com/JayaSuryaOolio/conveyor/internal/runner"
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
+	"github.com/JayaSuryaOolio/conveyor/internal/workspace"
 )
 
 func git(t *testing.T, dir string, args ...string) {
@@ -748,3 +749,88 @@ func TestReapAgy(t *testing.T) {
 	}
 }
 
+// attachCmd returns the task's "attach" action command, via core like the UI.
+func (e *env) attachCmd(t *testing.T, key string) string {
+	t.Helper()
+	acts, err := (&core.Service{DB: e.db, Home: e.d.Home, Bin: "/bin/conveyor"}).Actions(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, a := range acts {
+		if a.Kind == "attach" {
+			return a.Cmd
+		}
+	}
+	t.Fatalf("no attach action in %+v", acts)
+	return ""
+}
+
+// A run keeps the runner it started with: switching the task (and default_runner) to agy while a
+// Claude run is live must not reap or attach it as agy.
+func TestRunKeepsRunnerClaudeToAgy(t *testing.T) {
+	e := setup(t)
+	tk := e.task(t, "t", 0)
+	e.tick(t) // launches a claude run, bg abcd0001
+	run, _ := store.LatestRun(e.db, tk.ID)
+	if run.Runner != "claude" {
+		t.Fatalf("run runner %q", run.Runner)
+	}
+	agy := "agy"
+	tk = e.get(t, tk.ID)
+	tk.Runner = &agy
+	if err := store.UpdateTask(e.db, tk); err != nil {
+		t.Fatal(err)
+	}
+	store.SetSetting(e.db, "default_runner", "agy")
+
+	if got := e.attachCmd(t, tk.Key); got != "claude attach 'abcd0001'" {
+		t.Fatalf("attach %q", got)
+	}
+	os.WriteFile(filepath.Join(e.fake, "agents.json"), []byte(`[{"id":"abcd0001"}]`), 0o644)
+	e.now = time.Now().Add(time.Minute)
+	e.tick(t) // agy would see no PID "abcd0001" and finish the run
+	if got, _ := store.GetRun(e.db, run.ID); got.Status != "running" && got.Status != "launching" {
+		t.Fatalf("live claude run reaped: %+v", got)
+	}
+	if e.get(t, tk.ID).Status != store.StatusRunning {
+		t.Fatalf("task %s", e.get(t, tk.ID).Status)
+	}
+}
+
+// The reverse: an agy run reaps and attaches as agy after the task switches to claude.
+func TestRunKeepsRunnerAgyToClaude(t *testing.T) {
+	e := setup(t)
+	tk := e.task(t, "t", 0)
+	tk, err := workspace.Ensure(e.db, e.d.Home, tk)
+	if err != nil {
+		t.Fatal(err)
+	}
+	claudeName := "claude"
+	tk.Runner = &claudeName
+	if err := store.UpdateTask(e.db, tk); err != nil {
+		t.Fatal(err)
+	}
+	pid, sess := "9999999", "conv-1" // non-existent PID: the agy run has ended
+	run, err := store.CreateRun(e.db, store.Run{TaskID: tk.ID, Kind: "auto", Mode: "fresh", Status: "running", BgID: &pid, SessionID: &sess, Runner: "agy"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.UpdateTaskStatus(e.db, tk.ID, store.StatusRunning, store.ActorSystem); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := e.attachCmd(t, tk.Key); !strings.HasPrefix(got, "kill -TERM 9999999 ") {
+		t.Fatalf("attach %q", got)
+	}
+	logPath := runner.BgLogPath(e.d.Home, tk.Key)
+	os.MkdirAll(filepath.Dir(logPath), 0o755)
+	os.WriteFile(logPath, []byte("<conveyor>\nstatus: done\nsummary: agy done\nstate: clean\nnext: none\n</conveyor>"), 0o644)
+	e.now = time.Now().Add(time.Minute)
+	if err := e.d.reap(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := store.GetRun(e.db, run.ID)
+	if got.Status != "finished" || got.Summary == nil || *got.Summary != "agy done" { // claude would fail it as vanished
+		t.Fatalf("run %+v", got)
+	}
+}

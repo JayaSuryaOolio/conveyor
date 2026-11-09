@@ -66,7 +66,8 @@ CREATE TABLE IF NOT EXISTS runs (
   dup_bash INTEGER NOT NULL DEFAULT 0, big_results INTEGER NOT NULL DEFAULT 0,
   error TEXT,
   started_at TEXT NOT NULL,
-  ended_at TEXT
+  ended_at TEXT,
+  runner TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS idx_runs_task ON runs(task_id);
 CREATE INDEX IF NOT EXISTS idx_runs_session ON runs(session_id);
@@ -238,6 +239,9 @@ func Migrate(db *sql.DB) error {
 	if err := migrateAddRunWaste(db); err != nil {
 		return err
 	}
+	if err := migrateAddRunRunner(db); err != nil {
+		return err
+	}
 	if err := migrateTerminalTemplate(db); err != nil {
 		return err
 	}
@@ -342,6 +346,20 @@ func migrateAddTaskRunner(db *sql.DB) error {
 	if n == 0 {
 		if _, err := db.Exec(`ALTER TABLE tasks ADD COLUMN runner TEXT`); err != nil {
 			return fmt.Errorf("add tasks.runner: %w", err)
+		}
+	}
+	return nil
+}
+
+// migrateAddRunRunner adds runs.runner; older runs read "" and fall back to the task's runner.
+func migrateAddRunRunner(db *sql.DB) error {
+	var n int
+	if err := db.QueryRow(`SELECT count(*) FROM pragma_table_info('runs') WHERE name='runner'`).Scan(&n); err != nil {
+		return fmt.Errorf("check runs.runner: %w", err)
+	}
+	if n == 0 {
+		if _, err := db.Exec(`ALTER TABLE runs ADD COLUMN runner TEXT NOT NULL DEFAULT ''`); err != nil {
+			return fmt.Errorf("add runs.runner: %w", err)
 		}
 	}
 	return nil

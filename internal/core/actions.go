@@ -49,13 +49,32 @@ func shq(s string) string { return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'
 func isActive(r store.Run) bool { return r.Status == "launching" || r.Status == "running" }
 
 // settingsPath makes sure the runner's settings file exists and returns its path.
-func (s *Service) settingsPath(t store.Task) (string, error) {
+func (s *Service) settingsPath(r runner.Runner) (string, error) {
 	bin, err := s.bin()
 	if err != nil {
 		return "", err
 	}
-	r := s.RunnerForTask(t)
 	return r.WriteSettings(s.Home, bin)
+}
+
+// runAction returns the attach (live run) or resume (ended run) command for a run, with the runner
+// it started with; ok is false when the run has nothing to open.
+func (s *Service) runAction(t store.Task, r store.Run) (cmd, kind string, ok bool, err error) {
+	if r.SessionID == nil && !(isActive(r) && r.BgID != nil) {
+		return "", "", false, nil
+	}
+	rr := s.RunnerForRun(r, t)
+	settings, err := s.settingsPath(rr)
+	if err != nil {
+		return "", "", false, err
+	}
+	if isActive(r) {
+		if r.BgID == nil {
+			return "", "", false, nil
+		}
+		return attachCommand(rr, r, settings, workspace.OtherPaths(t)), "attach", true, nil
+	}
+	return rr.ResumeCommand(*r.SessionID, settings, workspace.OtherPaths(t)), "resume", true, nil
 }
 
 // bin is the conveyor CLI the hooks call: Bin if set, else this executable.
@@ -123,7 +142,7 @@ func (s *Service) Actions(key string) ([]Action, error) {
 		return []Action{}, nil
 	}
 	bgRunner := s.RunnerForTask(t)
-	settings, err := s.settingsPath(t)
+	settings, err := s.settingsPath(bgRunner)
 	if err != nil {
 		return nil, err
 	}
@@ -138,12 +157,15 @@ func (s *Service) Actions(key string) ([]Action, error) {
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, err
 	}
-	switch {
-	case err != nil:
-	case isActive(run) && run.BgID != nil:
-		out = append(out, Action{"Attach to session", primary, cwd, attachCommand(bgRunner, run, settings, workspace.OtherPaths(t)), "attach"})
-	case !isActive(run) && run.SessionID != nil:
-		out = append(out, Action{"Resume in terminal", primary, cwd, bgRunner.ResumeCommand(*run.SessionID, settings, workspace.OtherPaths(t)), "resume"})
+	if err == nil {
+		cmd, kind, ok, err := s.runAction(t, run)
+		if err != nil {
+			return nil, err
+		}
+		if ok {
+			label := map[string]string{"attach": "Attach to session", "resume": "Resume in terminal"}[kind]
+			out = append(out, Action{label, primary, cwd, cmd, kind})
+		}
 	}
 	briefPath, err := brief.Render(s.DB, s.Home, t)
 	if err != nil {
@@ -162,13 +184,17 @@ func (s *Service) Actions(key string) ([]Action, error) {
 	}
 	// Kinds carry the run id, not the session id: a resume run shares its session id with the run it resumed.
 	for i, r := range runs {
-		id := strconv.FormatInt(r.ID, 10)
-		switch {
-		case r.SessionID == nil:
-		case !isActive(r):
-			out = append(out, Action{fmt.Sprintf("Resume run #%d", i+1), primary, cwd, bgRunner.ResumeCommand(*r.SessionID, settings, workspace.OtherPaths(t)), "resume:" + id})
-		case r.BgID != nil: // a run that is not the latest, e.g. blocked on a question, still needs its attach icon
-			out = append(out, Action{fmt.Sprintf("Attach to run #%d", i+1), primary, cwd, attachCommand(bgRunner, r, settings, workspace.OtherPaths(t)), "attach:" + id})
+		if r.SessionID == nil {
+			continue
+		}
+		// a live run that is not the latest, e.g. blocked on a question, still needs its attach icon
+		cmd, kind, ok, err := s.runAction(t, r)
+		if err != nil {
+			return nil, err
+		}
+		if ok {
+			label := map[string]string{"attach": "Attach to run #%d", "resume": "Resume run #%d"}[kind]
+			out = append(out, Action{fmt.Sprintf(label, i+1), primary, cwd, cmd, kind + ":" + strconv.FormatInt(r.ID, 10)})
 		}
 	}
 	return out, nil
@@ -249,11 +275,11 @@ func (s *Service) Sessions(key string) ([]Session, error) {
 			known[*r.SessionID] = true
 		}
 	}
-	settings, err := s.settingsPath(t)
+	bgRunner := s.RunnerForTask(t)
+	settings, err := s.settingsPath(bgRunner)
 	if err != nil {
 		return nil, err
 	}
-	bgRunner := s.RunnerForTask(t)
 	out := []Session{}
 	for _, r := range t.Repos {
 		if r.WorktreePath == nil {
