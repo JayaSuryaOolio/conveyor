@@ -83,3 +83,9 @@ func DetectConversationID(pid int) string {
 func BgLogPath(home, taskKey string) string {
 	return filepath.Join(home, "agy-logs", taskKey+".log")
 }
+
+// Plugin is the slot for agy: Conveyor doesn't know yet where agy takes user hooks and skills
+// (~/.gemini), so it installs nothing and says so.
+func (a *AgyRunner) Plugin(string, PluginSpec) (PluginStatus, error) {
+	return PluginStatus{Tool: a.Name(), Status: "not supported", Note: "hooks and skills: no user-level install for agy yet"}, nil
+}

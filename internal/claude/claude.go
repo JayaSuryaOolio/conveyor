@@ -197,7 +197,9 @@ func WriteSettings(home, conveyorBin string) (string, error) {
 	pre := hook("PreToolUse")
 	pre[0].(map[string]any)["matcher"] = "Bash|AskUserQuestion"
 	b, err := json.MarshalIndent(map[string]any{
-		"worktree":    map[string]any{"bgIsolation": "none"},
+		"worktree": map[string]any{"bgIsolation": "none"},
+		// Tells the Conveyor plugin's hooks these ones run already (see pluginFiles).
+		"env":         map[string]any{"CONVEYOR_HOOKS": home},
 		"permissions": writeScope(),
 		"hooks": map[string]any{
 			"PreToolUse":       pre,

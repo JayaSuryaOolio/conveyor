@@ -10,6 +10,7 @@ import (
 
 	"github.com/JayaSuryaOolio/conveyor/internal/apps"
 	"github.com/JayaSuryaOolio/conveyor/internal/core"
+	"github.com/JayaSuryaOolio/conveyor/internal/runner"
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
@@ -142,8 +143,10 @@ func (a *App) GraftRoot(worktree string) string { return core.GraftRoot(worktree
 // GraftStop stops the graft instance mirroring into root.
 func (a *App) GraftStop(root string) error { return core.GraftStop(root) }
 
-// UserHooks reports or changes Conveyor's hooks in ~/.claude/settings.json ("status", "install", "uninstall").
-func (a *App) UserHooks(action string) (string, error) { return a.svc.UserHooks(action) }
+// Plugin reports or changes the Conveyor plugin per tool ("" = all; "status", "install", "uninstall").
+func (a *App) Plugin(tool, action string) ([]runner.PluginStatus, error) {
+	return a.svc.Plugin(tool, action)
+}
 
 // ExampleApps lists the bundled example apps (shown under Templates).
 func (a *App) ExampleApps() []apps.Example { return apps.ExampleApps() }

@@ -99,7 +99,7 @@ conveyor task unlink CV-1A blocks CV-1B
 conveyor task label CV-1A add bug        # labels: shown on cards, filterable on the Board; `rm` removes
 ```
 
-**Epics** (docs/epic-builder.md): `task new --epic` labels the root `epic` + `epic:<name>` (name unique among open epics). After charting, the epic waits in needs_you until `conveyor epic approve KEY` (or a human comment `approve`) starts flow 1 at stage `decide`; label `epic_gate:off` skips the wait. The dispatcher wakes an epic with a system comment when its sub-tasks have all settled; only `conveyor epic restart KEY --reason` abandons a flow (cancels open sub-tasks, starts the next flow at `spec`). Agents in epic runs cannot `gh pr merge`. Stage logic lives in the `epic` skill (`skills/epic/`, planner adapters in `skills/epic/planners/`), installed with the hooks; `hooks install` also seeds a user agent `epic-builder` whose prompt only loads it (never overwritten). The brief of a labelled task adds a `Labels:` line and, from them, the epic/stage/flow line, the rule for its `epic_kind:` and "Load these skills before starting" from `skill:*` labels.
+**Epics** (docs/epic-builder.md): `task new --epic` labels the root `epic` + `epic:<name>` (name unique among open epics). After charting, the epic waits in needs_you until `conveyor epic approve KEY` (or a human comment `approve`) starts flow 1 at stage `decide`; label `epic_gate:off` skips the wait. The dispatcher wakes an epic with a system comment when its sub-tasks have all settled; only `conveyor epic restart KEY --reason` abandons a flow (cancels open sub-tasks, starts the next flow at `spec`). Agents in epic runs cannot `gh pr merge`. Stage logic lives in the `epic` skill (`skills/epic/`, planner adapters in `skills/epic/planners/`), installed with the plugin; `plugin install` also seeds a user agent `epic-builder` whose prompt only loads it (never overwritten). The brief of a labelled task adds a `Labels:` line and, from them, the epic/stage/flow line, the rule for its `epic_kind:` and "Load these skills before starting" from `skill:*` labels.
 
 **Epic view** (`e` on a task page, the sitemap icon on board cards and the task header, or sidebar *Epics* = board filtered by `label:epic`): sub-tasks as cards in a group per parent, layered by `blocks`. Cards edit agent, model, skills and kind; drag handle to handle to add a `blocks` link, select an edge and press Backspace to unlink, `+` on a group adds a sub-task. Header: stage pipeline, n/m done, wants-you count, Approve plan at the gate, Restart (reason required). Updates live on `db:changed`.
 
@@ -139,19 +139,19 @@ Actions on a task:
 
 Sessions you started by hand in a worktree also appear on the task page, found by scanning `~/.claude/projects` for that worktree path.
 
-With the Claude Code hooks installed (below), those manual sessions are also recorded as interactive runs, and replying to a task in needs_you moves it back to running.
+With the Conveyor plugin installed (below), those manual sessions are also recorded as interactive runs, and replying to a task in needs_you moves it back to running.
 
 ## Hooks
 
 ![Hook and event flow](diagrams/hook-flow.svg)
 
-Sessions report back through Claude Code hooks, which run `conveyor hook <Event>`. Conveyor-launched sessions get them through `--settings`. For sessions you start yourself, run:
+Sessions report back through Claude Code hooks, which run `conveyor hook <Event>`. Conveyor-launched sessions get them through `--settings`. For sessions you start yourself, install the Conveyor plugin:
 
 ```
-conveyor hooks install      # status | install | uninstall
+conveyor plugin install     # status | install | uninstall [claude|agy]; `conveyor hooks ...` is an alias
 ```
 
-This adds `UserPromptSubmit`, `Stop` and `Notification` to `~/.claude/settings.json` (the old file is kept as `settings.json.conveyor.bak`). The PR prefix hook is not installed there, so it never affects your other Claude sessions. Hooks ignore any session whose directory is not under `~/.conveyor/workspaces/<KEY>`. It also writes the `epic` skill to `~/.claude/skills/epic/` (uninstall removes it); a missing or stale skill shows as `outdated`. The Apps page in the app shows the same status with an install button.
+For Claude Code it writes `~/.claude/skills/conveyor/`, a skills-dir plugin Claude Code loads as `conveyor@skills-dir` (no marketplace step): `UserPromptSubmit`, `Stop` and `Notification` hooks plus the `conveyor` and `epic` skills. The PR prefix hook is not in it, so it never affects your other Claude sessions. Hooks ignore any session whose directory is not under `~/.conveyor/workspaces/<KEY>`. Claude Code doesn't dedupe a plugin hook against the same `--settings` hook, so Conveyor's `--settings` set `CONVEYOR_HOOKS` and the plugin's copy exits early there. Installing or uninstalling also removes the older install (hooks in `~/.claude/settings.json`, `~/.claude/skills/epic/`); while it is still there, or a file is missing or stale, the status is `outdated`. agy shows `not supported` until it has a user-level target. The Apps page shows the same status per tool with install buttons.
 
 ## Learnings
 
@@ -305,7 +305,7 @@ workspaces/<KEY>/BRIEF.md   the agent's brief
 workspaces/<KEY>/attachments/   pasted images
 ```
 
-Outside it, Conveyor reads `~/.claude/projects` (session transcripts), `~/.claude/agents`, and edits `~/.claude/settings.json` only through `conveyor hooks install`.
+Outside it, Conveyor reads `~/.claude/projects` (session transcripts), `~/.claude/agents`, and writes `~/.claude/skills/conveyor/` and removes Conveyor's old hooks from `~/.claude/settings.json` only through `conveyor plugin install`.
 
 ## Troubleshooting
 

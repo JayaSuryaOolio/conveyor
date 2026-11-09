@@ -128,7 +128,7 @@ An **epic flow** is one attempt to finish the epic. It is not a task and is not 
 
 ### 2.4 The `epic` skill and its checklist
 
-The skill ships in this repo at `skills/epic/`. "Install hooks" (Settings, `UserHooks("install")`) copies it to `~/.claude/skills/epic/`, and "uninstall" removes it. Every epic run and every child run loads it (the brief names it).
+The skill ships in this repo at `skills/epic/`. Installing the Conveyor plugin (Apps page, `conveyor plugin install`) copies it to `~/.claude/skills/conveyor/skills/epic/`, and "uninstall" removes it. Every epic run and every child run loads it (the brief names it).
 
 Tasks remember nothing between runs. The skill makes them seem to: **every run starts from `conveyor epic status KEY --json`**, which assembles flow, tasks, PRs, AC coverage and the recent audit tail from the DB. That status is the state. The workspace's STATE.md is only a scratchpad.
 
@@ -236,8 +236,8 @@ ALTER TABLE automations ADD COLUMN flow_id INTEGER REFERENCES epic_flows(id) ON 
 
 ## 8. Epic agent, skill and brief
 
-- **Agent** `epic-builder`, seeded into `~/.claude/agents` by `hooks install` (no UI). The prompt is short: "You run an epic. Load the `epic` skill and follow it." Stage logic lives in the skill, so it can change without a Go release.
-- **Skill files**: `skills/epic/SKILL.md` (loop, gate, checklist, no-merge rule, commands), `skills/epic/planners/wayfinder.md` (§2.1 table as commands). They are embedded with `go:embed` and written by `UserHooks("install")` next to the hooks. `status` reports the skill too.
+- **Agent** `epic-builder`, seeded into `~/.claude/agents` by `plugin install` (no UI). The prompt is short: "You run an epic. Load the `epic` skill and follow it." Stage logic lives in the skill, so it can change without a Go release.
+- **Skill files**: `skills/epic/SKILL.md` (loop, gate, checklist, no-merge rule, commands), `skills/epic/planners/wayfinder.md` (§2.1 table as commands). They are embedded with `go:embed` and written by `Plugin("claude", "install")` into the plugin next to the hooks. `status` reports the skill too.
 - **Brief** (`internal/brief`):
   - a `Labels:` line,
   - for epic members: `Epic <name> (root <ROOTKEY>), stage <s>, flow <n>. Load the epic skill and run conveyor epic status <ROOTKEY> first.`,

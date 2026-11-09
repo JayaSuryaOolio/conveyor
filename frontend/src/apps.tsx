@@ -1,8 +1,8 @@
 import {useEffect, useRef, useState} from 'react'
 import {ActionIcon, Badge, Button, Checkbox, Code, FileButton, Group, Modal, MultiSelect, NumberInput, Paper, Select, Stack, Switch, Table, Tabs, Text, TextInput, Textarea, Title} from '@mantine/core'
 import {IconDownload, IconPlus, IconPuzzle, IconSettings, IconTrash, IconUpload} from '@tabler/icons-react'
-import {AddApp, AppSettings, SaveAppSettings, ExampleApps, InstallExample, GetSettings, SetSetting, AppIcons, AppPresets, Confirm, SetAppDisabled, DeleteApp, ExportApp, InstallManifest, InstallPreset, ListApps, ManifestSchema, UserHooks, ValidateManifest} from '../wailsjs/go/ui/App'
-import {store} from '../wailsjs/go/models'
+import {AddApp, AppSettings, SaveAppSettings, ExampleApps, InstallExample, GetSettings, SetSetting, AppIcons, AppPresets, Confirm, SetAppDisabled, DeleteApp, ExportApp, InstallManifest, InstallPreset, ListApps, ManifestSchema, Plugin, ValidateManifest} from '../wailsjs/go/ui/App'
+import {runner, store} from '../wailsjs/go/models'
 import {AppIcon, errMsg, toast} from './components'
 import {Field, SettingRow} from './forms'
 import {useData} from './util'
@@ -136,25 +136,39 @@ function hasSettings(a: store.App) {
     try { return JSON.parse(a.manifest).settings?.length > 0 } catch { return false }
 }
 
-function AgentHooks() {
-    const {data: status, error, reload} = useData(() => UserHooks('status'), [])
-    const act = (a: string) => UserHooks(a).then(reload, errMsg)
+const pluginColor: Record<string, string> = {installed: 'green', outdated: 'orange'}
+
+function PluginRow({st, act}: {st: runner.PluginStatus, act: (tool: string, a: string) => void}) {
+    const supported = st.status !== 'not supported'
+    return (
+        <Group justify="space-between">
+            <Group gap="xs">
+                <Text size="sm" fw={500}>{st.tool}</Text>
+                <Badge variant="light" color={pluginColor[st.status] ?? 'gray'}>{st.status}</Badge>
+                {st.path && <Code>{st.path}</Code>}
+                {st.note && <Text size="xs" c="dimmed">{st.note}</Text>}
+            </Group>
+            {supported && <Group gap="xs">
+                {st.status !== 'installed' && <Button size="xs" onClick={() => act(st.tool, 'install')}>{st.status === 'outdated' ? 'Update' : 'Install'}</Button>}
+                {st.status !== 'not installed' && <Button size="xs" variant="default" onClick={() => act(st.tool, 'uninstall')}>Uninstall</Button>}
+            </Group>}
+        </Group>
+    )
+}
+
+function ConveyorPlugin() {
+    const {data, error, reload} = useData(() => Plugin('', 'status'), [])
+    const act = (tool: string, a: string) => Plugin(tool, a).then(reload, errMsg)
     return (
         <Paper withBorder p="md" radius="md">
             <Stack gap="xs">
-                <Group justify="space-between">
-                    <Group gap="xs"><Title order={5}>Claude Code hooks</Title>
-                        {status && <Badge variant="light" color={status === 'installed' ? 'green' : status === 'outdated' ? 'orange' : 'gray'}>{status}</Badge>}
-                    </Group>
-                    <Group gap="xs">
-                        {status !== 'installed' && <Button size="xs" onClick={() => act('install')}>{status === 'outdated' ? 'Update' : 'Install'}</Button>}
-                        {status && status !== 'not installed' && <Button size="xs" variant="default" onClick={() => act('uninstall')}>Uninstall</Button>}
-                    </Group>
-                </Group>
+                <Title order={5}>Conveyor plugin</Title>
+                {data?.map(st => <PluginRow key={st.tool} st={st} act={act}/>)}
                 <Text size="sm" c="dimmed">
-                    Sessions Conveyor starts always report back. Installing adds the same hooks (prompt, stop, notification) to <Code>~/.claude/settings.json</Code>,
-                    so a <Code>claude</Code> you start yourself in a task worktree, from an app or any terminal, shows up on the task as an interactive run.
-                    Sessions outside Conveyor workspaces are ignored. Same as <Code>conveyor hooks install</Code>.
+                    Sessions Conveyor starts always report back. The plugin adds the same hooks (prompt, stop, notification) and the
+                    {' '}<Code>conveyor</Code> and <Code>epic</Code> skills for sessions you start yourself, so a <Code>claude</Code> run in a task
+                    worktree, from an app or any terminal, shows up on the task as an interactive run. Sessions outside Conveyor workspaces are ignored.
+                    Installing also removes the older hooks from <Code>~/.claude/settings.json</Code>. Same as <Code>conveyor plugin install</Code>.
                 </Text>
                 {error && <Text c="red" size="sm">{error}</Text>}
             </Stack>
@@ -225,7 +239,7 @@ function AppList() {
                     ))}
                 </Group>
             </>}
-            <AgentHooks/>
+            <ConveyorPlugin/>
             <Modal opened={importing} onClose={() => setImporting(false)} title="Install app from manifest" size="lg">
                 {importing && <ManifestForm onClose={saved => { setImporting(false); if (saved) reload() }}/>}
             </Modal>

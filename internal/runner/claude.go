@@ -2,6 +2,7 @@ package runner
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/JayaSuryaOolio/conveyor/internal/claude"
 )
@@ -55,4 +56,29 @@ func (c *ClaudeRunner) FreshCommand(settingsPath, briefPath string, addDirs []st
 
 func (c *ClaudeRunner) WriteSettings(home, conveyorBin string) (string, error) {
 	return claude.WriteSettings(home, conveyorBin)
+}
+
+// Plugin installs the conveyor@skills-dir plugin: the user hooks plus the skills.
+func (c *ClaudeRunner) Plugin(action string, p PluginSpec) (PluginStatus, error) {
+	st := PluginStatus{Tool: c.Name()}
+	dir, err := claude.PluginDir()
+	if err != nil {
+		return st, err
+	}
+	st.Path = dir
+	settings, err := claude.UserSettingsPath()
+	if err != nil {
+		return st, err
+	}
+	switch action {
+	case "status":
+	case "install", "uninstall":
+		if err := claude.SetPlugin(dir, settings, p.Skills, p.ConveyorBin, p.Home, action == "install"); err != nil {
+			return st, err
+		}
+	default:
+		return st, fmt.Errorf("unknown plugin action %q", action)
+	}
+	st.Status, err = claude.PluginStatus(dir, settings, p.Skills, p.ConveyorBin, p.Home)
+	return st, err
 }

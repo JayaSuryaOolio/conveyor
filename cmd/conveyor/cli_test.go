@@ -154,6 +154,27 @@ func TestHookLogScope(t *testing.T) {
 	}
 }
 
+// The plugin's copy of a hook stands down in a session whose --settings run it (CONVEYOR_HOOKS set).
+func TestHookPluginCopy(t *testing.T) {
+	home := t.TempDir()
+	hook := func(env ...string) int {
+		cmd := exec.Command(bin, "--home", home, "hook", "Stop")
+		cmd.Env = append(os.Environ(), env...)
+		cmd.Stdin = strings.NewReader(`{"session_id":"s1","cwd":"` + filepath.Join(home, "workspaces", "CV-9", "repo") + `"}`)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("hook failed: %v %s", err, out)
+		}
+		b, _ := os.ReadFile(filepath.Join(home, "logs", "hook.log"))
+		return strings.Count(string(b), "[Stop]")
+	}
+	if n := hook("CLAUDE_PLUGIN_ROOT=/p", "CONVEYOR_HOOKS="+home); n != 0 {
+		t.Fatalf("plugin copy ran: %d", n)
+	}
+	if n := hook("CLAUDE_PLUGIN_ROOT=/p", "CONVEYOR_HOOKS="); n != 1 { // a session the user started: the plugin reports it
+		t.Fatalf("plugin hook skipped: %d", n)
+	}
+}
+
 func TestAutomationCLI(t *testing.T) {
 	home := t.TempDir()
 	cv(t, home, "automation", "add", "--template", "pr-sweep")

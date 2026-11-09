@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/JayaSuryaOolio/conveyor/internal/brief"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -16,7 +15,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/JayaSuryaOolio/conveyor/internal/claude"
 	"github.com/JayaSuryaOolio/conveyor/internal/runner"
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 	"github.com/JayaSuryaOolio/conveyor/internal/terminal"
@@ -89,46 +87,36 @@ func (s *Service) bin() (string, error) {
 	return exe, nil
 }
 
-// UserHooks reports or changes Conveyor's hooks in ~/.claude/settings.json.
-// action is "status", "install" or "uninstall"; it returns the resulting status.
-func (s *Service) UserHooks(action string) (string, error) {
-	path, err := claude.UserSettingsPath()
-	if err != nil {
-		return "", err
-	}
+// Plugin reports or changes the Conveyor plugin (hooks + skills) for tool, or for every tool when
+// tool is "". action is "status", "install" or "uninstall"; it returns each tool's resulting status.
+func (s *Service) Plugin(tool, action string) ([]runner.PluginStatus, error) {
 	bin, err := s.bin()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	epic, err := fs.Sub(skills.FS, "epic")
-	if err != nil {
-		return "", err
-	}
-	dir := filepath.Join(filepath.Dir(path), "skills", "epic") // ~/.claude/skills/epic
-	switch action {
-	case "status":
-	case "install", "uninstall":
-		if err := claude.SetUserHooks(path, bin, s.Home, action == "install"); err != nil {
-			return "", err
+	spec := runner.PluginSpec{Home: s.Home, ConveyorBin: bin, Skills: skills.FS}
+	var out []runner.PluginStatus
+	for _, r := range runner.All(s.Home) {
+		if tool != "" && tool != r.Name() {
+			continue
 		}
-		if err := claude.SetSkill(epic, dir, action == "install"); err != nil {
-			return "", fmt.Errorf("epic skill: %w", err)
+		st, err := r.Plugin(action, spec)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", r.Name(), err)
 		}
-		if action == "install" { // seed the agent epic roots run under; never overwrites an edited one
+		out = append(out, st)
+		if action == "install" && st.Status == "installed" && r.Name() == "claude" { // seed the agent epic roots run under; never overwrites an edited one
 			if _, err := os.Stat(filepath.Join(userAgentsDir(), "epic-builder.md")); err != nil {
 				if err := s.AddAgent("epic-builder", "Runs a Conveyor epic: plans it, waits at the gate, drives its sub-tasks to PRs.", "You run an epic. Load the `epic` skill and follow it.", "user", ""); err != nil {
-					return "", fmt.Errorf("epic-builder agent: %w", err)
+					return nil, fmt.Errorf("epic-builder agent: %w", err)
 				}
 			}
 		}
-	default:
-		return "", fmt.Errorf("unknown hooks action %q", action)
 	}
-	st, err := claude.UserHooksStatus(path, bin, s.Home)
-	if err != nil {
-		return "", err
+	if out == nil {
+		return nil, fmt.Errorf("unknown tool %q", tool)
 	}
-	return claude.SkillStatus(st, epic, dir), nil
+	return out, nil
 }
 
 // Actions lists what can be opened for a task. Without a primary worktree it returns none.
