@@ -2,7 +2,7 @@ import {useState} from 'react'
 import {ActionIcon, Anchor, Badge, Button, Code, Divider, Group, Menu, Modal, Paper, Stack, TagsInput, Text, TextInput, Title, Tooltip} from '@mantine/core'
 import {useClipboard} from '@mantine/hooks'
 import {IconCopy, IconMessageSearch, IconPencil, IconPlus, IconStar, IconX, IconTerminal, IconTerminal2} from '@tabler/icons-react'
-import {Actions, AddLabel, AddTaskRepo, CheckReviews, EnsureWorkspace, GetSettings, ListLabels, ListRepos, RemoveLabel, RemoveTaskRepo, RunAction, Sessions, SetTaskRepo, TermStart} from '../wailsjs/go/ui/App'
+import {Actions, AddLabel, AddTaskRepo, CheckReviews, EnsureWorkspace, ListLabels, ListRepos, RemoveLabel, RemoveTaskRepo, RunAction, Sessions, SetTaskRepo, TermStart} from '../wailsjs/go/ui/App'
 import {core, store, ui} from '../wailsjs/go/models'
 import {BrowserOpenURL} from '../wailsjs/runtime/runtime'
 import {PlacedButtons, StatusSelect, Time, errMsg} from './components'
@@ -130,22 +130,6 @@ function RepoFields({k, r, reload, canRemove, children}: {k: string; r: store.Ta
     )
 }
 
-/** Who made the task: the exact created_by, else (rows from before it existed) inferred from the lettered key (CV-14A is a child of CV-14). */
-function creator(key: string, source: string, user: string | undefined, createdBy?: string | null) {
-    if (createdBy) {
-        const [kind, ...rest] = createdBy.split(':'), arg = rest.join(':')
-        if (kind === 'human') return user || 'human'
-        if (kind === 'agent') return `agent · ${arg}`
-        if (kind === 'followup') return `follow-up of ${arg}`
-        if (kind === 'automation') return `automation · ${arg}`
-        return createdBy
-    }
-    const parent = key.match(/^(.+-\d+)[A-Z]+$/)?.[1]
-    if (parent) return source === 'followup' ? `follow-up of ${parent}` : `agent · ${parent}`
-    if (source === 'jira' || source === 'learning') return source
-    return user || 'human'
-}
-
 /** Label picker: choose existing labels from the dropdown or type a new one and press Enter. */
 function Labels({k, labels, reload}: {k: string; labels: string[]; reload: () => void}) {
     const {data: all, reload: reloadAll} = useData(ListLabels, [])
@@ -178,13 +162,11 @@ function AddRepo({k, have, reload}: {k: string; have: string[]; reload: () => vo
     </>)
 }
 
-export function TaskSidebar({t, runs, reload, onTerm}: {t: store.Task; runs: store.Run[]; reload: () => void; onTerm: (t: ui.TermInfo) => void}) {
+export function TaskSidebar({t, by, runs, reload, onTerm}: {t: store.Task; by: string; runs: store.Run[]; reload: () => void; onTerm: (t: ui.TermInfo) => void}) {
     const k = t.key
     const repos = t.repos ?? []
     const {data: actions, error: actionsError, reload: reloadActions} = useData(() => Actions(k), [k])
     const {data: sessions, error: sessionsError, reload: reloadSessions} = useData(() => Sessions(k), [k])
-    const {data: settings} = useData(GetSettings, [])
-    const by = creator(k, t.source, settings?.user_name, t.created_by)
     const [busy, setBusy] = useState(false)
     const taskActions = (actions ?? []).filter(a => ['attach', 'fresh', 'shell'].includes(a.kind))
     const resume = new Map((actions ?? []).filter(a => /^(resume|attach):/.test(a.kind)).map(a => [a.kind.split(':')[1], a]))

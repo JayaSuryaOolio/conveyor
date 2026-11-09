@@ -340,7 +340,7 @@ export function TaskPage({k, nav, height = 'calc(100vh - 2 * var(--mantine-spaci
                         {side ? <IconLayoutSidebarRightCollapse size={18}/> : <IconLayoutSidebarRightExpand size={18}/>}
                     </ActionIcon>
                 </Group>
-                {side && <TaskSidebar t={t} runs={d.runs} reload={reload} onTerm={setAdded}/>}
+                {side && <TaskSidebar t={t} by={d.creator} runs={d.runs} reload={reload} onTerm={setAdded}/>}
             </Box>
         </Box>
         <Box mx="calc(-1 * var(--mantine-spacing-md))" mb="calc(-1 * var(--mantine-spacing-md))" mt="md" style={{flex: 'none'}}>

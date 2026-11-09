@@ -238,6 +238,37 @@ type TaskDetail struct {
 	Comments  []store.Comment `json:"comments"`
 	Runs      []store.Run     `json:"runs"`
 	Relations store.Relations `json:"relations"`
+	Creator   string          `json:"creator"` // who made the task, for the sidebar
+}
+
+// creator labels who made t: from created_by, else (rows from before it existed) from its parent and source.
+func creator(t store.Task, parent *store.TaskRef, user string) string {
+	if user == "" {
+		user = "human"
+	}
+	if t.CreatedBy != nil {
+		kind, arg, _ := strings.Cut(*t.CreatedBy, ":")
+		switch kind {
+		case "human":
+			return user
+		case "agent":
+			return "agent · " + arg
+		case "followup":
+			return "follow-up of " + arg
+		case "automation":
+			return "automation · " + arg
+		}
+		return *t.CreatedBy
+	}
+	switch {
+	case parent != nil && t.Source == "followup":
+		return "follow-up of " + parent.Key
+	case parent != nil:
+		return "agent · " + parent.Key
+	case t.Source == "jira" || t.Source == "learning":
+		return t.Source
+	}
+	return user
 }
 
 // ListTasks returns every task as a card.
@@ -309,7 +340,8 @@ func (a *App) GetTask(key string) (TaskDetail, error) {
 	if err != nil {
 		return TaskDetail{}, err
 	}
-	return TaskDetail{Task: t, Comments: cs, Runs: rs, Relations: rel}, nil
+	by := creator(t, rel.Parent, store.GetSetting(a.svc.DB, "user_name"))
+	return TaskDetail{Task: t, Comments: cs, Runs: rs, Relations: rel, Creator: by}, nil
 }
 
 // Link records "from <kind> to" (blocks, relates).

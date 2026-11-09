@@ -3,13 +3,13 @@ import {ActionIcon, Box, Button, Group, Popover, SegmentedControl, Stack, Text, 
 import {IconBold, IconCode, IconItalic, IconLink, IconList, IconListCheck} from '@tabler/icons-react'
 import {Complete, SaveAttachment, ShowError} from '../wailsjs/go/ui/App'
 import {core} from '../wailsjs/go/models'
-import {load} from './paletteCache'
+import {escapeRe, load, useKeyPrefix} from './paletteCache'
 import type {Nav} from './components'
 
 /** The task whose repos @file mentions in rendered markdown resolve against; '' = not clickable. */
 export const TaskKey = createContext('')
 
-/** Navigates the app; lets rendered CV-* keys open their task. No-op outside App. */
+/** Navigates the app; lets rendered task keys open their task. No-op outside App. */
 export const NavContext = createContext<Nav>(() => {})
 
 const MdRender = lazy(() => import('./md-render'))
@@ -36,21 +36,22 @@ const LIST_LINE = /^\s*([-*+]|\d+\.)\s/
 
 let uploads = 0
 
-/** The @file, /command or task key prefix (CV-, Conveyor's fixed key prefix) being typed just before the caret, if any. */
-const TRIGGER = /(^|\s)(@|\/|CV-)([^\s@]*)$/
+/** Matches the @file, /command or task key prefix (e.g. CV-) being typed just before the caret. */
+const trigger = (keyPrefix: string) => new RegExp(`(^|\\s)(@|\\/${keyPrefix && '|' + escapeRe(keyPrefix)})([^\\s@]*)$`)
 
 /** Asks the backend for the token's suggestions (it streams git ls-files per query); stale replies are dropped. */
-function useSuggestions(key: string, repos: string[]) {
+function useSuggestions(key: string, repos: string[], keyPrefix: string) {
     const [items, setItems] = useState<core.Suggestion[]>([])
     const seq = useRef(0)
     const query = (t: {kind: string; q: string} | null) => {
         const n = ++seq.current
-        if (!t || (!key && !repos.length && t.kind !== 'CV-')) { setItems([]); return }
-        if (t.kind === 'CV-') { // from the Cmd+K palette's cache: no backend call per keystroke
+        const isKey = !!keyPrefix && t?.kind === keyPrefix
+        if (!t || (!key && !repos.length && !isKey)) { setItems([]); return }
+        if (isKey) { // from the Cmd+K palette's cache: no backend call per keystroke
             const q = t.q.toLowerCase()
             load(false).then(raw => {
                 if (n !== seq.current) return
-                const hits = raw.tasks.filter(k => k.key.slice(3).toLowerCase().includes(q) || k.title.toLowerCase().includes(q)).slice(0, 8)
+                const hits = raw.tasks.filter(k => k.key.slice(keyPrefix.length).toLowerCase().includes(q) || k.title.toLowerCase().includes(q)).slice(0, 8)
                 setItems(hits.map(k => core.Suggestion.createFrom({insert: k.key, label: k.key, hint: k.title})))
             }, () => {})
             return
@@ -78,13 +79,14 @@ export function MarkdownEditor({value, onChange, onSubmit, submitLabel = 'Send',
     const [pending, setPending] = useState(0)
     const submit = pending ? undefined : onSubmit
     // @file / slash-command autocomplete: files and commands of attachKey's task, else of repos.
-    const [found, query] = useSuggestions(attachKey, repos)
+    const keyPrefix = useKeyPrefix()
+    const [found, query] = useSuggestions(attachKey, repos, keyPrefix)
     const [trig, setTrigState] = useState<{kind: string; q: string; at: number} | null>(null)
     const setTrig = (t: typeof trig) => { setTrigState(t); query(t) }
     const [hi, setHi] = useState(0)
     const items = trig ? found : []
     const track = (t: HTMLTextAreaElement) => {
-        const m = t.selectionStart === t.selectionEnd ? TRIGGER.exec(t.value.slice(0, t.selectionStart)) : null
+        const m = t.selectionStart === t.selectionEnd ? trigger(keyPrefix).exec(t.value.slice(0, t.selectionStart)) : null
         const next = m ? {kind: m[2], q: m[3], at: t.selectionStart - m[3].length - m[2].length} : null
         if (next?.kind !== trig?.kind || next?.q !== trig?.q || next?.at !== trig?.at) setTrig(next)
         setHi(0)
@@ -212,7 +214,7 @@ export function MarkdownEditor({value, onChange, onSubmit, submitLabel = 'Send',
                     {value.trim() ? <Markdown>{value}</Markdown> : <Text size="sm" c="dimmed">Nothing to preview</Text>}
                 </Stack>}
             <Group justify="space-between" wrap="nowrap" px="xs" py={6} style={{borderTop: '1px solid var(--mantine-color-default-border)'}}>
-                <Text size="xs" c="dimmed">{pending ? 'Uploading…' : <>Markdown supported · @ files · / commands · CV- tasks · paste or drop images{onSubmit && ' · ⌘↵ to send'}</>}</Text>
+                <Text size="xs" c="dimmed">{pending ? 'Uploading…' : <>Markdown supported · @ files · / commands ·{keyPrefix && ` ${keyPrefix} tasks ·`} paste or drop images{onSubmit && ' · ⌘↵ to send'}</>}</Text>
                 {onSubmit && <Button size="compact-sm" onClick={submit} loading={submitting} disabled={!canSubmit || pending > 0}>{submitLabel}</Button>}
             </Group>
         </Box>
