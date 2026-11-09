@@ -112,7 +112,7 @@ An adapter is one markdown file, `skills/epic/planners/<name>.md`, holding this 
 | `decide` | Frontier tickets run as they unblock. A resolution can add tickets. | No open decision tickets | Only on grilling and prototype tickets |
 | `spec` | The epic run writes the spec, creates `epic_kind:build` sub-tasks (repo, AC ids, agent, skills) with `blocks` links, and moves them to `todo`. | Build tickets exist | No |
 | `build` | Build tickets run test-first and open PRs. Review events requeue them (§10). | Every build child done or cancelled | When an agent gets stuck, and **for merging: the human always merges** |
-| `verify` | The epic run checks every AC against the merged work. Gaps become new build tickets and the stage goes back to `build`. | All AC met | No |
+| `verify` | The epic run checks every AC against the merged work, in a fresh session (the dispatcher never resumes the root's planning session here; `#resume` overrides). Gaps become new build tickets and the stage goes back to `build`. | All AC met | No |
 | `done` | The epic moves to done, and the flow ends. | | |
 
 The epic agent swaps its own stage label, so moving between stages needs no Go code. Go adds one rule: when the last open child settles, wake the epic (§9).

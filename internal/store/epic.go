@@ -20,6 +20,7 @@ const (
 	StageChart      = "chart"
 	StageDecide     = "decide"
 	StageSpec       = "spec"
+	StageVerify     = "verify"
 	FlowActive      = "active"
 	FlowAbandoned   = "abandoned"
 	FlowDone        = "done"

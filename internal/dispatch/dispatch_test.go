@@ -267,6 +267,35 @@ func TestResumeVsFresh(t *testing.T) {
 	}
 }
 
+// The epic root's verify stage starts fresh so it does not grade its own plan; #resume still overrides.
+func TestVerifyStageStartsFresh(t *testing.T) {
+	for _, tc := range []struct {
+		body   string
+		resume bool
+	}{{"verify now", false}, {"#resume", true}} {
+		e := setup(t)
+		tk := e.task(t, "epic", 0)
+		for _, l := range []string{store.LabelEpic, store.PrefixStage + store.StageVerify} {
+			if err := store.AddLabel(e.db, tk.ID, l); err != nil {
+				t.Fatal(err)
+			}
+		}
+		r, _ := store.CreateRun(e.db, store.Run{TaskID: tk.ID, Kind: "auto", Mode: "fresh", Status: "launching"})
+		sess, bg := "sess-1", "oldbg001"
+		r.SessionID, r.BgID, r.Status, r.CtxPeak = &sess, &bg, "finished", 1000
+		if err := store.UpdateRun(e.db, r); err != nil {
+			t.Fatal(err)
+		}
+		store.AddComment(e.db, store.Comment{TaskID: tk.ID, Author: store.AuthorHuman, Body: tc.body})
+		e.now = time.Now().Add(time.Minute)
+		e.tick(t)
+		a := strings.Join(launches(t, e.fake)[0], " ")
+		if got := strings.Contains(a, "--resume"); got != tc.resume {
+			t.Errorf("%q: resumed=%v: %q", tc.body, got, a)
+		}
+	}
+}
+
 func TestMaxParallel(t *testing.T) {
 	e := setup(t)
 	store.SetSetting(e.db, "max_parallel", "1")

@@ -624,9 +624,10 @@ func sessionDirective(delta []store.Comment) string {
 }
 
 // resumable returns the latest auto run if it can be resumed: finished, with session and bg ids, and a small
-// context. directive "fresh" never resumes; "resume" ignores resume_threshold.
+// context. directive "fresh" never resumes; "resume" ignores resume_threshold. An epic root in the verify
+// stage never resumes unless told to, so the check comes from a session that did not plan the epic.
 func (d *Dispatcher) resumable(task store.Task, directive string) (*store.Run, error) {
-	if directive == "fresh" {
+	if directive == "fresh" || (directive != "resume" && store.IsEpic(task) && store.EpicStage(task) == store.StageVerify) {
 		return nil, nil
 	}
 	runs, err := store.ListRuns(d.Svc.DB, task.ID)
