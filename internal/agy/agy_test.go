@@ -1,11 +1,12 @@
 package agy
 
 import (
-	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 )
 
@@ -87,18 +88,24 @@ func TestLaunchSpecArgs(t *testing.T) {
 	}
 }
 
-func TestMockLaunch(t *testing.T) {
-	oldExec := execCommand
-	defer func() { execCommand = oldExec }()
-
-	execCommand = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+// mockExec records the args of the next agy start and runs `true` instead.
+func mockExec(t *testing.T) *[]string {
+	t.Helper()
+	old := execCommand
+	t.Cleanup(func() { execCommand = old })
+	var got []string
+	execCommand = func(name string, args ...string) *exec.Cmd {
+		got = args
 		return exec.Command("true")
 	}
+	return &got
+}
 
+func TestMockLaunch(t *testing.T) {
+	mockExec(t)
 	home := t.TempDir()
-	cwd := t.TempDir()
-	pid, _, err := Launch(context.Background(), home, LaunchSpec{
-		Cwd:          cwd,
+	pid, _, err := Launch(home, LaunchSpec{
+		Cwd:          t.TempDir(),
 		Name:         "CV-1",
 		Prompt:       "test",
 		SettingsPath: filepath.Join(home, "agy-settings.json"),
@@ -109,5 +116,49 @@ func TestMockLaunch(t *testing.T) {
 	}
 	if pid == "" {
 		t.Fatal("expected non-empty pid")
+	}
+}
+
+// A resume appends to the task's own log (the one the reaper reads) and keeps model and agent.
+func TestResumeLogPathAndArgs(t *testing.T) {
+	got := mockExec(t)
+	home := t.TempDir()
+	log := BgLogPath(home, "CV-1")
+	if err := os.MkdirAll(filepath.Dir(log), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(log, []byte("first run\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	pid, err := Resume(home, "999999999", "conv-1", LaunchSpec{
+		Cwd: t.TempDir(), Name: "CV-1", Prompt: "go on", Model: "gemini-pro", Agent: "sse", Bypass: true,
+	})
+	if err != nil || pid == "" {
+		t.Fatalf("pid %q err %v", pid, err)
+	}
+	if b, _ := os.ReadFile(log); string(b) != "first run\n" {
+		t.Errorf("resume truncated or missed %s: %q", log, b)
+	}
+	joined := strings.Join(*got, " ")
+	for _, want := range []string{"--conversation conv-1", "--print go on", "--model gemini-pro", "--agent sse", "--dangerously-skip-permissions"} {
+		if !strings.Contains(joined, want) {
+			t.Errorf("args %q missing %q", joined, want)
+		}
+	}
+}
+
+// agy runs in its own process group, so signals to Conveyor's group on quit do not reach it.
+func TestStartDetached(t *testing.T) {
+	old := execCommand
+	t.Cleanup(func() { execCommand = old })
+	execCommand = func(string, ...string) *exec.Cmd { return exec.Command("sleep", "30") }
+	pid, _, err := Launch(t.TempDir(), LaunchSpec{Cwd: t.TempDir(), Name: "CV-1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	n, _ := strconv.Atoi(pid)
+	defer syscall.Kill(n, syscall.SIGKILL)
+	if g, err := syscall.Getpgid(n); err != nil || g != n || g == syscall.Getpgrp() {
+		t.Errorf("pgid %d (err %v), want own group %d", g, err, n)
 	}
 }

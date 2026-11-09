@@ -24,8 +24,8 @@ type Agent struct {
 type Runner interface {
 	// Launch starts a fresh background session and returns the bg id and session id (if immediately known).
 	Launch(ctx context.Context, s LaunchSpec) (bgID string, sessionID string, err error)
-	// Resume continues session sessionID (stopping bgID first) and returns the new bg id.
-	Resume(ctx context.Context, cwd, bgID, sessionID, settingsPath, prompt string, addDirs []string) (string, error)
+	// Resume continues session sessionID (stopping bgID first) with s and returns the new bg id.
+	Resume(ctx context.Context, bgID, sessionID string, s LaunchSpec) (string, error)
 	// Stop signals the background session to stop.
 	Stop(ctx context.Context, bgID string) error
 	// Remove removes / cleans up the background session record.
