@@ -121,10 +121,10 @@ Once one of a task's PRs is merged, a comment on it no longer simply reopens it:
 
 When the dispatcher launches a task that already has runs, it chooses between:
 
-- **Resume**: stop the old background session and run `claude --bg --resume <session>` with only the new comments as the prompt. Used when the latest auto run finished, its session is known, and its peak context was below `resume_threshold` (default 60000 tokens).
+- **Resume**: stop the old background session and run `claude --bg --resume <session>` with only the new comments as the prompt. Used when the latest auto run finished, its session is known, and its peak context was below `resume_threshold` (default 60000 tokens). Not used, so the session starts fresh, when the last run failed (until a run reports done) or for an epic root in stage `build` or `verify` (it is about to check the AC against the work): a session judging its own failed attempt or its own plan tends to repeat it.
 - **Fresh**: a new session that reads `BRIEF.md`, which carries the summaries of recent runs and your comments. Used otherwise.
 
-To choose yourself, start a comment with `#fresh` or `#resume` (CLI, app or Slack; the latest pending one wins). `#fresh` always starts a new session; `#resume` resumes regardless of `resume_threshold`, as long as the last auto run finished with a known session.
+To choose yourself, start a comment with `#fresh` or `#resume` (CLI, app or Slack; the latest pending one wins). `#fresh` always starts a new session; `#resume` resumes regardless of `resume_threshold` and those rules, as long as the last auto run finished with a known session.
 
 ## Interactive sessions and terminals
 
@@ -188,7 +188,7 @@ conveyor automation add NAME --schedule "0 9 * * 1-5" --kind create_task --arg '
 conveyor automation list | enable NAME | disable NAME | run NAME | rm NAME
 ```
 
-**Conveyor doctor.** `scripts/install.sh` installs the `conveyor-doctor` skill (`skills/conveyor-doctor`) to `~/.claude/skills` and, when the Conveyor checkout is a registered repo, adds the `conveyor-doctor` automation: every Monday at 09:00 it creates and starts a "Conveyor doctor: weekly run review" task. Its agent samples the week's longest, shortest, failed and most-commented runs, reads their briefs, transcripts and threads plus recent logs, and proposes fixes: a PR to Conveyor's default prompts, `conveyor config set` commands for your own settings, backlog tasks for other repos' `CLAUDE.md`, and learnings. Run it now with `conveyor automation run conveyor-doctor`; turn it off with `conveyor automation disable conveyor-doctor`.
+**Conveyor doctor.** `scripts/install.sh` installs the `conveyor-doctor` skill (`skills/conveyor-doctor`) to `~/.claude/skills` and, when the Conveyor checkout is a registered repo, adds the `conveyor-doctor` automation: every Monday at 09:00 it creates and starts a "Conveyor doctor: weekly run review" task. Its agent samples the week's longest, shortest, failed and most-commented runs, reads their briefs, transcripts and threads plus recent logs, has a fresh subagent restate a few briefs to catch ones that don't stand alone, checks this guide, the conveyor skill and `CLAUDE.md` against the code, and proposes fixes (doc drift is fixed in the same PR): a PR to Conveyor's default prompts, `conveyor config set` commands for your own settings, backlog tasks for other repos' `CLAUDE.md`, and learnings. Run it now with `conveyor automation run conveyor-doctor`; turn it off with `conveyor automation disable conveyor-doctor`.
 
 ## Apps
 

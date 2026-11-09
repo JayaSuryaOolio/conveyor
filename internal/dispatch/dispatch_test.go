@@ -239,10 +239,34 @@ func TestResumeVsFresh(t *testing.T) {
 	for _, tc := range []struct {
 		peak   int64
 		body   string
+		fails  int
+		labels []string
 		resume bool
-	}{{1000, "more", true}, {100000, "more", false}, {1000, "#fresh\nstart over", false}, {100000, "#resume please", true}} {
+	}{
+		{1000, "more", 0, nil, true},
+		{100000, "more", 0, nil, false},
+		{1000, "#fresh\nstart over", 0, nil, false},
+		{100000, "#resume please", 0, nil, true},
+		{1000, "retry", 1, nil, false},                                              // last run failed: fresh
+		{1000, "#resume retry", 1, nil, true},                                       // unless forced
+		{1000, "settled", 0, []string{"epic", "epic:e", "epic_stage:build"}, false}, // root about to verify: fresh
+		{1000, "more", 0, []string{"epic", "epic:e", "epic_stage:spec"}, true},
+		{1000, "more", 0, []string{"epic:e", "epic_stage:build"}, true}, // a member, not the root
+	} {
 		e := setup(t)
 		tk := e.task(t, "t", 0)
+		for _, l := range tc.labels {
+			if err := store.AddLabel(e.db, tk.ID, l); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if tc.fails > 0 {
+			tk = e.get(t, tk.ID)
+			tk.ConsecutiveFailures = tc.fails
+			if err := store.UpdateTask(e.db, tk); err != nil {
+				t.Fatal(err)
+			}
+		}
 		r, _ := store.CreateRun(e.db, store.Run{TaskID: tk.ID, Kind: "auto", Mode: "fresh", Status: "launching"})
 		sess, bg := "sess-1", "oldbg001"
 		r.SessionID, r.BgID, r.Status, r.CtxPeak = &sess, &bg, "finished", tc.peak
@@ -255,10 +279,10 @@ func TestResumeVsFresh(t *testing.T) {
 		a := strings.Join(launches(t, e.fake)[0], " ")
 		if tc.resume {
 			if !strings.Contains(a, "--bg --resume sess-1 --settings "+filepath.Join(e.d.Svc.Home, "claude-settings.json")+" New comments on "+tk.Key) || strings.Contains(a, "--permission-mode") {
-				t.Errorf("peak %d: not a bare resume: %q", tc.peak, a)
+				t.Errorf("%+v: not a bare resume: %q", tc, a)
 			}
 		} else if strings.Contains(a, "--resume") || !strings.Contains(a, "You are working on") {
-			t.Errorf("peak %d: not fresh: %q", tc.peak, a)
+			t.Errorf("%+v: not fresh: %q", tc, a)
 		}
 		run, _ := store.LatestRun(e.db, tk.ID)
 		if tc.resume && (run.Mode != "resume" || run.SessionID == nil || *run.SessionID != sess) {

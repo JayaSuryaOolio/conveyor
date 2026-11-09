@@ -45,9 +45,17 @@ For each run, note:
 - **Missing context**: questions the agent asked, wrong assumptions, repo conventions it broke (tests, branch names, PR format), skills/commands it should have used but didn't.
 - **Unused context**: brief sections or rules the agent never needed across the sample (candidates to cut).
 
+### Brief comprehension check (fresh reader)
+
+For 2-3 sampled tasks (prefer follow-ups, `source: followup`, and tasks the human had to steer), spawn a fresh subagent (Agent tool) and give it only that task's brief from `conveyor task brief KEY --preview`: no thread, no transcript, none of your notes. Ask it to restate in 3 sentences what the task wants, what is already done and what "done" means, and to list anything the brief assumes but never says. Compare that with what the thread shows the human meant. A wrong or incomplete restatement is a brief defect (for example, follow-up context in `parentContext` or the run history in `history`, both in `internal/brief/brief.go`). Report it with the runs that show it. The reader must not see your notes: a reader that knows the answer cannot find the gap.
+
 ## 3. Check the logs (recent only)
 
 `~/.conveyor/conveyor.log` (+ `conveyor.log.1`), `~/.conveyor/logs/dispatcher.log`, `~/.conveyor/logs/hook.log`: errors and warnings from the last 7 days, grouped by message. Launch failures, hook errors and reaps explain bad runs that the transcript can't. Match what you find against `docs/troubleshooting.md` in the Conveyor repo: a known failure gets its recipe applied or cited, not a new diagnosis.
+
+### Doc drift
+
+Check `docs/guide.md`, `.claude/skills/conveyor/SKILL.md` and the repo `CLAUDE.md` against the code in your worktree. Agents load these files and act on them as if they were true. Check what they name: CLI commands and flags (`go run . <cmd> --help`, `cmd/`), settings and their defaults (`conveyor config list`, the defaults in `internal/store`), functions and files cited by name (`dispatch.sessionDirective`, `core.followUp`, ...: grep that they exist and still do what the doc says), statuses and allowed moves (`internal/store/status.go`). List each mismatch as doc line → code fact. Fix the doc in the same PR: it does not count toward the 3-prompt-change limit, because a doc fix changes no behavior. A mismatch where the doc is right and the code is wrong is a Conveyor bug (see the table below).
 
 ## 4. Decide what to change
 
@@ -70,4 +78,4 @@ Rules for proposals:
 
 ## 5. Report
 
-Final reply (it becomes the task's summary): a table of sampled runs (key, run, outcome, duration, ctx_peak, one-line verdict), then findings, then what you changed (PR link), the settings commands you suggest, and the backlog tasks you created. End with the Conveyor status block.
+Final reply (it becomes the task's summary): a table of sampled runs (key, run, outcome, duration, ctx_peak, one-line verdict), then findings (including the comprehension check and doc drift), then what you changed (PR link), the settings commands you suggest, and the backlog tasks you created. End with the Conveyor status block.
