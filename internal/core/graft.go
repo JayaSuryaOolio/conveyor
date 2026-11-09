@@ -1,22 +1,22 @@
 package core
 
 import (
-	"os"
+	"fmt"
 	"os/exec"
-	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/JayaSuryaOolio/conveyor/internal/apps"
 )
 
 var graftLine = regexp.MustCompile(`^(.+)  <-  (.+)  \(pid \d+\)$`)
 
-// graftBin finds the graft CLI (the GUI's PATH often lacks ~/.local/bin).
-func graftBin() string {
-	if p, err := exec.LookPath("graft"); err == nil {
-		return p
+// runShell runs cmd via `sh -c`, folding its output into the error.
+func runShell(what, cmd string) error {
+	if out, err := exec.Command("sh", "-c", cmd).CombinedOutput(); err != nil {
+		return fmt.Errorf("%s: %w: %s", what, err, strings.TrimSpace(string(out)))
 	}
-	h, _ := os.UserHomeDir()
-	return filepath.Join(h, ".local", "bin", "graft")
+	return nil
 }
 
 // graftRoot returns the root that `graft list` output shows worktree mirrored into, "" if none.
@@ -31,7 +31,7 @@ func graftRoot(list, worktree string) string {
 
 // GraftRoot returns the root graft mirrors worktree into, "" when it is not active for it.
 func GraftRoot(worktree string) string {
-	out, err := exec.Command(graftBin(), "list").Output()
+	out, err := exec.Command(apps.GraftBin(), "list").Output()
 	if err != nil {
 		return ""
 	}
@@ -40,5 +40,5 @@ func GraftRoot(worktree string) string {
 
 // GraftStop stops the graft instance mirroring into root.
 func GraftStop(root string) error {
-	return runShell("stop graft", shq(graftBin())+" stop "+shq(root))
+	return runShell("stop graft", shq(apps.GraftBin())+" stop "+shq(root))
 }

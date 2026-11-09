@@ -9,118 +9,141 @@ import (
 	"strings"
 	"time"
 
+	"github.com/JayaSuryaOolio/conveyor/examples"
+	"github.com/JayaSuryaOolio/conveyor/internal/apps"
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 )
 
-// presetApps are macOS apps offered as one-click presets when installed. Each opens
-// with `open -a NAME {cwd}`, so supporting another app is one more name here.
-var presetApps = append(editorApps,
-	"Terminal", "iTerm", "Ghostty", "Warp", "WezTerm", "kitty",
-	"GitHub Desktop", "Fork", "Tower", "Sourcetree",
-)
+// Thin delegates to internal/apps for the CLI, UI and dispatcher.
 
-// editorApps are the presets that can also open one file (`open -a NAME file`); used by @file links.
-var editorApps = []string{
-	"Visual Studio Code", "Cursor", "Zed", "Windsurf", "Antigravity", "Sublime Text", "Xcode",
-	"GoLand", "IntelliJ IDEA", "WebStorm", "PyCharm",
+func (s *Service) WorktreePath(key, repo string) (string, error) {
+	return apps.WorktreePath(s.DB, key, repo)
+}
+func (s *Service) OpenApp(name, key, repo string) (string, error) {
+	return apps.OpenApp(s.DB, name, key, repo)
+}
+func (s *Service) AppSettings(name string) ([]apps.AppSetting, error) {
+	return apps.AppSettings(s.DB, name)
+}
+func (s *Service) SaveAppSettings(name string, vals map[string]string) error {
+	return apps.SaveAppSettings(s.DB, name, vals)
+}
+func (s *Service) PlacedActions(place string) ([]apps.Placed, error) {
+	return apps.PlacedActions(s.DB, place)
+}
+func (s *Service) RunAppAction(app, id, place, key string) (string, error) {
+	return apps.RunAppAction(s.DB, app, id, place, key)
+}
+func (s *Service) AppServiceRunning(app, id, place, key string) (bool, error) {
+	return apps.AppServiceRunning(s.DB, app, id, place, key)
+}
+func (s *Service) StopAppService(app, id, place, key string) error {
+	return apps.StopAppService(s.DB, app, id, place, key)
+}
+func (s *Service) ConvertApp(name string) error          { return apps.ConvertApp(s.DB, s.Home, name) }
+func (s *Service) ExportApp(name string) (string, error) { return apps.ExportApp(s.DB, name) }
+func (s *Service) EnsureServices() error                 { return apps.EnsureServices(s.DB) }
+
+// InstallExample installs a bundled example by its apps.ExampleApps File (the same path as importing a manifest).
+func (s *Service) InstallExample(file string) error {
+	raw, err := examples.FS.ReadFile(file + ".json")
+	if err != nil {
+		return err
+	}
+	_, err = s.InstallManifest(string(raw), false)
+	return err
 }
 
-// appDirs is where presets are looked for (swapped in tests).
-var appDirs = func() []string {
-	h, _ := os.UserHomeDir()
-	return []string{"/Applications", "/System/Applications", "/System/Applications/Utilities", filepath.Join(h, "Applications")}
-}
-
-// AppPresets returns Finder plus every preset app installed on this Mac.
-func AppPresets() []store.App {
-	out := []store.App{{Name: "Finder", Command: "open {cwd}"}}
-	for _, name := range presetApps {
-		for _, d := range appDirs() {
-			if _, err := os.Stat(filepath.Join(d, name+".app")); err == nil {
-				out = append(out, store.App{Name: name, Command: "open -a " + shq(name) + " {cwd}"})
+// InstallManifest validates raw, stores the app and creates its agents (user scope) and
+// automations (disabled until the user enables them). A failure rolls the app back.
+// An app of the same name is an error unless replace, which uninstalls it first.
+func (s *Service) InstallManifest(raw string, replace bool) (store.App, error) {
+	m, err := apps.ParseManifest(raw)
+	if err != nil {
+		return store.App{}, err
+	}
+	if m.Check != "" {
+		if err := runCheck(m.Check); err != nil {
+			return store.App{}, fmt.Errorf("%s: sample run failed (is the tool installed and on PATH?): %w", m.Name, err)
+		}
+	}
+	// read icons before a replace uninstalls the copies an exported manifest points at
+	icons, err := apps.ReadIcons(m)
+	if err != nil {
+		return store.App{}, err
+	}
+	if _, err := store.GetApp(s.DB, m.Name); err == nil && replace {
+		// ponytail: not atomic; a failed install after this leaves the old app gone
+		if err := s.UninstallApp(m.Name); err != nil {
+			return store.App{}, err
+		}
+	}
+	if raw, err = apps.WriteIcons(s.Home, &m, icons, raw); err != nil {
+		return store.App{}, err
+	}
+	a, err := store.CreateApp(s.DB, store.App{Name: m.Name, Manifest: raw})
+	if err != nil {
+		return a, err
+	}
+	for _, g := range m.Agents {
+		if err = s.AddAgent(g.Name, g.Description, g.Prompt, "user", g.Model); err != nil {
+			break
+		}
+	}
+	if err == nil {
+		for _, x := range m.Automations {
+			if _, err = store.CreateAutomation(s.DB, store.Automation{Name: x.Name, Schedule: x.Schedule, Precheck: x.Precheck, ActionKind: x.ActionKind, ActionArg: x.ActionArg}); err != nil {
 				break
 			}
 		}
 	}
-	// graft (github.com/JayaSuryaOolio/graft) mirrors a worktree into its repo's main checkout.
-	h, _ := os.UserHomeDir()
-	if _, err := exec.LookPath("graft"); err == nil {
-		out = append(out, store.App{Name: "Graft", Command: "cd {cwd} && graft start"})
-	} else if _, err := os.Stat(filepath.Join(h, ".local", "bin", "graft")); err == nil {
-		out = append(out, store.App{Name: "Graft", Command: "cd {cwd} && ~/.local/bin/graft start"})
+	if err != nil {
+		_ = s.UninstallApp(m.Name)
+		return store.App{}, err
 	}
-	return out
+	return a, nil
 }
 
-// RenderApp fills {cwd} and {key} (shell-quoted; key is "" without a task) in an app command.
-func RenderApp(command, cwd, key string) string {
-	return strings.NewReplacer("{cwd}", shq(cwd), "{key}", shq(key)).Replace(command)
-}
-
-// runShell runs cmd via `sh -c`, folding its output into the error.
-func runShell(what, cmd string) error {
-	if out, err := exec.Command("sh", "-c", cmd).CombinedOutput(); err != nil {
-		return fmt.Errorf("%s: %w: %s", what, err, strings.TrimSpace(string(out)))
+func runCheck(script string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if out, err := exec.CommandContext(ctx, "sh", "-c", script).CombinedOutput(); err != nil {
+		return fmt.Errorf("%w: %s", err, strings.TrimSpace(string(out)))
 	}
 	return nil
 }
 
-// appTimeout bounds an output app (a quick action); launching apps return at once.
-var appTimeout = 2 * time.Minute
-
-// RunApp runs a rendered app. An output app's stdout+stderr is returned (≤ 4 KB);
-// other apps return "".
-func RunApp(a store.App, cwd, key string) (string, error) {
-	cmd := RenderApp(a.Command, cwd, key)
-	if !a.Output {
-		return "", runShell("open app", cmd)
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), appTimeout)
-	defer cancel()
-	c := exec.CommandContext(ctx, "sh", "-c", cmd)
-	c.Dir = cwd
-	b, err := c.CombinedOutput()
-	out := strings.TrimSpace(string(b))
-	if len(out) > 4096 {
-		out = out[:4096] + "…"
-	}
-	if err != nil {
-		return "", fmt.Errorf("%s: %w: %s", a.Name, err, out)
-	}
-	return out, nil
-}
-
-// WorktreePath returns the task repo's worktree ("" repo means the primary).
-func (s *Service) WorktreePath(key, repo string) (string, error) {
-	t, err := store.GetTaskByKey(s.DB, key)
-	if err != nil {
-		return "", err
-	}
-	for _, r := range t.Repos {
-		if (r.RepoName == repo || repo == "" && r.IsPrimary) && r.WorktreePath != nil {
-			return *r.WorktreePath, nil
-		}
-	}
-	if repo == "" {
-		return "", fmt.Errorf("%s has no workspace yet", key)
-	}
-	return "", fmt.Errorf("%s: no worktree for repo %q", key, repo)
-}
-
-// OpenApp runs the named app in the task repo's worktree and returns an output app's output.
-func (s *Service) OpenApp(name, key, repo string) (string, error) {
+// UninstallApp deletes the app; a manifest app's automations and agents go with it.
+func (s *Service) UninstallApp(name string) error {
 	a, err := store.GetApp(s.DB, name)
 	if err != nil {
-		return "", err
+		return err
 	}
-	if a.Disabled {
-		return "", fmt.Errorf("app %q is disabled", name)
+	if a.Manifest != "" {
+		if m, err := apps.ParseManifest(a.Manifest); err == nil {
+			for _, x := range m.Automations {
+				_ = store.DeleteAutomation(s.DB, x.Name)
+			}
+			for _, x := range m.Actions {
+				if x.IconPath != "" && filepath.Dir(x.IconPath) == apps.IconsDir(s.Home) {
+					_ = os.Remove(x.IconPath)
+				}
+			}
+			for _, g := range m.Agents {
+				_ = os.Remove(userAgentsDir() + "/" + g.Name + ".md")
+			}
+		}
 	}
-	cwd, err := s.WorktreePath(key, repo)
+	return store.DeleteApp(s.DB, name)
+}
+
+// InstallLegacy installs a plain command app (e.g. a detected preset) as a manifest app.
+func (s *Service) InstallLegacy(a store.App) (store.App, error) {
+	raw, err := apps.LegacyManifest(a)
 	if err != nil {
-		return "", err
+		return store.App{}, err
 	}
-	return RunApp(a, cwd, key)
+	return s.InstallManifest(raw, false)
 }
 
 // SessionIDs returns the task's Claude session ids: its runs' (oldest first), then

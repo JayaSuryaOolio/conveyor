@@ -14,7 +14,7 @@ type App struct {
 	Command string `json:"command"`
 	// Output apps are run to completion and their output is shown (a quick action), instead of opening something.
 	Output bool `json:"output"`
-	// Manifest is the plugin manifest JSON (see core.Manifest); "" for a plain command app.
+	// Manifest is the plugin manifest JSON (see apps.Manifest); "" for a plain command app.
 	Manifest string `json:"manifest"`
 	// Disabled keeps the app (and its manifest) installed but inactive everywhere.
 	Disabled bool `json:"disabled"`

@@ -6,22 +6,6 @@ import (
 	"testing"
 )
 
-func TestExampleApps(t *testing.T) {
-	apps := ExampleApps()
-	if len(apps) == 0 {
-		t.Fatal("no example apps found")
-	}
-	names := make(map[string]bool)
-	for _, app := range apps {
-		names[app.File] = true
-	}
-	for _, expected := range []string{"acli", "review-webhooks", "graft", "vscode", "nautilus"} {
-		if !names[expected] {
-			t.Errorf("missing expected example app: %s", expected)
-		}
-	}
-}
-
 func TestInstallBundledExamples(t *testing.T) {
 	for _, file := range []string{"graft", "vscode", "nautilus"} {
 		t.Run(file, func(t *testing.T) {

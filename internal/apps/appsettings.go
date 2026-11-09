@@ -1,6 +1,7 @@
-package core
+package apps
 
 import (
+	"database/sql"
 	"fmt"
 	"slices"
 	"strconv"
@@ -36,10 +37,10 @@ func (st ManifestSetting) check(v string) error {
 	return nil
 }
 
-// appSettings lists the app's settings with current values; saved values that no longer
+// AppSettings lists the app's settings with current values; saved values that no longer
 // validate (the manifest changed) fall back to the default.
-func (s *Service) appSettings(name string) ([]AppSetting, error) {
-	a, err := store.GetApp(s.DB, name)
+func AppSettings(db *sql.DB, name string) ([]AppSetting, error) {
+	a, err := store.GetApp(db, name)
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +48,7 @@ func (s *Service) appSettings(name string) ([]AppSetting, error) {
 	if err != nil {
 		return nil, err
 	}
-	saved, err := store.GetAppSettings(s.DB, name)
+	saved, err := store.GetAppSettings(db, name)
 	if err != nil {
 		return nil, err
 	}
@@ -62,12 +63,9 @@ func (s *Service) appSettings(name string) ([]AppSetting, error) {
 	return out, nil
 }
 
-// AppSettings returns the app's settings for its settings modal.
-func (s *Service) AppSettings(name string) ([]AppSetting, error) { return s.appSettings(name) }
-
 // SaveAppSettings validates and stores vals (key -> value) as the app's settings; unknown keys are an error.
-func (s *Service) SaveAppSettings(name string, vals map[string]string) error {
-	cur, err := s.appSettings(name)
+func SaveAppSettings(db *sql.DB, name string, vals map[string]string) error {
+	cur, err := AppSettings(db, name)
 	if err != nil {
 		return err
 	}
@@ -84,15 +82,15 @@ func (s *Service) SaveAppSettings(name string, vals map[string]string) error {
 			return fmt.Errorf("setting %q: %w", x.Key, err)
 		}
 	}
-	return store.SetAppSettings(s.DB, name, vals)
+	return store.SetAppSettings(db, name, vals)
 }
 
 // settingValues maps each setting key to its current value, for ${{ setting.key }}.
-func (s *Service) settingValues(m Manifest, app string) (map[string]string, error) {
+func settingValues(db *sql.DB, m Manifest, app string) (map[string]string, error) {
 	if len(m.Settings) == 0 {
 		return nil, nil
 	}
-	cur, err := s.appSettings(app)
+	cur, err := AppSettings(db, app)
 	if err != nil {
 		return nil, err
 	}

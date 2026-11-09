@@ -1,4 +1,4 @@
-package core
+package apps
 
 import (
 	"io/fs"
@@ -25,14 +25,4 @@ func ExampleApps() []Example {
 		}
 	}
 	return out
-}
-
-// InstallExample installs a bundled example by its ExampleApps File (the same path as importing a manifest).
-func (s *Service) InstallExample(file string) error {
-	raw, err := examples.FS.ReadFile(file + ".json")
-	if err != nil {
-		return err
-	}
-	_, err = s.InstallManifest(string(raw), false)
-	return err
 }

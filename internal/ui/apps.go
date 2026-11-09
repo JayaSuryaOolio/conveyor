@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/JayaSuryaOolio/conveyor/internal/apps"
 	"github.com/JayaSuryaOolio/conveyor/internal/core"
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -17,7 +18,7 @@ import (
 func (a *App) ListApps() ([]store.App, error) { return store.ListApps(a.svc.DB) }
 
 // AppPresets returns the apps detected on this Mac that can be added in one click.
-func (a *App) AppPresets() []store.App { return core.AppPresets() }
+func (a *App) AppPresets() []store.App { return apps.AppPresets() }
 
 func validApp(x store.App) error {
 	if strings.TrimSpace(x.Name) == "" || strings.TrimSpace(x.Command) == "" {
@@ -76,7 +77,7 @@ func (a *App) ExportApp(name string) (string, error) {
 
 // ValidateManifest returns why raw is not an installable manifest, "" when it is (live check in the builder).
 func (a *App) ValidateManifest(raw string) string {
-	if _, err := core.ParseManifest(raw); err != nil {
+	if _, err := apps.ParseManifest(raw); err != nil {
 		return err.Error()
 	}
 	return ""
@@ -84,16 +85,16 @@ func (a *App) ValidateManifest(raw string) string {
 
 // ManifestSchema lists what the builder can insert: "vars" (${{ var }} placeholders), "places" and "version".
 func (a *App) ManifestSchema() map[string][]string {
-	places := make([]string, 0, len(core.Placements))
-	for p := range core.Placements {
+	places := make([]string, 0, len(apps.Placements))
+	for p := range apps.Placements {
 		places = append(places, p)
 	}
 	sort.Strings(places)
-	return map[string][]string{"vars": core.ManifestVars, "places": places, "version": {strconv.Itoa(core.ManifestVersion)}}
+	return map[string][]string{"vars": apps.ManifestVars, "places": places, "version": {strconv.Itoa(apps.ManifestVersion)}}
 }
 
 // AppSettings lists a manifest app's settings with their current values.
-func (a *App) AppSettings(name string) ([]core.AppSetting, error) { return a.svc.AppSettings(name) }
+func (a *App) AppSettings(name string) ([]apps.AppSetting, error) { return a.svc.AppSettings(name) }
 
 // SaveAppSettings stores the app's setting values (key -> value).
 func (a *App) SaveAppSettings(name string, vals map[string]string) error {
@@ -110,7 +111,7 @@ func (a *App) InstallPreset(x store.App) error {
 }
 
 // PlacedActions lists manifest actions wanting a UI slot (global_nav, task_sidebar, board_card).
-func (a *App) PlacedActions(place string) ([]core.Placed, error) { return a.svc.PlacedActions(place) }
+func (a *App) PlacedActions(place string) ([]apps.Placed, error) { return a.svc.PlacedActions(place) }
 
 // RunAppAction runs a manifest action; key "" for global_nav ones.
 func (a *App) RunAppAction(app, id, place, key string) (string, error) {
@@ -136,7 +137,7 @@ func (a *App) StopAppService(app, id, place, key string) error {
 }
 
 // RenderApp previews command for cwd and task key.
-func (a *App) RenderApp(command, cwd, key string) string { return core.RenderApp(command, cwd, key) }
+func (a *App) RenderApp(command, cwd, key string) string { return apps.RenderApp(command, cwd, key) }
 
 // TestApp runs app x (saved or not) on the user's home directory with no task key.
 func (a *App) TestApp(x store.App) (string, error) {
@@ -144,7 +145,7 @@ func (a *App) TestApp(x store.App) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return core.RunApp(x, h, "")
+	return apps.RunApp(x, h, "")
 }
 
 // OpenApp runs the named app in the task repo's worktree ("" repo = primary); an output app returns its output.
@@ -158,11 +159,11 @@ func (a *App) OpenApp(name, key, repo string) (string, error) {
 
 // AppIcons maps configured app names to PNG data: URLs of their macOS icons.
 func (a *App) AppIcons() (map[string]string, error) {
-	apps, err := store.ListApps(a.svc.DB)
+	list, err := store.ListApps(a.svc.DB)
 	if err != nil {
 		return nil, err
 	}
-	return core.AppIcons(a.svc.Home, apps), nil
+	return apps.AppIcons(a.svc.Home, list), nil
 }
 
 // GraftRoot returns the root checkout graft mirrors worktree into, "" when inactive for it.
@@ -175,7 +176,7 @@ func (a *App) GraftStop(root string) error { return core.GraftStop(root) }
 func (a *App) UserHooks(action string) (string, error) { return a.svc.UserHooks(action) }
 
 // ExampleApps lists the bundled example apps (shown under Templates).
-func (a *App) ExampleApps() []core.Example { return core.ExampleApps() }
+func (a *App) ExampleApps() []apps.Example { return apps.ExampleApps() }
 
 // InstallExample installs a bundled example app by file name (no extension).
 func (a *App) InstallExample(file string) error { return a.svc.InstallExample(file) }

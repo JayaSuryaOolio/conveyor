@@ -9,6 +9,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"github.com/JayaSuryaOolio/conveyor/internal/apps"
 	"github.com/JayaSuryaOolio/conveyor/internal/core"
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 )
@@ -46,7 +47,7 @@ func runApp(home string, args []string) error {
 		return err
 	}
 	if cmd == "presets" {
-		ps := core.AppPresets()
+		ps := apps.AppPresets()
 		if *asJSON {
 			return printJSON(ps)
 		}
@@ -68,7 +69,7 @@ func runApp(home string, args []string) error {
 				return errors.New(appUsage)
 			}
 			if *fromApp != "" {
-				raw, err := core.ManifestFromApp(*fromApp)
+				raw, err := apps.ManifestFromApp(*fromApp)
 				if err != nil {
 					return err
 				}
@@ -80,7 +81,7 @@ func runApp(home string, args []string) error {
 			}
 			a := store.App{Name: pos[0], Command: *command, Output: *output}
 			if a.Command == "" {
-				for _, p := range core.AppPresets() {
+				for _, p := range apps.AppPresets() {
 					if p.Name == a.Name {
 						a.Command = p.Command
 					}
@@ -167,10 +168,10 @@ func runApp(home string, args []string) error {
 				return err
 			}
 			if *print {
-				fmt.Fprintln(out, core.RenderApp(a.Command, cwd, key))
+				fmt.Fprintln(out, apps.RenderApp(a.Command, cwd, key))
 				return nil
 			}
-			res, err := core.RunApp(a, cwd, key)
+			res, err := apps.RunApp(a, cwd, key)
 			if res != "" {
 				fmt.Fprintln(out, res)
 			}
