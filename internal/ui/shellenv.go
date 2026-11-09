@@ -2,6 +2,8 @@ package ui
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -16,7 +18,7 @@ var pathRe = regexp.MustCompile(`__CONVEYOR_PATH__(.*?)__CONVEYOR_PATH__`)
 // the Dock or Finder gets only /usr/bin:/bin:/usr/sbin:/sbin, so runners (claude, agy, ...), gh,
 // conveyor and git hook deps would not be found. It runs on every start, whatever is already on
 // PATH, so it needs no list of tools; entries already on PATH keep their precedence.
-func loadShellPATH() {
+func loadShellPATH() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	sh := os.Getenv("SHELL")
@@ -30,11 +32,13 @@ func loadShellPATH() {
 	// -i as well as -l: PATH is often set in .zshrc. The markers skip any noise the rc files print.
 	out, err := exec.CommandContext(ctx, sh, "-ilc", `printf __CONVEYOR_PATH__%s__CONVEYOR_PATH__ "$PATH"`).Output()
 	if err != nil {
-		return
+		return fmt.Errorf("load PATH from %s: %w", sh, err)
 	}
-	if m := pathRe.FindSubmatch(out); m != nil {
-		os.Setenv("PATH", mergePATH(os.Getenv("PATH"), string(m[1])))
+	m := pathRe.FindSubmatch(out)
+	if m == nil {
+		return errors.New("load PATH from " + sh + ": no PATH in its output")
 	}
+	return os.Setenv("PATH", mergePATH(os.Getenv("PATH"), string(m[1])))
 }
 
 // mergePATH returns cur followed by the entries of extra that cur lacks.

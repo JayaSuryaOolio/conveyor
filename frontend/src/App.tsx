@@ -3,12 +3,12 @@ import {useLocation, useNavigate} from 'react-router'
 import {ActionIcon, AppShell, Badge, Box, Button, Group, Kbd, NavLink, Stack, Text, Title, Tooltip} from '@mantine/core'
 import {useLocalStorage} from '@mantine/hooks'
 import {IconApps, IconBolt, IconArrowLeft, IconBook2, IconClock, IconLayoutKanban, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconLogs, IconPlus, IconRobot, IconSettings, IconSitemap} from '@tabler/icons-react'
-import {AppVersion, DispatcherState, Learnings} from '../wailsjs/go/ui/App'
+import {AppVersion, DispatcherState, Learnings, ShellPATHError} from '../wailsjs/go/ui/App'
 import {Agents} from './agents'
 import {EpicView} from './epic'
 import {Apps} from './apps'
 import {Automations} from './automations'
-import {Nav, PlacedButtons, Toasts, View} from './components'
+import {Nav, PlacedButtons, Toasts, View, toast} from './components'
 import {NewTask, Settings} from './forms'
 import {LearningsPage} from './learnings'
 import {Logs} from './logs'
@@ -50,6 +50,9 @@ export default function App() {
     const nav: Nav = v => setView(v)
     const viewRef = useRef({view, path: ''})
     viewRef.current = {view, path: loc.pathname + loc.search}
+
+    // No close button: without the login shell's PATH, runners, gh and hooks may not be found.
+    useEffect(() => { ShellPATHError().then(e => { if (e) toast(`Could not load your shell's PATH, so claude, agy, gh or git hooks may not be found. Restart Conveyor after fixing your shell rc files.\n${e}`, true) }) }, [])
 
     useEffect(() => {
         const poll = () => DispatcherState().then(setDispatcher, () => {})

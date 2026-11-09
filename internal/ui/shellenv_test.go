@@ -27,7 +27,9 @@ func TestLoadShellPATH(t *testing.T) {
 	if _, err := exec.LookPath("claude"); err == nil {
 		t.Skip("claude already on the minimal PATH")
 	}
-	loadShellPATH()
+	if err := loadShellPATH(); err != nil {
+		t.Fatal(err)
+	}
 	if p, err := exec.LookPath("claude"); err != nil || !strings.HasPrefix(p, bin) {
 		t.Fatalf("claude not found after loadShellPATH: %v %q", err, os.Getenv("PATH"))
 	}
@@ -48,8 +50,19 @@ func TestLoadShellPATHWithRunnerOnPATH(t *testing.T) {
 	if _, err := exec.LookPath("claude"); err == nil {
 		t.Skip("claude already on the minimal PATH")
 	}
-	loadShellPATH()
+	if err := loadShellPATH(); err != nil {
+		t.Fatal(err)
+	}
 	if p, err := exec.LookPath("claude"); err != nil || !strings.HasPrefix(p, bin) {
 		t.Fatalf("claude not found after loadShellPATH with a runner on PATH: %v %q", err, os.Getenv("PATH"))
+	}
+}
+
+func TestLoadShellPATHError(t *testing.T) {
+	sh := filepath.Join(t.TempDir(), "fakesh")
+	os.WriteFile(sh, []byte("#!/bin/sh\necho no marker\n"), 0o755)
+	t.Setenv("SHELL", sh)
+	if err := loadShellPATH(); err == nil {
+		t.Fatal("want error when the shell prints no PATH")
 	}
 }
