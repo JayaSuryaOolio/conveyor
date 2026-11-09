@@ -86,6 +86,24 @@ func TestAutoConfigureDefaultRunner(t *testing.T) {
 	if changed || picked != "agy" {
 		t.Fatalf("expected keep valid agy even if claude installed, got picked=%s changed=%v", picked, changed)
 	}
+
+	// Case 4: a stored default is never rewritten, even when its runner is not installed.
+	if err := store.SetSetting(db, "default_runner", "claude"); err != nil {
+		t.Fatal(err)
+	}
+	lookPath = func(file string) (string, error) {
+		if file == "agy" {
+			return "/usr/bin/agy", nil
+		}
+		return "", errors.New("not found")
+	}
+	picked, changed, err = AutoConfigureDefaultRunner(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if changed || picked != "claude" || store.GetSetting(db, "default_runner") != "claude" {
+		t.Fatalf("expected stored claude kept, got picked=%s changed=%v", picked, changed)
+	}
 }
 
 func TestInstructionFileForRunner(t *testing.T) {

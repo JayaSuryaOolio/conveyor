@@ -163,7 +163,7 @@ func (d *Dispatcher) reap(ctx context.Context) error {
 	needClaudeAgents := false
 	for _, r := range runs {
 		task, _ := store.GetTask(d.DB, r.TaskID)
-		bgRunner := d.runnerForTask(task)
+		bgRunner := d.runnerForRun(r, task)
 		if r.Kind == "interactive" {
 			if r.SessionID != nil { // without a session id there is nothing to match
 				if bgRunner.Name() == "claude" {
@@ -205,7 +205,7 @@ func (d *Dispatcher) reap(ctx context.Context) error {
 
 		// Determine which backend this run uses.
 		task, taskErr := store.GetTask(d.DB, r.TaskID)
-		bgRunner := d.runnerForTask(task)
+		bgRunner := d.runnerForRun(r, task)
 
 		if bgRunner.Name() == "agy" {
 			if err := d.reapAgy(ctx, r, task, taskErr); err != nil {
@@ -491,8 +491,11 @@ func (d *Dispatcher) start(ctx context.Context, task store.Task, delta []store.C
 	if err != nil {
 		return store.Run{}, err
 	}
+	if prev != nil && d.runnerForRun(*prev, task).Name() != bgRunner.Name() {
+		prev = nil // the task switched backends: one cannot resume the other's session
+	}
 	cwd := workspace.PrimaryPath(task)
-	run := store.Run{TaskID: task.ID, Kind: "auto", Mode: "fresh", Status: "launching"}
+	run := store.Run{TaskID: task.ID, Kind: "auto", Mode: "fresh", Status: "launching", Runner: bgRunner.Name()}
 	if prev != nil {
 		run.Mode, run.SessionID = "resume", prev.SessionID // the hook matches resumed sessions by id
 		run.Prompt = brief.ResumePrompt(task, briefPath, delta, store.GetSetting(d.DB, "prompt_resume"))
@@ -568,6 +571,15 @@ func (d *Dispatcher) runnerForTask(task store.Task) runner.Runner {
 		taskRunner = *task.Runner
 	}
 	return runner.ForTask(taskRunner, store.GetSetting(d.DB, "default_runner"), d.Home)
+}
+
+// runnerForRun returns the Runner a run was started with, falling back to the task's for runs from
+// before runs stored it. Changing the task's runner or default_runner must not affect a live run.
+func (d *Dispatcher) runnerForRun(r store.Run, task store.Task) runner.Runner {
+	if r.Runner != "" {
+		return runner.ForTask(r.Runner, "", d.Home)
+	}
+	return d.runnerForTask(task)
 }
 
 // model picks the task's model, else "" (no --model) when its agent sets one, else default_model.

@@ -87,6 +87,7 @@ type Run struct {
 	Error        *string `json:"error"`
 	StartedAt    string  `json:"started_at"`
 	EndedAt      *string `json:"ended_at"`
+	Runner       string  `json:"runner"` // backend the run was started with; "" on runs from before it was stored
 }
 
 // Comment is a thread entry.

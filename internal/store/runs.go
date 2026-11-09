@@ -7,13 +7,13 @@ import (
 
 const runCols = `id, task_id, kind, mode, bg_id, session_id, status, prompt, block_status,
  summary, state, next, criteria, final_message, tokens_in, tokens_out, cache_read, cache_write,
- ctx_peak, api_calls, hook_denials, rereads, dup_bash, big_results, error, started_at, ended_at`
+ ctx_peak, api_calls, hook_denials, rereads, dup_bash, big_results, error, started_at, ended_at, runner`
 
 func scanRun(r interface{ Scan(...any) error }) (Run, error) {
 	var x Run
 	err := r.Scan(&x.ID, &x.TaskID, &x.Kind, &x.Mode, &x.BgID, &x.SessionID, &x.Status, &x.Prompt, &x.BlockStatus,
 		&x.Summary, &x.State, &x.Next, &x.Criteria, &x.FinalMessage, &x.TokensIn, &x.TokensOut, &x.CacheRead, &x.CacheWrite,
-		&x.CtxPeak, &x.APICalls, &x.HookDenials, &x.Rereads, &x.DupBash, &x.BigResults, &x.Error, &x.StartedAt, &x.EndedAt)
+		&x.CtxPeak, &x.APICalls, &x.HookDenials, &x.Rereads, &x.DupBash, &x.BigResults, &x.Error, &x.StartedAt, &x.EndedAt, &x.Runner)
 	return x, err
 }
 
@@ -39,8 +39,8 @@ func CreateRun(db *sql.DB, r Run) (Run, error) {
 	if r.StartedAt == "" {
 		r.StartedAt = now()
 	}
-	res, err := db.Exec(`INSERT INTO runs (task_id, kind, mode, bg_id, session_id, status, prompt, started_at) VALUES (?,?,?,?,?,?,?,?)`,
-		r.TaskID, r.Kind, r.Mode, r.BgID, r.SessionID, r.Status, r.Prompt, r.StartedAt)
+	res, err := db.Exec(`INSERT INTO runs (task_id, kind, mode, bg_id, session_id, status, prompt, started_at, runner) VALUES (?,?,?,?,?,?,?,?,?)`,
+		r.TaskID, r.Kind, r.Mode, r.BgID, r.SessionID, r.Status, r.Prompt, r.StartedAt, r.Runner)
 	if err != nil {
 		return Run{}, fmt.Errorf("create run: %w", err)
 	}
