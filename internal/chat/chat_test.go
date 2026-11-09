@@ -2,6 +2,7 @@ package chat
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"path/filepath"
 	"strconv"
@@ -77,12 +78,12 @@ func TestNotifyDropsEventFailingPastMaxRetry(t *testing.T) {
 	store.UpdateTaskStatus(db, tk.ID, store.StatusReview, store.ActorSystem)
 	b.notify(f)
 	b.notify(f)
-	if f.n != 2 || store.GetSetting(db, cursorKey) == strconv.FormatInt(b.maxEvent(), 10) {
+	if f.n != 2 || store.GetSetting(db, cursorKey) == strconv.FormatInt(maxEvent(db), 10) {
 		t.Fatalf("fresh failure should retry and hold the cursor: sends=%d", f.n)
 	}
 	db.Exec(`UPDATE events SET created_at=? WHERE kind='status_changed'`, time.Now().Add(-2*maxRetry).UTC().Format(time.RFC3339))
 	b.notify(f)
-	if got := store.GetSetting(db, cursorKey); got != strconv.FormatInt(b.maxEvent(), 10) {
+	if got := store.GetSetting(db, cursorKey); got != strconv.FormatInt(maxEvent(db), 10) {
 		t.Fatalf("old failing event should be dropped, cursor=%s", got)
 	}
 }
@@ -205,4 +206,9 @@ func TestThreadCmd(t *testing.T) {
 			t.Errorf("threadCmd(%q) = %q, want %q", in, got, want)
 		}
 	}
+}
+
+func maxEvent(db *sql.DB) int64 {
+	n, _ := store.MaxEventID(db)
+	return n
 }

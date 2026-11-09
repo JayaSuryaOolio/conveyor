@@ -132,8 +132,6 @@ func (b *bridge) listen(ctx context.Context, fs map[string]Factory) {
 	}
 }
 
-var toStatus = regexp.MustCompile(`-> (\w+) \(system\)$`)
-
 func (b *bridge) wanted() map[string]bool {
 	m := map[string]bool{}
 	for _, s := range strings.Split(b.setting("chat_statuses"), ",") {
@@ -142,9 +140,15 @@ func (b *bridge) wanted() map[string]bool {
 	return m
 }
 
-func (b *bridge) maxEvent() (cur int64) {
-	b.svc.DB.QueryRow(`SELECT COALESCE(MAX(id),0) FROM events`).Scan(&cur)
-	return
+// lastAgentComment returns the agent's newest comment on a task, or "".
+func (b *bridge) lastAgentComment(taskID int64) string {
+	cs, _ := store.ListComments(b.svc.DB, taskID)
+	for i := len(cs) - 1; i >= 0; i-- {
+		if cs[i].Author == store.AuthorAgent {
+			return cs[i].Body
+		}
+	}
+	return ""
 }
 
 // maxRetry bounds how long one failing event can hold the cursor; past it the event is
@@ -158,64 +162,40 @@ const maxRetry = time.Hour
 func (b *bridge) notify(t Transport) {
 	cur, err := strconv.ParseInt(b.setting(cursorKey), 10, 64)
 	if err != nil || t == nil { // first run or off: start from now, never replay history
-		store.SetSetting(b.svc.DB, cursorKey, strconv.FormatInt(b.maxEvent(), 10))
+		if n, err := store.MaxEventID(b.svc.DB); err == nil {
+			store.SetSetting(b.svc.DB, cursorKey, strconv.FormatInt(n, 10))
+		}
 		return
 	}
-	want := b.wanted() // before Query: the DB has one connection
-	rows, err := b.svc.DB.Query(`SELECT id, task_id, detail, created_at FROM events WHERE kind='status_changed' AND id>? ORDER BY id`, cur)
+	want := b.wanted()
+	evs, err := store.StatusEventsAfter(b.svc.DB, cur)
 	if err != nil {
 		b.logf("chat: events: %v", err)
 		return
 	}
-	type ev struct {
-		id, task int64
-		to       string
-		at       time.Time
-	}
-	var evs []ev
-	for rows.Next() {
-		var e ev
-		var detail, at string
-		if rows.Scan(&e.id, &e.task, &detail, &at) == nil {
-			e.at, _ = time.Parse(time.RFC3339, at)
-			if m := toStatus.FindStringSubmatch(detail); m != nil && want[m[1]] {
-				e.to = m[1]
-			}
-			evs = append(evs, e)
-		}
-	}
-	rows.Close()
 	for _, e := range evs {
-		if e.to != "" {
-			task, err := store.GetTask(b.svc.DB, e.task)
-			var later bool // the task changed status again since: this one is stale
-			b.svc.DB.QueryRow(`SELECT EXISTS(SELECT 1 FROM events WHERE task_id=? AND kind='status_changed' AND id>?)`, e.task, e.id).Scan(&later)
+		if e.Actor == store.ActorSystem && want[string(e.To)] {
+			task, err := store.GetTask(b.svc.DB, e.TaskID)
+			later, _ := store.HasLaterStatusEvent(b.svc.DB, e.TaskID, e.ID) // the task changed status again since: this one is stale
 			if err != nil || later {
-				store.SetSetting(b.svc.DB, cursorKey, strconv.FormatInt(e.id, 10))
+				store.SetSetting(b.svc.DB, cursorKey, strconv.FormatInt(e.ID, 10))
 				continue
 			}
-			m := Msg{Key: task.Key, Title: task.Title, Status: e.to}
-			cs, _ := store.ListComments(b.svc.DB, task.ID)
-			for i := len(cs) - 1; i >= 0; i-- {
-				if cs[i].Author == store.AuthorAgent {
-					m.Last = cs[i].Body
-					break
-				}
-			}
+			m := Msg{Key: task.Key, Title: task.Title, Status: string(e.To), Last: b.lastAgentComment(task.ID)}
 			for _, r := range task.Repos {
 				if r.PRURL != nil {
 					m.PRs = append(m.PRs, Link{r.RepoName, *r.PRURL})
 				}
 			}
 			if err := t.Send(m); err != nil {
-				if time.Since(e.at) < maxRetry {
+				if time.Since(e.At) < maxRetry {
 					b.logf("chat: send %s: %v", task.Key, err)
 					return // retry this event next tick
 				}
 				b.logf("chat: send %s: %v; dropped after %s", task.Key, err, maxRetry)
 			}
 		}
-		store.SetSetting(b.svc.DB, cursorKey, strconv.FormatInt(e.id, 10))
+		store.SetSetting(b.svc.DB, cursorKey, strconv.FormatInt(e.ID, 10))
 	}
 }
 
@@ -356,16 +336,11 @@ func (b *bridge) show(key string) string {
 			s += " " + *r.PRURL
 		}
 	}
-	cs, _ := store.ListComments(b.svc.DB, t.ID)
-	for i := len(cs) - 1; i >= 0; i-- {
-		if cs[i].Author == store.AuthorAgent {
-			last := strings.TrimSpace(cs[i].Body)
-			if len(last) > 1000 {
-				last = last[:1000] + "…"
-			}
-			s += "\n> " + strings.ReplaceAll(last, "\n", "\n> ")
-			break
+	if last := strings.TrimSpace(b.lastAgentComment(t.ID)); last != "" {
+		if len(last) > 1000 {
+			last = last[:1000] + "…"
 		}
+		s += "\n> " + strings.ReplaceAll(last, "\n", "\n> ")
 	}
 	return s
 }
