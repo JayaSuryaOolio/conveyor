@@ -25,9 +25,7 @@ func EpicMember(db *sql.DB, home, cwd string) bool {
 // Upgrade to a GitHub token without merge rights if agents route around it.
 func mergesPR(cmd string) bool {
 	for _, seg := range tokenize(cmd) {
-		for len(seg) > 0 && strings.Contains(seg[0], "=") && !strings.HasPrefix(seg[0], "-") {
-			seg = seg[1:]
-		}
+		seg = stripEnv(seg)
 		if len(seg) == 0 || filepath.Base(seg[0]) != "gh" {
 			continue
 		}
@@ -85,9 +83,7 @@ func AuditCommand(home string, raw []byte, denied bool) {
 // tracked reports whether any segment runs conveyor, gh or git push.
 func tracked(cmd string) bool {
 	for _, seg := range tokenize(cmd) {
-		for len(seg) > 0 && strings.Contains(seg[0], "=") && !strings.HasPrefix(seg[0], "-") {
-			seg = seg[1:]
-		}
+		seg = stripEnv(seg)
 		if len(seg) == 0 {
 			continue
 		}

@@ -142,3 +142,15 @@ func splitCSV(s string) []string {
 	}
 	return r
 }
+
+// readText reads path, or stdin when path is "-".
+func readText(path string) (string, error) {
+	var b []byte
+	var err error
+	if path == "-" {
+		b, err = io.ReadAll(os.Stdin)
+	} else {
+		b, err = os.ReadFile(path)
+	}
+	return string(b), err
+}

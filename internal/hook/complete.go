@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -13,6 +12,7 @@ import (
 	"github.com/JayaSuryaOolio/conveyor/internal/statusblock"
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 	"github.com/JayaSuryaOolio/conveyor/internal/transcript"
+	"github.com/JayaSuryaOolio/conveyor/internal/workspace"
 )
 
 // completionGaps lists what an auto run reporting status done still owes: per task repo a clean worktree,
@@ -29,13 +29,9 @@ func completionGaps(db *sql.DB, task store.Task, run store.Run, p payload, prSyn
 	if err != nil {
 		return nil, err
 	}
-	repos, err := store.ListRepos(db)
+	def, err := store.RepoMap(db, func(r store.Repo) string { return r.DefaultBranch })
 	if err != nil {
 		return nil, err
-	}
-	def := map[int64]string{}
-	for _, r := range repos {
-		def[r.ID] = r.DefaultBranch
 	}
 	var uses []transcript.ToolUse
 	usesOK := false
@@ -56,7 +52,7 @@ func completionGaps(db *sql.DB, task store.Task, run store.Run, p payload, prSyn
 			continue
 		}
 		wt, name := *tr.WorktreePath, tr.RepoName
-		dirty, err := git(wt, "status", "--porcelain")
+		dirty, err := workspace.Git(wt, "status", "--porcelain")
 		if err != nil {
 			continue // not a worktree (any more): nothing to check
 		}
@@ -64,11 +60,11 @@ func completionGaps(db *sql.DB, task store.Task, run store.Run, p payload, prSyn
 			gaps = append(gaps, fmt.Sprintf("%s: the worktree has uncommitted changes; commit or discard them", name))
 		}
 		ahead := 0
-		if out, err := git(wt, "rev-list", "--count", "origin/"+def[tr.RepoID]+"..HEAD"); err == nil {
+		if out, err := workspace.Git(wt, "rev-list", "--count", "origin/"+def[tr.RepoID]+"..HEAD"); err == nil {
 			ahead, _ = strconv.Atoi(out)
 		}
 		if ahead > 0 {
-			if out, err := git(wt, "rev-list", "--count", "origin/"+tr.Branch+"..HEAD"); err != nil || out != "0" {
+			if out, err := workspace.Git(wt, "rev-list", "--count", "origin/"+tr.Branch+"..HEAD"); err != nil || out != "0" {
 				gaps = append(gaps, fmt.Sprintf("%s: branch %s has commits not pushed to origin; push it", name, tr.Branch))
 			}
 			if wantPR && tr.PRURL == nil {
@@ -136,7 +132,7 @@ func skillUsed(s string, uses []transcript.ToolUse) bool {
 
 // needsChangeset: the branch changes code files but adds no changeset.
 func needsChangeset(wt, base string) bool {
-	out, err := git(wt, "diff", "--name-only", "--diff-filter=AM", base+"...HEAD")
+	out, err := workspace.Git(wt, "diff", "--name-only", "--diff-filter=AM", base+"...HEAD")
 	if err != nil {
 		return false
 	}
@@ -186,9 +182,4 @@ func stopBlock(gaps []string) string {
 		"\nFix these, then end with the status block again. If one cannot be fixed, say why and report status: failed."
 	b, _ := json.Marshal(map[string]string{"decision": "block", "reason": reason})
 	return string(b)
-}
-
-func git(dir string, args ...string) (string, error) {
-	out, err := exec.Command("git", append([]string{"-C", dir}, args...)...).Output()
-	return strings.TrimSpace(string(out)), err
 }

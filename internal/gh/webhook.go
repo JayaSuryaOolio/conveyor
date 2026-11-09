@@ -26,9 +26,9 @@ var ErrNoWebhookExt = errors.New("the gh webhook extension is missing: run `gh e
 
 // CheckWebhookExt errors with ErrNoWebhookExt (or ErrNotFound) when `gh webhook` is unusable.
 func CheckWebhookExt() error {
-	bin, err := exec.LookPath("gh")
+	bin, err := ghBin()
 	if err != nil {
-		return ErrNotFound
+		return err
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -129,6 +129,10 @@ func RunWebhook(ctx context.Context, db *sql.DB, events []string) error {
 	if err := CheckWebhookExt(); err != nil {
 		return err
 	}
+	bin, err := ghBin()
+	if err != nil {
+		return err
+	}
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		return err
@@ -148,7 +152,7 @@ func RunWebhook(ctx context.Context, db *sql.DB, events []string) error {
 			}
 			running[repo] = true
 			log.Printf("review webhook: forwarding %s", repo)
-			cmd := exec.CommandContext(ctx, "gh", "webhook", "forward", "--repo", repo, "--events="+strings.Join(events, ","), "--url", url)
+			cmd := exec.CommandContext(ctx, bin, "webhook", "forward", "--repo", repo, "--events="+strings.Join(events, ","), "--url", url)
 			go func() {
 				out, err := cmd.CombinedOutput()
 				if ctx.Err() == nil {

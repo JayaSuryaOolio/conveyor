@@ -81,6 +81,14 @@ func search(ctx context.Context, jql, fields string) ([]issue, error) {
 	return issues, nil
 }
 
+// browseURL is <jira_base_url>/browse/KEY when that setting is set, else the issue's API URL.
+func browseURL(svc *core.Service, is issue) string {
+	if base := strings.TrimRight(store.GetSetting(svc.DB, "jira_base_url"), "/"); base != "" {
+		return base + "/browse/" + is.Key
+	}
+	return is.Self
+}
+
 // Import runs `acli jira workitem search` for jql and creates a backlog task in
 // repo for each issue whose key is not yet an external_key. It returns the new task keys.
 // The task URL is <jira_base_url>/browse/KEY when that setting is set, else the issue's API URL.
@@ -89,24 +97,18 @@ func Import(ctx context.Context, svc *core.Service, jql, repo string) ([]string,
 	if err != nil {
 		return nil, err
 	}
-	base := strings.TrimRight(store.GetSetting(svc.DB, "jira_base_url"), "/")
 	var created []string
 	for _, is := range issues {
-		var exists int
-		err := svc.DB.QueryRow(`SELECT 1 FROM tasks WHERE external_key=?`, is.Key).Scan(&exists)
+		_, err := store.TaskByExternalKey(svc.DB, is.Key)
 		if err == nil {
 			continue
 		}
 		if !errors.Is(err, sql.ErrNoRows) {
 			return created, fmt.Errorf("check %s: %w", is.Key, err)
 		}
-		url := is.Self
-		if base != "" {
-			url = base + "/browse/" + is.Key
-		}
 		t, err := svc.CreateTask(core.NewTaskInput{
 			Title: is.Fields.Summary, Description: strings.TrimSpace(adfText(is.Fields.Description)), Repos: []string{repo},
-			Source: "jira", CreatedBy: "jira", ExternalKey: is.Key, ExternalURL: url,
+			Source: "jira", CreatedBy: "jira", ExternalKey: is.Key, ExternalURL: browseURL(svc, is),
 		})
 		if err != nil {
 			return created, fmt.Errorf("import %s: %w", is.Key, err)

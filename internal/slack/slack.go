@@ -27,8 +27,6 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-const cursorKey = "slack_cursor"
-
 // api is the Slack Web API base (swapped in tests).
 var api = "https://slack.com/api/"
 

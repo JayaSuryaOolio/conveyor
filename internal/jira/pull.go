@@ -129,13 +129,9 @@ func upsert(svc *core.Service, epic store.Task, src store.JiraSource, is issue, 
 	if repo == "" && repoKnown(svc, src.DefaultRepo) {
 		repo = src.DefaultRepo
 	}
-	url := is.Self
-	if base := strings.TrimRight(store.GetSetting(svc.DB, "jira_base_url"), "/"); base != "" {
-		url = base + "/browse/" + is.Key
-	}
 	in := core.NewTaskInput{
 		Title: is.Fields.Summary, Description: desc, ParentKey: parentKey,
-		Source: "jira", CreatedBy: "jira", ExternalKey: is.Key, ExternalURL: url,
+		Source: "jira", CreatedBy: "jira", ExternalKey: is.Key, ExternalURL: browseURL(svc, is),
 	}
 	if repo != "" {
 		in.Repos = []string{repo} // else the task inherits its parent's repos

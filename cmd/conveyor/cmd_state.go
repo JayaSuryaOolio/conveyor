@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -30,13 +31,13 @@ func (r repoFlags) Set(v string) error {
 
 func runState(home string, args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf(stateUsage)
+		return errors.New(stateUsage)
 	}
 	return withService(home, func(s *core.Service) error {
 		switch args[0] {
 		case "export":
 			if len(args) > 2 {
-				return fmt.Errorf(stateUsage)
+				return errors.New(stateUsage)
 			}
 			st, err := s.ExportState()
 			if err != nil {
@@ -66,7 +67,7 @@ func runState(home string, args []string) error {
 				return err
 			}
 			if len(pos) != 1 {
-				return fmt.Errorf(stateUsage)
+				return errors.New(stateUsage)
 			}
 			b, err := os.ReadFile(pos[0])
 			if err != nil {
@@ -82,6 +83,6 @@ func runState(home string, args []string) error {
 			}
 			return err
 		}
-		return fmt.Errorf(stateUsage)
+		return errors.New(stateUsage)
 	})
 }

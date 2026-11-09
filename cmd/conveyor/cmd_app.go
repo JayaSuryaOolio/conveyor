@@ -4,7 +4,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -124,17 +123,11 @@ func runApp(home string, args []string) error {
 			if len(pos) != 1 {
 				return errors.New(appUsage)
 			}
-			var b []byte
-			var err error
-			if pos[0] == "-" {
-				b, err = io.ReadAll(os.Stdin)
-			} else {
-				b, err = os.ReadFile(pos[0])
-			}
+			m, err := readText(pos[0])
 			if err != nil {
 				return err
 			}
-			a, err := s.InstallManifest(string(b), *replace)
+			a, err := s.InstallManifest(m, *replace)
 			if err == nil {
 				fmt.Fprintf(out, "installed %s\n", a.Name)
 			}

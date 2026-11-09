@@ -5,7 +5,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io"
 	"os"
 	"strings"
 	"text/tabwriter"
@@ -161,11 +160,9 @@ func taskNew(s *core.Service, args []string) error {
 	}
 	d := *desc
 	if *descFile != "" {
-		b, err := os.ReadFile(*descFile)
-		if err != nil {
+		if d, err = readText(*descFile); err != nil {
 			return fmt.Errorf("read desc file: %w", err)
 		}
-		d = string(b)
 	}
 	if *parent != "" && strings.TrimSpace(d) == "" {
 		return fmt.Errorf("a sub-task needs --desc or --desc-file: its agent sees only the title and description")
@@ -332,11 +329,10 @@ func taskComment(s *core.Service, args []string) error {
 	}
 	body := args[1]
 	if body == "-" {
-		b, err := io.ReadAll(os.Stdin)
-		if err != nil {
+		if body, err = readText("-"); err != nil {
 			return fmt.Errorf("read stdin: %w", err)
 		}
-		body = strings.TrimSpace(string(b))
+		body = strings.TrimSpace(body)
 	}
 	if body == "" {
 		return fmt.Errorf("comment is empty")
@@ -366,11 +362,10 @@ func taskSet(s *core.Service, args []string) error {
 	given := map[string]bool{}
 	fs.Visit(func(f *flag.Flag) { given[f.Name] = true })
 	if *descFile != "" {
-		b, err := os.ReadFile(*descFile)
-		if err != nil {
+		if *desc, err = readText(*descFile); err != nil {
 			return err
 		}
-		*desc, given["desc"] = string(b), true
+		given["desc"] = true
 	}
 	if given["desc"] {
 		if err := s.SetTaskDescription(pos[0], *desc); err != nil {

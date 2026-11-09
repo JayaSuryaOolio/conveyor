@@ -25,22 +25,40 @@ type PR struct {
 	HeadRefOid     string `json:"headRefOid"`
 }
 
-// FindPR returns the latest PR for branch in repoPath, or (nil, nil) if none.
-func FindPR(ctx context.Context, repoPath, branch string) (*PR, error) {
+// ghBin resolves the gh CLI, or ErrNotFound.
+func ghBin() (string, error) {
 	bin, err := exec.LookPath("gh")
 	if err != nil {
-		return nil, ErrNotFound
+		return "", ErrNotFound
 	}
-	cmd := exec.CommandContext(ctx, bin, "pr", "list", "--head", branch, "--state", "all",
-		"--json", "url,state,number,reviewDecision,updatedAt,headRefOid", "--limit", "1")
-	cmd.Dir = repoPath
+	return bin, nil
+}
+
+// run execs gh args in dir; a failure is prefixed with name and carries gh's stderr.
+func run(ctx context.Context, dir, name string, args ...string) ([]byte, error) {
+	bin, err := ghBin()
+	if err != nil {
+		return nil, err
+	}
+	cmd := exec.CommandContext(ctx, bin, args...)
+	cmd.Dir = dir
 	out, err := cmd.Output()
 	if err != nil {
 		var ee *exec.ExitError
 		if errors.As(err, &ee) {
-			return nil, fmt.Errorf("gh pr list %s: %w: %s", branch, err, ee.Stderr)
+			return nil, fmt.Errorf("%s: %w: %s", name, err, ee.Stderr)
 		}
-		return nil, fmt.Errorf("gh pr list %s: %w", branch, err)
+		return nil, fmt.Errorf("%s: %w", name, err)
+	}
+	return out, nil
+}
+
+// FindPR returns the latest PR for branch in repoPath, or (nil, nil) if none.
+func FindPR(ctx context.Context, repoPath, branch string) (*PR, error) {
+	out, err := run(ctx, repoPath, "gh pr list "+branch, "pr", "list", "--head", branch, "--state", "all",
+		"--json", "url,state,number,reviewDecision,updatedAt,headRefOid", "--limit", "1")
+	if err != nil {
+		return nil, err
 	}
 	var prs []PR
 	if err := json.Unmarshal(out, &prs); err != nil {
@@ -56,13 +74,9 @@ func FindPR(ctx context.Context, repoPath, branch string) (*PR, error) {
 // in review to done (all PRs merged or closed, at least one merged) or to
 // needs_you (every PR closed without merge).
 func SyncTask(ctx context.Context, db *sql.DB, task store.Task) error {
-	repos, err := store.ListRepos(db)
+	paths, err := store.RepoMap(db, func(r store.Repo) string { return r.Path })
 	if err != nil {
 		return err
-	}
-	paths := map[int64]string{}
-	for _, r := range repos {
-		paths[r.ID] = r.Path
 	}
 	var total, merged, closed int
 	for _, tr := range task.Repos {

@@ -572,13 +572,9 @@ func (a *App) Learnings() ([]LearningRow, error) {
 	if err != nil {
 		return nil, err
 	}
-	repos, err := store.ListRepos(a.svc.DB)
+	names, err := store.RepoMap(a.svc.DB, func(r store.Repo) string { return r.Name })
 	if err != nil {
 		return nil, err
-	}
-	names := map[int64]string{}
-	for _, r := range repos {
-		names[r.ID] = r.Name
 	}
 	out := make([]LearningRow, 0, len(ls))
 	for _, l := range ls {
