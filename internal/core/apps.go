@@ -40,7 +40,6 @@ func (s *Service) AppServiceRunning(app, id, place, key string) (bool, error) {
 func (s *Service) StopAppService(app, id, place, key string) error {
 	return apps.StopAppService(s.DB, app, id, place, key)
 }
-func (s *Service) ConvertApp(name string) error          { return apps.ConvertApp(s.DB, s.Home, name) }
 func (s *Service) ExportApp(name string) (string, error) { return apps.ExportApp(s.DB, name) }
 func (s *Service) EnsureServices() error                 { return apps.EnsureServices(s.DB) }
 
@@ -137,13 +136,9 @@ func (s *Service) UninstallApp(name string) error {
 	return store.DeleteApp(s.DB, name)
 }
 
-// InstallLegacy installs a plain command app (e.g. a detected preset) as a manifest app.
-func (s *Service) InstallLegacy(a store.App) (store.App, error) {
-	raw, err := apps.LegacyManifest(a)
-	if err != nil {
-		return store.App{}, err
-	}
-	return s.InstallManifest(raw, false)
+// InstallCommand installs a shell command ({cwd}/{key} placeholders) as a manifest app.
+func (s *Service) InstallCommand(name, command string, output bool) (store.App, error) {
+	return s.InstallManifest(apps.CommandManifest(name, command, output), false)
 }
 
 // SessionIDs returns the task's Claude session ids: its runs' (oldest first), then

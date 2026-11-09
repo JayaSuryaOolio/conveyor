@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -40,14 +41,12 @@ func TestTaskOpenPrint(t *testing.T) {
 	if out := cv(t, home, "task", "open", tk.Key, "--fresh", "--print"); !strings.Contains(out, "claude --settings") || !strings.Contains(out, "BRIEF.md") {
 		t.Fatal(out)
 	}
-	cv(t, home, "app", "add", "Ed", "--command", "ed {cwd}")
-	if out := cv(t, home, "app", "list"); !strings.Contains(out, "ed {cwd}") {
+	os.MkdirAll(wt, 0o755)
+	cv(t, home, "app", "add", "Ed", "--command", "echo ed {cwd} {key}", "--output")
+	if out := cv(t, home, "app", "list"); !strings.Contains(out, "Ed") || !strings.Contains(out, "open") {
 		t.Fatal(out)
 	}
-	if out := cv(t, home, "app", "open", "Ed", tk.Key, "--print"); strings.TrimSpace(out) != "ed '"+wt+"'" {
-		t.Fatal(out)
-	}
-	if out := cv(t, home, "app", "open", "Ed", home, "--print"); strings.TrimSpace(out) != "ed '"+home+"'" {
+	if out := cv(t, home, "app", "open", "Ed", tk.Key); strings.TrimSpace(out) != "ed "+wt+" "+tk.Key {
 		t.Fatal(out)
 	}
 	cv(t, home, "app", "rm", "Ed")

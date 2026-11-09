@@ -32,7 +32,7 @@ func TestOpenApp(t *testing.T) {
 		t.Fatal("unknown repo accepted")
 	}
 	out := filepath.Join(t.TempDir(), "out")
-	store.CreateApp(s.DB, store.App{Name: "t", Command: "echo {cwd} > " + shq(out)})
+	s.InstallCommand("t", "echo {cwd} > "+shq(out), false)
 	if _, err := s.OpenApp("t", tk.Key, "b"); err != nil {
 		t.Fatal(err)
 	}
@@ -46,11 +46,11 @@ func TestOutputApp(t *testing.T) {
 	tk := actionTask(t, s)
 	wt, _ := s.WorktreePath(tk.Key, "")
 	os.MkdirAll(wt, 0o755)
-	store.CreateApp(s.DB, store.App{Name: "o", Command: "echo {key}; basename \"$PWD\"", Output: true})
+	s.InstallCommand("o", "echo {key}; basename \"$PWD\"", true)
 	if got, err := s.OpenApp("o", tk.Key, ""); err != nil || got != tk.Key+"\na" {
 		t.Fatalf("%q %v", got, err)
 	}
-	store.CreateApp(s.DB, store.App{Name: "f", Command: "echo nope; exit 3", Output: true})
+	s.InstallCommand("f", "echo nope; exit 3", true)
 	if _, err := s.OpenApp("f", tk.Key, ""); err == nil || !strings.Contains(err.Error(), "nope") {
 		t.Fatal(err)
 	}
@@ -110,20 +110,7 @@ func TestInstallManifest(t *testing.T) {
 	}
 }
 
-func TestConvertApp(t *testing.T) {
-	s := newSvc(t)
-	if _, err := store.CreateApp(s.DB, store.App{Name: "Zed", Command: "open -a Zed {cwd}"}); err != nil {
-		t.Fatal(err)
-	}
-	if err := s.ConvertApp("Zed"); err != nil {
-		t.Fatal(err)
-	}
-	if p, _ := s.PlacedActions("task_sidebar"); len(p) != 1 || p[0].App != "Zed" {
-		t.Fatal(p)
-	}
-	if err := s.ConvertApp("Zed"); err == nil {
-		t.Fatal("converted twice")
-	}
+func TestManifestVersion(t *testing.T) {
 	if _, err := apps.ParseManifest(`{"version":99,"name":"x","actions":[{"id":"a","label":"A","run":"x","places":["global_nav"]}]}`); err == nil {
 		t.Fatal("accepted future version")
 	}

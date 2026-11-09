@@ -1,37 +1,28 @@
 import {useEffect, useRef, useState} from 'react'
 import {ActionIcon, Badge, Button, Checkbox, Code, FileButton, Group, Modal, MultiSelect, NumberInput, Paper, Select, Stack, Switch, Table, Tabs, Text, TextInput, Textarea, Title} from '@mantine/core'
-import {IconDownload, IconPencil, IconPlayerPlay, IconPlus, IconPuzzle, IconSettings, IconTransform, IconTrash, IconUpload} from '@tabler/icons-react'
-import {AddApp, AppSettings, SaveAppSettings, ExampleApps, InstallExample, GetSettings, SetSetting, AppIcons, AppPresets, Confirm, SetAppDisabled, ConvertApp, DeleteApp, ExportApp, Home, InstallManifest, InstallPreset, ListApps, ManifestSchema, RenderApp, TestApp, UpdateApp, UserHooks, ValidateManifest} from '../wailsjs/go/ui/App'
+import {IconDownload, IconPlus, IconPuzzle, IconSettings, IconTrash, IconUpload} from '@tabler/icons-react'
+import {AddApp, AppSettings, SaveAppSettings, ExampleApps, InstallExample, GetSettings, SetSetting, AppIcons, AppPresets, Confirm, SetAppDisabled, DeleteApp, ExportApp, InstallManifest, InstallPreset, ListApps, ManifestSchema, UserHooks, ValidateManifest} from '../wailsjs/go/ui/App'
 import {store} from '../wailsjs/go/models'
-import {AppIcon, errMsg, runApp, toast} from './components'
+import {AppIcon, errMsg, toast} from './components'
 import {Field, SettingRow} from './forms'
 import {useData} from './util'
 
-function AppForm({initial, onClose}: {initial: store.App; onClose: (saved: boolean) => void}) {
-    const [f, setF] = useState(initial)
-    const [preview, setPreview] = useState('')
-    const {data: home} = useData(Home, [], {static: true})
-    const sample = (home ?? '~/.conveyor') + '/workspaces/CV-1/my repo'
-    useEffect(() => { RenderApp(f.command, sample, 'CV-1').then(setPreview, errMsg) }, [f.command, sample])
-    const ready = f.name.trim() && f.command.trim()
-    const save = () => (f.id ? UpdateApp(f) : AddApp(f)).then(() => onClose(true), errMsg)
+/** Wraps a shell command in a one-action manifest app (see AddApp). */
+function AppForm({onClose}: {onClose: (saved: boolean) => void}) {
+    const [name, setName] = useState('')
+    const [command, setCommand] = useState('')
+    const [output, setOutput] = useState(false)
+    const save = () => AddApp(name, command, output).then(() => onClose(true), errMsg)
     return (
         <Stack gap="sm">
-            <TextInput data-autofocus label="Name" value={f.name} onChange={e => setF({...f, name: e.target.value})}/>
+            <TextInput data-autofocus label="Name" value={name} onChange={e => setName(e.target.value)}/>
             <TextInput label="Command" description="Run with sh -c. {cwd} becomes the quoted worktree path and {key} the task key, e.g. open -a Zed {cwd}" ff="monospace"
-                       value={f.command} onChange={e => setF({...f, command: e.target.value})}/>
-            <Switch label="Quick action" checked={f.output} onChange={e => setF({...f, output: e.currentTarget.checked})}
+                       value={command} onChange={e => setCommand(e.target.value)}/>
+            <Switch label="Quick action" checked={output} onChange={e => setOutput(e.currentTarget.checked)}
                     description={<>Runs to completion in the task's primary worktree and shows its output as a toast; a button in the task sidebar. Scripts can call <Code>conveyor task sessions {'{key}'}</Code> for the task's Claude session ids.</>}/>
-            <div>
-                <Text size="sm" fw={500}>Preview</Text>
-                <Code block style={{whiteSpace: 'pre-wrap', wordBreak: 'break-all'}}>{preview}</Code>
-            </div>
-            <Group justify="space-between">
-                <Button variant="default" leftSection={<IconPlayerPlay size={16}/>} disabled={!f.command.trim()} onClick={() => runApp(f, TestApp(f))}>Test on home folder</Button>
-                <Group>
-                    <Button variant="default" onClick={() => onClose(false)}>Cancel</Button>
-                    <Button onClick={save} disabled={!ready}>{f.id ? 'Save' : 'Create'}</Button>
-                </Group>
+            <Group justify="flex-end">
+                <Button variant="default" onClick={() => onClose(false)}>Cancel</Button>
+                <Button onClick={save} disabled={!name.trim() || !command.trim()}>Create</Button>
             </Group>
         </Stack>
     )
@@ -176,7 +167,7 @@ function AppList() {
     const {data: presets} = useData(AppPresets, [], {static: true})
     const {data: examples} = useData(ExampleApps, [], {static: true})
     const {data: icons} = useData(AppIcons, [])
-    const [form, setForm] = useState<store.App>()
+    const [adding, setAdding] = useState(false)
     const [importing, setImporting] = useState(false)
     const [settingsApp, setSettingsApp] = useState('')
     const have = new Set((data ?? []).map(a => a.name))
@@ -188,7 +179,7 @@ function AppList() {
                 <Title order={3}>Apps</Title>
                 <Group gap="xs">
                     <Button variant="default" leftSection={<IconPuzzle size={16}/>} onClick={() => setImporting(true)}>Install manifest</Button>
-                    <Button leftSection={<IconPlus size={16}/>} onClick={() => setForm(store.App.createFrom({id: 0, name: '', command: '', output: false, manifest: ''}))}>New app</Button>
+                    <Button leftSection={<IconPlus size={16}/>} onClick={() => setAdding(true)}>New app</Button>
                 </Group>
             </Group>
             <Text size="sm" c="dimmed">Apps a task worktree can be opened in, from the icons under each repo on the task page or <Code>conveyor app open NAME KEY</Code>.</Text>
@@ -196,22 +187,17 @@ function AppList() {
             {data && data.length === 0 && <Text c="dimmed">None yet. Add one below or create your own.</Text>}
             {data && data.length > 0 && (
                 <Table verticalSpacing="xs">
-                    <Table.Thead><Table.Tr><Table.Th>Name</Table.Th><Table.Th>Command</Table.Th><Table.Th/></Table.Tr></Table.Thead>
+                    <Table.Thead><Table.Tr><Table.Th>Name</Table.Th><Table.Th>Actions</Table.Th><Table.Th/></Table.Tr></Table.Thead>
                     <Table.Tbody>
                         {data.map(a => (
                             <Table.Tr key={a.id} opacity={a.disabled ? 0.5 : 1}>
-                                <Table.Td fw={600}><Group gap="xs" wrap="nowrap"><AppIcon name={a.name} icons={icons}/>{a.name}{a.output && <Badge size="xs" variant="light">quick action</Badge>}{a.manifest && <Badge size="xs" variant="light" color="grape">manifest</Badge>}</Group></Table.Td>
-                                <Table.Td><Code title={a.manifest || a.command} style={{display: 'block', maxWidth: 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>{a.manifest ? manifestSummary(a) : a.command}</Code></Table.Td>
+                                <Table.Td fw={600}><Group gap="xs" wrap="nowrap"><AppIcon name={a.name} icons={icons}/>{a.name}</Group></Table.Td>
+                                <Table.Td><Code title={a.manifest} style={{display: 'block', maxWidth: 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>{manifestSummary(a)}</Code></Table.Td>
                                 <Table.Td>
                                     <Group gap="xs" wrap="nowrap" justify="flex-end">
                                         <Switch size="xs" aria-label={`Enable ${a.name}`} title={a.disabled ? 'Disabled: enable to use it again' : 'Disable (keeps its settings)'} checked={!a.disabled} onChange={e => SetAppDisabled(a.name, !e.currentTarget.checked).then(reload, errMsg)}/>
                                         {hasSettings(a) && <ActionIcon variant="subtle" color="gray" aria-label="Settings" title="Settings" onClick={() => setSettingsApp(a.name)}><IconSettings size={16}/></ActionIcon>}
-                                        {a.manifest && <ActionIcon variant="subtle" color="gray" aria-label="Export" title="Export manifest as .json" onClick={() => ExportApp(a.name).then(p => p && toast(`Exported to ${p}`), errMsg)}><IconDownload size={16}/></ActionIcon>}
-                                        {!a.manifest && <>
-                                            <ActionIcon variant="subtle" color="gray" aria-label="Test" title="Test on home folder" onClick={() => runApp(a, TestApp(a))}><IconPlayerPlay size={16}/></ActionIcon>
-                                            <ActionIcon variant="subtle" color="gray" aria-label="Convert" title="Convert to manifest app" onClick={() => ConvertApp(a.name).then(reload, errMsg)}><IconTransform size={16}/></ActionIcon>
-                                            <ActionIcon variant="subtle" color="gray" aria-label="Edit" onClick={() => setForm(a)}><IconPencil size={16}/></ActionIcon>
-                                        </>}
+                                        <ActionIcon variant="subtle" color="gray" aria-label="Export" title="Export manifest as .json" onClick={() => ExportApp(a.name).then(p => p && toast(`Exported to ${p}`), errMsg)}><IconDownload size={16}/></ActionIcon>
                                         <ActionIcon variant="subtle" color="red" aria-label="Delete" onClick={() => Confirm(`Delete app ${a.name}?`).then(ok => { if (ok) return DeleteApp(a.name).then(reload) }).catch(errMsg)}><IconTrash size={16}/></ActionIcon>
                                     </Group>
                                 </Table.Td>
@@ -224,7 +210,7 @@ function AppList() {
                 <Title order={5}>Detected on this Mac</Title>
                 <Group gap="xs">
                     {missing.map(p => (
-                        <Button key={p.name} size="xs" variant="light" leftSection={<IconPlus size={14}/>} title={p.command}
+                        <Button key={p.name} size="xs" variant="light" leftSection={<IconPlus size={14}/>}
                                 onClick={() => InstallPreset(p).then(reload, errMsg)}>{p.name}</Button>
                     ))}
                 </Group>
@@ -246,8 +232,8 @@ function AppList() {
             <Modal opened={!!settingsApp} onClose={() => setSettingsApp('')} title={`${settingsApp} settings`} size="lg">
                 {settingsApp && <SettingsForm app={settingsApp} onClose={() => setSettingsApp('')}/>}
             </Modal>
-            <Modal opened={!!form} onClose={() => setForm(undefined)} title={form?.id ? 'Edit app' : 'New app'} size="lg">
-                {form && <AppForm initial={form} onClose={saved => { setForm(undefined); if (saved) reload() }}/>}
+            <Modal opened={adding} onClose={() => setAdding(false)} title="New app" size="lg">
+                {adding && <AppForm onClose={saved => { setAdding(false); if (saved) reload() }}/>}
             </Modal>
         </Stack>
     )

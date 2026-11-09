@@ -13,7 +13,7 @@ func TestStateRoundTrip(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	src := newSvc(t)
 	store.SetSetting(src.DB, "max_parallel", "5")
-	store.CreateApp(src.DB, store.App{Name: "Zed", Command: "zed {cwd}"})
+	src.InstallCommand("Zed", "zed {cwd}", false)
 	store.CreateAutomation(src.DB, store.Automation{Name: "weekly", Schedule: "0 9 * * 1", ActionKind: "create_task", ActionArg: `{"title":"t","repos":["secret-repo","other"]}`, Enabled: true})
 	store.CreateAutomation(src.DB, store.Automation{Name: "again", Schedule: "0 9 * * 1", ActionKind: "create_task", ActionArg: `{"title":"t","repos":["other"]}`, Enabled: true})
 	if err := src.AddAgent("rev", "Reviews", "Be strict.", "user", ""); err != nil {
@@ -95,7 +95,7 @@ func TestSeedMockState(t *testing.T) {
 	autos, _ := store.ListAutomations(db)
 	var out, enabled, disabled bool
 	for _, a := range apps {
-		out = out || a.Output
+		out = out || strings.Contains(a.Manifest, `"output": true`)
 	}
 	kinds := map[string]bool{}
 	for _, a := range autos {

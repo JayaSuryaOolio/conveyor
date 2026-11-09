@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/JayaSuryaOolio/conveyor/internal/apps"
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 )
 
@@ -62,10 +63,10 @@ var mockState = State{
 		"brief_extra_rules": "Mock rule: keep changes small.",
 	},
 	Apps: []StateApp{
-		{Name: "Mock Editor", Command: "mock-editor {cwd}"},
-		{Name: "Mock Tests", Command: "mock-test --watch", Output: true},
-		{Name: "Mock Logs", Command: "mock-logs -f", Output: true},
-		{Name: "Mock Repo Shell", Command: "mock-shell {cwd}"},
+		{Name: "Mock Editor", Manifest: apps.CommandManifest("Mock Editor", "mock-editor {cwd}", false)},
+		{Name: "Mock Tests", Manifest: apps.CommandManifest("Mock Tests", "mock-test --watch", true)},
+		{Name: "Mock Logs", Manifest: apps.CommandManifest("Mock Logs", "mock-logs -f", true)},
+		{Name: "Mock Repo Shell", Manifest: apps.CommandManifest("Mock Repo Shell", "mock-shell {cwd}", false)},
 	},
 	Automations: []StateAutomation{
 		{Name: "mock-weekly-task", Schedule: "0 9 * * 1", ActionKind: "create_task", Enabled: true,

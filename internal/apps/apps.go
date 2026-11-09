@@ -3,7 +3,6 @@
 package apps
 
 import (
-	"context"
 	"database/sql"
 	"fmt"
 	"os"
@@ -11,7 +10,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 )
@@ -48,13 +46,16 @@ func GraftBin() string {
 	return filepath.Join(h, ".local", "bin", "graft")
 }
 
-// AppPresets returns Finder plus every preset app installed on this Mac.
+// AppPresets returns Finder plus every preset app installed on this Mac, as manifest apps.
 func AppPresets() []store.App {
-	out := []store.App{{Name: "Finder", Command: "open {cwd}"}}
+	preset := func(name, command string) store.App {
+		return store.App{Name: name, Manifest: CommandManifest(name, command, false)}
+	}
+	out := []store.App{preset("Finder", "open {cwd}")}
 	for _, name := range presetApps {
 		for _, d := range appDirs() {
 			if _, err := os.Stat(filepath.Join(d, name+".app")); err == nil {
-				out = append(out, store.App{Name: name, Command: "open -a " + shq(name) + " {cwd}"})
+				out = append(out, preset(name, "open -a "+shq(name)+" {cwd}"))
 				break
 			}
 		}
@@ -62,16 +63,11 @@ func AppPresets() []store.App {
 	// graft (github.com/JayaSuryaOolio/graft) mirrors a worktree into its repo's main checkout.
 	h, _ := os.UserHomeDir()
 	if _, err := exec.LookPath("graft"); err == nil {
-		out = append(out, store.App{Name: "Graft", Command: "cd {cwd} && graft start"})
+		out = append(out, preset("Graft", "cd {cwd} && graft start"))
 	} else if _, err := os.Stat(filepath.Join(h, ".local", "bin", "graft")); err == nil {
-		out = append(out, store.App{Name: "Graft", Command: "cd {cwd} && ~/.local/bin/graft start"})
+		out = append(out, preset("Graft", "cd {cwd} && ~/.local/bin/graft start"))
 	}
 	return out
-}
-
-// RenderApp fills {cwd} and {key} (shell-quoted; key is "" without a task) in an app command.
-func RenderApp(command, cwd, key string) string {
-	return strings.NewReplacer("{cwd}", shq(cwd), "{key}", shq(key)).Replace(command)
 }
 
 // runShell runs cmd via `sh -c`, folding its output into the error.
@@ -80,31 +76,6 @@ func runShell(what, cmd string) error {
 		return fmt.Errorf("%s: %w: %s", what, err, strings.TrimSpace(string(out)))
 	}
 	return nil
-}
-
-// appTimeout bounds an output app (a quick action); launching apps return at once.
-var appTimeout = 2 * time.Minute
-
-// RunApp runs a rendered app. An output app's stdout+stderr is returned (≤ 4 KB);
-// other apps return "".
-func RunApp(a store.App, cwd, key string) (string, error) {
-	cmd := RenderApp(a.Command, cwd, key)
-	if !a.Output {
-		return "", runShell("open app", cmd)
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), appTimeout)
-	defer cancel()
-	c := exec.CommandContext(ctx, "sh", "-c", cmd)
-	c.Dir = cwd
-	b, err := c.CombinedOutput()
-	out := strings.TrimSpace(string(b))
-	if len(out) > 4096 {
-		out = out[:4096] + "…"
-	}
-	if err != nil {
-		return "", fmt.Errorf("%s: %w: %s", a.Name, err, out)
-	}
-	return out, nil
 }
 
 // WorktreePath returns the task repo's worktree ("" repo means the primary).
@@ -124,18 +95,19 @@ func WorktreePath(db *sql.DB, key, repo string) (string, error) {
 	return "", fmt.Errorf("%s: no worktree for repo %q", key, repo)
 }
 
-// OpenApp runs the named app in the task repo's worktree and returns an output app's output.
+// OpenApp runs the app's first action in the task repo's worktree ("" repo = primary)
+// and returns an output action's output.
 func OpenApp(db *sql.DB, name, key, repo string) (string, error) {
 	a, err := store.GetApp(db, name)
 	if err != nil {
 		return "", err
 	}
-	if a.Disabled {
-		return "", fmt.Errorf("app %q is disabled", name)
-	}
-	cwd, err := WorktreePath(db, key, repo)
+	m, err := ParseManifest(a.Manifest)
 	if err != nil {
 		return "", err
 	}
-	return RunApp(a, cwd, key)
+	if len(m.Actions) == 0 {
+		return "", fmt.Errorf("app %q has no actions", name)
+	}
+	return runAppAction(db, name, m.Actions[0].ID, "", key, repo)
 }

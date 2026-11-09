@@ -8,19 +8,14 @@ import (
 
 func TestAppsCRUD(t *testing.T) {
 	db := openTest(t)
-	a, err := CreateApp(db, App{Name: "Zed", Command: "zed {cwd}"})
-	if err != nil {
+	if _, err := CreateApp(db, App{Name: "Zed2", Manifest: "{}"}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := CreateApp(db, App{Name: "Zed", Command: "x"}); err == nil {
+	if _, err := CreateApp(db, App{Name: "Zed2"}); err == nil {
 		t.Fatal("duplicate name accepted")
 	}
-	CreateApp(db, App{Name: "finder", Command: "open {cwd}"})
-	a.Name, a.Command = "Zed2", "open -a Zed {cwd}"
-	if err := UpdateApp(db, a); err != nil {
-		t.Fatal(err)
-	}
-	if got, err := GetApp(db, "Zed2"); err != nil || got.Command != "open -a Zed {cwd}" {
+	CreateApp(db, App{Name: "finder"})
+	if got, err := GetApp(db, "Zed2"); err != nil || got.Manifest != "{}" {
 		t.Fatal(got, err)
 	}
 	as, err := ListApps(db)
@@ -44,7 +39,8 @@ func TestMigrateDropsAppGlobal(t *testing.T) {
 	if err := Migrate(db); err != nil {
 		t.Fatal(err)
 	}
-	if got, err := GetApp(db, "old"); err != nil || got.Command != "x" {
-		t.Fatal(got, err)
+	var cmd string
+	if err := db.QueryRow(`SELECT command FROM apps WHERE name='old'`).Scan(&cmd); err != nil || cmd != "x" {
+		t.Fatal(cmd, err)
 	}
 }

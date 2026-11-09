@@ -585,3 +585,44 @@ cat ` + dir + `/$k.json 2>/dev/null || echo '[]'
 		t.Fatal(s)
 	}
 }
+
+// Plain command apps from an older database become manifest apps on the next start; `app convert` is gone.
+func TestCLIPlainAppMigration(t *testing.T) {
+	home := t.TempDir()
+	db, err := store.Open(core.DBPath(home))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`DROP TABLE apps; CREATE TABLE apps (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE, command TEXT NOT NULL, output INTEGER NOT NULL DEFAULT 0,
+		manifest TEXT NOT NULL DEFAULT '', disabled INTEGER NOT NULL DEFAULT 0, settings TEXT NOT NULL DEFAULT '{}');
+		INSERT INTO apps (name, command, output) VALUES ('Old', 'echo old {key}', 1)`); err != nil {
+		t.Fatal(err)
+	}
+	db.Close()
+	if out := cv(t, home, "app", "list"); !strings.Contains(out, "Old") || !strings.Contains(out, "open") {
+		t.Fatal(out)
+	}
+	if out := cv(t, home, "app", "export", "Old"); !strings.Contains(out, `"output": true`) || !strings.Contains(out, "echo old ${{ task.key }}") {
+		t.Fatal(out)
+	}
+	if b, err := exec.Command(bin, "--home", home, "app", "convert", "Old").CombinedOutput(); err == nil {
+		t.Fatalf("app convert still exists: %s", b)
+	}
+}
+
+// `app add` always installs a manifest app, from --command or a preset.
+func TestCLIAppAddManifest(t *testing.T) {
+	home := t.TempDir()
+	cv(t, home, "app", "add", "Lint", "--command", "make lint {cwd}", "--output")
+	cv(t, home, "app", "add", "Finder")
+	out := cv(t, home, "app", "export", "Lint")
+	if !strings.Contains(out, `"output": true`) || !strings.Contains(out, "make lint ${{ worktree.path }}") {
+		t.Fatal(out)
+	}
+	if out := cv(t, home, "app", "list"); !strings.Contains(out, "Finder") {
+		t.Fatal(out)
+	}
+	if b, err := exec.Command(bin, "--home", home, "app", "add", "Nope").CombinedOutput(); err == nil || !strings.Contains(string(b), "no installed preset") {
+		t.Fatalf("%v %s", err, b)
+	}
+}
