@@ -33,8 +33,8 @@ func TestLoadShellPATH(t *testing.T) {
 	}
 }
 
-// agy on the inherited PATH must not stop the shell PATH from loading: claude, gh etc. live there.
-func TestLoadShellPATHWithAgy(t *testing.T) {
+// A runner already on the inherited PATH must not stop the shell PATH from loading.
+func TestLoadShellPATHWithRunnerOnPATH(t *testing.T) {
 	dir := t.TempDir()
 	bin, agyDir := filepath.Join(dir, "bin"), filepath.Join(dir, "agy")
 	os.Mkdir(bin, 0o755)
@@ -50,6 +50,6 @@ func TestLoadShellPATHWithAgy(t *testing.T) {
 	}
 	loadShellPATH()
 	if p, err := exec.LookPath("claude"); err != nil || !strings.HasPrefix(p, bin) {
-		t.Fatalf("claude not found after loadShellPATH with agy on PATH: %v %q", err, os.Getenv("PATH"))
+		t.Fatalf("claude not found after loadShellPATH with a runner on PATH: %v %q", err, os.Getenv("PATH"))
 	}
 }
