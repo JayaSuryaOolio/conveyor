@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"github.com/JayaSuryaOolio/conveyor/internal/audit"
-	"github.com/JayaSuryaOolio/conveyor/internal/automation"
 	"github.com/JayaSuryaOolio/conveyor/internal/core"
 	"github.com/JayaSuryaOolio/conveyor/internal/dispatch"
 	"github.com/JayaSuryaOolio/conveyor/internal/gh"
@@ -76,7 +75,6 @@ func (a *App) Startup(ctx context.Context) {
 	a.svc = &core.Service{DB: db, Home: home, Bin: conveyorBin()}
 	jira.Attach(a.svc)
 	a.startTerms()
-	automation.Bin = conveyorBin() // the cli automation kind runs the CLI, not the app binary
 	ctx, a.cancel = context.WithCancel(ctx)
 	go pollDataVersion(ctx, core.DBPath(home), pollEvery, func() { runtime.EventsEmit(ctx, "db:changed") })
 	go a.startDispatcher(ctx)
@@ -130,7 +128,7 @@ func (a *App) runDispatcher(ctx context.Context) {
 	} else {
 		log.Printf("dispatcher log: %v", err)
 	}
-	d := &dispatch.Dispatcher{DB: db, Home: a.svc.Home, ConveyorBin: a.svc.Bin, Log: log.New(w, "dispatcher: ", log.LstdFlags)}
+	d := &dispatch.Dispatcher{Svc: &core.Service{DB: db, Home: a.svc.Home, Bin: a.svc.Bin}, Log: log.New(w, "dispatcher: ", log.LstdFlags)}
 	d.Log.Printf("started (app)")
 	d.Run(ctx)
 }

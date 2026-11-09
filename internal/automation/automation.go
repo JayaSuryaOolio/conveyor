@@ -24,12 +24,10 @@ const (
 	maxOutput       = 8 << 10
 )
 
-// Bin is the conveyor binary the cli kind runs; empty means this executable.
-var Bin string
-
-func bin() (string, error) {
-	if Bin != "" {
-		return Bin, nil
+// bin is the conveyor CLI the cli kind runs: svc.Bin, else this executable.
+func bin(svc *core.Service) (string, error) {
+	if svc.Bin != "" {
+		return svc.Bin, nil
 	}
 	return os.Executable()
 }
@@ -148,7 +146,7 @@ func (act action) run(ctx context.Context, svc *core.Service, name, kind, out, k
 		}
 		return "created " + t.Key, nil
 	case "cli":
-		b, err := bin()
+		b, err := bin(svc)
 		if err != nil {
 			return "", fmt.Errorf("find conveyor binary: %w", err)
 		}

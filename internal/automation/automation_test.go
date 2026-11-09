@@ -66,10 +66,7 @@ func env(t *testing.T) (*core.Service, string) {
 	// gh reports new comments only for PRs whose URL ends in /1
 	script("gh", `echo "gh $@" >> "`+log+`"; case "$3" in */1) echo 2;; *) echo 0;; esac`)
 	t.Setenv("PATH", bind+":"+os.Getenv("PATH"))
-	old := Bin
-	Bin = filepath.Join(bind, "conveyor")
-	t.Cleanup(func() { Bin = old })
-	return &core.Service{DB: db, Home: t.TempDir()}, log
+	return &core.Service{DB: db, Home: t.TempDir(), Bin: filepath.Join(bind, "conveyor")}, log
 }
 
 func mk(t *testing.T, kind, arg, pre string) store.Automation {

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"regexp"
+	"sync"
 )
 
 var jiraKeyRe = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]*-[0-9]+$`)
@@ -98,12 +99,31 @@ func TaskByExternalKey(db *sql.DB, key string) (Task, error) {
 	return getTask(db, `external_key=?`, key, key)
 }
 
-// OnTaskChange, when set, is called after a task's status or branch/PR changes (Jira write-back).
-// It must not block: implementations hand off to a goroutine.
-var OnTaskChange func(taskID int64)
+var (
+	taskSubsMu sync.Mutex
+	taskSubs   = map[int]func(taskID int64){}
+	taskSubsN  int
+)
+
+// OnTaskChange subscribes f to task status and branch/PR changes (Jira write-back) and returns its unsubscribe.
+// f must not block: hand off to a goroutine.
+func OnTaskChange(f func(taskID int64)) (unsubscribe func()) {
+	taskSubsMu.Lock()
+	defer taskSubsMu.Unlock()
+	taskSubsN++
+	n := taskSubsN
+	taskSubs[n] = f
+	return func() { taskSubsMu.Lock(); delete(taskSubs, n); taskSubsMu.Unlock() }
+}
 
 func notifyTask(id int64) {
-	if f := OnTaskChange; f != nil {
+	taskSubsMu.Lock()
+	fs := make([]func(int64), 0, len(taskSubs))
+	for _, f := range taskSubs {
+		fs = append(fs, f)
+	}
+	taskSubsMu.Unlock()
+	for _, f := range fs {
 		f(id)
 	}
 }

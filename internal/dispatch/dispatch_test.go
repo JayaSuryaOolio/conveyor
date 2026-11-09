@@ -95,7 +95,7 @@ func setup(t *testing.T) *env {
 		t.Fatal(err)
 	}
 	e := &env{db: db, fake: fakeClaude(t), repo: repo, root: root, now: time.Now()}
-	e.d = &Dispatcher{DB: db, Home: filepath.Join(root, "home"), ConveyorBin: "/bin/conveyor",
+	e.d = &Dispatcher{Svc: &core.Service{DB: db, Home: filepath.Join(root, "home"), Bin: "/bin/conveyor"},
 		Now: func() time.Time { return e.now }, Log: log.New(io.Discard, "", 0)}
 	return e
 }
@@ -141,12 +141,12 @@ func TestLaunchFresh(t *testing.T) {
 		t.Fatalf("launches: %v", ls)
 	}
 	a := ls[0]
-	wantCwd := filepath.Join(e.d.Home, "workspaces", tk.Key, "api")
+	wantCwd := filepath.Join(e.d.Svc.Home, "workspaces", tk.Key, "api")
 	if real(a[0]) != real(wantCwd) {
 		t.Errorf("cwd %s, want %s", a[0], wantCwd)
 	}
 	joined := strings.Join(a, " ")
-	for _, w := range []string{"--bg You are working on Conveyor task " + tk.Key + ": Do it.", "--name " + tk.Key, "--permission-mode bypassPermissions", "--settings " + filepath.Join(e.d.Home, "claude-settings.json"), "--strict-mcp-config"} {
+	for _, w := range []string{"--bg You are working on Conveyor task " + tk.Key + ": Do it.", "--name " + tk.Key, "--permission-mode bypassPermissions", "--settings " + filepath.Join(e.d.Svc.Home, "claude-settings.json"), "--strict-mcp-config"} {
 		if !strings.Contains(joined, w) {
 			t.Errorf("argv missing %q: %q", w, joined)
 		}
@@ -158,7 +158,7 @@ func TestLaunchFresh(t *testing.T) {
 	if run.BgID == nil || *run.BgID != "abcd0001" || run.Mode != "fresh" || run.Kind != "auto" || run.Status != "launching" {
 		t.Errorf("run %+v", run)
 	}
-	if _, err := os.Stat(filepath.Join(e.d.Home, "workspaces", tk.Key, "BRIEF.md")); err != nil {
+	if _, err := os.Stat(filepath.Join(e.d.Svc.Home, "workspaces", tk.Key, "BRIEF.md")); err != nil {
 		t.Error(err)
 	}
 	e.tick(t) // running with an active run: no second launch
@@ -254,7 +254,7 @@ func TestResumeVsFresh(t *testing.T) {
 		e.tick(t)
 		a := strings.Join(launches(t, e.fake)[0], " ")
 		if tc.resume {
-			if !strings.Contains(a, "--bg --resume sess-1 --settings "+filepath.Join(e.d.Home, "claude-settings.json")+" New comments on "+tk.Key) || strings.Contains(a, "--permission-mode") {
+			if !strings.Contains(a, "--bg --resume sess-1 --settings "+filepath.Join(e.d.Svc.Home, "claude-settings.json")+" New comments on "+tk.Key) || strings.Contains(a, "--permission-mode") {
 				t.Errorf("peak %d: not a bare resume: %q", tc.peak, a)
 			}
 		} else if strings.Contains(a, "--resume") || !strings.Contains(a, "You are working on") {
@@ -728,7 +728,7 @@ func TestReapAgy(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	logPath := runner.BgLogPath(e.d.Home, tk.Key)
+	logPath := runner.BgLogPath(e.d.Svc.Home, tk.Key)
 	os.MkdirAll(filepath.Dir(logPath), 0o755)
 	os.WriteFile(logPath, []byte("<conveyor>\nstatus: done\nsummary: completed agy run\nstate: clean\nnext: none\n</conveyor>"), 0o644)
 
@@ -753,7 +753,7 @@ func TestReapAgy(t *testing.T) {
 // attachCmd returns the task's "attach" action command, via core like the UI.
 func (e *env) attachCmd(t *testing.T, key string) string {
 	t.Helper()
-	acts, err := (&core.Service{DB: e.db, Home: e.d.Home, Bin: "/bin/conveyor"}).Actions(key)
+	acts, err := (&core.Service{DB: e.db, Home: e.d.Svc.Home, Bin: "/bin/conveyor"}).Actions(key)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -802,7 +802,7 @@ func TestRunKeepsRunnerClaudeToAgy(t *testing.T) {
 func TestRunKeepsRunnerAgyToClaude(t *testing.T) {
 	e := setup(t)
 	tk := e.task(t, "t", 0)
-	tk, err := workspace.Ensure(e.db, e.d.Home, tk)
+	tk, err := workspace.Ensure(e.db, e.d.Svc.Home, tk)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -823,7 +823,7 @@ func TestRunKeepsRunnerAgyToClaude(t *testing.T) {
 	if got := e.attachCmd(t, tk.Key); !strings.HasPrefix(got, "kill -TERM 9999999 ") {
 		t.Fatalf("attach %q", got)
 	}
-	logPath := runner.BgLogPath(e.d.Home, tk.Key)
+	logPath := runner.BgLogPath(e.d.Svc.Home, tk.Key)
 	os.MkdirAll(filepath.Dir(logPath), 0o755)
 	os.WriteFile(logPath, []byte("<conveyor>\nstatus: done\nsummary: agy done\nstate: clean\nnext: none\n</conveyor>"), 0o644)
 	e.now = time.Now().Add(time.Minute)
