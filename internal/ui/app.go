@@ -39,6 +39,7 @@ type App struct {
 	svc        *core.Service
 	cancel     context.CancelFunc
 	dispatcher atomic.Bool // true while this process holds the dispatcher lock
+	pathErr    string      // why the login shell's PATH could not be loaded; empty on success
 }
 
 // NewApp returns an App; the DB is opened in Startup.
@@ -48,7 +49,9 @@ func NewApp() *App { return &App{} }
 // change poller and the dispatcher hook. It matches Wails' OnStartup.
 func (a *App) Startup(ctx context.Context) {
 	a.ctx = ctx
-	loadShellPATH()
+	if err := loadShellPATH(); err != nil {
+		a.pathErr = err.Error()
+	}
 	home, err := core.Home("")
 	if err != nil {
 		runtime.LogFatalf(ctx, "conveyor home: %v", err)
@@ -61,6 +64,9 @@ func (a *App) Startup(ctx context.Context) {
 	}
 	pe := filepath.SplitList(os.Getenv("PATH"))
 	log.Printf("app start: home=%s cli=%s PATH entries=%d first=%v", home, conveyorBin(), len(pe), pe[:min(len(pe), 5)])
+	if a.pathErr != "" {
+		log.Printf("app start: %s", a.pathErr)
+	}
 	db, err := store.Open(core.DBPath(home))
 	if err != nil {
 		log.Printf("open db: %v", err) // LogFatalf writes only to the Wails logger
@@ -167,6 +173,9 @@ var Version = "dev"
 
 // AppVersion returns the build version shown in the sidebar.
 func (a *App) AppVersion() string { return Version }
+
+// ShellPATHError says why the login shell's PATH could not be loaded at startup; empty on success.
+func (a *App) ShellPATHError() string { return a.pathErr }
 
 // DispatcherState says whether this app is dispatching or only showing the UI.
 func (a *App) DispatcherState() string {

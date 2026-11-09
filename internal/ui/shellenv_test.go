@@ -27,8 +27,42 @@ func TestLoadShellPATH(t *testing.T) {
 	if _, err := exec.LookPath("claude"); err == nil {
 		t.Skip("claude already on the minimal PATH")
 	}
-	loadShellPATH()
+	if err := loadShellPATH(); err != nil {
+		t.Fatal(err)
+	}
 	if p, err := exec.LookPath("claude"); err != nil || !strings.HasPrefix(p, bin) {
 		t.Fatalf("claude not found after loadShellPATH: %v %q", err, os.Getenv("PATH"))
+	}
+}
+
+// A runner already on the inherited PATH must not stop the shell PATH from loading.
+func TestLoadShellPATHWithRunnerOnPATH(t *testing.T) {
+	dir := t.TempDir()
+	bin, agyDir := filepath.Join(dir, "bin"), filepath.Join(dir, "agy")
+	os.Mkdir(bin, 0o755)
+	os.Mkdir(agyDir, 0o755)
+	os.WriteFile(filepath.Join(bin, "claude"), []byte("#!/bin/sh\n"), 0o755)
+	os.WriteFile(filepath.Join(agyDir, "agy"), []byte("#!/bin/sh\n"), 0o755)
+	sh := filepath.Join(dir, "fakesh")
+	os.WriteFile(sh, []byte("#!/bin/sh\nprintf '__CONVEYOR_PATH__%s:/usr/bin__CONVEYOR_PATH__' '"+bin+"'\n"), 0o755)
+	t.Setenv("SHELL", sh)
+	t.Setenv("PATH", agyDir+":/usr/bin:/bin")
+	if _, err := exec.LookPath("claude"); err == nil {
+		t.Skip("claude already on the minimal PATH")
+	}
+	if err := loadShellPATH(); err != nil {
+		t.Fatal(err)
+	}
+	if p, err := exec.LookPath("claude"); err != nil || !strings.HasPrefix(p, bin) {
+		t.Fatalf("claude not found after loadShellPATH with a runner on PATH: %v %q", err, os.Getenv("PATH"))
+	}
+}
+
+func TestLoadShellPATHError(t *testing.T) {
+	sh := filepath.Join(t.TempDir(), "fakesh")
+	os.WriteFile(sh, []byte("#!/bin/sh\necho no marker\n"), 0o755)
+	t.Setenv("SHELL", sh)
+	if err := loadShellPATH(); err == nil {
+		t.Fatal("want error when the shell prints no PATH")
 	}
 }

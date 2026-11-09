@@ -12,22 +12,22 @@ export type Nav = (v: View) => void
 
 export const errMsg = (e: unknown) => ShowError(String(e))
 
-let pushToast: (m: string) => void = () => {}
-/** Shows a message bottom-right for 10 seconds (needs <Toasts/> mounted once). */
-export const toast = (m: string) => pushToast(m)
+let pushToast: (m: string, sticky?: boolean) => void = () => {}
+/** Shows a message bottom-right for 10 seconds (needs <Toasts/> mounted once). A sticky toast stays and has no close button. */
+export const toast = (m: string, sticky = false) => pushToast(m, sticky)
 
 export function Toasts() {
-    const [list, setList] = useState<{id: number; m: string}[]>([])
+    const [list, setList] = useState<{id: number; m: string; sticky: boolean}[]>([])
     useEffect(() => {
         let n = 0
         const drop = (id: number) => setList(l => l.filter(x => x.id !== id))
-        pushToast = m => { const id = ++n; setList(l => [...l, {id, m}]); setTimeout(() => drop(id), 10000) }
+        pushToast = (m, sticky = false) => { const id = ++n; setList(l => [...l, {id, m, sticky}]); if (!sticky) setTimeout(() => drop(id), 10000) }
         return () => { pushToast = () => {} }
     }, [])
     return (
         <Stack pos="fixed" bottom={16} right={16} gap="xs" maw={480} style={{zIndex: 1000}}>
             {list.map(x => (
-                <Notification key={x.id} withBorder onClose={() => setList(l => l.filter(y => y.id !== x.id))}>
+                <Notification key={x.id} withBorder color={x.sticky ? 'red' : undefined} withCloseButton={!x.sticky} onClose={() => setList(l => l.filter(y => y.id !== x.id))}>
                     <Text size="sm" ff="monospace" style={{whiteSpace: 'pre-wrap', wordBreak: 'break-word'}}>{x.m}</Text>
                 </Notification>
             ))}
