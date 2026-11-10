@@ -139,7 +139,7 @@ export function Board({nav, q, setQ, search, link}: {nav: Nav; q: string; setQ: 
     </Stack>)
 }
 
-/** Focus popup: what is waiting on you, each card showing only the last message. Preview opens the task page in a nested modal. Refactor: share the preview modal with epic.tsx. */
+/** Focus popup: what is waiting on you, each card showing only the last message. Preview opens the task page in a nested modal. */
 export function Focus({nav, onClose}: {nav: Nav; onClose: () => void}) {
     const {data, error} = useData(listTasks, [])
     const [peek, setPeek] = useState('')
@@ -171,10 +171,17 @@ export function Focus({nav, onClose}: {nav: Nav; onClose: () => void}) {
                 ))}
             </Stack>
         </Modal>
-        <Modal opened={!!peek} onClose={() => setPeek('')} size="min(1200px, 96vw)" padding="sm" title={peek}>
-            {peek && <TaskPage k={peek} height="calc(100vh - 140px)" nav={go}/>}
-        </Modal>
+        <TaskPreview k={peek} onClose={() => setPeek('')} nav={go}/>
     </>
+}
+
+/** The task page in a modal ("" = closed), so agent/model/skills edit in place; navigating away from it closes the modal. */
+export function TaskPreview({k, onClose, nav}: {k: string; onClose: () => void; nav: Nav}) {
+    return (
+        <Modal opened={!!k} onClose={onClose} size="min(1200px, 96vw)" padding="sm" title={k}>
+            {k && <TaskPage k={k} height="calc(100vh - 140px)" nav={nav}/>}
+        </Modal>
+    )
 }
 
 type Item = {t: string; run?: store.Run; comment?: store.Comment}

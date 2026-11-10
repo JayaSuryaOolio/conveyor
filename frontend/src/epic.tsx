@@ -11,7 +11,7 @@ import {Nav, StatusBadge, errMsg} from './components'
 import {CARD, layout} from './epicLayout'
 import {useData} from './util'
 import {JiraSource} from './jiraSource'
-import {TaskPage} from './views'
+import {TaskPreview} from './views'
 
 const STAGES = ['chart', 'decide', 'spec', 'build', 'verify', 'done']
 const KIND_COLOR: Record<string, string> = {grilling: 'orange', prototype: 'grape', research: 'teal', build: 'blue'}
@@ -224,10 +224,7 @@ export function EpicView({k, task = '', nav}: {k: string; task?: string; nav: Na
                         <Controls showInteractive={false}/>
                     </ReactFlow>
                 </Box>
-                <Modal opened={!!task} onClose={() => setTask('')} size="min(1200px, 96vw)" padding="sm" title={task}>
-                    {/* the same task page, so agent/model/skills edit here; navigating away from it closes the modal */}
-                    {task && <TaskPage k={task} height="calc(100vh - 140px)" nav={nav}/>}
-                </Modal>
+                <TaskPreview k={task ?? ''} onClose={() => setTask('')} nav={nav}/>
                 <Modal opened={!!adding} onClose={() => setAdding('')} title={`New sub-task of ${adding}`}>
                     <form onSubmit={e => { e.preventDefault(); if (title.trim()) create() }}>
                         <Stack gap="sm">
