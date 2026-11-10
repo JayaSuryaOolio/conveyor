@@ -22,7 +22,6 @@ import {Board, Focus, TaskPage} from './views'
 const NAV: {name: string; key?: string; label: string; icon: typeof IconBolt; filter?: string}[] = [
     {name: 'board', key: 'b', label: 'Board', icon: IconLayoutKanban},
     {name: 'board', label: 'Epics', icon: IconSitemap, filter: 'epic'},
-    {name: 'focus', key: 'f', label: 'Focus', icon: IconBolt},
     {name: 'learnings', label: 'Learnings', icon: IconBook2},
     {name: 'automations', label: 'Automations', icon: IconClock},
     {name: 'apps', label: 'Apps', icon: IconApps},
@@ -72,8 +71,7 @@ export default function App() {
             if (g) {
                 g = false
                 const n = NAV.find(x => x.key === e.key)
-                if (n?.name === 'focus') setShowFocus(true) // a popup, not a route
-                else if (n) setView({name: n.name})
+                if (n) setView({name: n.name})
                 return
             }
             if (e.key === 'n') { e.preventDefault(); setShowNew(true) }
@@ -113,7 +111,7 @@ export default function App() {
                             <Tooltip key={label} label={label} position="right" disabled={!mini}>
                                 <NavLink label={mini ? undefined : label} active={view.name === name && (view.label ?? undefined) === filter} leftSection={<Icon size={18}/>} aria-label={label}
                                          rightSection={mini ? undefined : name === 'learnings' && proposed > 0 ? <Badge size="sm" circle>{proposed}</Badge> : key ? <Kbd size="xs" title={`g then ${key}`}>g {key}</Kbd> : undefined}
-                                         onClick={() => name === 'focus' ? setShowFocus(true) : setView(filter ? {name, label: filter} : {name})}/>
+                                         onClick={() => setView(filter ? {name, label: filter} : {name})}/>
                             </Tooltip>
                         ))}
                     </Stack>
@@ -139,7 +137,7 @@ export default function App() {
             </AppShell.Main>
             {showFocus && <Focus nav={nav} onClose={() => setShowFocus(false)}/>}
             {showNew && <NewTask nav={nav} close={() => setShowNew(false)}/>}
-            <CommandPalette nav={nav}/>
+            <CommandPalette nav={nav} onFocus={() => setShowFocus(true)}/>
             <Toasts/>
         </AppShell>
         </NavContext.Provider>

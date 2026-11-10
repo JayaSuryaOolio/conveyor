@@ -2,7 +2,7 @@ import {useCallback, useEffect, useState} from 'react'
 import {ActionIcon, Badge, Group, Text, Tooltip} from '@mantine/core'
 import {Spotlight, spotlight} from '@mantine/spotlight'
 import '@mantine/spotlight/styles.css'
-import {IconFilter, IconLayoutKanban, IconRefresh, IconRobot, IconSearch, IconSettings} from '@tabler/icons-react'
+import {IconBolt, IconFilter, IconLayoutKanban, IconRefresh, IconRobot, IconSearch, IconSettings} from '@tabler/icons-react'
 import {Nav} from './components'
 import {SETTING_LABELS} from './forms'
 import {load, Raw} from './paletteCache'
@@ -11,7 +11,8 @@ type Item = {id: string; label: string; hint: string; go: () => void}
 
 const PER_GROUP = 20
 
-export function CommandPalette({nav}: {nav: Nav}) {
+/** onFocus opens the Focus popup, which is reachable only from here. */
+export function CommandPalette({nav, onFocus}: {nav: Nav; onFocus: () => void}) {
     const [raw, setRaw] = useState<Raw>()
     const [query, setQuery] = useState('')
     const [busy, setBusy] = useState(false)
@@ -41,6 +42,7 @@ export function CommandPalette({nav}: {nav: Nav}) {
     }
     const r = raw ?? {tasks: [], agents: [], labels: [], repos: []}
     const groups: {title: string; icon: typeof IconSearch; items: Item[]}[] = [
+        {title: 'Go to', icon: IconBolt, items: pick([0], () => 'focus waiting on you', () => ({id: 'focus', label: 'Focus', hint: 'waiting on you', go: onFocus}))},
         {title: 'Tasks', icon: IconLayoutKanban, items: pick(r.tasks, t => `${t.key} ${t.title}`, t => ({id: 't' + t.key, label: `${t.key} ${t.title}`, hint: t.status, go: () => nav({name: 'task', key: t.key})}))},
         {title: 'Filters', icon: IconFilter, items: [
             ...pick(r.labels, l => 'label ' + l, l => ({id: 'l' + l, label: l, hint: 'label', go: () => nav({name: 'board', label: l})})),
