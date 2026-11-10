@@ -1,5 +1,5 @@
 import {lazy, Ref, Suspense, useEffect, useRef, useState} from 'react'
-import {ActionIcon, Anchor, Badge, Box, Breadcrumbs, Button, CloseButton, Code, CopyButton, Divider, Group, Kbd, Paper, Popover, Stack, Text, TextInput, Timeline, Title, Tooltip} from '@mantine/core'
+import {ActionIcon, Anchor, Badge, Box, Breadcrumbs, Button, CloseButton, Code, CopyButton, Divider, Group, Kbd, Modal, Paper, Popover, Stack, Text, TextInput, Timeline, Title, Tooltip} from '@mantine/core'
 import {useLocalStorage} from '@mantine/hooks'
 import {IconAbc, IconSitemap, IconArrowDown, IconArrowUp, IconClock, IconFlame, IconHash, IconPencil, IconSearch, IconTerminal, IconX, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconMessage, IconPlayerPlay} from '@tabler/icons-react'
 import {Actions, GetTask, RunLog, SetTaskDescription, Stop, TakeQueuedComment, TermStart} from '../wailsjs/go/ui/App'
@@ -139,33 +139,42 @@ export function Board({nav, q, setQ, search, link}: {nav: Nav; q: string; setQ: 
     </Stack>)
 }
 
-export function Focus({nav}: {nav: Nav}) {
-    const {data, error, reload} = useData(listTasks, [])
-    if (error) return <Text c="red">{error}</Text>
+/** Focus popup: what is waiting on you, each card showing only the last message. Preview opens the task page in a nested modal. Refactor: share the preview modal with epic.tsx. */
+export function Focus({nav, onClose}: {nav: Nav; onClose: () => void}) {
+    const {data, error} = useData(listTasks, [])
+    const [peek, setPeek] = useState('')
+    const go: Nav = v => { onClose(); nav(v) } // leaving for the task page also closes the popup
     const rows = (data ?? [])
         .filter(c => FOCUS_ORDER.includes(c.status))
         .sort((a, b) => waiting(a) - waiting(b) || lastAt(b) - lastAt(a) || a.priority - b.priority)
-    return (
-        <Stack maw={800}>
-            <Title order={3}>Focus</Title>
-            {rows.length === 0 && <Text c="dimmed">Nothing needs you.</Text>}
-            {rows.map(c => (
-                <Paper key={c.key} withBorder p="md" radius="md">
-                    <Stack gap="xs">
-                        <Group wrap="nowrap">
-                            <StatusBadge status={c.status}/>
-                            <Text size="sm" fw={600}>{c.key}</Text>
-                            <Text size="sm" style={{flex: 1}} lineClamp={1}>{c.title}</Text>
-                            <Text size="xs" c="dimmed">{c.lastMsgBy ? c.lastMsgBy + ' · ' : ''}<Time iso={c.lastMsgAt || c.updatedAt}/></Text>
-                            <Button variant="default" size="xs" onClick={() => nav({name: 'task', key: c.key})}>Open</Button>
-                        </Group>
-                        {c.lastSummary && <Box mah={40} style={{overflow: 'hidden'}}><Markdown c="dimmed">{c.lastSummary}</Markdown></Box>}
-                        <CommentBox k={c.key} onDone={reload}/>
-                    </Stack>
-                </Paper>
-            ))}
-        </Stack>
-    )
+    return <>
+        <Modal opened onClose={onClose} size="min(800px, 96vw)" title="Focus">
+            {error && <Text c="red">{error}</Text>}
+            {!error && rows.length === 0 && <Text c="dimmed">Nothing needs you.</Text>}
+            <Stack>
+                {rows.map(c => (
+                    <Paper key={c.key} withBorder p="md" radius="md">
+                        <Stack gap="xs">
+                            <Group wrap="nowrap">
+                                <StatusBadge status={c.status}/>
+                                <Text size="sm" fw={600}>{c.key}</Text>
+                                <Text size="sm" style={{flex: 1}} lineClamp={1}>{c.title}</Text>
+                                <Text size="xs" c="dimmed">{c.lastMsgBy ? c.lastMsgBy + ' · ' : ''}<Time iso={c.lastMsgAt || c.updatedAt}/></Text>
+                            </Group>
+                            {c.lastSummary && <Box mah={80} style={{overflow: 'hidden'}}><Markdown c="dimmed">{c.lastSummary}</Markdown></Box>}
+                            <Group gap="xs">
+                                <Button variant="default" size="compact-xs" onClick={() => setPeek(c.key)}>Preview</Button>
+                                <Button variant="default" size="compact-xs" onClick={() => go({name: 'task', key: c.key})}>Open task</Button>
+                            </Group>
+                        </Stack>
+                    </Paper>
+                ))}
+            </Stack>
+        </Modal>
+        <Modal opened={!!peek} onClose={() => setPeek('')} size="min(1200px, 96vw)" padding="sm" title={peek}>
+            {peek && <TaskPage k={peek} height="calc(100vh - 140px)" nav={go}/>}
+        </Modal>
+    </>
 }
 
 type Item = {t: string; run?: store.Run; comment?: store.Comment}

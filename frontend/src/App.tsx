@@ -40,6 +40,7 @@ export default function App() {
     const setView = (v: View) => { const to = toPath(v); if (to !== viewRef.current.path) navigate(to) }
     const back = () => { if (window.history.state?.idx > 0) navigate(-1) }
     const [showNew, setShowNew] = useState(false)
+    const [showFocus, setShowFocus] = useState(false)
     const [q, setQ] = useState('')
     const search = useRef<HTMLInputElement>(null)
     const [dispatcher, setDispatcher] = useState('')
@@ -71,7 +72,8 @@ export default function App() {
             if (g) {
                 g = false
                 const n = NAV.find(x => x.key === e.key)
-                if (n) setView({name: n.name})
+                if (n?.name === 'focus') setShowFocus(true) // a popup, not a route
+                else if (n) setView({name: n.name})
                 return
             }
             if (e.key === 'n') { e.preventDefault(); setShowNew(true) }
@@ -111,7 +113,7 @@ export default function App() {
                             <Tooltip key={label} label={label} position="right" disabled={!mini}>
                                 <NavLink label={mini ? undefined : label} active={view.name === name && (view.label ?? undefined) === filter} leftSection={<Icon size={18}/>} aria-label={label}
                                          rightSection={mini ? undefined : name === 'learnings' && proposed > 0 ? <Badge size="sm" circle>{proposed}</Badge> : key ? <Kbd size="xs" title={`g then ${key}`}>g {key}</Kbd> : undefined}
-                                         onClick={() => setView(filter ? {name, label: filter} : {name})}/>
+                                         onClick={() => name === 'focus' ? setShowFocus(true) : setView(filter ? {name, label: filter} : {name})}/>
                             </Tooltip>
                         ))}
                     </Stack>
@@ -126,8 +128,7 @@ export default function App() {
             </AppShell.Navbar>
             <AppShell.Main key={view.name + (view.key ?? '')} h="100vh" style={{overflow: view.name === 'task' ? 'hidden' : 'auto'}}>
                 {view.name === 'board' && <Board nav={nav} q={q} setQ={setQ} search={search} link={view}/>}
-                {view.name === 'focus' && <Focus nav={nav}/>}
-                {view.name === 'task' && <TaskPage k={view.key!} nav={nav}/>}
+                                {view.name === 'task' && <TaskPage k={view.key!} nav={nav}/>}
                 {view.name === 'epic' && <EpicView k={view.key!} task={view.task} nav={nav}/>}
                 {view.name === 'learnings' && <LearningsPage nav={nav}/>}
                 {view.name === 'automations' && <Automations/>}
@@ -136,6 +137,7 @@ export default function App() {
                 {view.name === 'logs' && <Logs/>}
                 {view.name === 'settings' && <Settings/>}
             </AppShell.Main>
+            {showFocus && <Focus nav={nav} onClose={() => setShowFocus(false)}/>}
             {showNew && <NewTask nav={nav} close={() => setShowNew(false)}/>}
             <CommandPalette nav={nav}/>
             <Toasts/>
