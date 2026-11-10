@@ -234,6 +234,9 @@ func Migrate(db *sql.DB) error {
 	if err := migrateAddCommentSource(db); err != nil {
 		return err
 	}
+	if err := migrateAddCommentEdits(db); err != nil {
+		return err
+	}
 	if err := migrateAddRunWaste(db); err != nil {
 		return err
 	}
@@ -316,6 +319,20 @@ func migrateAddCommentSource(db *sql.DB) error {
 	if n == 0 {
 		if _, err := db.Exec(`ALTER TABLE comments ADD COLUMN source TEXT NOT NULL DEFAULT ''`); err != nil {
 			return fmt.Errorf("add comments.source: %w", err)
+		}
+	}
+	return nil
+}
+
+// migrateAddCommentEdits adds comments.edits (JSON list of replaced versions; "" = never edited).
+func migrateAddCommentEdits(db *sql.DB) error {
+	var n int
+	if err := db.QueryRow(`SELECT count(*) FROM pragma_table_info('comments') WHERE name='edits'`).Scan(&n); err != nil {
+		return fmt.Errorf("check comments.edits: %w", err)
+	}
+	if n == 0 {
+		if _, err := db.Exec(`ALTER TABLE comments ADD COLUMN edits TEXT NOT NULL DEFAULT ''`); err != nil {
+			return fmt.Errorf("add comments.edits: %w", err)
 		}
 	}
 	return nil

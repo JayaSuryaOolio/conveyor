@@ -33,7 +33,7 @@ func IsAsk(raw []byte) bool {
 
 // OnAsk posts the questions of an AskUserQuestion call to the task thread as an agent comment: a
 // background run's dialog shows only in the session, so the thread would otherwise stay empty.
-// Agent-authored, so it does not requeue the task.
+// Agent-authored, so it does not requeue the task. Tied to the run, so the run's reply replaces it.
 func OnAsk(db *sql.DB, home string, raw []byte) error {
 	var p askPayload
 	if err := json.Unmarshal(raw, &p); err != nil {
@@ -47,7 +47,11 @@ func OnAsk(db *sql.DB, home string, raw []byte) error {
 	if err != nil {
 		return fmt.Errorf("hook AskUserQuestion: %w", err)
 	}
-	_, err = store.AddComment(db, store.Comment{TaskID: task.ID, Author: store.AuthorAgent, Body: askBody(p)})
+	c := store.Comment{TaskID: task.ID, Author: store.AuthorAgent, Body: askBody(p)}
+	if run, err := store.LatestRun(db, task.ID); err == nil { // the asking run: its Stop updates this comment
+		c.RunID = &run.ID
+	}
+	_, err = store.PostRunComment(db, c)
 	return err
 }
 

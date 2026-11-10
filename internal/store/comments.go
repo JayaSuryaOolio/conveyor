@@ -2,10 +2,11 @@ package store
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 )
 
-const commentCols = `id, task_id, author, body, source, run_id, consumed_by_run_id, created_at`
+const commentCols = `id, task_id, author, body, source, run_id, consumed_by_run_id, created_at, edits`
 
 func queryComments(db dbtx, where string, args ...any) ([]Comment, error) {
 	rows, err := db.Query(`SELECT `+commentCols+` FROM comments WHERE `+where+` ORDER BY id`, args...)
@@ -16,8 +17,14 @@ func queryComments(db dbtx, where string, args ...any) ([]Comment, error) {
 	var out []Comment
 	for rows.Next() {
 		var c Comment
-		if err := rows.Scan(&c.ID, &c.TaskID, &c.Author, &c.Body, &c.Source, &c.RunID, &c.ConsumedByRunID, &c.CreatedAt); err != nil {
+		var edits string
+		if err := rows.Scan(&c.ID, &c.TaskID, &c.Author, &c.Body, &c.Source, &c.RunID, &c.ConsumedByRunID, &c.CreatedAt, &edits); err != nil {
 			return nil, fmt.Errorf("scan comment: %w", err)
+		}
+		if edits != "" {
+			if err := json.Unmarshal([]byte(edits), &c.Edits); err != nil {
+				return nil, fmt.Errorf("comment %d edits: %w", c.ID, err)
+			}
 		}
 		out = append(out, c)
 	}
@@ -34,6 +41,32 @@ func AddComment(db *sql.DB, c Comment) (Comment, error) {
 	}
 	c.ID, _ = res.LastInsertId()
 	return c, nil
+}
+
+// PostRunComment adds the run's agent comment, or updates it when the run already has one (a question
+// asked mid-run, then each Stop), keeping the replaced body in edits. A run without an id always adds.
+func PostRunComment(db *sql.DB, c Comment) (Comment, error) {
+	if c.RunID == nil {
+		return AddComment(db, c)
+	}
+	cs, err := queryComments(db, `id=(SELECT MAX(id) FROM comments WHERE run_id=? AND author=?)`, *c.RunID, c.Author)
+	if err != nil {
+		return Comment{}, err
+	}
+	if len(cs) == 0 {
+		return AddComment(db, c)
+	}
+	old := cs[0]
+	if old.Body == c.Body {
+		return old, nil
+	}
+	old.Edits = append(old.Edits, CommentEdit{Body: old.Body, At: now()})
+	old.Body = c.Body
+	edits, _ := json.Marshal(old.Edits)
+	if _, err := db.Exec(`UPDATE comments SET body=?, edits=? WHERE id=?`, old.Body, string(edits), old.ID); err != nil {
+		return Comment{}, fmt.Errorf("update comment: %w", err)
+	}
+	return old, nil
 }
 
 // ListComments returns a task's thread oldest first.

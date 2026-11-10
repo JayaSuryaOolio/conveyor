@@ -218,7 +218,7 @@ func ProcessStop(db *sql.DB, task store.Task, run store.Run, lastAssistantMessag
 		body = block.Summary
 	}
 	if body != "" {
-		if _, err := store.AddComment(db, store.Comment{TaskID: task.ID, Author: store.AuthorAgent, Body: body, RunID: &run.ID}); err != nil {
+		if _, err := store.PostRunComment(db, store.Comment{TaskID: task.ID, Author: store.AuthorAgent, Body: body, RunID: &run.ID}); err != nil {
 			return err
 		}
 	}
