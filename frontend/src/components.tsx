@@ -1,5 +1,5 @@
 import {useEffect, useState} from 'react'
-import {ActionIcon, Badge, Box, Button, Card as MCard, Group, Indicator, Menu, Modal, Notification, Paper, Select, Stack, Text, Tooltip} from '@mantine/core'
+import {ActionIcon, Badge, Box, Button, Card as MCard, Group, Indicator, Menu, Modal, Notification, Paper, Popover, ScrollArea, Select, Stack, Text, Tooltip} from '@mantine/core'
 import {IconAppWindow, IconCheck, IconDots, IconMessageSearch, IconPencil, IconSitemap, IconX} from '@tabler/icons-react'
 import {AddComment, AppServiceRunning, CheckReviews, MergedPR, Move, PlacedActions, RunAppAction, ShowError, StopAppService, TakeQueuedComment} from '../wailsjs/go/ui/App'
 import {store, ui} from '../wailsjs/go/models'
@@ -207,6 +207,29 @@ export function CommentBox({k, placeholder = 'Comment…', onDone, restored}: {k
     </>
 }
 
+/** The "edited" corner badge of a comment the run updated (a question, then its replies); opens the replaced versions. */
+function Edits({edits}: {edits: store.CommentEdit[]}) {
+    return (
+        <Popover width={480} position="bottom-end" withinPortal shadow="md">
+            <Popover.Target>
+                <Badge size="xs" variant="light" color="gray" ml="auto" style={{cursor: 'pointer'}} component="button">edited {edits.length}×</Badge>
+            </Popover.Target>
+            <Popover.Dropdown>
+                <ScrollArea.Autosize mah={400}>
+                    <Stack gap="sm">
+                        {[...edits].reverse().map((e, i) => (
+                            <Box key={i}>
+                                <Text size="xs" c="dimmed">Replaced <Time iso={e.at}/></Text>
+                                <Markdown>{e.body}</Markdown>
+                            </Box>
+                        ))}
+                    </Stack>
+                </ScrollArea.Autosize>
+            </Popover.Dropdown>
+        </Popover>
+    )
+}
+
 /** One comment in the thread. */
 export function Message({m, onEdit}: {m: store.Comment; onEdit?: () => void}) {
     return (
@@ -216,6 +239,7 @@ export function Message({m, onEdit}: {m: store.Comment; onEdit?: () => void}) {
                 <Time iso={m.created_at}/>
                 {onEdit && <Tooltip label="Sent to the agent when the next run starts"><Badge size="xs" variant="light" color="gray">queued</Badge></Tooltip>}
                 {onEdit && <Tooltip label="Move back to the editor"><ActionIcon variant="subtle" color="gray" size="xs" aria-label="Edit queued message" onClick={onEdit}><IconPencil size={12}/></ActionIcon></Tooltip>}
+                {!!m.edits?.length && <Edits edits={m.edits}/>}
             </Group>
             <Markdown>{m.body}</Markdown>
         </Paper>

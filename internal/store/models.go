@@ -92,14 +92,21 @@ type Run struct {
 
 // Comment is a thread entry.
 type Comment struct {
-	ID              int64  `json:"id"`
-	TaskID          int64  `json:"task_id"`
-	Author          string `json:"author"`
-	Body            string `json:"body"`
-	Source          string `json:"source"` // "" = typed in the app, else the chat transport ("slack")
-	RunID           *int64 `json:"run_id"`
-	ConsumedByRunID *int64 `json:"consumed_by_run_id"`
-	CreatedAt       string `json:"created_at"`
+	ID              int64         `json:"id"`
+	TaskID          int64         `json:"task_id"`
+	Author          string        `json:"author"`
+	Body            string        `json:"body"`
+	Source          string        `json:"source"` // "" = typed in the app, else the chat transport ("slack")
+	RunID           *int64        `json:"run_id"`
+	ConsumedByRunID *int64        `json:"consumed_by_run_id"`
+	CreatedAt       string        `json:"created_at"`
+	Edits           []CommentEdit `json:"edits"` // earlier versions, oldest first; a run's agent comment is updated, not re-posted
+}
+
+// CommentEdit is a replaced version of a comment: its body and when it was replaced.
+type CommentEdit struct {
+	Body string `json:"body"`
+	At   string `json:"at"`
 }
 
 // Event is an audit-log row.

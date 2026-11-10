@@ -59,3 +59,22 @@ func TestLatestRunsAndComments(t *testing.T) {
 		t.Fatalf("comments = %+v %v", msgs, err)
 	}
 }
+
+func TestPostRunCommentUpdates(t *testing.T) {
+	db := openTest(t)
+	task := mkTask(t, db, StatusRunning)
+	run, err := CreateRun(db, Run{TaskID: task.ID, Kind: "auto", Mode: "fresh", Status: "running"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, b := range []string{"question?", "reply 1", "reply 1", "final"} {
+		if _, err := PostRunComment(db, Comment{TaskID: task.ID, Author: AuthorAgent, Body: b, RunID: &run.ID}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	PostRunComment(db, Comment{TaskID: task.ID, Author: AuthorAgent, Body: "no run"})
+	cs, _ := ListComments(db, task.ID)
+	if len(cs) != 2 || cs[0].Body != "final" || len(cs[0].Edits) != 2 || cs[0].Edits[0].Body != "question?" || cs[0].Edits[1].Body != "reply 1" {
+		t.Fatalf("got %+v", cs)
+	}
+}
