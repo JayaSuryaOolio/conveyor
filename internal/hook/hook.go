@@ -90,6 +90,9 @@ func Handle(db *sql.DB, home, event string, raw []byte) (string, error) {
 		store.RecordEvent(db, task.ID, "error", "completion check: "+err.Error())
 	}
 	if len(gaps) > 0 { // the session keeps going; its next Stop records the run
+		if err := holdReply(db, run, p.LastAssistantMessage); err != nil {
+			return "", err
+		}
 		return stopBlock(gaps), store.RecordEvent(db, task.ID, "completion_check", strings.Join(gaps, "; "))
 	}
 	return "", onStop(db, task, run, p)
@@ -144,7 +147,27 @@ func auditStart(taskID int64, r store.Run) {
 	store.Audit("epic.run.start", "task_id", taskID, "run", r.ID, "session", deref(r.SessionID))
 }
 
+// holdReply keeps the reply of a Stop the completion check blocked on the still-running run, so the
+// run's final Stop posts it ahead of the fix-up message; often that blocked reply is the actual answer.
+func holdReply(db *sql.DB, run store.Run, msg string) error {
+	_, text, _ := statusblock.Parse(msg)
+	if text = strings.TrimSpace(text); text == "" {
+		return nil
+	}
+	if run.FinalMessage != nil && *run.FinalMessage != "" {
+		text = *run.FinalMessage + "\n\n" + text
+	}
+	run.FinalMessage = &text
+	return store.UpdateRun(db, run)
+}
+
 func onPrompt(db *sql.DB, task store.Task, run store.Run) error {
+	if run.FinalMessage != nil { // a new prompt starts a new reply; drop text held from an earlier turn
+		run.FinalMessage = nil
+		if err := store.UpdateRun(db, run); err != nil {
+			return err
+		}
+	}
 	if run.Status != "running" {
 		run.Status = "running"
 		if err := store.UpdateRun(db, run); err != nil {
@@ -172,6 +195,10 @@ func ProcessStop(db *sql.DB, task store.Task, run store.Run, lastAssistantMessag
 	block, final, hasBlock := statusblock.Parse(lastAssistantMessage)
 	if !hasBlock {
 		final = strings.TrimSpace(lastAssistantMessage)
+	}
+	// Still running with a final message: replies of Stops the completion check blocked (holdReply).
+	if held := deref(run.FinalMessage); run.Status == "running" && held != "" {
+		final = strings.TrimSpace(held + "\n\n" + final)
 	}
 	if transcriptPath != "" {
 		if u, err := transcript.Sum(transcriptPath, run.Prompt); err == nil {

@@ -60,7 +60,7 @@ func TestStopCompletionCheckBlocksThenFinishes(t *testing.T) {
 	tp := writeTranscript(t, `{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Bash","input":{}}]}}`)
 	r := e.run(t, "auto", "running", "S1", "p")
 
-	out, err := e.fireOut(t, "Stop", map[string]any{"session_id": "S1", "last_assistant_message": doneMsg, "transcript_path": tp})
+	out, err := e.fireOut(t, "Stop", map[string]any{"session_id": "S1", "last_assistant_message": "The answer.\n" + doneMsg, "transcript_path": tp})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,9 +77,13 @@ func TestStopCompletionCheckBlocksThenFinishes(t *testing.T) {
 	}
 
 	// The session continues from the hook; its next stop finishes whatever it still lacks.
-	out, err = e.fireOut(t, "Stop", map[string]any{"session_id": "S1", "last_assistant_message": doneMsg, "transcript_path": tp, "stop_hook_active": true})
+	out, err = e.fireOut(t, "Stop", map[string]any{"session_id": "S1", "last_assistant_message": "Cleaned up.\n" + doneMsg, "transcript_path": tp, "stop_hook_active": true})
 	if err != nil || out != "" {
 		t.Fatalf("second stop: %q %v", out, err)
+	}
+	// The blocked stop's reply (often the real answer) is posted ahead of the fix-up message.
+	if cs, _ := store.ListComments(e.db, e.task.ID); len(cs) != 1 || cs[0].Body != "The answer.\nAll good.\n\nCleaned up.\nAll good." {
+		t.Fatalf("comments %+v", cs)
 	}
 	if e.status(t).Status != store.StatusReview {
 		t.Fatalf("status %s, want review", e.status(t).Status)
