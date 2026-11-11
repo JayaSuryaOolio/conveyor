@@ -35,7 +35,7 @@ spawn: [todo] child task title | description with everything its agent needs (re
 
 // relationsHelp tells the agent how to split work: Conveyor only stores the relations, the agent does the handoff.
 const relationsHelp = `
-To split work or hand a part off, create a sub-task (` + "`--parent`" + `, key CV-1A) or a sibling (same ` + "`--parent`" + ` as this task); give it ` + "`--repo`" + ` of the repo it must change, which may differ from this task's, and a description with everything its agent needs:
+To split work or hand a part off, create a sub-task (` + "`--parent`" + `, key CV-1A) or a sibling (same ` + "`--parent`" + ` as this task); give it ` + "`--repo`" + ` of the repo it must change, which may differ from this task's, and a description with everything its agent needs, in light markdown (a short goal line, bullets for steps, code formatting for paths and commands; no headings or padding, it costs the child's context):
 
 ` + "```" + `
 conveyor task new "title" --repo <repo> --parent <KEY> --desc "..." [--todo] [--agent <name>]
