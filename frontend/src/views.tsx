@@ -289,7 +289,12 @@ export function TaskPage({k, nav, height = 'calc(100vh - 2 * var(--mantine-spaci
     const needsYou = d?.task.status === 'needs_you'
     const {data: actions} = useData(() => needsYou ? Actions(k) : Promise.resolve([]), [k, needsYou, d?.runs.length])
     const attach = actions?.find(a => a.kind === 'attach')
-    const answer = attach && <Button size="compact-sm" leftSection={<IconTerminal size={14}/>} onClick={() => TermStart(k, 'attach', attach.repo).then(setAdded).catch(errMsg)}>Answer in terminal</Button>
+    // Gated on needsYou: `actions` keeps its last value until the refetch lands, so without it the button lingers after the answer.
+    const open = () => attach && TermStart(k, 'attach', attach.repo).then(setAdded).catch(errMsg)
+    const answer = needsYou && attach && <Button id="answer-inline" size="compact-sm" leftSection={<IconTerminal size={14}/>} onClick={open}>Answer in terminal</Button>
+    // Floating twin: opens the terminal too; scrollIntoView 'nearest' is a no-op when the inline button is already visible.
+    const floatingAnswer = needsYou && attach && <Button variant="default" size="compact-sm" leftSection={<IconTerminal size={14}/>}
+        onClick={() => { open(); document.getElementById('answer-inline')?.scrollIntoView({behavior: 'smooth', block: 'nearest'}) }}>Answer in terminal</Button>
     if (error) return <Text c="red">{error}</Text>
     if (!d) return <Text c="dimmed">Loading…</Text>
     const t = d.task
@@ -321,7 +326,7 @@ export function TaskPage({k, nav, height = 'calc(100vh - 2 * var(--mantine-spaci
                 </Breadcrumbs>
                 <Tooltip label="Epic view (e)"><ActionIcon variant="subtle" color="gray" aria-label="Epic view" onClick={() => nav({name: 'epic', key: t.key})}><IconSitemap size={18}/></ActionIcon></Tooltip>
                 </Group>
-                <ScrollBox floating={answer}>
+                <ScrollBox floating={floatingAnswer}>
                     <Stack>
                         <WatchedTitle onGone={setTitleGone}>{t.title}</WatchedTitle>
                         <Description t={t} reload={reload}/>
