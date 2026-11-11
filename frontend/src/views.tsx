@@ -289,7 +289,8 @@ export function TaskPage({k, nav, height = 'calc(100vh - 2 * var(--mantine-spaci
     const needsYou = d?.task.status === 'needs_you'
     const {data: actions} = useData(() => needsYou ? Actions(k) : Promise.resolve([]), [k, needsYou, d?.runs.length])
     const attach = actions?.find(a => a.kind === 'attach')
-    const answer = attach && <Button size="compact-sm" leftSection={<IconTerminal size={14}/>} onClick={() => TermStart(k, 'attach', attach.repo).then(setAdded).catch(errMsg)}>Answer in terminal</Button>
+    // Gated on needsYou: `actions` keeps its last value until the refetch lands, so without it the button lingers after the answer.
+    const answer = needsYou && attach && <Button size="compact-sm" leftSection={<IconTerminal size={14}/>} onClick={() => TermStart(k, 'attach', attach.repo).then(setAdded).catch(errMsg)}>Answer in terminal</Button>
     if (error) return <Text c="red">{error}</Text>
     if (!d) return <Text c="dimmed">Loading…</Text>
     const t = d.task
@@ -338,7 +339,6 @@ export function TaskPage({k, nav, height = 'calc(100vh - 2 * var(--mantine-spaci
                                         )}</CopyButton> · </>)(it.run.session_id)}{it.run.api_calls} calls · {fmtK(it.run.ctx_peak)} peak · {fmtDuration(it.run.started_at, it.run.ended_at)} · <Time iso={it.run.started_at}/>
                                     </Text>
                                     <SessionLog run={it.run} onStop={it.run.kind !== 'interactive' ? stop : undefined}/>
-                                    {it.run === latest && answer && <Box mt="xs">{answer}</Box>}
                                 </Timeline.Item>
                             ) : (
                                 <Timeline.Item key={'c' + it.comment!.id} bullet={<IconMessage size={12}/>}>
