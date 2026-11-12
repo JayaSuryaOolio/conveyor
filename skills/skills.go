@@ -3,5 +3,5 @@ package skills
 
 import "embed"
 
-//go:embed all:epic all:conveyor
+//go:embed all:epic all:conveyor all:conveyor-drift
 var FS embed.FS

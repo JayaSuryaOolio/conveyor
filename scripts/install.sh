@@ -41,10 +41,16 @@ elif [ -f build/bin/Conveyor ]; then
 	cp build/bin/Conveyor "$APP_DIR/"
 fi
 
+echo "==> Plugin"
+# Hooks plus the skills embedded in skills/skills.go, as ~/.claude/skills/conveyor (conveyor@skills-dir).
+"$BIN_DIR/conveyor" plugin install claude
+
 echo "==> Skills"
-# Conveyor's user-level skills; overwritten on every install, so edit them in this repo.
+# The other user-level skills; overwritten on every install, so edit them in this repo.
+plugin_skills=" $(sed -n 's|^//go:embed ||p' skills/skills.go | sed 's|all:||g') "
 mkdir -p "$HOME/.claude/skills"
 for d in skills/*/; do
+	case "$plugin_skills" in *" $(basename "$d") "*) continue ;; esac
 	rm -rf "$HOME/.claude/skills/$(basename "$d")"
 	cp -R "${d%/}" "$HOME/.claude/skills/" # no trailing slash: BSD cp would copy the contents only
 	echo "installed: ~/.claude/skills/$(basename "$d")"
@@ -78,6 +84,17 @@ elif "$BIN_DIR/conveyor" automation list | grep -q '^conveyor-doctor '; then
 else
 	"$BIN_DIR/conveyor" automation add conveyor-doctor --schedule "0 9 * * 1" --kind create_task \
 		--arg "{\"title\":\"Conveyor doctor: weekly run review\",\"description\":\"Use the conveyor-doctor skill to review last week's runs and propose prompt and context fixes.\",\"repos\":[\"$repo\"],\"start\":true}"
+fi
+
+echo "==> Weekly doc drift"
+# A weekly task, on the same repo, that runs the plugin's conveyor-drift skill.
+if [ -z "$repo" ]; then
+	echo "skipped: register this checkout first (conveyor repo add $PWD), then re-run"
+elif "$BIN_DIR/conveyor" automation list | grep -q '^conveyor-drift '; then
+	echo "exists: automation conveyor-drift"
+else
+	"$BIN_DIR/conveyor" automation add conveyor-drift --schedule "0 9 * * 3" --kind create_task \
+		--arg "{\"title\":\"Conveyor docs: drift check\",\"description\":\"Use the conveyor-drift skill to check docs/guide.md, the conveyor skill and CLAUDE.md against the code and open one PR fixing any drift.\",\"repos\":[\"$repo\"],\"start\":true}"
 fi
 
 echo "==> Saved state"
