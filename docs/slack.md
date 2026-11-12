@@ -100,7 +100,7 @@ and **Open PR**. Buttons need *Interactivity* on: in the manifest add `settings.
 thread: later notifications for it, and the agent's answers to your thread replies, post into it.
 Thread links are stored in settings (`slack_thread:CHANNEL:TS` -> task key, `slack_task:KEY` -> `CHANNEL:TS`), so
 routing does not parse message text and survives restarts; only threads from before the links existed fall back to
-reading the thread (`conversations.replies`). Rows are never pruned.
+reading the thread (`conversations.replies`). Rows are never pruned. They are part of the exported state, but Settings > General hides them; Settings > Integrations lists them under Slack in a paginated table.
 
 Routing rules: a reply goes to the task linked to the thread it is in, so two threads about the same task (or two
 tasks) never mix. The whole text is the comment, so other task keys inside it are plain text. A top-level DM
