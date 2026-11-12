@@ -200,6 +200,7 @@ export function EpicView({k, task = '', nav}: {k: string; task?: string; nav: Na
         id: `${l.kind}:${l.from}:${l.to}`, source: l.from, target: l.to, deletable: true,
         markerEnd: l.kind === 'blocks' ? {type: MarkerType.ArrowClosed} : undefined, // blocks: solid + arrow; relates: dashed
         style: l.kind === 'relates' ? {strokeDasharray: '5 4'} : undefined,
+        ...(l.kind === 'loop' ? {animated: true, label: '⟳ loop'} : {}), // worker -> checker (`conveyor task loop`)
     })), [g])
     // Controlled edges need their own state or selection (and so delete-to-unlink) never sticks.
     const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])

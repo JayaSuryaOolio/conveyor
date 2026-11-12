@@ -11,6 +11,7 @@ import (
 const (
 	LinkBlocks  = "blocks"
 	LinkRelates = "relates"
+	LinkLoop    = "loop" // not a task_links row: a loops row (loops.go), listed with the links
 )
 
 // linkLabels are the forward and inverse labels per kind.
@@ -271,5 +272,23 @@ func ListRelations(db *sql.DB, t Task) (Relations, error) {
 		}
 		rel.Links = append(rel.Links, r)
 	}
-	return rel, rows.Err()
+	if err := rows.Err(); err != nil {
+		return rel, err
+	}
+	loops, err := TaskLoops(db, t.ID, false)
+	if err != nil {
+		return rel, err
+	}
+	for _, l := range loops { // shown as links of kind "loop", from the worker to the checker
+		other := l.CheckerID
+		if other == t.ID {
+			other = l.WorkerID
+		}
+		refs, err := listRefs(db, `SELECT key, title, status FROM tasks WHERE id=?`, other)
+		if err != nil || len(refs) == 0 {
+			return rel, err
+		}
+		rel.Links = append(rel.Links, Relation{Kind: LinkLoop, Label: LoopLabel(l), From: l.WorkerID == t.ID, Task: refs[0]})
+	}
+	return rel, nil
 }

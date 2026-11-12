@@ -28,8 +28,11 @@ func (s *Service) Link(from, kind, to string) error {
 	return store.AddLink(s.DB, a, b, kind)
 }
 
-// Unlink removes "from <kind> to".
+// Unlink removes "from <kind> to"; kind loop removes the loops with worker from and checker to.
 func (s *Service) Unlink(from, kind, to string) error {
+	if kind == store.LinkLoop {
+		return s.RemoveLoops(from, to)
+	}
 	a, b, err := s.pair(from, to)
 	if err != nil {
 		return err
