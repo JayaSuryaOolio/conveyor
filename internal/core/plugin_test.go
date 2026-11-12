@@ -43,7 +43,7 @@ func TestPlugin(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	for _, f := range []string{"plugin.json", "hooks.json", "skills/epic/SKILL.md", "skills/conveyor/SKILL.md", "skills/conveyor-drift/SKILL.md", "agents/sse.md", "agents/software-architect.md", "agents/senior-frontend-expert.md", "agents/peer-reviewer.md", "agents/automation-tester.md", "agents/ai-agents-expert.md", "agents/epic-builder.md"} {
+	for _, f := range []string{"plugin.json", "hooks.json", "skills/epic/SKILL.md", "skills/conveyor/SKILL.md", "skills/conveyor-drift/SKILL.md", "agents/epic-builder.md"} {
 		if _, err := os.Stat(filepath.Join(agyPlugin, f)); err != nil {
 			t.Fatal(err)
 		}
@@ -51,7 +51,7 @@ func TestPlugin(t *testing.T) {
 	if b, _ := os.ReadFile(filepath.Join(claudePlugin, "hooks", "hooks.json")); !strings.Contains(string(b), `'/bin/cv' --home '/conveyor-home' hook Stop`) {
 		t.Fatal(string(b))
 	}
-	if b, _ := os.ReadFile(filepath.Join(agyPlugin, "hooks.json")); !strings.Contains(string(b), `'/bin/cv' --home '/conveyor-home' hook Stop`) || !strings.Contains(string(b), `.*ask_question.*`) {
+	if b, _ := os.ReadFile(filepath.Join(agyPlugin, "hooks.json")); !strings.Contains(string(b), `'/bin/cv' --home '/conveyor-home' hook Stop`) || !strings.Contains(string(b), `"matcher": ""`) {
 		t.Fatal(string(b))
 	}
 	if b, _ := os.ReadFile(settings); strings.Contains(string(b), " hook ") || !strings.Contains(string(b), "opus") {
@@ -64,12 +64,6 @@ func TestPlugin(t *testing.T) {
 	agent := filepath.Join(claudeDir, "agents", "epic-builder.md")
 	if _, err := os.Stat(agent); err != nil {
 		t.Fatal(err)
-	}
-	// Check seeded basic software engineering agents in Claude user agents dir
-	for _, a := range []string{"sse.md", "software-architect.md", "senior-frontend-expert.md", "peer-reviewer.md", "automation-tester.md", "ai-agents-expert.md"} {
-		if _, err := os.Stat(filepath.Join(claudeDir, "agents", a)); err != nil {
-			t.Fatalf("missing seeded claude agent %s: %v", a, err)
-		}
 	}
 	os.WriteFile(agent, []byte("edited"), 0o644)
 	status("install", "installed", "installed")
@@ -103,12 +97,12 @@ func TestSeedAgentsNotOverwritingEdits(t *testing.T) {
 		t.Fatalf("first seedAgents: %v", err)
 	}
 
-	target := filepath.Join(dir, "sse.md")
+	target := filepath.Join(dir, "epic-builder.md")
 	if _, err := os.Stat(target); err != nil {
-		t.Fatalf("expected sse.md seeded: %v", err)
+		t.Fatalf("expected epic-builder.md seeded: %v", err)
 	}
 
-	custom := "custom sse agent modified by user"
+	custom := "custom epic-builder agent modified by user"
 	if err := os.WriteFile(target, []byte(custom), 0o644); err != nil {
 		t.Fatal(err)
 	}
