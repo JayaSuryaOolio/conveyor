@@ -17,6 +17,7 @@ const maxComments = 20
 const statusBlock = `## Status block
 
 End every final reply with this block. Omit it to ask the human a question instead.
+Blocked on something only the human can do (install a tool, log in, make a decision)? Omit the block and ask: status: failed triggers an automatic retry.
 
 ` + "```" + `
 <conveyor>
