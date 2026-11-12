@@ -34,6 +34,7 @@ func TestReleaseIfNothingQueued(t *testing.T) {
 	if got, _ := GetTask(db, task.ID); got.Status != StatusTodo {
 		t.Fatalf("with queued comment = %s", got.Status)
 	}
+	AddComment(db, Comment{TaskID: task.ID, Author: AuthorSystem, Body: "The agy session was interrupted."})
 	TakeQueuedComment(db, task.ID, c.ID)
 	if err := ReleaseIfNothingQueued(db, task.ID); err != nil {
 		t.Fatal(err)
