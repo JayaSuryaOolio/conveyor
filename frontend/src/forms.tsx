@@ -90,8 +90,10 @@ export function RunnerSelect({value, onChange, size, label}: {value: string; onC
         value: a.id,
         label: a.name + (a.installed ? '' : ' (not installed)')
     }))
-    const options = [{value: '', label: 'Default runner'}, ...runners]
-    return <Select size={size} label={label} placeholder="Runner: default (claude code)" aria-label="Agent runner" clearable data={options} value={value || null} onChange={v => onChange(v ?? '')}/>
+    const {data: settings} = useData(GetSettings, [])
+    const def = agents?.find(a => a.id === settings?.default_runner)?.name ?? settings?.default_runner
+    const options = [{value: '', label: def ? `Default runner (${def})` : 'Default runner'}, ...runners]
+    return <Select size={size} label={label} placeholder={def ? `Runner: default (${def})` : 'Runner: default'} aria-label="Agent runner" clearable data={options} value={value || null} onChange={v => onChange(v ?? '')}/>
 }
 
 export function RunnerSettingSelect({value, onChange, ...rest}: {value: string; onChange: (r: string) => void} & Omit<SelectProps, 'value' | 'onChange' | 'data'>) {
