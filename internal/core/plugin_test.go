@@ -51,7 +51,7 @@ func TestPlugin(t *testing.T) {
 	if b, _ := os.ReadFile(filepath.Join(claudePlugin, "hooks", "hooks.json")); !strings.Contains(string(b), `'/bin/cv' --home '/conveyor-home' hook Stop`) {
 		t.Fatal(string(b))
 	}
-	if b, _ := os.ReadFile(filepath.Join(agyPlugin, "hooks.json")); !strings.Contains(string(b), `'/bin/cv' --home '/conveyor-home' hook Stop`) {
+	if b, _ := os.ReadFile(filepath.Join(agyPlugin, "hooks.json")); !strings.Contains(string(b), `'/bin/cv' --home '/conveyor-home' hook Stop`) || !strings.Contains(string(b), `.*ask_question.*`) {
 		t.Fatal(string(b))
 	}
 	if b, _ := os.ReadFile(settings); strings.Contains(string(b), " hook ") || !strings.Contains(string(b), "opus") {

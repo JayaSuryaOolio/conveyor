@@ -24,7 +24,7 @@ func pluginFiles(skills, agents fs.FS, conveyorBin, home string) (map[string][]b
 		"conveyor": map[string]any{
 			"PreToolUse": []any{
 				map[string]any{
-					"matcher": "*",
+					"matcher": ".*ask_question.*",
 					"hooks": []any{
 						map[string]any{
 							"type":    "command",
