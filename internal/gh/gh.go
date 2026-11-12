@@ -70,6 +70,20 @@ func FindPR(ctx context.Context, repoPath, branch string) (*PR, error) {
 	return &prs[0], nil
 }
 
+// ViewPR returns the PR at url, looked up from repoPath.
+func ViewPR(ctx context.Context, repoPath, url string) (*PR, error) {
+	out, err := run(ctx, repoPath, "gh pr view "+url, "pr", "view", url,
+		"--json", "url,state,number,reviewDecision,updatedAt,headRefOid")
+	if err != nil {
+		return nil, err
+	}
+	var pr PR
+	if err := json.Unmarshal(out, &pr); err != nil {
+		return nil, fmt.Errorf("parse gh output: %w", err)
+	}
+	return &pr, nil
+}
+
 // SyncTask updates pr_url and pr_state for every task repo, then moves a task
 // in review to done (all PRs merged or closed, at least one merged) or to
 // needs_you (every PR closed without merge).
@@ -83,6 +97,12 @@ func SyncTask(ctx context.Context, db *sql.DB, task store.Task) error {
 		pr, err := FindPR(ctx, paths[tr.RepoID], tr.Branch)
 		if err != nil {
 			return err
+		}
+		if pr == nil && tr.PRURL != nil && *tr.PRURL != "" {
+			// The PR came from another branch, e.g. epic children done in the root's PR.
+			if pr, err = ViewPR(ctx, paths[tr.RepoID], *tr.PRURL); err != nil {
+				return err
+			}
 		}
 		if pr == nil {
 			continue
