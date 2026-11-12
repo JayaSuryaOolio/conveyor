@@ -420,3 +420,115 @@ func TestPreToolUseDeniesMergeForEpicMembers(t *testing.T) {
 		}
 	}
 }
+
+func TestStopAgyRealCapturedPayloadDone(t *testing.T) {
+	e := setup(t, store.StatusRunning)
+	sessID := "29ae7b1e-79ee-4214-ac18-2788ced586f4"
+	r := e.run(t, "auto", "running", sessID, "do work")
+	tp := filepath.Join(t.TempDir(), "transcript_full.jsonl")
+	statusBlockContent := "Completed the task successfully.\n" + doneMsg
+	entryJSON, _ := json.Marshal(map[string]any{
+		"step_index": 1,
+		"source":     "MODEL",
+		"type":       "PLANNER_RESPONSE",
+		"status":     "DONE",
+		"created_at": "2026-11-12T10:24:16Z",
+		"content":    statusBlockContent,
+	})
+	os.WriteFile(tp, append(entryJSON, '\n'), 0o644)
+
+	realAgyStop := []byte(`{
+		"artifactDirectoryPath": "/Users/jayasurya/.gemini/antigravity-cli/brain/29ae7b1e-79ee-4214-ac18-2788ced586f4",
+		"continuationActive": false,
+		"conversationId": "` + sessID + `",
+		"cwd": "` + e.cwd() + `",
+		"error": "",
+		"executionNum": 0,
+		"fullyIdle": true,
+		"hookEventName": "Stop",
+		"lastUserInput": "do work",
+		"modelName": "gemini-3.8-flash-high",
+		"terminationReason": "NO_TOOL_CALL",
+		"transcriptPath": "` + tp + `",
+		"workspacePaths": ["` + e.cwd() + `"]
+	}`)
+
+	res, err := Handle(e.db, e.home, "Stop", realAgyStop)
+	if err != nil {
+		t.Fatalf("Handle Stop failed: %v", err)
+	}
+	if res != "" {
+		t.Fatalf("expected empty stdout, got %q", res)
+	}
+
+	got, err := store.GetRun(e.db, r.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Status != "finished" {
+		t.Fatalf("expected run finished, got %s", got.Status)
+	}
+	if got.BlockStatus == nil || *got.BlockStatus != "done" {
+		t.Fatalf("expected block status done, got %v", got.BlockStatus)
+	}
+	if got.Summary == nil || *got.Summary != "s" {
+		t.Fatalf("expected summary s, got %v", got.Summary)
+	}
+	if got.Criteria == nil || !strings.Contains(*got.Criteria, "- [x] AC1 — ok") {
+		t.Fatalf("expected criteria, got %v", got.Criteria)
+	}
+	if e.status(t).Status != store.StatusReview {
+		t.Fatalf("expected task status review, got %s", e.status(t).Status)
+	}
+}
+
+func TestStopAgyRealCapturedPayloadNoStatusBlock(t *testing.T) {
+	e := setup(t, store.StatusRunning)
+	sessID := "41630003-1b8a-4ec2-9f09-8dce99c5d7cd"
+	r := e.run(t, "auto", "running", sessID, "reply pong")
+	tp := filepath.Join(t.TempDir(), "transcript_full.jsonl")
+	entryJSON, _ := json.Marshal(map[string]any{
+		"step_index": 1,
+		"source":     "MODEL",
+		"type":       "PLANNER_RESPONSE",
+		"status":     "DONE",
+		"created_at": "2026-11-12T10:23:06Z",
+		"content":    "pong",
+	})
+	os.WriteFile(tp, append(entryJSON, '\n'), 0o644)
+
+	realAgyStop := []byte(`{
+		"artifactDirectoryPath": "/Users/jayasurya/.gemini/antigravity-cli/brain/41630003-1b8a-4ec2-9f09-8dce99c5d7cd",
+		"continuationActive": false,
+		"conversationId": "` + sessID + `",
+		"cwd": "` + e.cwd() + `",
+		"error": "",
+		"executionNum": 0,
+		"fullyIdle": true,
+		"hookEventName": "Stop",
+		"lastUserInput": "reply with only the word pong",
+		"modelName": "gemini-3.8-flash-high",
+		"terminationReason": "NO_TOOL_CALL",
+		"transcriptPath": "` + tp + `",
+		"workspacePaths": ["` + e.cwd() + `"]
+	}`)
+
+	res, err := Handle(e.db, e.home, "Stop", realAgyStop)
+	if err != nil {
+		t.Fatalf("Handle Stop failed: %v", err)
+	}
+	if res != "" {
+		t.Fatalf("expected empty stdout, got %q", res)
+	}
+
+	got, err := store.GetRun(e.db, r.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Status != "finished" {
+		t.Fatalf("expected run finished, got %s", got.Status)
+	}
+	if e.status(t).Status != store.StatusNeedsYou {
+		t.Fatalf("expected task status needs_you, got %s", e.status(t).Status)
+	}
+}

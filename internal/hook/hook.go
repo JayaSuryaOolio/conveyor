@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -19,22 +20,17 @@ import (
 )
 
 type payload struct {
-	SessionID                 string `json:"session_id"`
-	SessionIDCamel            string `json:"sessionId"`
-	ConversationID            string `json:"conversation_id"` // agy alias
-	ConversationIDCamel       string `json:"conversationId"`
-	Cwd                       string `json:"cwd"`
-	TaskKey                   string `json:"task_key"` // optional direct key
-	TaskKeyCamel              string `json:"taskKey"`
-	TranscriptPath            string `json:"transcript_path"`
-	TranscriptPathCamel       string `json:"transcriptPath"`
-	LastAssistantMessage      string `json:"last_assistant_message"`
-	LastAssistantMessageCamel string `json:"lastAssistantMessage"`
-	Message                   string `json:"message"`
-	NotificationType          string `json:"notification_type"`
-	StopHookActive            bool   `json:"stop_hook_active"`
-	FilePath                  string `json:"file_path"` // InstructionsLoaded
-	FilePathCamel             string `json:"filePath"`
+	SessionID            string `json:"session_id"`
+	ConversationID       string `json:"conversationId"` // agy
+	Cwd                  string `json:"cwd"`
+	TaskKey              string `json:"task_key"` // optional direct key
+	TranscriptPath       string `json:"transcript_path"`
+	TranscriptPathAgy    string `json:"transcriptPath"` // agy
+	LastAssistantMessage string `json:"last_assistant_message"`
+	Message              string `json:"message"`
+	NotificationType     string `json:"notification_type"`
+	StopHookActive       bool   `json:"stop_hook_active"`
+	FilePath             string `json:"file_path"` // InstructionsLoaded
 }
 
 // Handle processes one hook event and returns what to print on stdout (a Stop it blocks), or "".
@@ -45,25 +41,13 @@ func Handle(db *sql.DB, home, event string, raw []byte) (string, error) {
 		return "", fmt.Errorf("parse %s payload: %w", event, err)
 	}
 	if p.SessionID == "" {
-		p.SessionID = p.SessionIDCamel
-	}
-	if p.ConversationID == "" {
-		p.ConversationID = p.ConversationIDCamel
-	}
-	if p.SessionID == "" && p.ConversationID != "" {
 		p.SessionID = p.ConversationID
 	}
-	if p.TaskKey == "" {
-		p.TaskKey = p.TaskKeyCamel
-	}
 	if p.TranscriptPath == "" {
-		p.TranscriptPath = p.TranscriptPathCamel
+		p.TranscriptPath = p.TranscriptPathAgy
 	}
-	if p.LastAssistantMessage == "" {
-		p.LastAssistantMessage = p.LastAssistantMessageCamel
-	}
-	if p.FilePath == "" {
-		p.FilePath = p.FilePathCamel
+	if p.LastAssistantMessage == "" && p.TranscriptPath != "" {
+		p.LastAssistantMessage = lastAssistantFromTranscript(p.TranscriptPath)
 	}
 	key := workspace.KeyFromCwd(home, p.Cwd)
 	if key == "" && p.TaskKey != "" {
@@ -389,4 +373,53 @@ func deref(s *string) string {
 		return ""
 	}
 	return *s
+}
+
+// lastAssistantFromTranscript extracts the last assistant message from a transcript file
+// when not directly provided in the Stop hook payload (e.g. Antigravity/agy sessions).
+func lastAssistantFromTranscript(path string) string {
+	b, err := os.ReadFile(path)
+	if err != nil || len(b) == 0 {
+		return ""
+	}
+	var last string
+	for _, line := range strings.Split(string(b), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		// Antigravity (agy) transcript.jsonl format
+		var agyEntry struct {
+			Type    string  `json:"type"`
+			Content *string `json:"content"`
+		}
+		if err := json.Unmarshal([]byte(line), &agyEntry); err == nil && agyEntry.Type == "PLANNER_RESPONSE" && agyEntry.Content != nil {
+			if trimmed := strings.TrimSpace(*agyEntry.Content); trimmed != "" {
+				last = trimmed
+			}
+			continue
+		}
+		// Claude Code transcript format
+		var claudeEntry struct {
+			Type    string `json:"type"`
+			Message struct {
+				Content []struct {
+					Type string `json:"type"`
+					Text string `json:"text"`
+				} `json:"content"`
+			} `json:"message"`
+		}
+		if err := json.Unmarshal([]byte(line), &claudeEntry); err == nil && claudeEntry.Type == "assistant" {
+			var sb strings.Builder
+			for _, c := range claudeEntry.Message.Content {
+				if c.Type == "text" {
+					sb.WriteString(c.Text)
+				}
+			}
+			if text := strings.TrimSpace(sb.String()); text != "" {
+				last = text
+			}
+		}
+	}
+	return last
 }

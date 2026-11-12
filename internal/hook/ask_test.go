@@ -95,3 +95,85 @@ func TestOnAsk(t *testing.T) {
 		t.Fatalf("expected Claude task status to remain running, got %s", gotTask2.Status)
 	}
 }
+
+func TestOnAskRealCapturedAgyPayload(t *testing.T) {
+	home := t.TempDir()
+	db, err := store.Open(core.DBPath(home))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	r, err := store.AddRepo(db, store.Repo{Name: "repo", Path: "/x/repo", DefaultBranch: "main"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tk, err := store.CreateTask(db, store.Task{Title: "Captured Agy Ask", Status: store.StatusRunning}, []store.TaskRepo{{RepoID: r.ID, IsPrimary: true, Branch: "b"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	pid := "54321"
+	_, err = store.CreateRun(db, store.Run{TaskID: tk.ID, Kind: "auto", Mode: "fresh", Status: "running", BgID: &pid})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	worktree := filepath.Join(home, "workspaces", tk.Key, "repo")
+	capturedPayload := []byte(`{
+		"artifactDirectoryPath": "/Users/jayasurya/.gemini/antigravity-cli/brain/29ae7b1e-79ee-4214-ac18-2788ced586f4",
+		"conversationId": "29ae7b1e-79ee-4214-ac18-2788ced586f4",
+		"cwd": "` + worktree + `",
+		"hookEventName": "PreToolUse",
+		"lastUserInput": "You MUST ONLY call the tool named ask_question. Do not use any other tool. Call ask_question with questions=[{\"question\":\"Choose:\",\"options\":[\"A\",\"B\"]}]",
+		"modelName": "gemini-3.8-flash-high",
+		"stepIdx": 2,
+		"toolCall": {
+			"args": {
+				"questions": [
+					{
+						"options": [
+							"A",
+							"B"
+						],
+						"question": "Choose:"
+					}
+				]
+			},
+			"id": "call_1923810955824889676",
+			"name": "ask_question"
+		},
+		"transcriptPath": "/Users/jayasurya/.gemini/antigravity-cli/brain/29ae7b1e-79ee-4214-ac18-2788ced586f4/.system_generated/logs/transcript_full.jsonl",
+		"workspacePaths": [
+			"` + worktree + `"
+		]
+	}`)
+
+	if !IsAsk(capturedPayload) {
+		t.Fatal("expected IsAsk true for captured agy ask_question payload")
+	}
+
+	if err := OnAsk(db, home, capturedPayload); err != nil {
+		t.Fatalf("OnAsk failed on captured payload: %v", err)
+	}
+
+	gotTask, err := store.GetTask(db, tk.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gotTask.Status != store.StatusNeedsYou {
+		t.Fatalf("expected task status needs_you, got %s", gotTask.Status)
+	}
+
+	comments, err := store.ListComments(db, tk.ID)
+	if err != nil || len(comments) == 0 {
+		t.Fatalf("expected comment posted, got %v", comments)
+	}
+	body := comments[0].Body
+	if !strings.Contains(body, "Asked in the session (ask_question)") {
+		t.Fatalf("expected header 'Asked in the session (ask_question)', got: %s", body)
+	}
+	if !strings.Contains(body, "Choose:") || !strings.Contains(body, "- A") || !strings.Contains(body, "- B") {
+		t.Fatalf("unexpected comment body: %s", body)
+	}
+}

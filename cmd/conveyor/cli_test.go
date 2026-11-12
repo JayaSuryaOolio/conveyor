@@ -152,6 +152,16 @@ func TestHookLogScope(t *testing.T) {
 	if !strings.Contains(string(b), "CV-9 [Stop] session=s1") {
 		t.Fatalf("log: %q", b)
 	}
+
+	cmdAgy := exec.Command(bin, "--home", home, "hook", "Stop")
+	cmdAgy.Stdin = strings.NewReader(`{"conversationId":"agy-conv-123","cwd":"` + filepath.Join(home, "workspaces", "CV-9", "repo") + `"}`)
+	if out, err := cmdAgy.CombinedOutput(); err != nil {
+		t.Fatalf("agy hook failed: %v %s", err, out)
+	}
+	b, _ = os.ReadFile(filepath.Join(home, "logs", "hook.log"))
+	if !strings.Contains(string(b), "CV-9 [Stop] session=agy-conv-123") {
+		t.Fatalf("log missing agy session: %q", b)
+	}
 }
 
 // The plugin's copy of a hook stands down in a session whose --settings run it (CONVEYOR_HOOKS set).
