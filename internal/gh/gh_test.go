@@ -17,6 +17,7 @@ func fakeGH(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
 	script := `#!/bin/sh
+[ "$2" = view ] && { cat "$FAKE/view.json"; exit; }
 while [ $# -gt 0 ]; do [ "$1" = --head ] && b=$2; shift; done
 f="$FAKE/$(echo "$b" | tr / _).json"
 if [ -f "$f" ]; then cat "$f"; else echo '[]'; fi
@@ -138,5 +139,35 @@ func TestMissingGH(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
 	if _, err := FindPR(context.Background(), t.TempDir(), "b"); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("err %v", err)
+	}
+}
+
+// Two tasks whose pr_url points at one PR from a third branch both move to done once it merges.
+func TestSharedPRMergedDone(t *testing.T) {
+	dir := fakeGH(t)
+	url := "https://x/pr/254"
+	body := `{"url":"` + url + `","state":"MERGED","number":254,"headRefOid":"abc"}`
+	if err := os.WriteFile(filepath.Join(dir, "view.json"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	db, a := newTask(t, 1)
+	r, err := store.AddRepo(db, store.Repo{Name: "z", Path: t.TempDir(), DefaultBranch: "main"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := store.CreateTask(db, store.Task{Title: "u", Status: store.StatusReview}, []store.TaskRepo{{RepoID: r.ID, IsPrimary: true, Branch: "s2"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tk := range []store.Task{a, b} {
+		tr := tk.Repos[0]
+		tr.PRURL = &url
+		if err := store.UpdateTaskRepo(db, tr); err != nil {
+			t.Fatal(err)
+		}
+		tk, _ = store.GetTask(db, tk.ID)
+		if got := sync(t, db, tk); got.Status != store.StatusDone || *got.Repos[0].PRState != "MERGED" {
+			t.Fatalf("%s: %+v", tk.Title, got)
+		}
 	}
 }
