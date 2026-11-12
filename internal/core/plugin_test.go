@@ -95,3 +95,34 @@ func TestPlugin(t *testing.T) {
 		t.Fatal("unknown tool accepted")
 	}
 }
+
+func TestSeedAgentsNotOverwritingEdits(t *testing.T) {
+	dir := t.TempDir()
+	s := &Service{}
+	if err := s.seedAgents(dir); err != nil {
+		t.Fatalf("first seedAgents: %v", err)
+	}
+
+	target := filepath.Join(dir, "sse.md")
+	if _, err := os.Stat(target); err != nil {
+		t.Fatalf("expected sse.md seeded: %v", err)
+	}
+
+	custom := "custom sse agent modified by user"
+	if err := os.WriteFile(target, []byte(custom), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Re-run seedAgents; it should not overwrite the modified file.
+	if err := s.seedAgents(dir); err != nil {
+		t.Fatalf("second seedAgents: %v", err)
+	}
+
+	got, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != custom {
+		t.Fatalf("expected %q, got %q (seedAgents overwrote user edit)", custom, string(got))
+	}
+}
