@@ -315,7 +315,11 @@ func (d *Dispatcher) reapAgy(ctx context.Context, r store.Run, task store.Task, 
 		logOutput = agy.LastTurnOutput(string(b))
 	}
 
-	interrupted := strings.Contains(logOutput, "error: interrupted") || strings.Contains(logOutput, "signal: interrupt")
+	tail := logOutput
+	if len(tail) > 300 {
+		tail = tail[len(tail)-300:]
+	}
+	interrupted := strings.Contains(tail, "error: interrupted") || strings.Contains(tail, "signal: interrupt")
 
 	// If there is log output and not interrupted, run ProcessStop which extracts the <conveyor> block and handles transitions.
 	if logOutput != "" && !interrupted {

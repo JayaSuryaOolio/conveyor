@@ -821,6 +821,52 @@ func TestReapAgyInterruptedDoesNotCopyPriorReply(t *testing.T) {
 	}
 }
 
+func TestReapAgyQuotingInterruptDoesNotFalsePositive(t *testing.T) {
+	e := setup(t)
+	runnerName := "agy"
+	tk := e.task(t, "t", 0)
+	tk.Runner = &runnerName
+	if err := store.UpdateTask(e.db, tk); err != nil {
+		t.Fatal(err)
+	}
+
+	pid := "9999999"
+	run, err := store.CreateRun(e.db, store.Run{
+		TaskID: tk.ID, Kind: "auto", Mode: "fresh", Status: "running", BgID: &pid,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.UpdateTaskStatus(e.db, tk.ID, store.StatusRunning, store.ActorSystem); err != nil {
+		t.Fatal(err)
+	}
+
+	logPath := runner.BgLogPath(e.d.Svc.Home, tk.Key)
+	os.MkdirAll(filepath.Dir(logPath), 0o755)
+	// Output quotes "error: interrupted" early in explanation, followed by padding and valid status block.
+	padding := strings.Repeat("investigating the interrupted run and resolving the issue.\n", 10)
+	logContent := "Earlier I saw error: interrupted in the session logs.\n" + padding +
+		"<conveyor>\nstatus: done\nsummary: successfully handled quote\nstate: clean\nnext: none\n</conveyor>\n"
+	os.WriteFile(logPath, []byte(logContent), 0o644)
+
+	e.now = time.Now().Add(time.Minute)
+	e.d.reap(t.Context())
+
+	got, err := store.GetRun(e.db, run.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Status != "finished" {
+		t.Fatalf("expected run finished, got %s", got.Status)
+	}
+	if got.Summary == nil || *got.Summary != "successfully handled quote" {
+		t.Fatalf("expected parsed summary, got %v", got.Summary)
+	}
+	if e.get(t, tk.ID).Status != store.StatusReview {
+		t.Fatalf("expected task status review, got %s", e.get(t, tk.ID).Status)
+	}
+}
+
 // attachCmd returns the task's "attach" action command, via core like the UI.
 func (e *env) attachCmd(t *testing.T, key string) string {
 	t.Helper()
