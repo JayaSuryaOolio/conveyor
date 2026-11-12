@@ -1,7 +1,7 @@
 import {useState} from 'react'
-import {ActionIcon, Button, Checkbox, Code, Group, Modal, MultiSelect, PasswordInput, ScrollArea, SegmentedControl, Select, SelectProps, Stack, Table, Tabs, Text, TextInput, Textarea, Title, Tooltip} from '@mantine/core'
+import {ActionIcon, Button, Checkbox, Code, Group, Modal, MultiSelect, PasswordInput, ScrollArea, SegmentedControl, Select, SelectProps, SimpleGrid, Stack, Table, TagsInput, Tabs, Text, TextInput, Textarea, Title, Tooltip} from '@mantine/core'
 import {IconAdjustments} from '@tabler/icons-react'
-import {AddRepo, CreateTask, ExportState, GetPromptDefaults, GetTask, GetSettings, ImportState, ListAgents, ListCLIAgents, ListModels, ListRepos, PreviewBrief, Requirements, ShellPATHError, SetRepoSetupScript, SetSetting, SetTaskAgent, SetTaskModel, SetTaskRunner} from '../wailsjs/go/ui/App'
+import {AddLabel, AddRepo, CreateTask, ExportState, GetPromptDefaults, GetTask, GetSettings, ImportState, ListAgents, ListCLIAgents, ListLabels, ListModels, ListRepos, PreviewBrief, Requirements, ShellPATHError, SetRepoSetupScript, SetSetting, SetTaskAgent, SetTaskModel, SetTaskRunner} from '../wailsjs/go/ui/App'
 import {core, store} from '../wailsjs/go/models'
 import {Nav, errMsg} from './components'
 import {Markdown, MarkdownEditor} from './markdown'
@@ -19,6 +19,8 @@ export function NewTask({nav, close}: {nav: Nav; close: () => void}) {
     const [agent, setAgent] = useState('')
     const [runner, setRunner] = useState('')
     const [start, setStart] = useState(false)
+    const [labels, setLabels] = useState<string[]>([])
+    const {data: allLabels} = useData(ListLabels, [])
     const [epic, setEpic] = useState(false)
     const [epicName, setEpicName] = useState('')
     const prim = sel.includes(primary) ? primary : sel[0] ?? ''
@@ -26,7 +28,7 @@ export function NewTask({nav, close}: {nav: Nav; close: () => void}) {
         CreateTask(core.NewTaskInput.createFrom({
             Title: title, Description: desc, Repos: sel, Primary: prim,
             Start: start, Model: model, Agent: agent, Runner: runner, ParentKey: parent, Epic: epic, EpicName: epicName.trim(),
-        })).then(key => { setTitle(''); setDesc(''); close(); nav({name: 'task', key}) }, errMsg)
+        })).then(key => Promise.all(labels.map(l => AddLabel(key, l))).then(() => key)).then(key => { setTitle(''); setDesc(''); close(); nav({name: 'task', key}) }, errMsg)
     // Picking a parent prefills repos, primary, agent and runner from it; they stay editable. Clearing leaves them.
     const pickParent = (key: string | null) => {
         setParent(key ?? '')
@@ -38,18 +40,25 @@ export function NewTask({nav, close}: {nav: Nav; close: () => void}) {
         }, errMsg)
     }
     return (
-        <Modal opened onClose={close} title="New task" size="md">
+        <Modal opened onClose={close} title="New task" size="clamp(28rem, 60vw, 64rem)">
             <Stack gap="sm">
                 <TextInput data-autofocus placeholder="Title" value={title} onChange={e => setTitle(e.target.value)}/>
                 <MarkdownEditor minRows={4} placeholder="Description" value={desc} onChange={setDesc} repos={sel}/>
-                <Select label="Parent" placeholder="None" searchable clearable value={parent || null} onChange={pickParent}
-                        data={(tasks ?? []).filter(t => t.status !== 'done' && t.status !== 'cancelled').map(t => ({value: t.key, label: `${t.key} ${t.title}`}))}/>
-                <MultiSelect label="Repos" placeholder="Pick repos" description={repos?.length === 0 ? 'Add one on the Repos page first' : undefined}
-                             data={repos?.map(r => r.name) ?? []} value={sel} onChange={setSel}/>
-                {sel.length > 1 && <Select label="Primary repo" allowDeselect={false} data={sel} value={prim} onChange={v => setPrimary(v ?? '')}/>}
-                <ModelSelect runner={runner} value={model} onChange={setModel}/>
-                <AgentSelect repos={sel} value={agent} onChange={setAgent}/>
-                <RunnerSelect value={runner} onChange={setRunner}/>
+                {/* one column on narrow screens, two from 56em (a 60%-wide modal is then ~34em) */}
+                <SimpleGrid cols={{base: 1, '56em': 2}} spacing="sm">
+                    <Select label="Parent" placeholder="None" searchable clearable value={parent || null} onChange={pickParent}
+                            data={(tasks ?? []).filter(t => t.status !== 'done' && t.status !== 'cancelled').map(t => ({value: t.key, label: `${t.key} ${t.title}`}))}/>
+                    <MultiSelect label="Repos" placeholder="Pick repos" description={repos?.length === 0 ? 'Add one on the Repos page first' : undefined}
+                                 data={repos?.map(r => r.name) ?? []} value={sel} onChange={setSel}/>
+                    {sel.length > 1 && <Select label="Primary repo" allowDeselect={false} data={sel} value={prim} onChange={v => setPrimary(v ?? '')}/>}
+                    <TagsInput label="Labels" placeholder="Add label…" data={allLabels ?? []} value={labels} onChange={setLabels} splitChars={[',']}/>
+                </SimpleGrid>
+                <Text size="sm" fw={500} mt="xs">Agents</Text>
+                <SimpleGrid cols={{base: 1, '56em': 3}} spacing="sm">
+                    <ModelSelect label="Model" runner={runner} value={model} onChange={setModel}/>
+                    <AgentSelect label="Agent" repos={sel} value={agent} onChange={setAgent}/>
+                    <RunnerSelect label="Runner" value={runner} onChange={setRunner}/>
+                </SimpleGrid>
                 <Checkbox label="Start now (todo)" checked={start} onChange={e => setStart(e.currentTarget.checked)}/>
                 <Checkbox label="Epic" checked={epic} onChange={e => setEpic(e.currentTarget.checked)}/>
                 {epic && <TextInput label="Epic name" placeholder="default: the lower-cased task key" value={epicName} onChange={e => setEpicName(e.target.value)}/>}
@@ -82,7 +91,7 @@ export function RunnerSelect({value, onChange, size, label}: {value: string; onC
         label: a.name + (a.installed ? '' : ' (not installed)')
     }))
     const options = [{value: '', label: 'Default runner'}, ...runners]
-    return <Select size={size} label={label} placeholder="Runner: default" aria-label="Agent runner" clearable data={options} value={value || null} onChange={v => onChange(v ?? '')}/>
+    return <Select size={size} label={label} placeholder="Runner: default (claude code)" aria-label="Agent runner" clearable data={options} value={value || null} onChange={v => onChange(v ?? '')}/>
 }
 
 export function RunnerSettingSelect({value, onChange, ...rest}: {value: string; onChange: (r: string) => void} & Omit<SelectProps, 'value' | 'onChange' | 'data'>) {
