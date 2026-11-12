@@ -13,7 +13,7 @@ import (
 )
 
 // fakeAPI installs a gh that serves $FAKE/{reviews,comments,threads}.json for `gh api` calls.
-func fakeAPI(t *testing.T, reviews, comments, threads string) {
+func fakeAPI(t *testing.T, reviews, comments, threads string) string {
 	t.Helper()
 	dir := t.TempDir()
 	script := `#!/bin/sh
@@ -21,14 +21,17 @@ case "$2" in
 */reviews*) cat "$FAKE/reviews.json";;
 */comments*) cat "$FAKE/comments.json";;
 graphql) cat "$FAKE/threads.json";;
+*/check-runs*) cat "$FAKE/runs.json";;
+*/pulls/*) cat "$FAKE/pulls.json";;
 esac
 `
 	os.WriteFile(filepath.Join(dir, "gh"), []byte(script), 0o755)
-	for n, v := range map[string]string{"reviews": reviews, "comments": comments, "threads": threads} {
+	for n, v := range map[string]string{"reviews": reviews, "comments": comments, "threads": threads, "runs": `{"check_runs":[]}`, "pulls": `{}`} {
 		os.WriteFile(filepath.Join(dir, n+".json"), []byte(v), 0o644)
 	}
 	t.Setenv("PATH", dir+":"+os.Getenv("PATH"))
 	t.Setenv("FAKE", dir)
+	return dir
 }
 
 func reviewTask(t *testing.T) (*core.Service, store.Task) {
@@ -48,12 +51,14 @@ const threads = `{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":
  {"isResolved":false,"comments":{"nodes":[{"databaseId":11}]}}]}}}}}`
 
 func TestReviewCheckPostsOnceThenBacksOff(t *testing.T) {
-	fakeAPI(t,
+	dir := fakeAPI(t,
 		`[{"id":10,"body":"please rename","state":"CHANGES_REQUESTED","user":{"login":"bob"}}]`,
 		`[{"id":11,"body":"nil deref","path":"a.go","line":3,"user":{"login":"bob"}},
 		  {"id":12,"body":"resolved already","path":"a.go","line":9,"user":{"login":"bob"}},
 		  {"id":13,"body":"ai agent: fixed","path":"a.go","line":3,"user":{"login":"me"}}]`,
 		threads)
+	os.WriteFile(filepath.Join(dir, "runs.json"), []byte(`{"check_runs":[{"name":"test","conclusion":"failure"},{"name":"lint","conclusion":"success"}]}`), 0o644)
+	os.WriteFile(filepath.Join(dir, "pulls.json"), []byte(`{"mergeable_state":"dirty","head":{"sha":"abc"}}`), 0o644)
 	svc, tk := reviewTask(t)
 	ctx := context.Background()
 
@@ -64,7 +69,7 @@ func TestReviewCheckPostsOnceThenBacksOff(t *testing.T) {
 	if len(cs) != 1 || cs[0].Author != store.AuthorSystem {
 		t.Fatalf("want one system comment, got %+v", cs)
 	}
-	for _, want := range []string{"PR review on https://github.com/o/r/pull/7:", "> a.go:3 (bob)\nnil deref", "please rename"} {
+	for _, want := range []string{"PR review on https://github.com/o/r/pull/7:", "> a.go:3 (bob)\nnil deref", "please rename", "Failing CI checks: test.", "merge conflicts"} {
 		if !strings.Contains(cs[0].Body, want) {
 			t.Errorf("missing %q in %q", want, cs[0].Body)
 		}
@@ -82,7 +87,7 @@ func TestReviewCheckPostsOnceThenBacksOff(t *testing.T) {
 		t.Errorf("state %+v", st)
 	}
 
-	// Second check: nothing new, no comment, next backoff step (30m).
+	// Second check: same CI/conflict state, so nothing new, no comment, next backoff step (30m).
 	if _, err := ReviewCheck(ctx, svc, tk.Key, 0); err != nil {
 		t.Fatal(err)
 	}

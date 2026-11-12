@@ -222,6 +222,9 @@ func Migrate(db *sql.DB) error {
 	if err := migrateAddAppSettings(db); err != nil {
 		return err
 	}
+	if err := migrateAddPRReported(db); err != nil {
+		return err
+	}
 	if err := migrateAddTaskCreatedBy(db); err != nil {
 		return err
 	}
@@ -433,6 +436,20 @@ func migrateAddAppSettings(db *sql.DB) error {
 	if n == 0 {
 		if _, err := db.Exec(`ALTER TABLE apps ADD COLUMN settings TEXT NOT NULL DEFAULT '{}'`); err != nil {
 			return fmt.Errorf("add apps.settings: %w", err)
+		}
+	}
+	return nil
+}
+
+// migrateAddPRReported adds pr_reviews.reported (the CI/conflict state last sent to the agent).
+func migrateAddPRReported(db *sql.DB) error {
+	var n int
+	if err := db.QueryRow(`SELECT count(*) FROM pragma_table_info('pr_reviews') WHERE name='reported'`).Scan(&n); err != nil {
+		return fmt.Errorf("check pr_reviews.reported: %w", err)
+	}
+	if n == 0 {
+		if _, err := db.Exec(`ALTER TABLE pr_reviews ADD COLUMN reported TEXT NOT NULL DEFAULT ''`); err != nil {
+			return fmt.Errorf("add pr_reviews.reported: %w", err)
 		}
 	}
 	return nil

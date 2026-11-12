@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -90,6 +91,41 @@ func api(ctx context.Context, dir string, args ...string) ([]byte, error) {
 	return run(ctx, dir, "gh api "+args[0], append([]string{"api"}, args...)...)
 }
 
+// get runs gh api and decodes its JSON output into dst.
+func get(ctx context.Context, dir string, dst any, args ...string) error {
+	out, err := api(ctx, dir, args...)
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(out, dst); err != nil {
+		return fmt.Errorf("parse gh api %s: %w", args[0], err)
+	}
+	return nil
+}
+
+// ciState describes failing CI checks and merge conflicts; state is "" when all is well,
+// else a signature that changes only when the problem does (new push, other check failing).
+func ciState(mergeable string, runs []struct{ Name, Conclusion string }, sha string) (state, text string) {
+	var failed []string
+	for _, r := range runs {
+		if r.Conclusion == "failure" || r.Conclusion == "timed_out" {
+			failed = append(failed, r.Name)
+		}
+	}
+	var lines []string
+	if len(failed) > 0 {
+		lines = append(lines, "Failing CI checks: "+strings.Join(failed, ", ")+". Find out why (`gh pr checks`, `gh run view --log-failed`) and fix.")
+	}
+	if mergeable == "dirty" {
+		lines = append(lines, "The PR has merge conflicts with its base branch. Rebase or merge the base and resolve them.")
+	}
+	if len(lines) == 0 {
+		return "", ""
+	}
+	sort.Strings(failed)
+	return sha + "|" + strings.Join(failed, ",") + "|" + strconv.FormatBool(mergeable == "dirty"), strings.Join(lines, "\n")
+}
+
 const threadsQuery = `query($o:String!,$r:String!,$n:Int!){repository(owner:$o,name:$r){pullRequest(number:$n){
 reviewThreads(first:100){nodes{isResolved comments(first:100){nodes{databaseId}}}}}}}`
 
@@ -145,6 +181,13 @@ func checkPR(ctx context.Context, db *sql.DB, taskID, repoID int64, dir, url str
 	// ponytail: first 100 only; add pagination if a PR outgrows it.
 	var reviews []review
 	var comments []comment
+	var pr struct {
+		MergeableState string `json:"mergeable_state"`
+		Head           struct{ SHA string }
+	}
+	var runs struct {
+		CheckRuns []struct{ Name, Conclusion string } `json:"check_runs"`
+	}
 	var threads struct {
 		Data struct {
 			Repository struct {
@@ -165,15 +208,15 @@ func checkPR(ctx context.Context, db *sql.DB, taskID, repoID int64, dir, url str
 	}{
 		{&reviews, []string{base + "/reviews?per_page=100"}},
 		{&comments, []string{base + "/comments?per_page=100"}},
+		{&pr, []string{base}},
 		{&threads, []string{"graphql", "-f", "query=" + threadsQuery, "-F", "o=" + owner, "-F", "r=" + repo, "-F", "n=" + strconv.Itoa(n)}},
 	} {
-		out, err := api(ctx, dir, q.args...)
-		if err != nil {
+		if err := get(ctx, dir, q.dst, q.args...); err != nil {
 			return "", err
 		}
-		if err := json.Unmarshal(out, q.dst); err != nil {
-			return "", fmt.Errorf("parse gh api %s: %w", q.args[0], err)
-		}
+	}
+	if err := get(ctx, dir, &runs, fmt.Sprintf("repos/%s/%s/commits/%s/check-runs?per_page=100", owner, repo, pr.Head.SHA)); err != nil {
+		return "", err
 	}
 	resolved, unresolved := map[int64]bool{}, 0
 	for _, th := range threads.Data.Repository.PullRequest.ReviewThreads.Nodes {
@@ -213,6 +256,12 @@ func checkPR(ctx context.Context, db *sql.DB, taskID, repoID int64, dir, url str
 		}
 	}
 	st.SeenCommentID, st.Unresolved = mark, unresolved
+	// CI failures and merge conflicts: sent once per distinct state, so a repeat check stays quiet.
+	state, ci := ciState(pr.MergeableState, runs.CheckRuns, pr.Head.SHA)
+	if state != st.Reported && state != "" {
+		fmt.Fprintf(&sb, "> CI and merge state\n%s\n\n", ci)
+	}
+	st.Reported = state
 	if err := store.SavePRReview(db, st); err != nil {
 		return "", err
 	}

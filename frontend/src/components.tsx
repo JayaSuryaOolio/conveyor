@@ -12,16 +12,16 @@ export type Nav = (v: View) => void
 
 export const errMsg = (e: unknown) => ShowError(String(e))
 
-let pushToast: (m: string, sticky?: boolean) => void = () => {}
-/** Shows a message bottom-right for 10 seconds (needs <Toasts/> mounted once). A sticky toast stays and has no close button. */
-export const toast = (m: string, sticky = false) => pushToast(m, sticky)
+let pushToast: (m: string, sticky?: boolean, ms?: number) => void = () => {}
+/** Shows a message bottom-right for 10 seconds, or ms (needs <Toasts/> mounted once). A sticky toast stays and has no close button. */
+export const toast = (m: string, sticky = false, ms = 10000) => pushToast(m, sticky, ms)
 
 export function Toasts() {
     const [list, setList] = useState<{id: number; m: string; sticky: boolean}[]>([])
     useEffect(() => {
         let n = 0
         const drop = (id: number) => setList(l => l.filter(x => x.id !== id))
-        pushToast = (m, sticky = false) => { const id = ++n; setList(l => [...l, {id, m, sticky}]); if (!sticky) setTimeout(() => drop(id), 10000) }
+        pushToast = (m, sticky = false, ms = 10000) => { const id = ++n; setList(l => [...l, {id, m, sticky}]); if (!sticky) setTimeout(() => drop(id), ms) }
         return () => { pushToast = () => {} }
     }, [])
     return (
@@ -161,7 +161,7 @@ export function Card({c, nav, onLabel}: {c: ui.TaskCard; nav: Nav; onLabel: (l: 
                 <Text size="xs" fw={600} c="dimmed">{c.key}{c.parent && <Text span size="xs" fw={400}> ↑ {c.parent}</Text>}</Text>
                 <Group gap={4} wrap="nowrap">
                     {c.ctxPeak > 0 && <Badge variant="outline" color="gray" size="xs" title="context peak">{fmtK(c.ctxPeak)}</Badge>}
-                    {c.openPR && <Tooltip label="Check reviews now"><ActionIcon variant="subtle" color="gray" size="sm" aria-label="Check reviews" onClick={e => { e.stopPropagation(); CheckReviews(c.key).catch(errMsg) }}><IconMessageSearch size={16}/></ActionIcon></Tooltip>}
+                    {c.openPR && <Tooltip label="Check PR now (reviews, CI, conflicts)"><ActionIcon variant="subtle" color="gray" size="sm" aria-label="Check PR" onClick={e => { e.stopPropagation(); CheckReviews(c.key).then(() => toast('Checking the PR for reviews, CI and conflicts…', false, 3000), errMsg) }}><IconMessageSearch size={16}/></ActionIcon></Tooltip>}
                     <Tooltip label="Epic view"><ActionIcon variant="subtle" color="gray" size="sm" aria-label="Epic view" onClick={e => { e.stopPropagation(); nav({name: 'epic', key: c.key}) }}><IconSitemap size={16}/></ActionIcon></Tooltip>
                     <StatusMenu k={c.key} status={c.status}/>
                 </Group>

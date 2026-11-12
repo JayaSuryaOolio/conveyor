@@ -434,7 +434,7 @@ func (a *App) AddComment(key, body, after string) error {
 	return err
 }
 
-// CheckReviews schedules a PR review check for the task right now (the "check reviews" button).
+// CheckReviews schedules a PR check (reviews, CI, conflicts) for the task right now (the "Check PR" button).
 func (a *App) CheckReviews(key string) error {
 	t, err := store.GetTaskByKey(a.svc.DB, key)
 	if err != nil {
