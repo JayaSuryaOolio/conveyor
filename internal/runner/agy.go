@@ -2,6 +2,7 @@ package runner
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 	"strconv"
 
@@ -84,8 +85,23 @@ func BgLogPath(home, taskKey string) string {
 	return filepath.Join(home, "agy-logs", taskKey+".log")
 }
 
-// Plugin is the slot for agy: Conveyor doesn't know yet where agy takes user hooks and skills
-// (~/.gemini), so it installs nothing and says so.
-func (a *AgyRunner) Plugin(string, PluginSpec) (PluginStatus, error) {
-	return PluginStatus{Tool: a.Name(), Status: "not supported", Note: "hooks and skills: no user-level install for agy yet"}, nil
+// Plugin installs the conveyor plugin for agy: hooks, skills, and agents.
+func (a *AgyRunner) Plugin(action string, p PluginSpec) (PluginStatus, error) {
+	st := PluginStatus{Tool: a.Name()}
+	dir, err := agy.PluginDir()
+	if err != nil {
+		return st, err
+	}
+	st.Path = dir
+	switch action {
+	case "status":
+	case "install", "uninstall":
+		if err := agy.SetPlugin(dir, p.Skills, p.Agents, p.ConveyorBin, p.Home, action == "install"); err != nil {
+			return st, err
+		}
+	default:
+		return st, fmt.Errorf("unknown plugin action %q", action)
+	}
+	st.Status, err = agy.PluginStatus(dir, p.Skills, p.Agents, p.ConveyorBin, p.Home)
+	return st, err
 }

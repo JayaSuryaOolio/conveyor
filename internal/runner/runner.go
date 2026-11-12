@@ -42,6 +42,7 @@ type PluginSpec struct {
 	Home        string // conveyor home the hooks report to
 	ConveyorBin string // conveyor CLI the hooks call
 	Skills      fs.FS  // skills to install, one directory each
+	Agents      fs.FS  // seed agents to bundle in the plugin
 }
 
 // PluginStatus is a tool's plugin install state: "installed", "outdated", "not installed" or

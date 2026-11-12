@@ -73,12 +73,12 @@ func (c *ClaudeRunner) Plugin(action string, p PluginSpec) (PluginStatus, error)
 	switch action {
 	case "status":
 	case "install", "uninstall":
-		if err := claude.SetPlugin(dir, settings, p.Skills, p.ConveyorBin, p.Home, action == "install"); err != nil {
+		if err := claude.SetPlugin(dir, settings, p.Skills, p.Agents, p.ConveyorBin, p.Home, action == "install"); err != nil {
 			return st, err
 		}
 	default:
 		return st, fmt.Errorf("unknown plugin action %q", action)
 	}
-	st.Status, err = claude.PluginStatus(dir, settings, p.Skills, p.ConveyorBin, p.Home)
+	st.Status, err = claude.PluginStatus(dir, settings, p.Skills, p.Agents, p.ConveyorBin, p.Home)
 	return st, err
 }

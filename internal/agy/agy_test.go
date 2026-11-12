@@ -143,7 +143,7 @@ func TestResumeLogPathAndArgs(t *testing.T) {
 	if err != nil || pid == "" {
 		t.Fatalf("pid %q err %v", pid, err)
 	}
-	if b, _ := os.ReadFile(log); string(b) != "first run\n" {
+	if b, _ := os.ReadFile(log); !strings.HasPrefix(string(b), "first run\n") {
 		t.Errorf("resume truncated or missed %s: %q", log, b)
 	}
 	joined := strings.Join(*got, " ")

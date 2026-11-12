@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/JayaSuryaOolio/conveyor/internal/agy"
 	"github.com/JayaSuryaOolio/conveyor/internal/core"
 	"github.com/JayaSuryaOolio/conveyor/internal/runner"
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
@@ -771,6 +772,52 @@ func TestReapAgy(t *testing.T) {
 	}
 	if e.get(t, tk.ID).Status != store.StatusReview {
 		t.Fatalf("expected task status review, got %s", e.get(t, tk.ID).Status)
+	}
+}
+
+func TestReapAgyInterruptedDoesNotCopyPriorReply(t *testing.T) {
+	e := setup(t)
+	runnerName := "agy"
+	tk := e.task(t, "t", 0)
+	tk.Runner = &runnerName
+	if err := store.UpdateTask(e.db, tk); err != nil {
+		t.Fatal(err)
+	}
+
+	pid := "9999999"
+	run, err := store.CreateRun(e.db, store.Run{
+		TaskID: tk.ID, Kind: "auto", Mode: "resume", Status: "running", BgID: &pid,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.UpdateTaskStatus(e.db, tk.ID, store.StatusRunning, store.ActorSystem); err != nil {
+		t.Fatal(err)
+	}
+
+	logPath := runner.BgLogPath(e.d.Svc.Home, tk.Key)
+	os.MkdirAll(filepath.Dir(logPath), 0o755)
+	// Prior run had finished with a status block; current run appended a turn marker and interrupted.
+	logContent := "<conveyor>\nstatus: done\nsummary: prior reply\nstate: clean\nnext: none\n</conveyor>" +
+		agy.TurnMarker +
+		"working on next task...\nerror: interrupted\n"
+	os.WriteFile(logPath, []byte(logContent), 0o644)
+
+	e.now = time.Now().Add(time.Minute)
+	e.d.reap(t.Context())
+
+	got, err := store.GetRun(e.db, run.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Status != "finished" {
+		t.Fatalf("expected run finished, got %s", got.Status)
+	}
+	if got.Summary != nil {
+		t.Fatalf("expected nil summary on interrupt, got %q (prior reply copied)", *got.Summary)
+	}
+	if e.get(t, tk.ID).Status != store.StatusNeedsYou {
+		t.Fatalf("expected task status needs_you, got %s", e.get(t, tk.ID).Status)
 	}
 }
 

@@ -288,9 +288,9 @@ export function TaskPage({k, nav, height = 'calc(100vh - 2 * var(--mantine-spaci
     // A question is answered in the session itself: needs_you offers a way into the live session's terminal.
     const needsYou = d?.task.status === 'needs_you'
     const {data: actions} = useData(() => needsYou ? Actions(k) : Promise.resolve([]), [k, needsYou, d?.runs.length])
-    const attach = actions?.find(a => a.kind === 'attach')
+    const attach = actions?.find(a => a.kind === 'attach' || a.kind === 'resume')
     // Gated on needsYou: `actions` keeps its last value until the refetch lands, so without it the button lingers after the answer.
-    const open = () => attach && TermStart(k, 'attach', attach.repo).then(setAdded).catch(errMsg)
+    const open = () => attach && TermStart(k, attach.kind, attach.repo).then(setAdded).catch(errMsg)
     const answer = needsYou && attach && <Button id="answer-inline" size="compact-sm" leftSection={<IconTerminal size={14}/>} onClick={open}>Answer in terminal</Button>
     // Floating twin: opens the terminal too; scrollIntoView 'nearest' is a no-op when the inline button is already visible.
     const floatingAnswer = needsYou && attach && <Button variant="default" size="compact-sm" leftSection={<IconTerminal size={14}/>}
