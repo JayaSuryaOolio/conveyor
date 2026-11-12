@@ -65,13 +65,10 @@ func TestPlugin(t *testing.T) {
 	if _, err := os.Stat(agent); err != nil {
 		t.Fatal(err)
 	}
-	// Check seeded basic software engineering agents in Claude and agy user agents dirs
+	// Check seeded basic software engineering agents in Claude user agents dir
 	for _, a := range []string{"sse.md", "software-architect.md", "senior-frontend-expert.md", "peer-reviewer.md", "automation-tester.md", "ai-agents-expert.md"} {
 		if _, err := os.Stat(filepath.Join(claudeDir, "agents", a)); err != nil {
 			t.Fatalf("missing seeded claude agent %s: %v", a, err)
-		}
-		if _, err := os.Stat(filepath.Join(h, ".gemini", "config", "agents", a)); err != nil {
-			t.Fatalf("missing seeded agy agent %s: %v", a, err)
 		}
 	}
 	os.WriteFile(agent, []byte("edited"), 0o644)

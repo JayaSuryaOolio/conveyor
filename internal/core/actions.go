@@ -107,12 +107,9 @@ func (s *Service) Plugin(tool, action string) ([]runner.PluginStatus, error) {
 			return nil, fmt.Errorf("%s: %w", r.Name(), err)
 		}
 		out = append(out, st)
-		if action == "install" && st.Status == "installed" {
-			switch r.Name() {
-			case "claude":
-				_ = s.seedAgents(userAgentsDir())
-			case "agy":
-				_ = s.seedAgents(geminiAgentsDir())
+		if action == "install" && st.Status == "installed" && r.Name() == "claude" {
+			if err := s.seedAgents(userAgentsDir()); err != nil {
+				return nil, fmt.Errorf("seed agents: %w", err)
 			}
 		}
 	}
@@ -127,23 +124,25 @@ func (s *Service) seedAgents(dir string) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
-	epicBuilder := filepath.Join(dir, "epic-builder.md")
-	if _, err := os.Stat(epicBuilder); os.IsNotExist(err) {
-		_ = os.WriteFile(epicBuilder, []byte("---\nname: epic-builder\ndescription: \"Runs a Conveyor epic: plans it, waits at the gate, drives its sub-tasks to PRs.\"\n---\n\nYou run an epic. Load the `epic` skill and follow it.\n"), 0o644)
-	}
 	if examples.AgentsFS != nil {
-		_ = fs.WalkDir(examples.AgentsFS, ".", func(p string, d fs.DirEntry, err error) error {
+		if err := fs.WalkDir(examples.AgentsFS, ".", func(p string, d fs.DirEntry, err error) error {
 			if err != nil || d.IsDir() {
-				return nil
+				return err
 			}
 			dst := filepath.Join(dir, filepath.Base(p))
 			if _, err := os.Stat(dst); os.IsNotExist(err) {
-				if b, err := fs.ReadFile(examples.AgentsFS, p); err == nil {
-					_ = os.WriteFile(dst, b, 0o644)
+				b, err := fs.ReadFile(examples.AgentsFS, p)
+				if err != nil {
+					return err
+				}
+				if err := os.WriteFile(dst, b, 0o644); err != nil {
+					return err
 				}
 			}
 			return nil
-		})
+		}); err != nil {
+			return err
+		}
 	}
 	return nil
 }

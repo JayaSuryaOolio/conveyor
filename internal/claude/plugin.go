@@ -21,7 +21,7 @@ func PluginDir() (string, error) {
 // pluginFiles is the plugin's content by slash path: the manifest, the user hooks and skills under skills/.
 // The hook commands equal the --settings ones; `conveyor hook` skips the plugin's copy in sessions whose
 // --settings already run them (Claude Code runs both, it only dedupes across settings files).
-func pluginFiles(skills, agents fs.FS, conveyorBin, home string) (map[string][]byte, error) {
+func pluginFiles(skills fs.FS, conveyorBin, home string) (map[string][]byte, error) {
 	hooks := map[string]any{}
 	for _, ev := range UserHookEvents {
 		hooks[ev] = []any{hookEntry(conveyorBin, home, ev)}
@@ -49,18 +49,6 @@ func pluginFiles(skills, agents fs.FS, conveyorBin, home string) (map[string][]b
 			return nil, err
 		}
 	}
-	if agents != nil {
-		if err := fs.WalkDir(agents, ".", func(p string, d fs.DirEntry, err error) error {
-			if err != nil || d.IsDir() {
-				return err
-			}
-			b, err := fs.ReadFile(agents, p)
-			files["agents/"+p] = b
-			return err
-		}); err != nil {
-			return nil, err
-		}
-	}
 	return files, nil
 }
 
@@ -76,7 +64,7 @@ func legacy(settings, conveyorBin, home string) (bool, error) {
 
 // SetPlugin replaces dir with the plugin or, if !install, removes it. Either way it removes the
 // hooks-only install (settings.json hooks, ~/.claude/skills/epic) so sessions don't report twice.
-func SetPlugin(dir, settings string, skills, agents fs.FS, conveyorBin, home string, install bool) error {
+func SetPlugin(dir, settings string, skills fs.FS, conveyorBin, home string, install bool) error {
 	if old, err := legacy(settings, conveyorBin, home); err != nil {
 		return err
 	} else if old {
@@ -90,7 +78,7 @@ func SetPlugin(dir, settings string, skills, agents fs.FS, conveyorBin, home str
 	if err := os.RemoveAll(dir); err != nil || !install {
 		return err
 	}
-	files, err := pluginFiles(skills, agents, conveyorBin, home)
+	files, err := pluginFiles(skills, conveyorBin, home)
 	if err != nil {
 		return err
 	}
@@ -108,7 +96,7 @@ func SetPlugin(dir, settings string, skills, agents fs.FS, conveyorBin, home str
 
 // PluginStatus is "installed", "outdated" (a stale or partial plugin, or the hooks-only install still
 // present) or "not installed".
-func PluginStatus(dir, settings string, skills, agents fs.FS, conveyorBin, home string) (string, error) {
+func PluginStatus(dir, settings string, skills fs.FS, conveyorBin, home string) (string, error) {
 	old, err := legacy(settings, conveyorBin, home)
 	if err != nil {
 		return "", err
@@ -119,7 +107,7 @@ func PluginStatus(dir, settings string, skills, agents fs.FS, conveyorBin, home 
 		}
 		return "not installed", nil
 	}
-	files, err := pluginFiles(skills, agents, conveyorBin, home)
+	files, err := pluginFiles(skills, conveyorBin, home)
 	if err != nil {
 		return "", err
 	}

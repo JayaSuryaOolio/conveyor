@@ -92,11 +92,6 @@ func pluginFiles(skills, agents fs.FS, conveyorBin, home string) (map[string][]b
 		}
 	}
 
-	// Also ensure epic-builder is in agents/
-	if files["agents/epic-builder.md"] == nil {
-		files["agents/epic-builder.md"] = []byte("---\nname: epic-builder\ndescription: \"Runs a Conveyor epic: plans it, waits at the gate, drives its sub-tasks to PRs.\"\n---\n\nYou run an epic. Load the `epic` skill and follow it.\n")
-	}
-
 	return files, nil
 }
 
