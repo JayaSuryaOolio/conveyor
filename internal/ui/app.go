@@ -57,16 +57,18 @@ type App struct {
 	ctx        context.Context // Wails' context, for native dialogs
 	svc        *core.Service
 	cancel     context.CancelFunc
-	dispatcher atomic.Bool // true while this process holds the dispatcher lock
-	pathErr    string      // why the login shell's PATH could not be loaded; empty on success
+	dispatcher atomic.Bool   // true while this process holds the dispatcher lock
+	pathErr    string        // why the login shell's PATH could not be loaded; empty on success
+	ready      chan struct{} // closed when Startup returns; see Ready
 }
 
 // NewApp returns an App; the DB is opened in Startup.
-func NewApp() *App { return &App{} }
+func NewApp() *App { return &App{ready: make(chan struct{})} }
 
 // Startup opens the DB under CONVEYOR_HOME (default ~/.conveyor), starts the
 // change poller and the dispatcher hook. It matches Wails' OnStartup.
 func (a *App) Startup(ctx context.Context) {
+	defer close(a.ready)
 	a.ctx = ctx
 	if err := loadShellPATH(); err != nil {
 		a.pathErr = err.Error()
@@ -504,6 +506,10 @@ func (a *App) Move(key, status string, stop bool) (int, error) {
 func (a *App) SetTaskRepo(key, repo, branch, prURL string) error {
 	return a.svc.SetTaskRepo(key, repo, branch, prURL)
 }
+
+// Ready blocks until Startup has finished. Wails runs Startup concurrently with the page load, and a binding
+// called before a.svc is set panics inside Wails and never answers, so the frontend waits on this first.
+func (a *App) Ready() { <-a.ready }
 
 // ListRepos returns the registered repos.
 func (a *App) ListRepos() ([]store.Repo, error) {

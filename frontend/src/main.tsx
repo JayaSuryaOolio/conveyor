@@ -5,6 +5,7 @@ import '@mantine/core/styles.css'
 import {HashRouter} from 'react-router'
 import './style.css'
 import App from './App'
+import {Ready} from '../wailsjs/go/ui/App'
 
 // Every dropdown can be typed into to filter it.
 const theme = createTheme({
@@ -20,7 +21,9 @@ const container = document.getElementById('root')
 
 const root = createRoot(container!)
 
-root.render(
+// Wails runs Startup (opens the DB) concurrently with the page load; a binding called before it finishes never answers,
+// so wait for it before mounting anything that loads data.
+Ready().then(() => root.render(
     <React.StrictMode>
         <MantineProvider theme={theme} defaultColorScheme="dark">
             <HashRouter>
@@ -28,4 +31,4 @@ root.render(
             </HashRouter>
         </MantineProvider>
     </React.StrictMode>
-)
+))
