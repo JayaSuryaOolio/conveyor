@@ -67,3 +67,10 @@ func TestModelsFromAPI(t *testing.T) {
 		t.Fatalf("bad key: %+v", ml)
 	}
 }
+
+func TestParseAgyModels(t *testing.T) {
+	ml := parseAgyModels("Fetching available models...\ngemini-3.8-flash-high\tGemini 3.8 Flash (High)\nclaude-sonnet-4-6\tClaude Sonnet 4.6\n")
+	if ml.Source != "agy" || len(ml.Models) != 2 || ml.Models[1].ID != "claude-sonnet-4-6" {
+		t.Fatalf("got %+v", ml)
+	}
+}

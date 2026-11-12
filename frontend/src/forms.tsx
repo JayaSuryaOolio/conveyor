@@ -47,7 +47,7 @@ export function NewTask({nav, close}: {nav: Nav; close: () => void}) {
                 <MultiSelect label="Repos" placeholder="Pick repos" description={repos?.length === 0 ? 'Add one on the Repos page first' : undefined}
                              data={repos?.map(r => r.name) ?? []} value={sel} onChange={setSel}/>
                 {sel.length > 1 && <Select label="Primary repo" allowDeselect={false} data={sel} value={prim} onChange={v => setPrimary(v ?? '')}/>}
-                <ModelSelect value={model} onChange={setModel}/>
+                <ModelSelect runner={runner} value={model} onChange={setModel}/>
                 <AgentSelect repos={sel} value={agent} onChange={setAgent}/>
                 <RunnerSelect value={runner} onChange={setRunner}/>
                 <Checkbox label="Start now (todo)" checked={start} onChange={e => setStart(e.currentTarget.checked)}/>
@@ -94,12 +94,12 @@ export function RunnerSettingSelect({value, onChange, ...rest}: {value: string; 
     return <Select aria-label="Default runner" allowDeselect={false} {...rest} value={value} onChange={v => onChange(v ?? '')} data={runners}/>
 }
 
-let modelsP: Promise<core.ModelList> | undefined
-const listModels = () => modelsP ??= ListModels()
+const modelsP: Record<string, Promise<core.ModelList>> = {}
+const listModels = (runner: string) => modelsP[runner] ??= ListModels(runner)
 
 /** Model choice; "" means the default (task: the agent's or default_model setting). A value not in the list is kept as an option. */
-export function ModelSelect({value, onChange, ...rest}: {value: string; onChange: (m: string) => void} & Omit<SelectProps, 'value' | 'onChange' | 'data'>) {
-    const {data: ml} = useData(listModels, [], {static: true})
+export function ModelSelect({value, onChange, runner = '', ...rest}: {value: string; onChange: (m: string) => void; runner?: string} & Omit<SelectProps, 'value' | 'onChange' | 'data'>) {
+    const {data: ml} = useData(() => listModels(runner), [runner], {static: true})
     const ms = ml?.models ?? []
     const known = !value || ms.some(m => m.id === value || m.id.replace(/-\d{8}$/, '') === value || (m.latest && m.tier === value))
     const data = [{value: '', label: 'Default'},
@@ -117,7 +117,7 @@ export function TaskSettings({k, model, runner, reload}: {k: string; model: stri
         </Tooltip>
         <Modal opened={open} onClose={() => setOpen(false)} title={`${k} settings`} size="sm">
             <Stack gap="sm">
-                <ModelSelect label="Model" value={model} onChange={m => SetTaskModel(k, m).then(reload, errMsg)}/>
+                <ModelSelect label="Model" runner={runner} value={model} onChange={m => SetTaskModel(k, m).then(reload, errMsg)}/>
                 <Text size="xs" c="dimmed">Used from the next run. Default: the agent's model, else the default_model setting.</Text>
                 <RunnerSelect label="Runner" value={runner ?? ''} onChange={r => SetTaskRunner(k, r).then(reload, errMsg)}/>
                 <Text size="xs" c="dimmed">Used from the next run. Default: the default_runner setting.</Text>
