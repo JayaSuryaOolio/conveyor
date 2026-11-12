@@ -32,11 +32,24 @@ import (
 // pollEvery is the data_version poll interval (tech-spec §2).
 const pollEvery = 700 * time.Millisecond
 
-// trace logs the start and end (with duration) of a binding, to find calls that never return.
+// slowCall is how long a binding may run before trace logs it.
+const slowCall = 3 * time.Second
+
+// trace logs a binding only when it is slow: "still running" once after slowCall (so a call that never
+// returns shows up), and "finished" with the duration if it was reported. Quiet otherwise.
 func trace(name string) func() {
 	t := time.Now()
-	log.Printf("ui: %s start", name)
-	return func() { log.Printf("ui: %s done in %s", name, time.Since(t).Round(time.Millisecond)) }
+	var slow atomic.Bool
+	timer := time.AfterFunc(slowCall, func() {
+		slow.Store(true)
+		log.Printf("ui: %s still running after %s", name, slowCall)
+	})
+	return func() {
+		timer.Stop()
+		if slow.Load() {
+			log.Printf("ui: %s finished after %s", name, time.Since(t).Round(time.Millisecond))
+		}
+	}
 }
 
 // App is bound to the frontend. Methods return plain JSON-friendly structs.
