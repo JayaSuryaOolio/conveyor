@@ -123,14 +123,21 @@ func TakeQueuedComment(db *sql.DB, taskID, id int64) (body string, ok bool, err 
 }
 
 // ReleaseIfNothingQueued undoes a comment's requeue after the comment was taken back: a todo task
-// that has already run and has nothing queued goes back to needs_you instead of resuming empty.
+// that has already run and has no human comment queued goes back to needs_you instead of resuming empty.
+// Queued system notes (e.g. "session was interrupted") don't count: they ride along with the next run.
 func ReleaseIfNothingQueued(db *sql.DB, taskID int64) error {
 	t, err := GetTask(db, taskID)
 	if err != nil || t.Status != StatusTodo {
 		return err
 	}
-	if q, err := UnconsumedComments(db, taskID); err != nil || len(q) > 0 {
+	q, err := UnconsumedComments(db, taskID)
+	if err != nil {
 		return err
+	}
+	for _, c := range q {
+		if c.Author == AuthorHuman {
+			return nil
+		}
 	}
 	if _, err := LatestRun(db, taskID); err != nil { // never ran: todo is the right state
 		return nil
