@@ -14,6 +14,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/JayaSuryaOolio/conveyor/internal/agy"
 	"github.com/JayaSuryaOolio/conveyor/internal/automation"
 	"github.com/JayaSuryaOolio/conveyor/internal/brief"
 	"github.com/JayaSuryaOolio/conveyor/internal/chat"
@@ -311,11 +312,17 @@ func (d *Dispatcher) reapAgy(ctx context.Context, r store.Run, task store.Task, 
 	logPath := runner.BgLogPath(d.Svc.Home, task.Key)
 	var logOutput string
 	if b, err := os.ReadFile(logPath); err == nil {
-		logOutput = string(b)
+		logOutput = agy.LastTurnOutput(string(b))
 	}
 
-	// If there is log output, run ProcessStop which extracts the <conveyor> block and handles transitions.
-	if logOutput != "" {
+	tail := logOutput
+	if len(tail) > 300 {
+		tail = tail[len(tail)-300:]
+	}
+	interrupted := strings.Contains(tail, "error: interrupted") || strings.Contains(tail, "signal: interrupt")
+
+	// If there is log output and not interrupted, run ProcessStop which extracts the <conveyor> block and handles transitions.
+	if logOutput != "" && !interrupted {
 		if err := hook.ProcessStop(d.Svc.DB, task, r, logOutput, ""); err == nil {
 			return nil
 		}
@@ -323,6 +330,10 @@ func (d *Dispatcher) reapAgy(ctx context.Context, r store.Run, task store.Task, 
 
 	ended := d.now().UTC().Format(time.RFC3339)
 	r.Status, r.EndedAt = "finished", &ended
+	if logOutput != "" {
+		trimmed := strings.TrimSpace(logOutput)
+		r.FinalMessage = &trimmed
+	}
 	if err := store.UpdateRun(d.Svc.DB, r); err != nil {
 		return err
 	}
@@ -330,6 +341,9 @@ func (d *Dispatcher) reapAgy(ctx context.Context, r store.Run, task store.Task, 
 		return nil
 	}
 	note := "The agy session exited without a status block."
+	if interrupted {
+		note = "The agy session was interrupted."
+	}
 	if _, err := store.AddComment(d.Svc.DB, store.Comment{TaskID: task.ID, Author: store.AuthorSystem, Body: note}); err != nil {
 		return err
 	}

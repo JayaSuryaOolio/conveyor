@@ -44,6 +44,9 @@ fi
 echo "==> Plugin"
 # Hooks plus the skills embedded in skills/skills.go, as ~/.claude/skills/conveyor (conveyor@skills-dir).
 "$BIN_DIR/conveyor" plugin install claude
+if command -v agy >/dev/null || [ -d "$HOME/.gemini" ]; then
+	"$BIN_DIR/conveyor" plugin install agy
+fi
 
 echo "==> Skills"
 # The other user-level skills; overwritten on every install, so edit them in this repo.

@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/JayaSuryaOolio/conveyor/internal/brief"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -15,6 +15,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/JayaSuryaOolio/conveyor/examples"
+	"github.com/JayaSuryaOolio/conveyor/internal/brief"
 	"github.com/JayaSuryaOolio/conveyor/internal/runner"
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 	"github.com/JayaSuryaOolio/conveyor/internal/terminal"
@@ -94,7 +96,7 @@ func (s *Service) Plugin(tool, action string) ([]runner.PluginStatus, error) {
 	if err != nil {
 		return nil, err
 	}
-	spec := runner.PluginSpec{Home: s.Home, ConveyorBin: bin, Skills: skills.FS}
+	spec := runner.PluginSpec{Home: s.Home, ConveyorBin: bin, Skills: skills.FS, Agents: examples.AgentsFS}
 	var out []runner.PluginStatus
 	for _, r := range runner.All(s.Home) {
 		if tool != "" && tool != r.Name() {
@@ -105,11 +107,9 @@ func (s *Service) Plugin(tool, action string) ([]runner.PluginStatus, error) {
 			return nil, fmt.Errorf("%s: %w", r.Name(), err)
 		}
 		out = append(out, st)
-		if action == "install" && st.Status == "installed" && r.Name() == "claude" { // seed the agent epic roots run under; never overwrites an edited one
-			if _, err := os.Stat(filepath.Join(userAgentsDir(), "epic-builder.md")); err != nil {
-				if err := s.AddAgent("epic-builder", "Runs a Conveyor epic: plans it, waits at the gate, drives its sub-tasks to PRs.", "You run an epic. Load the `epic` skill and follow it.", "user", ""); err != nil {
-					return nil, fmt.Errorf("epic-builder agent: %w", err)
-				}
+		if action == "install" && st.Status == "installed" && r.Name() == "claude" {
+			if err := s.seedAgents(userAgentsDir()); err != nil {
+				return nil, fmt.Errorf("seed agents: %w", err)
 			}
 		}
 	}
@@ -117,6 +117,34 @@ func (s *Service) Plugin(tool, action string) ([]runner.PluginStatus, error) {
 		return nil, fmt.Errorf("unknown tool %q", tool)
 	}
 	return out, nil
+}
+
+// seedAgents ensures basic software engineering agents exist in dir without overwriting existing files.
+func (s *Service) seedAgents(dir string) error {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	if examples.AgentsFS != nil {
+		if err := fs.WalkDir(examples.AgentsFS, ".", func(p string, d fs.DirEntry, err error) error {
+			if err != nil || d.IsDir() {
+				return err
+			}
+			dst := filepath.Join(dir, filepath.Base(p))
+			if _, err := os.Stat(dst); os.IsNotExist(err) {
+				b, err := fs.ReadFile(examples.AgentsFS, p)
+				if err != nil {
+					return err
+				}
+				if err := os.WriteFile(dst, b, 0o644); err != nil {
+					return err
+				}
+			}
+			return nil
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Actions lists what can be opened for a task. Without a primary worktree it returns none.

@@ -37,15 +37,19 @@ func pluginFiles(skills fs.FS, conveyorBin, home string) (map[string][]byte, err
 		}
 		files[p] = append(b, '\n')
 	}
-	err := fs.WalkDir(skills, ".", func(p string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
+	if skills != nil {
+		if err := fs.WalkDir(skills, ".", func(p string, d fs.DirEntry, err error) error {
+			if err != nil || d.IsDir() {
+				return err
+			}
+			b, err := fs.ReadFile(skills, p)
+			files["skills/"+p] = b
 			return err
+		}); err != nil {
+			return nil, err
 		}
-		b, err := fs.ReadFile(skills, p)
-		files["skills/"+p] = b
-		return err
-	})
-	return files, err
+	}
+	return files, nil
 }
 
 // legacy reports what the hooks-only install left: hooks in settings.json or ~/.claude/skills/epic.

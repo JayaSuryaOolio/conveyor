@@ -18,6 +18,7 @@
 package agy
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -82,8 +83,12 @@ func ensureAgyAgentAvailable(name string) {
 		return
 	}
 	geminiAgent := filepath.Join(h, ".gemini", "config", "agents", name+".md")
-	if _, err := os.Stat(geminiAgent); err == nil {
-		return // already present
+	if b, err := os.ReadFile(geminiAgent); err == nil {
+		sanitized := SanitizeAgentForAgy(b)
+		if !bytes.Equal(b, sanitized) {
+			_ = os.WriteFile(geminiAgent, sanitized, 0o644)
+		}
+		return
 	}
 	claudeAgent := filepath.Join(h, ".claude", "agents", name+".md")
 	b, err := os.ReadFile(claudeAgent)
@@ -91,7 +96,37 @@ func ensureAgyAgentAvailable(name string) {
 		return
 	}
 	_ = os.MkdirAll(filepath.Dir(geminiAgent), 0o755)
-	_ = os.WriteFile(geminiAgent, b, 0o644)
+	_ = os.WriteFile(geminiAgent, SanitizeAgentForAgy(b), 0o644)
+}
+
+// SanitizeAgentForAgy strips invalid model fields from agent markdown frontmatter,
+// because agy only allows inherit, flash_lite, flash, and pro (or omitting model).
+func SanitizeAgentForAgy(content []byte) []byte {
+	lines := strings.Split(string(content), "\n")
+	var out []string
+	inFrontmatter := false
+	for i, l := range lines {
+		trimmed := strings.TrimSpace(l)
+		if trimmed == "---" {
+			if i == 0 {
+				inFrontmatter = true
+			} else if inFrontmatter {
+				inFrontmatter = false
+			}
+		} else if inFrontmatter && strings.HasPrefix(trimmed, "model:") {
+			val := strings.TrimSpace(strings.TrimPrefix(trimmed, "model:"))
+			switch val {
+			case "inherit", "flash_lite", "flash", "pro":
+				out = append(out, l)
+			default:
+				// Strip unsupported model so agy defaults to inherit
+				continue
+			}
+			continue
+		}
+		out = append(out, l)
+	}
+	return []byte(strings.Join(out, "\n"))
 }
 
 // Launch starts `agy --print ...` as a detached OS process, writing its output to
@@ -102,6 +137,17 @@ func Launch(conveyorHome string, s LaunchSpec) (bgID string, conversationID stri
 		return "", "", err
 	}
 	return strconv.Itoa(pid), "", nil // the reaper fills the conversation id once agy opens it
+}
+
+// TurnMarker separates turns in the agy background log file.
+const TurnMarker = "\n=== conveyor: turn ===\n"
+
+// LastTurnOutput returns the output belonging to the most recent turn from logOutput.
+func LastTurnOutput(logOutput string) string {
+	if idx := strings.LastIndex(logOutput, TurnMarker); idx >= 0 {
+		return logOutput[idx+len(TurnMarker):]
+	}
+	return logOutput
 }
 
 // Resume stops bgID (errors ignored) and continues conversationID with a new
@@ -128,6 +174,10 @@ func start(conveyorHome string, s LaunchSpec, mode int, args []string) (int, err
 		return 0, fmt.Errorf("agy log file: %w", err)
 	}
 	defer logFile.Close()
+
+	if mode&os.O_APPEND != 0 {
+		_, _ = logFile.WriteString(TurnMarker)
+	}
 
 	cmd := execCommand("agy", args...)
 	cmd.Dir = s.Cwd

@@ -143,7 +143,7 @@ func TestResumeLogPathAndArgs(t *testing.T) {
 	if err != nil || pid == "" {
 		t.Fatalf("pid %q err %v", pid, err)
 	}
-	if b, _ := os.ReadFile(log); string(b) != "first run\n" {
+	if b, _ := os.ReadFile(log); !strings.HasPrefix(string(b), "first run\n") {
 		t.Errorf("resume truncated or missed %s: %q", log, b)
 	}
 	joined := strings.Join(*got, " ")
@@ -168,4 +168,71 @@ func TestStartDetached(t *testing.T) {
 	if g, err := syscall.Getpgid(n); err != nil || g != n || g == syscall.Getpgrp() {
 		t.Errorf("pgid %d (err %v), want own group %d", g, err, n)
 	}
+}
+
+func TestSanitizeAgentForAgy(t *testing.T) {
+	cases := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{
+			name: "unsupported claude model is stripped",
+			in:   "---\nname: my-agent\nmodel: claude-sonnet-5-5\ndescription: test\n---\nbody content",
+			want: "---\nname: my-agent\ndescription: test\n---\nbody content",
+		},
+		{
+			name: "valid agy models preserved",
+			in:   "---\nname: agy-agent\nmodel: flash\ndescription: fast\n---\nbody",
+			want: "---\nname: agy-agent\nmodel: flash\ndescription: fast\n---\nbody",
+		},
+		{
+			name: "inherit model preserved",
+			in:   "---\nname: agy-agent\nmodel: inherit\n---\nbody",
+			want: "---\nname: agy-agent\nmodel: inherit\n---\nbody",
+		},
+		{
+			name: "pro model preserved",
+			in:   "---\nname: agy-agent\nmodel: pro\n---\nbody",
+			want: "---\nname: agy-agent\nmodel: pro\n---\nbody",
+		},
+		{
+			name: "model outside frontmatter unchanged",
+			in:   "---\nname: no-model\n---\nmodel: claude-sonnet-5-5 in body",
+			want: "---\nname: no-model\n---\nmodel: claude-sonnet-5-5 in body",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := string(SanitizeAgentForAgy([]byte(tc.in)))
+			if got != tc.want {
+				t.Errorf("got:\n%s\nwant:\n%s", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestLastTurnOutput(t *testing.T) {
+	t.Run("without marker", func(t *testing.T) {
+		input := "hello world\nline 2\n<conveyor>\nstatus: done\n</conveyor>"
+		if got := LastTurnOutput(input); got != input {
+			t.Errorf("got %q, want %q", got, input)
+		}
+	})
+
+	t.Run("with single marker", func(t *testing.T) {
+		input := "prior turn output\n" + TurnMarker + "second turn output\n"
+		want := "second turn output\n"
+		if got := LastTurnOutput(input); got != want {
+			t.Errorf("got %q, want %q", got, want)
+		}
+	})
+
+	t.Run("with multiple markers", func(t *testing.T) {
+		input := "turn 1\n" + TurnMarker + "turn 2\n" + TurnMarker + "turn 3 latest\n"
+		want := "turn 3 latest\n"
+		if got := LastTurnOutput(input); got != want {
+			t.Errorf("got %q, want %q", got, want)
+		}
+	})
 }

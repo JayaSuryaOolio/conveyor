@@ -19,16 +19,22 @@ import (
 )
 
 type payload struct {
-	SessionID            string `json:"session_id"`
-	ConversationID       string `json:"conversation_id"` // agy alias
-	Cwd                  string `json:"cwd"`
-	TaskKey              string `json:"task_key"` // optional direct key
-	TranscriptPath       string `json:"transcript_path"`
-	LastAssistantMessage string `json:"last_assistant_message"`
-	Message              string `json:"message"`
-	NotificationType     string `json:"notification_type"`
-	StopHookActive       bool   `json:"stop_hook_active"`
-	FilePath             string `json:"file_path"` // InstructionsLoaded
+	SessionID                 string `json:"session_id"`
+	SessionIDCamel            string `json:"sessionId"`
+	ConversationID            string `json:"conversation_id"` // agy alias
+	ConversationIDCamel       string `json:"conversationId"`
+	Cwd                       string `json:"cwd"`
+	TaskKey                   string `json:"task_key"` // optional direct key
+	TaskKeyCamel              string `json:"taskKey"`
+	TranscriptPath            string `json:"transcript_path"`
+	TranscriptPathCamel       string `json:"transcriptPath"`
+	LastAssistantMessage      string `json:"last_assistant_message"`
+	LastAssistantMessageCamel string `json:"lastAssistantMessage"`
+	Message                   string `json:"message"`
+	NotificationType          string `json:"notification_type"`
+	StopHookActive            bool   `json:"stop_hook_active"`
+	FilePath                  string `json:"file_path"` // InstructionsLoaded
+	FilePathCamel             string `json:"filePath"`
 }
 
 // Handle processes one hook event and returns what to print on stdout (a Stop it blocks), or "".
@@ -38,8 +44,26 @@ func Handle(db *sql.DB, home, event string, raw []byte) (string, error) {
 	if err := json.Unmarshal(raw, &p); err != nil {
 		return "", fmt.Errorf("parse %s payload: %w", event, err)
 	}
+	if p.SessionID == "" {
+		p.SessionID = p.SessionIDCamel
+	}
+	if p.ConversationID == "" {
+		p.ConversationID = p.ConversationIDCamel
+	}
 	if p.SessionID == "" && p.ConversationID != "" {
 		p.SessionID = p.ConversationID
+	}
+	if p.TaskKey == "" {
+		p.TaskKey = p.TaskKeyCamel
+	}
+	if p.TranscriptPath == "" {
+		p.TranscriptPath = p.TranscriptPathCamel
+	}
+	if p.LastAssistantMessage == "" {
+		p.LastAssistantMessage = p.LastAssistantMessageCamel
+	}
+	if p.FilePath == "" {
+		p.FilePath = p.FilePathCamel
 	}
 	key := workspace.KeyFromCwd(home, p.Cwd)
 	if key == "" && p.TaskKey != "" {

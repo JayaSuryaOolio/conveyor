@@ -10,20 +10,22 @@ import (
 )
 
 // One install puts hooks + skills in the conveyor@skills-dir plugin and migrates the hooks-only
-// install away; uninstall removes it all; agy is listed as not supported.
+// install away; agy plugin installs hooks + skills + agents in ~/.gemini/config/plugins/conveyor;
+// uninstall removes it all.
 func TestPlugin(t *testing.T) {
 	h := t.TempDir()
 	t.Setenv("HOME", h)
 	s := &Service{Home: "/conveyor-home", Bin: "/bin/cv"}
 	claudeDir := filepath.Join(h, ".claude")
 	settings := filepath.Join(claudeDir, "settings.json")
-	plugin := filepath.Join(claudeDir, "skills", "conveyor")
+	claudePlugin := filepath.Join(claudeDir, "skills", "conveyor")
+	agyPlugin := filepath.Join(h, ".gemini", "config", "plugins", "conveyor")
 	oldEpic := filepath.Join(claudeDir, "skills", "epic")
-	status := func(action, want string) {
+	status := func(action, wantClaude, wantAgy string) {
 		t.Helper()
 		sts, err := s.Plugin("", action)
-		if err != nil || len(sts) != 2 || sts[0].Tool != "claude" || sts[0].Status != want || sts[1].Status != "not supported" {
-			t.Fatalf("%s: %+v, %v; want claude %q", action, sts, err, want)
+		if err != nil || len(sts) != 2 || sts[0].Tool != "claude" || sts[0].Status != wantClaude || sts[1].Tool != "agy" || sts[1].Status != wantAgy {
+			t.Fatalf("%s: %+v, %v; want claude %q, agy %q", action, sts, err, wantClaude, wantAgy)
 		}
 	}
 
@@ -33,15 +35,23 @@ func TestPlugin(t *testing.T) {
 	if err := claude.SetUserHooks(settings, "/bin/cv", "/conveyor-home", true); err != nil {
 		t.Fatal(err)
 	}
-	status("status", "outdated")
+	status("status", "outdated", "not installed")
 
-	status("install", "installed")
+	status("install", "installed", "installed")
 	for _, f := range []string{".claude-plugin/plugin.json", "hooks/hooks.json", "skills/epic/SKILL.md", "skills/epic/planners/wayfinder.md", "skills/conveyor/SKILL.md", "skills/conveyor-drift/SKILL.md"} {
-		if _, err := os.Stat(filepath.Join(plugin, f)); err != nil {
+		if _, err := os.Stat(filepath.Join(claudePlugin, f)); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if b, _ := os.ReadFile(filepath.Join(plugin, "hooks", "hooks.json")); !strings.Contains(string(b), `'/bin/cv' --home '/conveyor-home' hook Stop`) {
+	for _, f := range []string{"plugin.json", "hooks.json", "skills/epic/SKILL.md", "skills/conveyor/SKILL.md", "skills/conveyor-drift/SKILL.md", "agents/epic-builder.md"} {
+		if _, err := os.Stat(filepath.Join(agyPlugin, f)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if b, _ := os.ReadFile(filepath.Join(claudePlugin, "hooks", "hooks.json")); !strings.Contains(string(b), `'/bin/cv' --home '/conveyor-home' hook Stop`) {
+		t.Fatal(string(b))
+	}
+	if b, _ := os.ReadFile(filepath.Join(agyPlugin, "hooks.json")); !strings.Contains(string(b), `'/bin/cv' --home '/conveyor-home' hook Stop`) || !strings.Contains(string(b), `"matcher": ""`) {
 		t.Fatal(string(b))
 	}
 	if b, _ := os.ReadFile(settings); strings.Contains(string(b), " hook ") || !strings.Contains(string(b), "opus") {
@@ -56,23 +66,57 @@ func TestPlugin(t *testing.T) {
 		t.Fatal(err)
 	}
 	os.WriteFile(agent, []byte("edited"), 0o644)
-	status("install", "installed")
+	status("install", "installed", "installed")
 	if b, _ := os.ReadFile(agent); string(b) != "edited" {
 		t.Fatal("install overwrote the epic-builder agent")
 	}
 
-	os.Remove(filepath.Join(plugin, "skills", "conveyor", "SKILL.md"))
-	status("status", "outdated")
+	os.Remove(filepath.Join(claudePlugin, "skills", "conveyor", "SKILL.md"))
+	status("status", "outdated", "installed")
 	s.Bin = "/new/cv" // a moved binary makes the hooks stale
-	status("install", "installed")
+	status("install", "installed", "installed")
 	s.Bin = "/bin/cv"
-	status("status", "outdated")
+	status("status", "outdated", "outdated")
 
-	status("uninstall", "not installed")
-	if _, err := os.Stat(plugin); !os.IsNotExist(err) {
-		t.Fatal("plugin left after uninstall")
+	status("uninstall", "not installed", "not installed")
+	if _, err := os.Stat(claudePlugin); !os.IsNotExist(err) {
+		t.Fatal("claude plugin left after uninstall")
+	}
+	if _, err := os.Stat(agyPlugin); !os.IsNotExist(err) {
+		t.Fatal("agy plugin left after uninstall")
 	}
 	if _, err := s.Plugin("vim", "status"); err == nil {
 		t.Fatal("unknown tool accepted")
+	}
+}
+
+func TestSeedAgentsNotOverwritingEdits(t *testing.T) {
+	dir := t.TempDir()
+	s := &Service{}
+	if err := s.seedAgents(dir); err != nil {
+		t.Fatalf("first seedAgents: %v", err)
+	}
+
+	target := filepath.Join(dir, "epic-builder.md")
+	if _, err := os.Stat(target); err != nil {
+		t.Fatalf("expected epic-builder.md seeded: %v", err)
+	}
+
+	custom := "custom epic-builder agent modified by user"
+	if err := os.WriteFile(target, []byte(custom), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Re-run seedAgents; it should not overwrite the modified file.
+	if err := s.seedAgents(dir); err != nil {
+		t.Fatalf("second seedAgents: %v", err)
+	}
+
+	got, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != custom {
+		t.Fatalf("expected %q, got %q (seedAgents overwrote user edit)", custom, string(got))
 	}
 }
