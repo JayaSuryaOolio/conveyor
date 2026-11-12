@@ -33,11 +33,17 @@ export function Board({nav, q, setQ, search, link}: {nav: Nav; q: string; setQ: 
     const {data, error} = useData(listTasks, [])
     const [open, setOpen] = useState<string[]>([])
     const [sort, setSort] = useLocalStorage({key: 'board-sort', defaultValue: {by: 'priority', desc: true}})
-    const [picked, setPicked] = useLocalStorage<string[]>({key: 'board-repos', defaultValue: []})
-    const [pickedLabels, setPickedLabels] = useLocalStorage<string[]>({key: 'board-labels', defaultValue: []})
+    const [savedRepos, saveRepos] = useLocalStorage<string[]>({key: 'board-repos', defaultValue: []})
+    const [savedLabels, saveLabels] = useLocalStorage<string[]>({key: 'board-labels', defaultValue: []})
+    // Deep-link filters (Epics nav, palette) live in plain state so they do not stick across launches; filters clicked on the board are saved.
+    const [deep, setDeep] = useState<{repos: string[]; labels: string[]} | null>(null)
+    const picked = deep ? deep.repos : savedRepos
+    const pickedLabels = deep ? deep.labels : savedLabels
+    const setPicked = (v: string[]) => { saveRepos(v); setDeep(d => d && {...d, repos: v}) }
+    const setPickedLabels = (v: string[]) => { saveLabels(v); setDeep(d => d && {...d, labels: v}) }
     useEffect(() => { // deep link from the palette: show only that label or repo
         if (!link.label && !link.repo) return
-        setQ(''); setPickedLabels(link.label ? [link.label] : []); setPicked(link.repo ? [link.repo] : [])
+        setQ(''); setDeep({labels: link.label ? [link.label] : [], repos: link.repo ? [link.repo] : []})
     }, [link]) // a new view object per palette pick, so re-picking the same label re-applies it
     if (error) return <Text c="red">{error}</Text>
     const shut = (s: string) => ARCHIVE.includes(s) && !open.includes(s)
@@ -108,6 +114,7 @@ export function Board({nav, q, setQ, search, link}: {nav: Nav; q: string; setQ: 
                     </Group>
                 </>}
                 {filtered && <Group gap={6} wrap="nowrap" ml="auto">
+                    <Badge size="lg" radius="md" color="yellow" variant="light" style={{textTransform: 'none'}}>Filtered: {[...selL, ...sel, ...(needle ? ['"' + q + '"'] : [])].join(', ')}</Badge>
                     <Text size="xs" c="dimmed">{cards.length} of {all.length}</Text>
                     <Button size="compact-xs" variant="subtle" color="gray" leftSection={<IconX size={12}/>} onClick={() => { setQ(''); setPicked([]); setPickedLabels([]) }}>Clear</Button>
                 </Group>}
