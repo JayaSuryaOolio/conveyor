@@ -505,8 +505,11 @@ func (a *App) SetTaskRepo(key, repo, branch, prURL string) error {
 	return a.svc.SetTaskRepo(key, repo, branch, prURL)
 }
 
+// LogUI writes a frontend diagnostic (a binding that never answered, a failed load) to conveyor.log.
+func (a *App) LogUI(msg string) { log.Printf("ui(js): %s", msg) }
+
 // ListRepos returns the registered repos.
-func (a *App) ListRepos() ([]store.Repo, error) {
+func (a *App) ListRepos()([]store.Repo, error) {
 	defer trace("ListRepos")()
 	r, err := store.ListRepos(a.svc.DB)
 	if r == nil {

@@ -16,9 +16,11 @@ export function CommandPalette({nav, onFocus}: {nav: Nav; onFocus: () => void}) 
     const [raw, setRaw] = useState<Raw>()
     const [query, setQuery] = useState('')
     const [busy, setBusy] = useState(false)
+    const [error, setError] = useState('')
     const refresh = useCallback((force: boolean) => {
         setBusy(true)
-        load(force).then(setRaw, () => {}).finally(() => setBusy(false))
+        setError('')
+        load(force).then(setRaw, e => setError(String(e))).finally(() => setBusy(false))
     }, [])
     useEffect(() => refresh(false), [refresh])
     useEffect(() => { // own listener: Mantine's `shortcut` skips focused inputs; capture so no field swallows it
@@ -69,7 +71,7 @@ export function CommandPalette({nav, onFocus}: {nav: Nav; onFocus: () => void}) 
                             </Spotlight.Action>
                         ))}
                     </Spotlight.ActionsGroup>
-                )) : <Spotlight.Empty>Nothing found</Spotlight.Empty>}
+                )) : <Spotlight.Empty>{error ? `Could not load: ${error}` : busy ? 'Loading…' : 'Nothing found'}</Spotlight.Empty>}
             </Spotlight.ActionsList>
         </Spotlight.Root>
     )

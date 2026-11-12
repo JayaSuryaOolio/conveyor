@@ -1,5 +1,5 @@
 import {useEffect, useState} from 'react'
-import {GetSettings, ListAgents, ListRepos} from '../wailsjs/go/ui/App'
+import {GetSettings, ListAgents, ListRepos, LogUI} from '../wailsjs/go/ui/App'
 import {listTasks, onDbChanged, perDbVersion} from './util'
 
 export type Raw = {
@@ -11,9 +11,25 @@ export type Raw = {
     keyPrefix: string // the key_prefix setting with its dash, e.g. "CV-"
 }
 
+/** Debug: a binding that never answers leaves the palette spinning; log which one, and how long it took, to conveyor.log. */
+function timed<T>(name: string, p: Promise<T>): Promise<T> {
+    const t = Date.now()
+    const timer = setTimeout(() => LogUI(`palette: ${name} still pending after 5s`).catch(() => {}), 5000)
+    return p.then(v => {
+        clearTimeout(timer)
+        if (Date.now() - t > 5000) LogUI(`palette: ${name} answered after ${Date.now() - t}ms`).catch(() => {})
+        return v
+    }, e => {
+        clearTimeout(timer)
+        LogUI(`palette: ${name} failed after ${Date.now() - t}ms: ${e}`).catch(() => {})
+        throw e
+    })
+}
+
 async function fetchRaw(): Promise<Raw> {
-    const repos = (await ListRepos()).map(r => r.name)
-    const [tasks, agents, settings] = await Promise.all([listTasks(), ListAgents(repos), GetSettings()])
+    const repos = (await timed('ListRepos', ListRepos())).map(r => r.name)
+    const [tasks, agents, settings] = await Promise.all([timed('ListTasks', listTasks()), timed('ListAgents', ListAgents(repos)), timed('GetSettings', GetSettings())])
+    if (!tasks.length) LogUI(`palette: ListTasks returned no tasks (repos=${repos.length}, agents=${agents.length})`).catch(() => {})
     return {
         tasks: tasks.filter(t => t.status !== 'done' && t.status !== 'cancelled').map(t => ({key: t.key, title: t.title, status: t.status})),
         agents: agents.map(a => ({name: a.name, scope: a.scope, description: a.description})),
