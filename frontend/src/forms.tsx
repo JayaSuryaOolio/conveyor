@@ -44,8 +44,8 @@ export function NewTask({nav, close}: {nav: Nav; close: () => void}) {
             <Stack gap="sm">
                 <TextInput data-autofocus placeholder="Title" value={title} onChange={e => setTitle(e.target.value)}/>
                 <MarkdownEditor minRows={4} placeholder="Description" value={desc} onChange={setDesc} repos={sel}/>
-                {/* one column on narrow screens, two from 56em (a 60%-wide modal is then ~34em) */}
-                <SimpleGrid cols={{base: 1, '56em': 2}} spacing="sm">
+                {/* type="container": columns follow the modal's width, not the window's (CV-136). Refactor: a shared <FieldGrid> if more modals need this. */}
+                <SimpleGrid type="container" cols={{base: 1, '30em': 2}} spacing="sm">
                     <Select label="Parent" placeholder="None" searchable clearable value={parent || null} onChange={pickParent}
                             data={(tasks ?? []).filter(t => t.status !== 'done' && t.status !== 'cancelled').map(t => ({value: t.key, label: `${t.key} ${t.title}`}))}/>
                     <MultiSelect label="Repos" placeholder="Pick repos" description={repos?.length === 0 ? 'Add one on the Repos page first' : undefined}
@@ -54,14 +54,16 @@ export function NewTask({nav, close}: {nav: Nav; close: () => void}) {
                     <TagsInput label="Labels" placeholder="Add label…" data={allLabels ?? []} value={labels} onChange={setLabels} splitChars={[',']}/>
                 </SimpleGrid>
                 <Text size="sm" fw={500} mt="xs">Agents</Text>
-                <SimpleGrid cols={{base: 1, '56em': 3}} spacing="sm">
+                <SimpleGrid type="container" cols={{base: 1, '36em': 3}} spacing="sm">
                     <ModelSelect label="Model" runner={runner} value={model} onChange={setModel}/>
                     <AgentSelect label="Agent" repos={sel} value={agent} onChange={setAgent}/>
                     <RunnerSelect label="Runner" value={runner} onChange={setRunner}/>
                 </SimpleGrid>
-                <Checkbox label="Start now (todo)" checked={start} onChange={e => setStart(e.currentTarget.checked)}/>
-                <Checkbox label="Epic" checked={epic} onChange={e => setEpic(e.currentTarget.checked)}/>
-                {epic && <TextInput label="Epic name" placeholder="default: the lower-cased task key" value={epicName} onChange={e => setEpicName(e.target.value)}/>}
+                <SimpleGrid type="container" cols={{base: 1, '30em': 2}} spacing="sm">
+                    <Checkbox label="Start now (todo)" checked={start} onChange={e => setStart(e.currentTarget.checked)}/>
+                    <Checkbox label="Epic" checked={epic} onChange={e => setEpic(e.currentTarget.checked)}/>
+                    {epic && <TextInput label="Epic name" placeholder="default: the lower-cased task key" value={epicName} onChange={e => setEpicName(e.target.value)}/>}
+                </SimpleGrid>
                 <Group justify="flex-end">
                     <Button variant="default" onClick={() => { setTitle(''); setDesc(''); close() }}>Cancel</Button>
                     <Button onClick={submit} disabled={!title.trim() || sel.length === 0}>Create</Button>
