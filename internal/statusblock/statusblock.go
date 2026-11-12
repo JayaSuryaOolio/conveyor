@@ -18,6 +18,7 @@ type Block struct {
 	Summary, State, Next string
 	Criteria             []Criterion
 	Learnings, Spawn     []string
+	Verdict              string // "approved" | "changes" from a loop checker (core/loop.go); "" when absent
 }
 
 var (
@@ -86,5 +87,6 @@ func parseBody(body string) (Block, bool) {
 		return Block{}, false
 	}
 	b.Summary, b.State, b.Next = join("summary"), join("state"), join("next")
+	b.Verdict = strings.ToLower(join("verdict"))
 	return b, true
 }

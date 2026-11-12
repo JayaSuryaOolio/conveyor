@@ -99,6 +99,14 @@ conveyor task unlink CV-1A blocks CV-1B
 conveyor task label CV-1A add bug        # labels: shown on cards, filterable on the Board; `rm` removes
 ```
 
+**Loops** coordinate two tasks: a worker produces (usually a PR) and a checker judges it, turn by turn, with no human relaying comments. `conveyor task loop WORKER CHECKER [--kind peer-review|spec-review|custom] [--max-rounds 3] [--prompt text]` starts one (`task loop KEY [--json]` lists a task's loops; `task unlink WORKER loop CHECKER`, or the trash icon, removes it). Turns pass when a run finishes (`core.LoopOnStop`, called from the Stop hook), never by polling:
+
+- worker ends with `status: done` (task in review) -> round+1 and a system comment asks the checker (requeues it; a checker that is mid-run gets it on its next run). The kind sets what it is asked: `peer-review` reads the diff, `spec-review` checks it against the worker's description and criteria, `custom` uses `--prompt` (which any kind appends).
+- checker ends with `verdict: approved` in its `<conveyor>` block -> loop approved (a note on the worker, no requeue); `verdict: changes` -> its reply is posted on the worker (requeues it).
+- stops (state, round and reason kept in the `loops` table, noted on the worker): `--max-rounds` requests to the checker reached, worker PR head unchanged since the last round (from `pr_reviews.head_sha`), no verdict, worker PR merged, or a human comment on either task. A task is in at most one active loop.
+
+Loops show in Relations as "peer-review loop 2/3: checker's turn" (or approved / stopped (reason)) and as an animated `loop` edge in the epic view, so an epic can pair a builder sub-task with a reviewer sub-task.
+
 **Epics** (docs/epic-builder.md): `task new --epic` labels the root `epic` + `epic:<name>` (name unique among open epics). After charting, the epic waits in needs_you until `conveyor epic approve KEY` (or a human comment `approve`) starts flow 1 at stage `decide`; label `epic_gate:off` skips the wait. The dispatcher wakes an epic with a system comment when its sub-tasks have all settled; only `conveyor epic restart KEY --reason` abandons a flow (cancels open sub-tasks, starts the next flow at `spec`). Agents in epic runs cannot `gh pr merge`. Stage logic lives in the `epic` skill (`skills/epic/`, planner adapters in `skills/epic/planners/`), installed with the plugin; `plugin install` also seeds a user agent `epic-builder` whose prompt only loads it (never overwritten). The brief of a labelled task adds a `Labels:` line and, from them, the epic/stage/flow line, the rule for its `epic_kind:` and "Load these skills before starting" from `skill:*` labels.
 
 **Epic view** (`e` on a task page, the sitemap icon on board cards and the task header, or sidebar *Epics* = board filtered by `label:epic`): sub-tasks as cards in a group per parent, layered by `blocks`. Cards edit agent, model, skills and kind; drag handle to handle to add a `blocks` link, select an edge and press Backspace to unlink, `+` on a group adds a sub-task. Header: stage pipeline, n/m done, wants-you count, Approve plan at the gate, Restart (reason required). Updates live on `db:changed`.
@@ -268,6 +276,7 @@ conveyor task done KEY [--stop]           conveyor task cancel KEY
 conveyor task stop KEY
 conveyor task set KEY [--repo r] [--branch b] [--pr url] [--model m] [--desc d | --desc-file f]
 conveyor task link KEY blocks|relates OTHER    conveyor task unlink KEY kind OTHER
+conveyor task loop WORKER CHECKER [--kind peer-review|spec-review|custom] [--max-rounds N] [--prompt p]   conveyor task loop KEY [--json]
 conveyor task parent KEY PARENT|--none   conveyor task label KEY add|rm NAME | set <prefix>:<value>
 conveyor task graph KEY [--json]          conveyor task new "t" --repo r --epic [--epic-name n]
 conveyor epic status KEY [--flow N] [--json]    conveyor epic check KEY [--fix]

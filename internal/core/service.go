@@ -206,6 +206,9 @@ func (s *Service) AddCommentVia(key, author, source, body string, after AfterMer
 	switch author {
 	case store.AuthorHuman:
 		actor = store.ActorHuman
+		if err := StopLoopsOnHuman(s.DB, t); err != nil { // a human stepped in: the loop hands over
+			return c, err
+		}
 	case store.AuthorSystem:
 		actor = store.ActorSystem
 	default:

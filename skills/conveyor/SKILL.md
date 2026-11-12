@@ -30,6 +30,7 @@ conveyor task comment KEY "text" [--ask|--note]   conveyor task move KEY <status
 conveyor task stop KEY                # end the running bg session -> needs_you
 conveyor task set KEY [--branch b] [--pr url] [--model m] [--desc d]   # --desc: any status; after a run, a system comment quotes the old one
 conveyor task link KEY blocks|relates OTHER     conveyor task unlink KEY kind OTHER
+conveyor task loop WORKER CHECKER [--kind peer-review|spec-review|custom] [--max-rounds 3] [--prompt p]   # checker re-checks worker each time it finishes; checker ends with `verdict: approved|changes` (core/loop.go, docs/guide.md Loops); `task loop KEY` lists, `task unlink W loop C` removes
 conveyor task parent KEY PARENT|--none
 conveyor task repo KEY add|rm NAME   # rm refused once the repo has a PR or is the last one
 conveyor task label KEY add|rm NAME     # labels: many per task (labels + task_labels tables), filter chips on the Board
