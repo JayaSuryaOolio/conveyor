@@ -867,6 +867,91 @@ func TestReapAgyQuotingInterruptDoesNotFalsePositive(t *testing.T) {
 	}
 }
 
+func TestReapAgyResumedTurnDoesNotRepeatPriorAnalysis(t *testing.T) {
+	e := setup(t)
+	runnerName := "agy"
+	tk := e.task(t, "t", 0)
+	tk.Runner = &runnerName
+	if err := store.UpdateTask(e.db, tk); err != nil {
+		t.Fatal(err)
+	}
+
+	pid := "9999999"
+	run1, err := store.CreateRun(e.db, store.Run{
+		TaskID: tk.ID, Kind: "auto", Mode: "fresh", Status: "running", BgID: &pid,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.UpdateTaskStatus(e.db, tk.ID, store.StatusRunning, store.ActorSystem); err != nil {
+		t.Fatal(err)
+	}
+
+	logPath := runner.BgLogPath(e.d.Svc.Home, tk.Key)
+	os.MkdirAll(filepath.Dir(logPath), 0o755)
+
+	// Turn 1 output: initial analysis + status block
+	turn1Output := "### Initial Analysis\nThis is the initial analysis for the task.\n\n" +
+		"<conveyor>\nstatus: done\nsummary: initial analysis complete\nstate: clean\nnext: none\n</conveyor>\n"
+	os.WriteFile(logPath, []byte(turn1Output), 0o644)
+
+	e.now = time.Now().Add(time.Minute)
+	e.d.reap(t.Context())
+
+	// Verify run 1 reaped
+	r1, err := store.GetRun(e.db, run1.ID)
+	if err != nil || r1.Status != "finished" || deref(r1.Summary) != "initial analysis complete" {
+		t.Fatalf("run1 not finished properly: %+v, err: %v", r1, err)
+	}
+	comments, err := store.ListComments(e.db, tk.ID)
+	if err != nil || len(comments) != 1 || !strings.Contains(comments[0].Body, "Initial Analysis") {
+		t.Fatalf("unexpected comments after turn 1: %+v, err: %v", comments, err)
+	}
+
+	// Turn 2: resumed turn. Resume appends TurnMarker and agy writes new turn output.
+	turn2Output := "### Follow-up Work\nHere is the follow-up work addressing the new comment.\n\n" +
+		"<conveyor>\nstatus: done\nsummary: follow-up work complete\nstate: clean\nnext: none\n</conveyor>\n"
+	f, err := os.OpenFile(logPath, os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.WriteString(agy.TurnMarker + turn2Output)
+	f.Close()
+
+	run2, err := store.CreateRun(e.db, store.Run{
+		TaskID: tk.ID, Kind: "auto", Mode: "resume", Status: "running", BgID: &pid,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.UpdateTaskStatus(e.db, tk.ID, store.StatusTodo, store.ActorHuman); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.UpdateTaskStatus(e.db, tk.ID, store.StatusRunning, store.ActorSystem); err != nil {
+		t.Fatal(err)
+	}
+
+	e.now = e.now.Add(time.Minute)
+	e.d.reap(t.Context())
+
+	r2, err := store.GetRun(e.db, run2.ID)
+	if err != nil || r2.Status != "finished" || deref(r2.Summary) != "follow-up work complete" {
+		t.Fatalf("run2 not finished properly: %+v, err: %v", r2, err)
+	}
+
+	comments, err = store.ListComments(e.db, tk.ID)
+	if err != nil || len(comments) != 2 {
+		t.Fatalf("expected 2 comments, got %d (err: %v)", len(comments), err)
+	}
+	// Comment 2 must contain the follow-up work and must NOT contain the initial analysis from turn 1.
+	if strings.Contains(comments[1].Body, "Initial Analysis") {
+		t.Errorf("comment 2 repeated initial analysis from turn 1: %q", comments[1].Body)
+	}
+	if !strings.Contains(comments[1].Body, "Follow-up Work") {
+		t.Errorf("comment 2 missing follow-up work: %q", comments[1].Body)
+	}
+}
+
 // attachCmd returns the task's "attach" action command, via core like the UI.
 func (e *env) attachCmd(t *testing.T, key string) string {
 	t.Helper()

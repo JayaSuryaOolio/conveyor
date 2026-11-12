@@ -143,8 +143,15 @@ func TestResumeLogPathAndArgs(t *testing.T) {
 	if err != nil || pid == "" {
 		t.Fatalf("pid %q err %v", pid, err)
 	}
-	if b, _ := os.ReadFile(log); !strings.HasPrefix(string(b), "first run\n") {
+	b, err := os.ReadFile(log)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(string(b), "first run\n") {
 		t.Errorf("resume truncated or missed %s: %q", log, b)
+	}
+	if !strings.Contains(string(b), TurnMarker) {
+		t.Errorf("resume did not append turn marker %q in %s: %q", TurnMarker, log, b)
 	}
 	joined := strings.Join(*got, " ")
 	for _, want := range []string{"--conversation conv-1", "--print go on", "--model gemini-pro", "--agent sse", "--dangerously-skip-permissions"} {
@@ -231,6 +238,14 @@ func TestLastTurnOutput(t *testing.T) {
 	t.Run("with multiple markers", func(t *testing.T) {
 		input := "turn 1\n" + TurnMarker + "turn 2\n" + TurnMarker + "turn 3 latest\n"
 		want := "turn 3 latest\n"
+		if got := LastTurnOutput(input); got != want {
+			t.Errorf("got %q, want %q", got, want)
+		}
+	})
+
+	t.Run("with marker at start without leading newline", func(t *testing.T) {
+		input := "=== conveyor: turn ===\nturn output\n"
+		want := "turn output\n"
 		if got := LastTurnOutput(input); got != want {
 			t.Errorf("got %q, want %q", got, want)
 		}

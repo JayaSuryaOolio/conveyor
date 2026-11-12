@@ -147,6 +147,10 @@ func LastTurnOutput(logOutput string) string {
 	if idx := strings.LastIndex(logOutput, TurnMarker); idx >= 0 {
 		return logOutput[idx+len(TurnMarker):]
 	}
+	trimmed := strings.TrimPrefix(TurnMarker, "\n")
+	if strings.HasPrefix(logOutput, trimmed) {
+		return logOutput[len(trimmed):]
+	}
 	return logOutput
 }
 
