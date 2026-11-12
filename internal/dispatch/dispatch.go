@@ -315,7 +315,7 @@ func (d *Dispatcher) reapAgy(ctx context.Context, r store.Run, task store.Task, 
 		logOutput = agy.LastTurnOutput(string(b))
 	}
 
-	tail := logOutput
+	tail := strings.TrimRight(logOutput, " \t\r\n")
 	if len(tail) > 300 {
 		tail = tail[len(tail)-300:]
 	}
