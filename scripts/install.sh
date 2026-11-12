@@ -100,6 +100,14 @@ else
 		--arg "{\"title\":\"Conveyor docs: drift check\",\"description\":\"Use the conveyor-drift skill to check docs/guide.md, the conveyor skill and CLAUDE.md against the code and open one PR fixing any drift.\",\"repos\":[\"$repo\"],\"start\":true}"
 fi
 
+echo "==> Database backups"
+# Every 6 hours, a copy of conveyor.db in <home>/backups; the newest 5 are kept.
+if "$BIN_DIR/conveyor" automation list | grep -q '^state-backup '; then
+	echo "exists: automation state-backup"
+else
+	"$BIN_DIR/conveyor" automation add --template state-backup
+fi
+
 echo "==> Saved state"
 # Left by scripts/uninstall.sh (or copied from another machine); renamed once imported so it is not re-applied.
 state="${CONVEYOR_HOME:-$HOME/.conveyor}/state.json"

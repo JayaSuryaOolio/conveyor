@@ -12,10 +12,10 @@ import (
 )
 
 func init() {
-	register("state", runState, "export or import settings, apps, automations and user agents as JSON")
+	register("state", runState, "export or import settings, apps, automations and user agents as JSON; back up the database")
 }
 
-const stateUsage = "usage: conveyor state export [FILE] | import FILE [--repo A=name ...]"
+const stateUsage = "usage: conveyor state export [FILE] | import FILE [--repo A=name ...] | backup [--keep N]"
 
 type repoFlags map[string]string
 
@@ -57,6 +57,20 @@ func runState(home string, args []string) error {
 			if len(st.Repos) > 0 {
 				fmt.Fprintf(out, "automations use repo placeholders %s; map them on import with --repo %s=<name>\n", strings.Join(st.Repos, ","), st.Repos[0])
 			}
+			return nil
+		case "backup":
+			fs := flag.NewFlagSet("state backup", flag.ContinueOnError)
+			keep := fs.Int("keep", 5, "backups to keep; older ones are deleted")
+			if pos, err := parseArgs(fs, args[1:]); err != nil {
+				return err
+			} else if len(pos) != 0 {
+				return errors.New(stateUsage)
+			}
+			path, err := s.Backup(*keep)
+			if err != nil {
+				return err
+			}
+			fmt.Fprintln(out, "backed up to", path)
 			return nil
 		case "import":
 			fs := flag.NewFlagSet("state import", flag.ContinueOnError)

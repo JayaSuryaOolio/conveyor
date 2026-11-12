@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/JayaSuryaOolio/conveyor/internal/apps"
 	"github.com/JayaSuryaOolio/conveyor/internal/claude"
@@ -236,4 +237,33 @@ func (s *Service) ImportState(st State, repoMap map[string]string) ([]string, er
 		out = append(out, "added agent "+a.Name)
 	}
 	return out, nil
+}
+
+// Backup copies the whole database (tasks, runs, comments and the State above) to
+// <home>/backups/conveyor-<UTC time>.db with VACUUM INTO, a consistent snapshot
+// that is safe while other processes write, then deletes all but the newest keep.
+func (s *Service) Backup(keep int) (string, error) {
+	if keep < 1 {
+		return "", fmt.Errorf("keep must be at least 1, got %d", keep)
+	}
+	dir := filepath.Join(s.Home, "backups")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return "", err
+	}
+	path := filepath.Join(dir, "conveyor-"+time.Now().UTC().Format("20060102-150405")+".db")
+	if _, err := s.DB.Exec(`VACUUM INTO ?`, path); err != nil {
+		return "", fmt.Errorf("backup to %s: %w", path, err)
+	}
+	old, err := filepath.Glob(filepath.Join(dir, "conveyor-*.db"))
+	if err != nil {
+		return path, err
+	}
+	sort.Strings(old) // names sort by time
+	for len(old) > keep {
+		if err := os.Remove(old[0]); err != nil {
+			return path, err
+		}
+		old = old[1:]
+	}
+	return path, nil
 }

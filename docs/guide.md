@@ -186,11 +186,14 @@ There is one built-in template, `pr-sweep` (every 15 minutes, comments on tasks 
 
 ```
 conveyor automation add --template pr-sweep
+conveyor automation add --template state-backup   # every 6 hours: conveyor state backup --keep 5
 conveyor automation add NAME --schedule "0 9 * * 1-5" --kind create_task --arg '{"title":"Daily check","repos":["my-repo"],"start":true}' [--precheck CMD]
 conveyor automation list | enable NAME | disable NAME | run NAME | rm NAME
 ```
 
 **Conveyor doctor.** `scripts/install.sh` installs the `conveyor-doctor` skill (`skills/conveyor-doctor`) to `~/.claude/skills` and, when the Conveyor checkout is a registered repo, adds the `conveyor-doctor` automation: every Monday at 09:00 it creates and starts a "Conveyor doctor: weekly run review" task. Its agent samples the week's longest, shortest, failed and most-commented runs, reads their briefs, transcripts and threads plus recent logs, has a fresh subagent restate a few briefs to catch ones that don't stand alone, checks this guide, the conveyor skill and `CLAUDE.md` against the code, and proposes fixes (doc drift is fixed in the same PR): a PR to Conveyor's default prompts, `conveyor config set` commands for your own settings, backlog tasks for other repos' `CLAUDE.md`, and learnings. Run it now with `conveyor automation run conveyor-doctor`; turn it off with `conveyor automation disable conveyor-doctor`.
+
+**Database backups.** `scripts/install.sh` adds the `state-backup` automation (the `state-backup` template): every 6 hours it runs `conveyor state backup --keep 5`, which copies the whole `conveyor.db` (tasks, runs, comments and everything `state export` carries) to `<home>/backups/conveyor-<UTC time>.db` with SQLite `VACUUM INTO` and deletes all but the newest 5. To restore, quit the app and daemon and copy a backup over `<home>/conveyor.db` (remove `conveyor.db-wal` and `conveyor.db-shm` first).
 
 **Doc drift.** `scripts/install.sh` also adds the `conveyor-drift` automation (same registered-repo condition): every Wednesday at 09:00 it creates and starts a "Conveyor docs: drift check" task that runs the plugin's `conveyor-drift` skill (`skills/conveyor-drift`). Its agent checks this guide, the conveyor skill and `CLAUDE.md` against the code (commands and flags, settings and defaults in `internal/store/settings.go`, named functions and files), fixes the docs to match the code in one PR, lists suspected missing features it didn't fix, or reports "No drift detected". Run it now with `conveyor automation run conveyor-drift`.
 
@@ -284,7 +287,7 @@ conveyor app list|presets|add|rm|open
 conveyor hooks status|install|uninstall
 conveyor review-webhook [--status|--stop]      # opt-in review-webhooks app (see Apps)
 conveyor config list | get <key> | set <key> <value>
-conveyor state export [file] | import <file> [--repo A=name ...]
+conveyor state export [file] | import <file> [--repo A=name ...] | backup [--keep N]
 conveyor --home <empty dir> mock seed          # mock repos, tasks, settings, apps, automations (fixtures: internal/core/mock.go)
 conveyor import jira --jql "..." --repo a      # needs acli: install it from the Apps page (Templates) after `brew install acli` and `acli jira auth login`
 conveyor jira source EPIC [--key PROJ-1 --repo R --interval SEC --status-map JSON | --clear]   # attach/show/detach a Jira epic as the epic's source

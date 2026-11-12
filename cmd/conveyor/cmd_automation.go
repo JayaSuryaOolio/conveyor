@@ -18,7 +18,7 @@ func init() {
 	register("import", runImport, "import tasks (jira --jql ... --repo a)")
 }
 
-const automationUsage = "usage: conveyor automation list | add NAME --schedule S --kind K --arg JSON [--precheck CMD] | add --template pr-sweep | enable|disable|run|rm NAME"
+const automationUsage = "usage: conveyor automation list | add NAME --schedule S --kind K --arg JSON [--precheck CMD] | add --template pr-sweep|state-backup | enable|disable|run|rm NAME"
 
 func runAutomation(home string, args []string) error {
 	if len(args) == 0 {
@@ -60,7 +60,7 @@ func runAutomation(home string, args []string) error {
 
 func automationAdd(s *core.Service, args []string) error {
 	fs := flag.NewFlagSet("automation add", flag.ContinueOnError)
-	tmpl := fs.String("template", "", "built-in template (pr-sweep)")
+	tmpl := fs.String("template", "", "built-in template (pr-sweep, state-backup)")
 	schedule := fs.String("schedule", "", "cron schedule (5 fields)")
 	precheck := fs.String("precheck", "", "shell precheck; exit 0 runs the action")
 	kind := fs.String("kind", "", "create_task, comment or cli")
