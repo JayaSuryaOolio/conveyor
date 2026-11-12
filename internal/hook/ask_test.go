@@ -76,4 +76,22 @@ func TestOnAsk(t *testing.T) {
 	if !strings.Contains(comments[0].Body, "Which auth provider?") || !strings.Contains(comments[0].Body, "Google") {
 		t.Fatalf("unexpected comment body: %s", comments[0].Body)
 	}
+
+	// Claude payload should post the comment but NOT transition to needs_you (handled by Notification hook).
+	tk2, err := store.CreateTask(db, store.Task{Key: "CV-2", Title: "Test Claude", Status: store.StatusRunning}, []store.TaskRepo{{RepoID: r.ID, IsPrimary: true, Branch: "b2"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	worktree2 := filepath.Join(home, "workspaces", "CV-2", "repo")
+	claudePayload := []byte(`{"cwd":"` + worktree2 + `","tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"Proceed?","options":[{"label":"yes"}]}]}}`)
+	if err := OnAsk(db, home, claudePayload); err != nil {
+		t.Fatalf("OnAsk failed for Claude: %v", err)
+	}
+	gotTask2, err := store.GetTask(db, tk2.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gotTask2.Status != store.StatusRunning {
+		t.Fatalf("expected Claude task status to remain running, got %s", gotTask2.Status)
+	}
 }

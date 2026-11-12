@@ -126,7 +126,9 @@ func OnAsk(db *sql.DB, home string, raw []byte) error {
 	if _, err := store.PostRunComment(db, c); err != nil {
 		return err
 	}
-	if task.Status == store.StatusRunning {
+	// Claude gets its needs_you transition from the Notification hook.
+	// Only transition here for agy toolCall payloads (ask_question).
+	if p.ToolCall.Name != "" && task.Status == store.StatusRunning {
 		_, err = store.UpdateTaskStatus(db, task.ID, store.StatusNeedsYou, store.ActorSystem)
 	}
 	return err
