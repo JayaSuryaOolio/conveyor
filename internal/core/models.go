@@ -7,11 +7,15 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"regexp"
 	"slices"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/JayaSuryaOolio/conveyor/internal/runner"
+	"github.com/JayaSuryaOolio/conveyor/internal/store"
 )
 
 // Model is a Claude model.
@@ -41,6 +45,31 @@ func (s *Service) Models() ModelList {
 		}
 	}
 	return ModelList{Models: classify(builtinModels), Source: "builtin"}
+}
+
+// ModelsFor lists the models of the named runner ("" is the default_runner setting): agy asks
+// `agy models`, anything else (or a failure) gives Models().
+func (s *Service) ModelsFor(runnerName string) ModelList {
+	if runner.ForTask(runnerName, store.GetSetting(s.DB, "default_runner"), s.Home).Name() == "agy" {
+		if out, err := exec.Command("agy", "models").Output(); err == nil {
+			if ml := parseAgyModels(string(out)); len(ml.Models) > 0 {
+				return ml
+			}
+		}
+	}
+	return s.Models()
+}
+
+// parseAgyModels reads `agy models` output: a progress line, then "id<TAB>label" rows.
+// Tier is the id and nothing is Latest, so no alias entries appear.
+func parseAgyModels(out string) ModelList {
+	ml := ModelList{Source: "agy"}
+	for _, l := range strings.Split(out, "\n") {
+		if id, _, ok := strings.Cut(l, "\t"); ok && id != "" {
+			ml.Models = append(ml.Models, Model{ID: id, Tier: id})
+		}
+	}
+	return ml
 }
 
 // apiModels lists model ids from the Anthropic Models API.

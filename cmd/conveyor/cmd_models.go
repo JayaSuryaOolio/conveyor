@@ -15,11 +15,12 @@ func init() {
 func runModels(home string, args []string) error {
 	fs := flag.NewFlagSet("models", flag.ContinueOnError)
 	asJSON := fs.Bool("json", false, "JSON output")
+	runnerName := fs.String("runner", "", "runner whose models to list (default: the default_runner setting)")
 	if _, err := parseArgs(fs, args); err != nil {
 		return err
 	}
 	return withService(home, func(s *core.Service) error {
-		ml := s.Models()
+		ml := s.ModelsFor(*runnerName)
 		if *asJSON {
 			return printJSON(ml)
 		}
