@@ -312,4 +312,11 @@ var Templates = map[string]store.Automation{
 		ActionArg:  `{"task_status":"review","body":"New PR review comments since the last sweep. Address them, push, and reply on the PR threads."}`,
 		Enabled:    true,
 	},
+	"state-backup": {
+		Name:       "state-backup",
+		Schedule:   "0 */6 * * *",
+		ActionKind: "cli",
+		ActionArg:  `{"args":["state","backup","--keep","5"]}`,
+		Enabled:    true,
+	},
 }

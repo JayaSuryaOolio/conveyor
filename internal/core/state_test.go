@@ -2,6 +2,7 @@ package core
 
 import (
 	"encoding/json"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -104,5 +105,31 @@ func TestSeedMockState(t *testing.T) {
 	}
 	if store.GetSetting(db, "max_parallel") != "2" || !out || !enabled || !disabled || len(kinds) != 3 {
 		t.Fatalf("mock state incomplete: apps %+v autos %+v", apps, autos)
+	}
+}
+
+func TestBackupKeepsNewest(t *testing.T) {
+	s := newSvc(t)
+	s.Home = t.TempDir()
+	dir := filepath.Join(s.Home, "backups")
+	os.MkdirAll(dir, 0o700)
+	for _, ts := range []string{"20200101-000000", "20200102-000000", "20200103-000000", "20200104-000000", "20200105-000000"} {
+		os.WriteFile(filepath.Join(dir, "conveyor-"+ts+".db"), nil, 0o600)
+	}
+	path, err := s.Backup(5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	left, _ := filepath.Glob(filepath.Join(dir, "conveyor-*.db"))
+	if len(left) != 5 || filepath.Base(left[0]) != "conveyor-20200102-000000.db" || left[4] != path {
+		t.Fatalf("left %v, new %s", left, path)
+	}
+	db, err := store.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if repos, _ := store.ListRepos(db); len(repos) != 2 {
+		t.Fatalf("backup has %d repos, want 2", len(repos))
 	}
 }
