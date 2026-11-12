@@ -22,6 +22,7 @@ import (
 	"github.com/JayaSuryaOolio/conveyor/internal/jira"
 	"github.com/JayaSuryaOolio/conveyor/internal/learning"
 	"github.com/JayaSuryaOolio/conveyor/internal/runner"
+	"github.com/JayaSuryaOolio/conveyor/internal/slack"
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 	"github.com/JayaSuryaOolio/conveyor/internal/term"
 	"github.com/JayaSuryaOolio/conveyor/internal/workspace"
@@ -503,8 +504,23 @@ func (a *App) SetRepoSetupScript(name, script string) error {
 	return store.SetRepoSetupScript(a.svc.DB, name, script)
 }
 
-// GetSettings returns every setting with defaults applied.
-func (a *App) GetSettings() (map[string]string, error) { return store.ListSettings(a.svc.DB), nil }
+// GetSettings returns every setting with defaults applied, except the Slack thread links
+// (see SlackLinks).
+func (a *App) GetSettings() (map[string]string, error) {
+	return slack.StripLinks(store.ListSettings(a.svc.DB)), nil
+}
+
+// SlackLinkPage is one page of Slack thread links and the total count.
+type SlackLinkPage struct {
+	Rows  []slack.Link `json:"rows"`
+	Total int          `json:"total"`
+}
+
+// SlackLinks returns a page of the Slack thread<->task links (state kept in settings).
+func (a *App) SlackLinks(offset, size int) (SlackLinkPage, error) {
+	rows, total := slack.Links(store.ListSettings(a.svc.DB), offset, size)
+	return SlackLinkPage{rows, total}, nil
+}
 
 // SetSetting stores one setting.
 func (a *App) SetSetting(k, v string) error { return store.SetSetting(a.svc.DB, k, v) }

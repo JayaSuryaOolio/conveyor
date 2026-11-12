@@ -1,7 +1,7 @@
 import {useEffect, useRef, useState} from 'react'
-import {ActionIcon, Badge, Button, Checkbox, Code, FileButton, Group, Modal, MultiSelect, NumberInput, Paper, Select, Stack, Switch, Table, Tabs, Text, TextInput, Textarea, Title} from '@mantine/core'
+import {ActionIcon, Badge, Button, Checkbox, Code, FileButton, Group, Modal, MultiSelect, NumberInput, Pagination, Paper, Select, Stack, Switch, Table, Tabs, Text, TextInput, Textarea, Title} from '@mantine/core'
 import {IconDownload, IconPlus, IconPuzzle, IconSettings, IconTrash, IconUpload} from '@tabler/icons-react'
-import {AddApp, AppSettings, SaveAppSettings, ExampleApps, InstallExample, GetSettings, SetSetting, AppIcons, AppPresets, Confirm, SetAppDisabled, DeleteApp, ExportApp, InstallManifest, InstallPreset, ListApps, ManifestSchema, Plugin, ValidateManifest} from '../wailsjs/go/ui/App'
+import {AddApp, AppSettings, SaveAppSettings, ExampleApps, InstallExample, GetSettings, SetSetting, AppIcons, AppPresets, Confirm, SetAppDisabled, DeleteApp, ExportApp, InstallManifest, InstallPreset, ListApps, SlackLinks, ManifestSchema, Plugin, ValidateManifest} from '../wailsjs/go/ui/App'
 import {runner, store} from '../wailsjs/go/models'
 import {AppIcon, errMsg, toast} from './components'
 import {Field, SettingRow} from './forms'
@@ -264,6 +264,32 @@ const SLACK: Field[] = [
 ]
 const STATUSES = ['needs_you', 'review', 'done', 'failed']
 
+const LINKS_PER_PAGE = 10
+
+/** Slack thread <-> task links. They are part of Conveyor's state (stored in settings, carried by Export state). */
+function SlackLinksTable() {
+    const [page, setPage] = useState(1)
+    const {data} = useData(() => SlackLinks((page - 1) * LINKS_PER_PAGE, LINKS_PER_PAGE), [page])
+    if (!data?.total) return null
+    return (
+        <Stack gap="xs">
+            <Text size="sm" fw={500}>Threads</Text>
+            <Text size="xs" c="dimmed">Which task each Slack thread replies to. Part of Conveyor's state, so Export state includes them.</Text>
+            <Table verticalSpacing={4}>
+                <Table.Thead><Table.Tr><Table.Th>Task</Table.Th><Table.Th>Channel</Table.Th><Table.Th>Thread</Table.Th><Table.Th>Notifies</Table.Th></Table.Tr></Table.Thead>
+                <Table.Tbody>
+                    {data.rows.map(r => (
+                        <Table.Tr key={`${r.channel}:${r.ts}`}>
+                            <Table.Td>{r.task}</Table.Td><Table.Td><Code>{r.channel}</Code></Table.Td><Table.Td><Code>{r.ts}</Code></Table.Td><Table.Td>{r.notify ? 'yes' : ''}</Table.Td>
+                        </Table.Tr>
+                    ))}
+                </Table.Tbody>
+            </Table>
+            {data.total > LINKS_PER_PAGE && <Pagination size="sm" total={Math.ceil(data.total / LINKS_PER_PAGE)} value={page} onChange={setPage}/>}
+        </Stack>
+    )
+}
+
 /** Chat bridge: DMs task status and takes replies, comments and /conveyor commands from a chat app (docs/slack.md). */
 function Integrations() {
     const {data, error, reload} = useData(GetSettings, [])
@@ -289,6 +315,7 @@ function Integrations() {
                         {SLACK.map(f => <SettingRow key={f.k} f={f} v={data[f.k] ?? ''} reload={reload}/>)}
                         <MultiSelect label="Notify on" description="Task statuses that send a DM." data={STATUSES} value={(data.chat_statuses ?? '').split(',').filter(Boolean)}
                                      onChange={v => set('chat_statuses', v.join(','))}/>
+                        <SlackLinksTable/>
                     </Stack>
                 </Paper>
             )}
