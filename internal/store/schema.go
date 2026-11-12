@@ -134,6 +134,22 @@ CREATE TABLE IF NOT EXISTS task_links (
   PRIMARY KEY (from_id, to_id, kind)
 );
 
+-- A loop hands turns between a worker task and a checker task (core/loop.go).
+CREATE TABLE IF NOT EXISTS loops (
+  id INTEGER PRIMARY KEY,
+  worker_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  checker_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL,
+  prompt TEXT NOT NULL DEFAULT '',
+  max_rounds INTEGER NOT NULL,
+  round INTEGER NOT NULL DEFAULT 0,
+  turn TEXT NOT NULL DEFAULT 'worker',
+  state TEXT NOT NULL DEFAULT 'active',
+  reason TEXT NOT NULL DEFAULT '',
+  last_sha TEXT NOT NULL DEFAULT '',
+  updated_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS labels (
   id INTEGER PRIMARY KEY,
   name TEXT NOT NULL UNIQUE COLLATE NOCASE
