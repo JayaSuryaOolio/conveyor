@@ -55,7 +55,10 @@ export function CommandPalette({nav, onFocus}: {nav: Nav; onFocus: () => void}) 
     ].filter(g => g.items.length)
 
     return (
-        <Spotlight.Root query={query} onQueryChange={setQuery} scrollable maxHeight={420} onSpotlightClose={() => setQuery('')}>
+        <Spotlight.Root query={query} onQueryChange={setQuery} scrollable maxHeight={420}
+                         // actionBody is a flex item with min-width:auto, so a long nowrap label stretches it past the modal; 0 lets `truncate` kick in.
+                         styles={{actionBody: {minWidth: 0}, actionsList: {overflowX: 'hidden'}}}
+                         onSpotlightClose={() => setQuery('')}>
             <Spotlight.Search placeholder="Search tasks, filters, agents and settings" leftSection={<IconSearch size={18}/>} rightSectionPointerEvents="all"
                               rightSection={<Tooltip label="Reload (ignore cache)"><ActionIcon variant="subtle" color="gray" aria-label="Reload" loading={busy} onClick={() => refresh(true)}><IconRefresh size={16}/></ActionIcon></Tooltip>}/>
             <Spotlight.ActionsList>
