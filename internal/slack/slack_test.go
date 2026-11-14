@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -272,5 +273,40 @@ func TestThreadLinksPersist(t *testing.T) {
 	}
 	if mk().rootOf("D1", "CV-8") != "40.0" {
 		t.Fatalf("task not linked to its thread: %v", cfg)
+	}
+}
+
+// CV-163: a reply to a closed or missing task is answered with the error, unprefixed, and an
+// unlinked thread is not linked to it.
+func TestClosedTaskReplyIsError(t *testing.T) {
+	var posts []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "conversations.replies") {
+			fmt.Fprint(w, `{"ok":true,"messages":[{"ts":"163.5","text":"*CV-9* done"}]}`)
+			return
+		}
+		b, _ := io.ReadAll(r.Body)
+		if strings.HasSuffix(r.URL.Path, "chat.postMessage") {
+			posts = append(posts, string(b))
+		}
+		fmt.Fprint(w, `{"ok":true,"ts":"163.7"}`)
+	}))
+	defer srv.Close()
+	api = srv.URL + "/"
+	cfg := map[string]string{"slack_bot_token": "x", "slack_user_id": "U1", "slack_thread:D1:163.1": "CV-8"}
+	s := &Slack{get: func(k string) string { return cfg[k] }, set: func(k, v string) error { cfg[k] = v; return nil }}
+	h := func(in chat.In) string { return chat.Closed + in.Key + " is closed." }
+	s.event([]byte(`{"event":{"type":"message","user":"U1","text":"hi","channel":"D1","ts":"163.2","thread_ts":"163.1"}}`), h)
+	s.event([]byte(`{"event":{"type":"message","user":"U1","text":"hi","channel":"D1","ts":"163.6","thread_ts":"163.5"}}`), h)
+	if len(posts) != 2 || !strings.Contains(posts[0], "CV-8 is closed") || !strings.Contains(posts[1], "CV-9 is closed") {
+		t.Fatalf("posts %v", posts)
+	}
+	for _, p := range posts {
+		if strings.Contains(p, "speech_balloon") {
+			t.Fatalf("closed reply shown as a comment: %s", p)
+		}
+	}
+	if cfg["slack_thread:D1:163.5"] != "" {
+		t.Fatal("closed task linked to thread")
 	}
 }
