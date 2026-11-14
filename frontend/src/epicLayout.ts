@@ -67,3 +67,17 @@ export function layout(nodes: LNode[], links: LLink[], heights: ReadonlyMap<stri
     place('', 0, 0)
     return out
 }
+
+/** Every key linked to `key` through any chain of links, upstream and downstream (the hover trace), including `key`. */
+export function trace(key: string, links: LLink[]): Set<string> {
+    const seen = new Set([key])
+    // Walk one direction at a time so a sibling (shares a blocker) isn't pulled in through the blocker.
+    for (const [from, to] of [['from', 'to'], ['to', 'from']] as const) {
+        const todo = [key], dir = new Set([key])
+        while (todo.length) {
+            const k = todo.pop()!
+            for (const l of links) if (l[from] === k && !dir.has(l[to])) { dir.add(l[to]); seen.add(l[to]); todo.push(l[to]) }
+        }
+    }
+    return seen
+}

@@ -13,3 +13,6 @@ html, body, #root { height: 100%; margin: 0; }
 .md-ref-task { color: var(--mantine-color-blue-text); }
 a.md-ref-task { text-decoration: none; cursor: pointer; } a.md-ref-task:hover { text-decoration: underline; }
 a.md-ref-file { text-decoration: none; cursor: pointer; } a.md-ref-file:hover { text-decoration: underline; }
+
+/* Epic view list rows (TaskRow): hover background. */
+.epic-row:hover { background: var(--mantine-color-default-hover); }
