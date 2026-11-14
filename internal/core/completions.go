@@ -225,6 +225,29 @@ func scanCommands(dir string, seen map[string]bool) []Command {
 	for _, f := range skills {
 		add(filepath.Base(filepath.Dir(f)), f)
 	}
+	// A skills-dir plugin (~/.claude/skills/<plugin>/.claude-plugin/plugin.json) keeps its skills
+	// in <plugin>/skills/*; Claude Code names them "<plugin>:<skill>", never the bare skill name.
+	plugged, _ := filepath.Glob(filepath.Join(dir, "skills", "*", "skills", "*", "SKILL.md"))
+	for _, f := range plugged {
+		pdir := filepath.Dir(filepath.Dir(filepath.Dir(f)))
+		if _, err := os.Stat(filepath.Join(pdir, ".claude-plugin", "plugin.json")); err != nil {
+			continue
+		}
+		b, err := os.ReadFile(f)
+		if err != nil {
+			continue
+		}
+		fm, _ := claude.Frontmatter(b)
+		n := fm["name"]
+		if n == "" {
+			n = filepath.Base(filepath.Dir(f))
+		}
+		name := filepath.Base(pdir) + ":" + n
+		if !seen[name] {
+			seen[name] = true
+			out = append(out, Command{Name: name, Description: fm["description"]})
+		}
+	}
 	cmds := filepath.Join(dir, "commands")
 	filepath.WalkDir(cmds, func(p string, d os.DirEntry, err error) error {
 		if err == nil && !d.IsDir() && strings.HasSuffix(p, ".md") {
