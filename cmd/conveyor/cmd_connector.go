@@ -14,7 +14,7 @@ import (
 )
 
 func init() {
-	register("connector", runConnector, "open worktrees in external tools, run quick actions (list|presets|add|install|export|run|enable|disable|rm|open)")
+	register("connector", runConnector, "open worktrees in external connectors, run quick actions (list|presets|add|install|export|run|enable|disable|rm|open)")
 	register("app", runConnector, "alias of connector")
 	register("plugin", runPlugin, "Conveyor plugin, hooks + skills, per tool (status|install|uninstall [tool])")
 	register("hooks", runPlugin, "alias of plugin")

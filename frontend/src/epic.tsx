@@ -163,7 +163,7 @@ function Header({g, nav, root}: {g: core.Graph; nav: Nav; root: core.GraphNode})
         {epic && hasPR && noHooks && !seen && (
             <Alert variant="light" withCloseButton onClose={() => setSeen(true)} title="Review comments arrive by backoff polling">
                 <Group gap="sm">
-                    <Text size="sm">Add the review-webhooks app to get them as they are posted.</Text>
+                    <Text size="sm">Add the review-webhooks connector to get them as they are posted.</Text>
                     <Button size="compact-xs" onClick={() => InstallExample('review-webhooks').then(reloadApps, errMsg)}>Add review webhooks</Button>
                 </Group>
             </Alert>

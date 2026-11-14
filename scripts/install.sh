@@ -112,7 +112,7 @@ echo "==> Saved state"
 # Left by scripts/uninstall.sh (or copied from another machine); renamed once imported so it is not re-applied.
 state="${CONVEYOR_HOME:-$HOME/.conveyor}/state.json"
 if [ -f "$state" ]; then
-	echo "found $state from a previous install; importing settings, apps, automations and agents (existing ones are kept):"
+	echo "found $state from a previous install; importing settings, connectors, automations and agents (existing ones are kept):"
 	"$BIN_DIR/conveyor" state import "$state" && mv "$state" "$state.imported"
 else
 	echo "none"

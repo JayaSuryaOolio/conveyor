@@ -217,7 +217,7 @@ func (a *App) Requirements() []Requirement {
 	}
 	reqs = append(reqs,
 		Requirement{Name: "acli", Purpose: "Jira sync", Optional: true},
-		Requirement{Name: "graft", Purpose: "run apps from a worktree", Optional: true})
+		Requirement{Name: "graft", Purpose: "run connectors from a worktree", Optional: true})
 	for i := range reqs {
 		p, err := exec.LookPath(reqs[i].Name)
 		reqs[i].Path, reqs[i].Found = p, err == nil

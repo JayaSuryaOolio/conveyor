@@ -7,7 +7,7 @@ import (
 )
 
 func init() {
-	register("mock", runMock, "seed an empty home with mock repos, one task per board scenario, settings, apps and automations")
+	register("mock", runMock, "seed an empty home with mock repos, one task per board scenario, settings, connectors and automations")
 }
 
 func runMock(home string, args []string) error {
@@ -18,7 +18,7 @@ func runMock(home string, args []string) error {
 		if err := s.SeedMock(home); err != nil {
 			return err
 		}
-		fmt.Fprintln(out, "seeded mock repos, tasks, settings, apps and automations in", home)
+		fmt.Fprintln(out, "seeded mock repos, tasks, settings, connectors and automations in", home)
 		return nil
 	})
 }

@@ -12,7 +12,7 @@ import (
 )
 
 func init() {
-	register("state", runState, "export or import settings, apps, automations and user agents as JSON; back up the database")
+	register("state", runState, "export or import settings, connectors, automations and user agents as JSON; back up the database")
 }
 
 const stateUsage = "usage: conveyor state export [FILE] | import FILE [--repo A=name ...] | backup [--keep N]"

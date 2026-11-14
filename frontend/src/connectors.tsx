@@ -58,7 +58,7 @@ function ManifestForm({onClose}: {onClose: (saved: boolean) => void}) {
     }
     const addAction = () => {
         let m: any
-        try { m = text.trim() ? JSON.parse(text) : {version: Number(schema?.version?.[0] ?? 1), name: 'My app'} } catch { errMsg('Fix the JSON first: ' + problem); return }
+        try { m = text.trim() ? JSON.parse(text) : {version: Number(schema?.version?.[0] ?? 1), name: 'My connector'} } catch { errMsg('Fix the JSON first: ' + problem); return }
         const n = (m.actions?.length ?? 0) + 1
         m.actions = [...(m.actions ?? []), {id: `action-${n}`, label: `Action ${n}`, places, run: 'echo hello'}]
         setText(JSON.stringify(m, null, 2))
@@ -83,7 +83,7 @@ function ManifestForm({onClose}: {onClose: (saved: boolean) => void}) {
                     {p => <Button {...p} variant="default" leftSection={<IconUpload size={16}/>}>Load file</Button>}
                 </FileButton>
                 <Group>
-                    <Checkbox label="Replace app with the same name" checked={replace} onChange={e => setReplace(e.currentTarget.checked)}/>
+                    <Checkbox label="Replace connector with the same name" checked={replace} onChange={e => setReplace(e.currentTarget.checked)}/>
                     <Button variant="default" onClick={() => onClose(false)}>Cancel</Button>
                     <Button disabled={!text.trim() || !!problem} onClick={() => InstallManifest(text, replace).then(() => onClose(true), errMsg)}>Install</Button>
                 </Group>
@@ -190,13 +190,13 @@ function ConnectorList() {
     return (
         <Stack maw={900}>
             <Group justify="space-between">
-                <Title order={3}>Apps</Title>
+                <Title order={3}>Connectors</Title>
                 <Group gap="xs">
                     <Button variant="default" leftSection={<IconPuzzle size={16}/>} onClick={() => setImporting(true)}>Install manifest</Button>
-                    <Button leftSection={<IconPlus size={16}/>} onClick={() => setAdding(true)}>New app</Button>
+                    <Button leftSection={<IconPlus size={16}/>} onClick={() => setAdding(true)}>New connector</Button>
                 </Group>
             </Group>
-            <Text size="sm" c="dimmed">Apps a task worktree can be opened in, from the icons under each repo on the task page or <Code>conveyor app open NAME KEY</Code>.</Text>
+            <Text size="sm" c="dimmed">Connectors a task worktree can be opened in, from the icons under each repo on the task page or <Code>conveyor app open NAME KEY</Code>.</Text>
             {error && <Text c="red">{error}</Text>}
             {data && data.length === 0 && <Text c="dimmed">None yet. Add one below or create your own.</Text>}
             {data && data.length > 0 && (
@@ -212,7 +212,7 @@ function ConnectorList() {
                                         <Switch size="xs" aria-label={`Enable ${a.name}`} title={a.disabled ? 'Disabled: enable to use it again' : 'Disable (keeps its settings)'} checked={!a.disabled} onChange={e => SetConnectorDisabled(a.name, !e.currentTarget.checked).then(reload, errMsg)}/>
                                         {hasSettings(a) && <ActionIcon variant="subtle" color="gray" aria-label="Settings" title="Settings" onClick={() => setSettingsApp(a.name)}><IconSettings size={16}/></ActionIcon>}
                                         <ActionIcon variant="subtle" color="gray" aria-label="Export" title="Export manifest as .json" onClick={() => ExportConnector(a.name).then(p => p && toast(`Exported to ${p}`), errMsg)}><IconDownload size={16}/></ActionIcon>
-                                        <ActionIcon variant="subtle" color="red" aria-label="Delete" onClick={() => Confirm(`Delete app ${a.name}?`).then(ok => { if (ok) return DeleteConnector(a.name).then(reload) }).catch(errMsg)}><IconTrash size={16}/></ActionIcon>
+                                        <ActionIcon variant="subtle" color="red" aria-label="Delete" onClick={() => Confirm(`Delete connector ${a.name}?`).then(ok => { if (ok) return DeleteConnector(a.name).then(reload) }).catch(errMsg)}><IconTrash size={16}/></ActionIcon>
                                     </Group>
                                 </Table.Td>
                             </Table.Tr>
@@ -240,13 +240,13 @@ function ConnectorList() {
                 </Group>
             </>}
             <ConveyorPlugin/>
-            <Modal opened={importing} onClose={() => setImporting(false)} title="Install app from manifest" size="lg">
+            <Modal opened={importing} onClose={() => setImporting(false)} title="Install connector from manifest" size="lg">
                 {importing && <ManifestForm onClose={saved => { setImporting(false); if (saved) reload() }}/>}
             </Modal>
             <Modal opened={!!settingsApp} onClose={() => setSettingsApp('')} title={`${settingsApp} settings`} size="lg">
                 {settingsApp && <SettingsForm app={settingsApp} onClose={() => setSettingsApp('')}/>}
             </Modal>
-            <Modal opened={adding} onClose={() => setAdding(false)} title="New app" size="lg">
+            <Modal opened={adding} onClose={() => setAdding(false)} title="New connector" size="lg">
                 {adding && <AppForm onClose={saved => { setAdding(false); if (saved) reload() }}/>}
             </Modal>
         </Stack>
@@ -326,7 +326,7 @@ function Integrations() {
 export function Connectors() {
     return (
         <Tabs defaultValue="apps" keepMounted={false}>
-            <Tabs.List mb="md"><Tabs.Tab value="apps">Apps</Tabs.Tab><Tabs.Tab value="integrations">Integrations</Tabs.Tab></Tabs.List>
+            <Tabs.List mb="md"><Tabs.Tab value="apps">Connectors</Tabs.Tab><Tabs.Tab value="integrations">Integrations</Tabs.Tab></Tabs.List>
             <Tabs.Panel value="apps"><ConnectorList/></Tabs.Panel>
             <Tabs.Panel value="integrations"><Stack maw={900}><Title order={3}>Integrations</Title><Integrations/></Stack></Tabs.Panel>
         </Tabs>
