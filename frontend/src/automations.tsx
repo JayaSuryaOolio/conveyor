@@ -1,6 +1,6 @@
 import {useEffect, useState} from 'react'
-import {ActionIcon, Button, Chip, Code, CopyButton, Group, Modal, MultiSelect, SegmentedControl, Select, Stack, Switch, Table, Text, TextInput, Textarea, Title, Tooltip} from '@mantine/core'
-import {IconCheck, IconCopy, IconPencil, IconPlus, IconTrash} from '@tabler/icons-react'
+import {ActionIcon, Button, Chip, Code, CopyButton, Group, Modal, MultiSelect, Popover, SegmentedControl, Select, Stack, Switch, Table, Text, TextInput, Textarea, Title, Tooltip} from '@mantine/core'
+import {IconCheck, IconCopy, IconCalendarTime, IconPencil, IconPlus, IconTrash} from '@tabler/icons-react'
 import {AddAutomation, Confirm, DeleteAutomation, DescribeSchedule, ListAutomations, ListRepos, RunAutomation, SetAutomationEnabled, UpdateAutomation} from '../wailsjs/go/ui/App'
 import {store, ui} from '../wailsjs/go/models'
 import {Time, errMsg} from './components'
@@ -107,6 +107,21 @@ function AutomationForm({initial, edit, onClose}: {initial: Form; edit: boolean;
     )
 }
 
+function NextRuns({schedule}: {schedule: string}) {
+    const [info, setInfo] = useState<ui.ScheduleInfo>()
+    return (
+        <Popover width={240} withArrow position="bottom">
+            <Popover.Target>
+                <ActionIcon variant="subtle" color="gray" aria-label="Next runs" onClick={() => DescribeSchedule(schedule).then(setInfo, errMsg)}><IconCalendarTime size={16}/></ActionIcon>
+            </Popover.Target>
+            <Popover.Dropdown>
+                <Text size="xs" c="dimmed" mb={4}>Next runs</Text>
+                {info?.valid ? info.next.map(t => <Text key={t} size="sm">{t}</Text>) : <Text size="sm" c="red">{info?.error}</Text>}
+            </Popover.Dropdown>
+        </Popover>
+    )
+}
+
 export function Automations() {
     const {data, error, reload} = useData(ListAutomations, [])
     const [form, setForm] = useState<{initial: Form; edit: boolean}>()
@@ -127,7 +142,7 @@ export function Automations() {
                                 <Table.Tr key={a.name}>
                                     <Table.Td><Switch checked={a.enabled} onChange={e => SetAutomationEnabled(a.name, e.currentTarget.checked).then(reload, errMsg)}/></Table.Td>
                                     <Table.Td fw={600}>{a.name}</Table.Td>
-                                    <Table.Td><Code>{a.schedule}</Code></Table.Td>
+                                    <Table.Td><Group gap={4} wrap="nowrap"><Code>{a.schedule}</Code><NextRuns schedule={a.schedule}/></Group></Table.Td>
                                     <Table.Td>{a.action_kind}</Table.Td>
                                     <Table.Td>{a.last_run_at ? <Time iso={a.last_run_at}/> : ''}</Table.Td>
                                     <Table.Td><Text size="sm" lineClamp={1}>{a.last_result ?? ''}</Text></Table.Td>
