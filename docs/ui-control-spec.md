@@ -9,7 +9,7 @@ No orb, text box or AI inside Conveyor. Three small additions to the CLI cover w
 | Need | What exists today | Add |
 |---|---|---|
 | Move status, comment, stop, link, run app actions | `conveyor task move/comment/stop`, `conveyor app run/open` | nothing |
-| "Check PR" button | binding `CheckReviews` only (UI) | `conveyor task check-pr KEY` |
+| "Check PR" button | binding `CheckReviews` only (UI); `conveyor epic review-check KEY` runs the same check | a manifest app action (`examples/pr-check.json`), no new command; see §5 |
 | Navigate the open app | nothing: the CLI cannot reach the UI | `conveyor ui go/palette/current` (§3) |
 | "on the task I'm looking at" | nothing: the CLI cannot see the UI | the `@` key token (§4) |
 | Let a tool know what it can do | `app list` (app-level only) | `conveyor actions KEY --json` (§5) |
@@ -69,7 +69,7 @@ A file, not a DB row, so navigation does not bump `data_version` and trigger a r
 ```
 conveyor task move @ review
 conveyor app run "Open in IDE" open @
-conveyor task check-pr @
+conveyor app run "PR check" check @
 ```
 
 ## 5. `conveyor actions [KEY|@] [--json]`
@@ -78,17 +78,17 @@ One list of everything a tool can run, each with a ready argv, so the external t
 
 ```json
 [
-  {"label":"Check PR","kind":"builtin","argv":["conveyor","task","check-pr","CV-128"]},
   {"label":"Move to review","kind":"builtin","argv":["conveyor","task","move","CV-128","review"]},
   {"label":"Cancel","kind":"builtin","argv":["conveyor","task","cancel","CV-128"],"confirm":"Cancel CV-128?"},
   {"label":"Comment","kind":"builtin","argv":["conveyor","task","comment","CV-128","{text}"],"needs_text":true},
   {"label":"Open task","kind":"nav","argv":["conveyor","ui","go","CV-128"]},
+  {"label":"Check PR","kind":"app","app":"PR check","argv":["conveyor","app","run","PR check","check","CV-128","--place","task_sidebar"]},
   {"label":"Run tests","kind":"app","app":"Make","argv":["conveyor","app","run","Make","test","CV-128","--place","task_sidebar"],"confirm":"..."}
 ]
 ```
 
-- **builtin**: the moves allowed from the task's status (`internal/store/status.go`, human transitions), `stop` when running, `check-pr` when the task has an open PR, `open --shell/--resume/--fresh`, `comment` (`needs_text`).
-- **app**: `apps.PlacedActions` for each place, and `app open` per app; `confirm` comes from the manifest's `Confirm`.
+- **builtin**: the moves allowed from the task's status (`internal/store/status.go`, human transitions), `stop` when running, `open --shell/--resume/--fresh`, `comment` (`needs_text`).
+- **app**: `apps.PlacedActions` for each place, and `app open` per app; `confirm` comes from the manifest's `Confirm`. Check PR is one of these, not a built-in: Conveyor stays ignorant of PR tooling, and an app that is not installed or is disabled is simply absent from the list. Manifests have no "only when a PR is open" condition, so the action runs and its output says there is no PR.
 - **nav**: task page, epic view when the task has a tree.
 - Without KEY: only actions that need no task (nav targets, `ui palette`).
 - `confirm` is a contract for the caller: the CLI does not prompt. Destructive built-ins (`cancel`, `done`, `stop`, `move` to cancelled) always carry `confirm`.
@@ -111,13 +111,25 @@ claude -p --allowedTools 'Bash(conveyor:*)' \
 
 - `cmd/conveyor/cli_test.go`: `ui go` with no app times out with exit 3 and leaves no row; `ui go BAD-1` fails before inserting; `@` with no state file, with a dead pid, with a task view, with an epic modal; `actions` for a running task with an open PR and one placed app action (golden JSON).
 - `internal/ui`: the consume step marks rows, drops rows older than 10 s, and emits once per row (inject `now` and the emit func, as `pollDataVersion` already takes `emit`).
-- `task check-pr`: schedules the same check as the button (`gh.ScheduleCheck(db, t, 0, 0)`).
+- `pr-check` joins the expected names in `TestExampleApps` (`internal/apps/apps_test.go`), and `actions CV-x --json` lists its action once the app is installed.
 
 ## 8. Work split
 
-1. `conveyor task check-pr` and `conveyor actions` (CLI and `internal/core` only, no UI).
+1. `examples/pr-check.json` and `conveyor actions` (CLI and `internal/core` only, no UI).
 2. `ui_intents` + `ui-state.json` + `conveyor ui` + the `@` rewrite (store migration, `internal/ui`, `App.tsx`, CLI).
 
 Both update `docs/guide.md` and the command list in `.claude/skills/conveyor/SKILL.md`.
 
 Out of scope: the voice/parsing tool itself, the `conveyor://` scheme, an in-app orb.
+
+## 9. Check PR as an app
+
+Bundled example `examples/pr-check.json` (listed under Apps > Detected, never auto-installed, like `review-webhooks.json`):
+
+```json
+{"name":"PR check","description":"Check the task's PR for reviews, CI and conflicts",
+ "actions":[{"id":"check","label":"Check PR","places":["task_sidebar"],"output":true,
+   "run":"conveyor epic review-check ${{ task.key }}"}]}
+```
+
+An output action runs to completion and toasts the result (`nothing new`, or the review comment summary). It differs from the button today, which only schedules a check for the dispatcher; whether the built-in button should later become this app is left open.
