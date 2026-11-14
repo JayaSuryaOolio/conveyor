@@ -68,3 +68,19 @@ func TestCompletions(t *testing.T) {
 		t.Errorf("Terminal: %v", err)
 	}
 }
+
+func TestScanCommandsPluginSkills(t *testing.T) {
+	d := t.TempDir()
+	p := filepath.Join(d, "skills", "conveyor")
+	os.MkdirAll(filepath.Join(p, ".claude-plugin"), 0o755)
+	os.MkdirAll(filepath.Join(p, "skills", "epic"), 0o755)
+	os.WriteFile(filepath.Join(p, ".claude-plugin", "plugin.json"), []byte("{}"), 0o644)
+	os.WriteFile(filepath.Join(p, "skills", "epic", "SKILL.md"), []byte("---\nname: epic\ndescription: d\n---\n"), 0o644)
+	// a non-plugin dir with nested skills must not be namespaced
+	os.MkdirAll(filepath.Join(d, "skills", "plain", "skills", "x"), 0o755)
+	os.WriteFile(filepath.Join(d, "skills", "plain", "skills", "x", "SKILL.md"), []byte("---\nname: x\n---\n"), 0o644)
+	got := scanCommands(d, map[string]bool{})
+	if len(got) != 1 || got[0].Name != "conveyor:epic" {
+		t.Fatalf("got %+v", got)
+	}
+}
