@@ -64,3 +64,10 @@ func TestLearningNoneIgnored(t *testing.T) {
 		}
 	}
 }
+
+func TestSpawnPlaceholderSkipped(t *testing.T) {
+	b, _, ok := Parse("<conveyor>\nstatus: done\nspawn: none | nothing\nspawn: None\nspawn: [todo] NONE | x\nspawn: | x\nspawn: real | do it\n</conveyor>")
+	if !ok || len(b.Spawn) != 1 || b.Spawn[0] != "real | do it" {
+		t.Fatalf("%v %+v", ok, b.Spawn)
+	}
+}
