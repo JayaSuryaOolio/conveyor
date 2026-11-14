@@ -22,16 +22,19 @@ func init() {
 	register("review-webhook", runReviewWebhook, "opt-in review webhooks: forward PR review events to review checks ([--status|--stop])")
 }
 
-// defaultApp is the id the built-in start (an open epic) runs under; the bundled manifest's slug matches it.
-const defaultApp = "review-webhooks"
+// defaultConnector is the id the built-in start (an open epic) runs under; the bundled manifest's slug matches it.
+const defaultConnector = "review-webhooks"
 
-func pidFile(home, app string) string { return filepath.Join(home, "apps", app+".pid") }
+func pidFile(home, id string) string { return filepath.Join(home, "connectors", id+".pid") }
 
-// runningPID returns the live listener's pid, or 0.
-func runningPID(home, app string) int {
-	b, err := os.ReadFile(pidFile(home, app))
+// runningPID returns the live listener's pid, or 0. It also reads the pre-rebrand apps/<id>.pid,
+// so a listener started by an older build is still found.
+func runningPID(home, id string) int {
+	b, err := os.ReadFile(pidFile(home, id))
 	if err != nil {
-		return 0
+		if b, err = os.ReadFile(filepath.Join(home, "apps", id+".pid")); err != nil {
+			return 0
+		}
 	}
 	pid, _ := strconv.Atoi(strings.TrimSpace(string(b)))
 	if pid > 0 && syscall.Kill(pid, 0) == nil {
@@ -45,12 +48,14 @@ func runReviewWebhook(home string, args []string) error {
 	status := fs.Bool("status", false, "exit 0 when the listener is running")
 	stop := fs.Bool("stop", false, "stop the listener")
 	serve := fs.Bool("serve", false, "run in the foreground (what the default start launches)")
-	app := fs.String("app", defaultApp, "app id: names the pid file and logs/app/<id>.log (${{ app.id }})")
+	connector := fs.String("connector", defaultConnector, "connector id: names the pid file and logs/app/<id>.log (${{ connector.id }})")
+	fs.StringVar(connector, "app", defaultConnector, "alias of --connector")
 	if _, err := parseArgs(fs, args); err != nil {
 		return err
 	}
+	app := connector
 	if !regexp.MustCompile(`^[a-z0-9][a-z0-9-]*$`).MatchString(*app) {
-		return fmt.Errorf("invalid --app %q", *app)
+		return fmt.Errorf("invalid --connector %q", *app)
 	}
 	pid := runningPID(home, *app)
 	switch {
@@ -98,7 +103,7 @@ func runReviewWebhook(home string, args []string) error {
 		return err
 	}
 	defer logf.Close()
-	c := exec.Command(self, "--home", home, "review-webhook", "--app", *app, "--serve")
+	c := exec.Command(self, "--home", home, "review-webhook", "--connector", *app, "--serve")
 	c.Stdout, c.Stderr = logf, logf
 	c.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 	if err := c.Start(); err != nil {

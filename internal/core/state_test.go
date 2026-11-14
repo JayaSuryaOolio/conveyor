@@ -92,7 +92,7 @@ func TestSeedMockState(t *testing.T) {
 	if err := (&Service{DB: db}).SeedMock(t.TempDir()); err != nil {
 		t.Fatal(err)
 	}
-	apps, _ := store.ListApps(db)
+	apps, _ := store.ListConnectors(db)
 	autos, _ := store.ListAutomations(db)
 	var out, enabled, disabled bool
 	for _, a := range apps {
@@ -131,5 +131,45 @@ func TestBackupKeepsNewest(t *testing.T) {
 	defer db.Close()
 	if repos, _ := store.ListRepos(db); len(repos) != 2 {
 		t.Fatalf("backup has %d repos, want 2", len(repos))
+	}
+}
+
+// Exports from before the rebrand carry the connectors under "apps"; import still reads them.
+func TestImportStateLegacyAppsKey(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	s := newSvc(t)
+	var st State
+	if err := json.Unmarshal([]byte(`{"apps":[{"name":"Old","command":"echo {key}","output":true}]}`), &st); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.ImportState(st, nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.GetConnector(s.DB, "Old"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// The pre-rebrand app-icons dir becomes connector-icons and stored manifests follow it.
+func TestMigrateIconsDir(t *testing.T) {
+	home := t.TempDir()
+	db, err := store.Open(DBPath(home))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	old := filepath.Join(home, "app-icons")
+	os.MkdirAll(old, 0o755)
+	os.WriteFile(filepath.Join(old, "a.png"), []byte("x"), 0o644)
+	store.CreateConnector(db, store.Connector{Name: "A", Manifest: `{"iconPath": "` + old + `/a.png"}`})
+	for i := 0; i < 2; i++ { // second run is a no-op
+		if err := migrateIconsDir(db, home); err != nil {
+			t.Fatal(err)
+		}
+	}
+	c, _ := store.GetConnector(db, "A")
+	want := filepath.Join(home, "connector-icons", "a.png")
+	if _, err := os.Stat(want); err != nil || !strings.Contains(c.Manifest, want) {
+		t.Fatal(err, c.Manifest)
 	}
 }

@@ -1,4 +1,4 @@
-package apps
+package connectors
 
 import (
 	"io/fs"
@@ -14,8 +14,8 @@ type Example struct {
 	Description string `json:"description"`
 }
 
-// ExampleApps lists the bundled examples.
-func ExampleApps() []Example {
+// ExampleConnectors lists the bundled examples.
+func ExampleConnectors() []Example {
 	var out []Example
 	files, _ := fs.Glob(examples.FS, "*.json")
 	for _, f := range files {

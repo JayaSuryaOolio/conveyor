@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/JayaSuryaOolio/conveyor/internal/apps"
 	"github.com/JayaSuryaOolio/conveyor/internal/claude"
+	"github.com/JayaSuryaOolio/conveyor/internal/connectors"
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 )
 
@@ -18,15 +18,17 @@ import (
 // user-level agents. Repos are not exported; the names automations use become
 // placeholders A, B, C... that import maps back to registered repos.
 type State struct {
-	Version     int               `json:"version"`
-	Repos       []string          `json:"repos"`
-	Settings    map[string]string `json:"settings"`
-	Apps        []StateApp        `json:"apps"`
+	Version    int               `json:"version"`
+	Repos      []string          `json:"repos"`
+	Settings   map[string]string `json:"settings"`
+	Connectors []StateConnector  `json:"connectors"`
+	// LegacyApps is the pre-rebrand "apps" key: still read on import, never written.
+	LegacyApps  []StateConnector  `json:"apps,omitempty"`
 	Automations []StateAutomation `json:"automations"`
 	Agents      []StateAgent      `json:"agents"`
 }
 
-type StateApp struct {
+type StateConnector struct {
 	Name string `json:"name"`
 	// Command and Output only appear in exports from before manifest-only apps; imported as a command manifest.
 	Command string `json:"command,omitempty"`
@@ -84,7 +86,7 @@ func mapRepos(arg string, f func(string) string) (string, error) {
 
 // ExportState collects the stored settings, apps, automations (repos replaced by placeholders) and user agents.
 func (s *Service) ExportState() (State, error) {
-	st := State{Version: 1, Repos: []string{}, Settings: map[string]string{}, Apps: []StateApp{}, Automations: []StateAutomation{}, Agents: []StateAgent{}}
+	st := State{Version: 1, Repos: []string{}, Settings: map[string]string{}, Connectors: []StateConnector{}, Automations: []StateAutomation{}, Agents: []StateAgent{}}
 	rows, err := s.DB.Query(`SELECT key, value FROM settings`)
 	if err != nil {
 		return st, err
@@ -98,16 +100,16 @@ func (s *Service) ExportState() (State, error) {
 		st.Settings[k] = v
 	}
 	rows.Close()
-	list, err := store.ListApps(s.DB)
+	list, err := store.ListConnectors(s.DB)
 	if err != nil {
 		return st, err
 	}
 	for _, a := range list {
-		sa := StateApp{Name: a.Name, Disabled: a.Disabled}
-		if sa.Manifest, err = apps.PortableManifest(a.Manifest); err != nil {
+		sa := StateConnector{Name: a.Name, Disabled: a.Disabled}
+		if sa.Manifest, err = connectors.PortableManifest(a.Manifest); err != nil {
 			return st, fmt.Errorf("app %q: %w", a.Name, err)
 		}
-		st.Apps = append(st.Apps, sa)
+		st.Connectors = append(st.Connectors, sa)
 	}
 	autos, err := store.ListAutomations(s.DB)
 	if err != nil {
@@ -169,23 +171,23 @@ func (s *Service) ImportState(st State, repoMap map[string]string) ([]string, er
 		}
 		out = append(out, "added setting "+k)
 	}
-	for _, a := range st.Apps {
-		if _, err := store.GetApp(s.DB, a.Name); err == nil {
-			out = append(out, "skipped app "+a.Name+": exists")
+	for _, a := range append(append([]StateConnector{}, st.Connectors...), st.LegacyApps...) {
+		if _, err := store.GetConnector(s.DB, a.Name); err == nil {
+			out = append(out, "skipped connector "+a.Name+": exists")
 			continue
 		}
 		if a.Manifest == "" {
-			a.Manifest = apps.CommandManifest(a.Name, a.Command, a.Output)
+			a.Manifest = connectors.CommandManifest(a.Name, a.Command, a.Output)
 		}
 		// agents and automations a manifest declares travel in their own state sections
-		if _, err := apps.ParseManifest(a.Manifest); err != nil {
-			out = append(out, "skipped app "+a.Name+": "+err.Error())
+		if _, err := connectors.ParseManifest(a.Manifest); err != nil {
+			out = append(out, "skipped connector "+a.Name+": "+err.Error())
 			continue
 		}
-		if _, err := store.CreateApp(s.DB, store.App{Name: a.Name, Manifest: a.Manifest, Disabled: a.Disabled}); err != nil {
+		if _, err := store.CreateConnector(s.DB, store.Connector{Name: a.Name, Manifest: a.Manifest, Disabled: a.Disabled}); err != nil {
 			return out, err
 		}
-		out = append(out, "added app "+a.Name)
+		out = append(out, "added connector "+a.Name)
 	}
 	for _, a := range st.Automations {
 		if _, err := store.GetAutomation(s.DB, a.Name); err == nil {

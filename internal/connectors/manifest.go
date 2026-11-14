@@ -1,4 +1,4 @@
-package apps
+package connectors
 
 import (
 	"context"
@@ -25,7 +25,7 @@ type Manifest struct {
 	// Version is the manifest schema version; absent means 1. See migrateManifest.
 	Version int    `json:"version,omitempty"`
 	Name    string `json:"name"`
-	// ID names the app's runtime files (logs/app/<id>.log, apps/<id>.pid) and is ${{ app.id }}; default: Name as a slug.
+	// ID names the app's runtime files (logs/app/<id>.log, apps/<id>.pid) and is ${{ connector.id }}; default: Name as a slug.
 	ID          string `json:"id,omitempty"`
 	Description string `json:"description,omitempty"`
 	// Check is a sample-run script (`sh -c`, 30s); install fails, storing nothing, if it exits non-zero.
@@ -66,7 +66,7 @@ type ManifestAction struct {
 	Run    string   `json:"run"`
 	Places []string `json:"places"`
 	Output bool     `json:"output,omitempty"`
-	// Timeline (v4) records an "app" entry in the task's timeline whenever the action runs for a task.
+	// Timeline (v4) records a "connector" entry in the task's timeline whenever the action runs for a task.
 	Timeline bool `json:"timeline,omitempty"`
 	// Confirm, when set, is asked (OK/Cancel) before the action runs or starts its service; stopping is never confirmed.
 	Confirm string `json:"confirm,omitempty"`
@@ -74,7 +74,7 @@ type ManifestAction struct {
 	// Label as its tooltip.
 	Icon string `json:"icon,omitempty"`
 	// IconPath is an image file (absolute or ~/, png/jpg/gif/webp/svg/icns, <= 1 MB) or a macOS .app
-	// bundle (its icon is extracted) used instead of Icon. Install copies it to <home>/app-icons
+	// bundle (its icon is extracted) used instead of Icon. Install copies it to <home>/connector-icons
 	// as an image and the stored manifest points at the copy.
 	IconPath string `json:"iconPath,omitempty"`
 	// Services (v2), keyed by place, makes the action a long-running service there: Status
@@ -162,7 +162,10 @@ func migrateManifest(m *Manifest) error {
 var Placements = map[string]bool{"global_nav": false, "task_sidebar": true, "board_card": true}
 
 // ManifestVars are the placeholders available to `run`, e.g. ${{ task.key }}.
-var ManifestVars = []string{"app.name", "app.id", "task.key", "task.title", "task.status", "repo.name", "worktree.path"}
+var ManifestVars = []string{"connector.name", "connector.id", "task.key", "task.title", "task.status", "repo.name", "worktree.path"}
+
+// legacyVars are the pre-rebrand names of connector.name and connector.id; old manifests keep working.
+var legacyVars = map[string]string{"app.name": "connector.name", "app.id": "connector.id"}
 
 var (
 	varRe = regexp.MustCompile(`\$\{\{\s*([\w.]+)\s*\}\}`)
@@ -171,8 +174,8 @@ var (
 	settingKeyRe = regexp.MustCompile(`^[a-z0-9_]+$`)
 )
 
-// AppID is the manifest's id, else its name as a slug ("Review webhooks" -> "review-webhooks").
-func (m Manifest) AppID() string {
+// ConnectorID is the manifest's id, else its name as a slug ("Review webhooks" -> "review-webhooks").
+func (m Manifest) ConnectorID() string {
 	if m.ID != "" {
 		return m.ID
 	}
@@ -245,7 +248,7 @@ func ParseManifest(raw string) (Manifest, error) {
 			scripts += "\n" + sv.Run + "\n" + sv.Status + "\n" + sv.Stop
 		}
 		for _, v := range varRe.FindAllStringSubmatch(scripts, -1) {
-			if k, ok := strings.CutPrefix(v[1], "setting."); !slices.Contains(ManifestVars, v[1]) && !(ok && keys[k]) {
+			if k, ok := strings.CutPrefix(v[1], "setting."); !slices.Contains(ManifestVars, v[1]) && legacyVars[v[1]] == "" && !(ok && keys[k]) {
 				return m, fmt.Errorf("manifest: action %q: unknown variable %q (have %s, setting.<key>)", a.ID, v[1], strings.Join(ManifestVars, ", "))
 			}
 		}
@@ -354,7 +357,7 @@ func ManifestFromApp(name string) (string, error) {
 }
 
 // IconsDir is where installed manifests' icon copies live.
-func IconsDir(home string) string { return filepath.Join(home, "app-icons") }
+func IconsDir(home string) string { return filepath.Join(home, "connector-icons") }
 
 // RenderManifest fills ${{ var }} placeholders in a run script with shell-quoted values.
 func RenderManifest(run string, vars map[string]string) string {
@@ -388,7 +391,7 @@ func ReadIcons(m Manifest) (map[int][]byte, error) {
 	return icons, nil
 }
 
-// WriteIcons copies icons into <home>/app-icons, points m's iconPaths at the copies and returns
+// WriteIcons copies icons into <home>/connector-icons, points m's iconPaths at the copies and returns
 // the manifest JSON; with no icons it returns raw unchanged.
 func WriteIcons(home string, m *Manifest, icons map[int][]byte, raw string) (string, error) {
 	if len(icons) == 0 {
@@ -411,18 +414,18 @@ func WriteIcons(home string, m *Manifest, icons map[int][]byte, raw string) (str
 
 // Placed is one manifest action ready to show in a UI slot.
 type Placed struct {
-	App     string `json:"app"`
-	ID      string `json:"id"`
-	Label   string `json:"label"`
-	Output  bool   `json:"output"`
-	Service bool   `json:"service"`
-	Icon    string `json:"icon,omitempty"`
-	Confirm string `json:"confirm,omitempty"`
+	Connector string `json:"connector"`
+	ID        string `json:"id"`
+	Label     string `json:"label"`
+	Output    bool   `json:"output"`
+	Service   bool   `json:"service"`
+	Icon      string `json:"icon,omitempty"`
+	Confirm   string `json:"confirm,omitempty"`
 }
 
 // PlacedActions lists the manifest actions that asked for place.
 func PlacedActions(db *sql.DB, place string) ([]Placed, error) {
-	apps, err := store.ListApps(db)
+	apps, err := store.ListConnectors(db)
 	if err != nil {
 		return nil, err
 	}
@@ -449,18 +452,18 @@ func PlacedActions(db *sql.DB, place string) ([]Placed, error) {
 	return out, nil
 }
 
-// RunAppAction runs one manifest action as shown at place (whose service may override Run;
+// RunConnectorAction runs one manifest action as shown at place (whose service may override Run;
 // "" = the action's own Run). key "" means no task (worktree.path is then the home directory).
 // Returns an output action's output.
-func RunAppAction(db *sql.DB, app, id, place, key string) (string, error) {
-	return runAppAction(db, app, id, place, key, "")
+func RunConnectorAction(db *sql.DB, app, id, place, key string) (string, error) {
+	return runConnectorAction(db, app, id, place, key, "")
 }
 
 // appTimeout bounds an output action (a quick action); launching actions return at once.
 var appTimeout = 2 * time.Minute
 
-// runAppAction is RunAppAction in the worktree of the task's repo ("" = primary).
-func runAppAction(db *sql.DB, app, id, place, key, repo string) (string, error) {
+// runConnectorAction is RunConnectorAction in the worktree of the task's repo ("" = primary).
+func runConnectorAction(db *sql.DB, app, id, place, key, repo string) (string, error) {
 	act, vars, cwd, err := resolveAction(db, app, id, key, repo)
 	if err != nil {
 		return "", err
@@ -472,7 +475,7 @@ func runAppAction(db *sql.DB, app, id, place, key, repo string) (string, error) 
 	cmd := RenderManifest(run, vars)
 	if act.Timeline && key != "" {
 		if t, err := store.GetTaskByKey(db, key); err == nil {
-			_ = store.RecordEvent(db, t.ID, "app", app+": "+act.Label)
+			_ = store.RecordEvent(db, t.ID, "connector", app+": "+act.Label)
 		}
 	}
 	if !act.Output {
@@ -493,8 +496,8 @@ func runAppAction(db *sql.DB, app, id, place, key, repo string) (string, error) 
 	return out, nil
 }
 
-// AppServiceRunning reports whether the action's service at place has its status script exit 0.
-func AppServiceRunning(db *sql.DB, app, id, place, key string) (bool, error) {
+// ConnectorServiceRunning reports whether the action's service at place has its status script exit 0.
+func ConnectorServiceRunning(db *sql.DB, app, id, place, key string) (bool, error) {
 	act, vars, cwd, err := resolveAction(db, app, id, key, "")
 	if err != nil {
 		return false, err
@@ -510,8 +513,8 @@ func AppServiceRunning(db *sql.DB, app, id, place, key string) (bool, error) {
 	return c.Run() == nil, nil
 }
 
-// StopAppService runs the stop script of the action's service at place.
-func StopAppService(db *sql.DB, app, id, place, key string) error {
+// StopConnectorService runs the stop script of the action's service at place.
+func StopConnectorService(db *sql.DB, app, id, place, key string) error {
 	act, vars, _, err := resolveAction(db, app, id, key, "")
 	if err != nil {
 		return err
@@ -525,7 +528,7 @@ func StopAppService(db *sql.DB, app, id, place, key string) error {
 
 // resolveAction finds the action and the variables and directory its scripts run with (the worktree of repo, "" = primary).
 func resolveAction(db *sql.DB, app, id, key, repo string) (*ManifestAction, map[string]string, string, error) {
-	a, err := store.GetApp(db, app)
+	a, err := store.GetConnector(db, app)
 	if err != nil {
 		return nil, nil, "", err
 	}
@@ -545,7 +548,10 @@ func resolveAction(db *sql.DB, app, id, key, repo string) (*ManifestAction, map[
 	if act == nil {
 		return nil, nil, "", fmt.Errorf("app %q has no action %q", app, id)
 	}
-	vars := map[string]string{"app.name": m.Name, "app.id": m.AppID()}
+	vars := map[string]string{"connector.name": m.Name, "connector.id": m.ConnectorID()}
+	for old, cur := range legacyVars {
+		vars[old] = vars[cur]
+	}
 	vals, err := settingValues(db, m, app)
 	if err != nil {
 		return nil, nil, "", err
@@ -603,16 +609,16 @@ func CommandManifest(name, command string, output bool) string {
 // manifest apps, then drops the columns. Idempotent; run once at startup.
 func MigratePlain(db *sql.DB, home string) error {
 	var n int
-	if err := db.QueryRow(`SELECT count(*) FROM pragma_table_info('apps') WHERE name='command'`).Scan(&n); err != nil || n == 0 {
+	if err := db.QueryRow(`SELECT count(*) FROM pragma_table_info('connectors') WHERE name='command'`).Scan(&n); err != nil || n == 0 {
 		return err
 	}
 	out := "0"
-	if err := db.QueryRow(`SELECT count(*) FROM pragma_table_info('apps') WHERE name='output'`).Scan(&n); err != nil {
+	if err := db.QueryRow(`SELECT count(*) FROM pragma_table_info('connectors') WHERE name='output'`).Scan(&n); err != nil {
 		return err
 	} else if n > 0 {
 		out = "output"
 	}
-	rows, err := db.Query(`SELECT id, name, command, ` + out + ` FROM apps WHERE manifest=''`)
+	rows, err := db.Query(`SELECT id, name, command, ` + out + ` FROM connectors WHERE manifest=''`)
 	if err != nil {
 		return err
 	}
@@ -636,15 +642,15 @@ func MigratePlain(db *sql.DB, home string) error {
 		if err != nil {
 			return fmt.Errorf("migrate app %q: %w", p.name, err)
 		}
-		if _, err := db.Exec(`UPDATE apps SET manifest=? WHERE id=?`, raw, p.id); err != nil {
+		if _, err := db.Exec(`UPDATE connectors SET manifest=? WHERE id=?`, raw, p.id); err != nil {
 			return err
 		}
 	}
-	if _, err := db.Exec(`ALTER TABLE apps DROP COLUMN command`); err != nil {
+	if _, err := db.Exec(`ALTER TABLE connectors DROP COLUMN command`); err != nil {
 		return err
 	}
 	if out == "output" {
-		_, err = db.Exec(`ALTER TABLE apps DROP COLUMN output`)
+		_, err = db.Exec(`ALTER TABLE connectors DROP COLUMN output`)
 	}
 	return err
 }
@@ -662,9 +668,9 @@ func withIcons(home, raw string) (string, error) {
 	return WriteIcons(home, &m, icons, raw)
 }
 
-// ExportApp returns the manifest JSON of a manifest app, ready for InstallManifest elsewhere.
-func ExportApp(db *sql.DB, name string) (string, error) {
-	a, err := store.GetApp(db, name)
+// ExportConnector returns the manifest JSON of a manifest app, ready for InstallManifest elsewhere.
+func ExportConnector(db *sql.DB, name string) (string, error) {
+	a, err := store.GetConnector(db, name)
 	if err != nil {
 		return "", err
 	}
@@ -673,7 +679,7 @@ func ExportApp(db *sql.DB, name string) (string, error) {
 
 // EnsureServices starts every enabled app's autostart service that is not running; errors are returned together.
 func EnsureServices(db *sql.DB) error {
-	apps, err := store.ListApps(db)
+	apps, err := store.ListConnectors(db)
 	if err != nil {
 		return err
 	}
@@ -688,10 +694,10 @@ func EnsureServices(db *sql.DB) error {
 				if !sv.Autostart {
 					continue
 				}
-				if up, _ := AppServiceRunning(db, a.Name, x.ID, place, ""); up {
+				if up, _ := ConnectorServiceRunning(db, a.Name, x.ID, place, ""); up {
 					continue
 				}
-				if _, err := RunAppAction(db, a.Name, x.ID, place, ""); err != nil {
+				if _, err := RunConnectorAction(db, a.Name, x.ID, place, ""); err != nil {
 					errs = append(errs, err)
 				}
 			}
@@ -703,7 +709,7 @@ func EnsureServices(db *sql.DB) error {
 // Injected joins the text enabled apps inject with pick (e.g. func(i ManifestInject) string { return i.Prompt }),
 // one block per app, headed by the app name when named is true. "" when no app injects any.
 func Injected(db *sql.DB, named bool, pick func(ManifestInject) string) string {
-	list, _ := store.ListApps(db)
+	list, _ := store.ListConnectors(db)
 	var out []string
 	for _, a := range list {
 		m, err := ParseManifest(a.Manifest)

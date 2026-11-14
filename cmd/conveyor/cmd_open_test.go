@@ -43,7 +43,7 @@ func TestTaskOpenPrint(t *testing.T) {
 	}
 	os.MkdirAll(wt, 0o755)
 	cv(t, home, "app", "add", "Ed", "--command", "echo ed {cwd} {key}", "--output")
-	if out := cv(t, home, "app", "list"); !strings.Contains(out, "Ed") || !strings.Contains(out, "open") {
+	if out := cv(t, home, "connector", "list"); !strings.Contains(out, "Ed") || !strings.Contains(out, "open") {
 		t.Fatal(out)
 	}
 	if out := cv(t, home, "app", "open", "Ed", tk.Key); strings.TrimSpace(out) != "ed "+wt+" "+tk.Key {

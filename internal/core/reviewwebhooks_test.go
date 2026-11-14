@@ -33,14 +33,14 @@ func TestEnsureServices(t *testing.T) {
 	if _, err := s.InstallManifest(raw, false); err != nil {
 		t.Fatal(err)
 	}
-	store.SetAppDisabled(s.DB, "Svc", true)
+	store.SetConnectorDisabled(s.DB, "Svc", true)
 	if err := s.EnsureServices(); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(flag); err == nil {
 		t.Fatal("disabled app was started")
 	}
-	store.SetAppDisabled(s.DB, "Svc", false)
+	store.SetConnectorDisabled(s.DB, "Svc", false)
 	if err := s.EnsureServices(); err != nil {
 		t.Fatal(err)
 	}
@@ -55,7 +55,7 @@ func TestInstallCheckGatesInstall(t *testing.T) {
 	if err := s.InstallExample("acli"); err == nil || !strings.Contains(err.Error(), "sample run failed") {
 		t.Fatalf("installed without acli: %v", err)
 	}
-	if _, err := store.GetApp(s.DB, "Atlassian CLI (acli)"); err == nil {
+	if _, err := store.GetConnector(s.DB, "Atlassian CLI (acli)"); err == nil {
 		t.Fatal("failed install left an app behind")
 	}
 	bin := t.TempDir()
@@ -71,18 +71,18 @@ func TestInstallCheckGatesInstall(t *testing.T) {
 // The app is found by its manifest, whatever its name or id; disabled apps are skipped.
 func TestReviewWebhookAppID(t *testing.T) {
 	s := newSvc(t)
-	if id := s.ReviewWebhookAppID(); id != "" {
+	if id := s.ReviewWebhookConnectorID(); id != "" {
 		t.Fatalf("id %q on a fresh home", id)
 	}
 	raw := `{"version":2,"name":"Other","id":"rw-v2","actions":[{"id":"go","label":"Go","places":["task_sidebar"],"run":"conveyor review-webhook --app ${{ app.id }}"}]}`
 	if _, err := s.InstallManifest(raw, false); err != nil {
 		t.Fatal(err)
 	}
-	if id := s.ReviewWebhookAppID(); id != "rw-v2" {
+	if id := s.ReviewWebhookConnectorID(); id != "rw-v2" {
 		t.Fatalf("id %q, want rw-v2", id)
 	}
-	store.SetAppDisabled(s.DB, "Other", true)
-	if id := s.ReviewWebhookAppID(); id != "" {
+	store.SetConnectorDisabled(s.DB, "Other", true)
+	if id := s.ReviewWebhookConnectorID(); id != "" {
 		t.Fatalf("disabled app found: %q", id)
 	}
 }

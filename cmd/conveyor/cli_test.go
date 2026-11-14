@@ -235,17 +235,17 @@ func TestReviewWebhookCLI(t *testing.T) {
 	if b, err := run(); err != nil {
 		t.Fatalf("start: %v: %s", err, b)
 	}
-	for i := 0; i < 50 && runningPID(home, defaultApp) == 0; i++ {
+	for i := 0; i < 50 && runningPID(home, defaultConnector) == 0; i++ {
 		time.Sleep(100 * time.Millisecond)
 	}
 	if out := cv(t, home, "review-webhook", "--status"); !strings.Contains(out, "running") {
 		t.Fatal(out)
 	}
 	cv(t, home, "review-webhook", "--stop")
-	for i := 0; i < 50 && runningPID(home, defaultApp) != 0; i++ {
+	for i := 0; i < 50 && runningPID(home, defaultConnector) != 0; i++ {
 		time.Sleep(100 * time.Millisecond)
 	}
-	if runningPID(home, defaultApp) != 0 {
+	if runningPID(home, defaultConnector) != 0 {
 		t.Fatal("still running after --stop")
 	}
 	// a second instance under its own id gets its own pid file and log
@@ -255,7 +255,7 @@ func TestReviewWebhookCLI(t *testing.T) {
 	for i := 0; i < 50 && runningPID(home, "rw-v2") == 0; i++ {
 		time.Sleep(100 * time.Millisecond)
 	}
-	if runningPID(home, defaultApp) != 0 || runningPID(home, "rw-v2") == 0 {
+	if runningPID(home, defaultConnector) != 0 || runningPID(home, "rw-v2") == 0 {
 		t.Fatal("instances not independent")
 	}
 	if _, err := os.Stat(filepath.Join(home, "logs", "app", "rw-v2.log")); err != nil {
@@ -614,7 +614,7 @@ func TestCLIPlainAppMigration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(`DROP TABLE apps; CREATE TABLE apps (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE, command TEXT NOT NULL, output INTEGER NOT NULL DEFAULT 0,
+	if _, err := db.Exec(`DROP TABLE connectors; CREATE TABLE apps (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE, command TEXT NOT NULL, output INTEGER NOT NULL DEFAULT 0,
 		manifest TEXT NOT NULL DEFAULT '', disabled INTEGER NOT NULL DEFAULT 0, settings TEXT NOT NULL DEFAULT '{}');
 		INSERT INTO apps (name, command, output) VALUES ('Old', 'echo old {key}', 1)`); err != nil {
 		t.Fatal(err)

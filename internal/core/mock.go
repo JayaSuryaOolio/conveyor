@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/JayaSuryaOolio/conveyor/internal/apps"
+	"github.com/JayaSuryaOolio/conveyor/internal/connectors"
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 )
 
@@ -62,11 +62,11 @@ var mockState = State{
 		"max_parallel":      "2",
 		"brief_extra_rules": "Mock rule: keep changes small.",
 	},
-	Apps: []StateApp{
-		{Name: "Mock Editor", Manifest: apps.CommandManifest("Mock Editor", "mock-editor {cwd}", false)},
-		{Name: "Mock Tests", Manifest: apps.CommandManifest("Mock Tests", "mock-test --watch", true)},
-		{Name: "Mock Logs", Manifest: apps.CommandManifest("Mock Logs", "mock-logs -f", true)},
-		{Name: "Mock Repo Shell", Manifest: apps.CommandManifest("Mock Repo Shell", "mock-shell {cwd}", false)},
+	Connectors: []StateConnector{
+		{Name: "Mock Editor", Manifest: connectors.CommandManifest("Mock Editor", "mock-editor {cwd}", false)},
+		{Name: "Mock Tests", Manifest: connectors.CommandManifest("Mock Tests", "mock-test --watch", true)},
+		{Name: "Mock Logs", Manifest: connectors.CommandManifest("Mock Logs", "mock-logs -f", true)},
+		{Name: "Mock Repo Shell", Manifest: connectors.CommandManifest("Mock Repo Shell", "mock-shell {cwd}", false)},
 	},
 	Automations: []StateAutomation{
 		{Name: "mock-weekly-task", Schedule: "0 9 * * 1", ActionKind: "create_task", Enabled: true,
