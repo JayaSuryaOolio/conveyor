@@ -266,3 +266,24 @@ func TestPruneSeededAndDue(t *testing.T) {
 		t.Error("reseeded after rm")
 	}
 }
+
+// close-tracker automations (created per task by agents) must skip while the task is running:
+// running -> done is not a legal move, so the action would fail on every tick.
+func TestCloseTrackerSkipsWhileRunning(t *testing.T) {
+	svc, log := env(t)
+	stub := t.TempDir()
+	st := filepath.Join(stub, "status")
+	os.WriteFile(filepath.Join(stub, "conveyor"), []byte("#!/bin/sh\nprintf '{\\n  \"status\": \"%s\",\\n}\\n' \"$(cat "+st+")\"\n"), 0o755)
+	t.Setenv("PATH", stub+":"+os.Getenv("PATH"))
+	pre := `st=$(conveyor task show CV-1 --json | grep -m1 "^  \"status\": " | cut -d\" -f4); case "$st" in running|done|cancelled) exit 1;; esac`
+	a := mk(t, "cli", `{"args":["task","move","CV-1","done","--stop"]}`, pre)
+	for status, want := range map[string]string{"running": "skipped: precheck failed", "review": "cli-ok", "done": "skipped: precheck failed"} {
+		os.WriteFile(st, []byte(status), 0o644)
+		if res, err := RunOne(context.Background(), svc, a); err != nil || res != want {
+			t.Errorf("%s: %q %v, want %q", status, res, err, want)
+		}
+	}
+	if b, _ := os.ReadFile(log); strings.Count(string(b), "task move CV-1 done --stop") != 1 {
+		t.Errorf("move should run exactly once: %s", b)
+	}
+}
