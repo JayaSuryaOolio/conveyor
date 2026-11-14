@@ -14,7 +14,7 @@ import (
 )
 
 func init() {
-	register("app", runApp, "open worktrees in external apps, run quick actions (list|presets|add|install|export|run|enable|disable|rm|open)")
+	register("app", runApp, "open worktrees in external connectors, run quick actions (list|presets|add|install|export|run|enable|disable|rm|open)")
 	register("plugin", runPlugin, "Conveyor plugin, hooks + skills, per tool (status|install|uninstall [tool])")
 	register("hooks", runPlugin, "alias of plugin")
 }
@@ -23,9 +23,9 @@ const appUsage = `usage: conveyor app list [--json] | presets [--json] | add NAM
        conveyor app install FILE|- [--replace] (manifest JSON; - reads stdin) | export NAME [FILE] | run APP ACTION [KEY] [--place p]
        conveyor app enable NAME | disable NAME | rm NAME
        conveyor app open NAME KEY [--repo r]
-add --command installs CMD, a shell command, as a manifest app: {cwd} becomes ${{ worktree.path }} and {key} ${{ task.key }}.
+add --command installs CMD, a shell command, as a manifest connector: {cwd} becomes ${{ worktree.path }} and {key} ${{ task.key }}.
 add without --command uses the preset of that name.
-An --output app is a quick action: it runs to completion in the worktree and its output is shown (a toast in the app).
+An --output connector is a quick action: it runs to completion in the worktree and its output is shown (a toast in the app).
 Scripts can use conveyor task sessions KEY [--json] for the task's Claude session ids.`
 
 func runApp(home string, args []string) error {
@@ -37,8 +37,8 @@ func runApp(home string, args []string) error {
 	asJSON := fs.Bool("json", false, "print JSON")
 	command := fs.String("command", "", "shell command; {cwd} is the worktree path")
 	output := fs.Bool("output", false, "run to completion and show the output (a quick action)")
-	replace := fs.Bool("replace", false, "install over an app of the same name")
-	fromApp := fs.String("from-app", "", "add: build a manifest app from an installed .app (e.g. \"Visual Studio Code\")")
+	replace := fs.Bool("replace", false, "install over a connector of the same name")
+	fromApp := fs.String("from-app", "", "add: build a manifest connector from an installed .app (e.g. \"Visual Studio Code\")")
 	repo := fs.String("repo", "", "repo of the task (default primary)")
 	place := fs.String("place", "", "run the action as shown at this place (its service there may override run)")
 	pos, err := parseArgs(fs, rest)
@@ -151,7 +151,7 @@ func runApp(home string, args []string) error {
 			}
 			return err
 		}
-		return fmt.Errorf("unknown app command %q\n%s", cmd, appUsage)
+		return fmt.Errorf("unknown connector command %q\n%s", cmd, appUsage)
 	})
 }
 

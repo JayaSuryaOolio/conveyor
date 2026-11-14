@@ -40,11 +40,11 @@ conveyor epic status|check|flows|prs|search|sessions|approve|restart KEY   # doc
 conveyor agent list|add|model         conveyor config list|get|set
 conveyor repo add|list|rm|setup <name> [script|-]
 conveyor models [--json]            # model list (API with ANTHROPIC_API_KEY, else built-in); names are not validated, a bad model fails the session -> needs_you
-conveyor state export [FILE] | import FILE [--repo A=name]   # settings/apps/automations/user agents, repos as placeholders
+conveyor state export [FILE] | import FILE [--repo A=name]   # settings/connectors/automations/user agents, repos as placeholders
 conveyor state backup [--keep N]   # whole DB to <home>/backups via VACUUM INTO, keeps newest N (5); state-backup automation runs it every 6h
 conveyor hooks status|install|uninstall   # install/uninstall also copy/remove skills/epic -> ~/.claude/skills/epic
 conveyor epic review-check KEY [--step N]   # one PR review check: new feedback -> one system comment (requeues); none -> next backoff (30m, 2h, 8h, stop). Scheduled as a one-shot automation (run_at) 10m after a new PR head, or now via the task page button
-conveyor review-webhook [--status|--stop]   # opt-in app (examples/review-webhooks.json, embedded in package examples): loopback listener + `gh webhook forward` per repo with an open PR; a review event schedules that task's check now. Starts detached (re-execs `--serve`), pid `<home>/apps/<app-id>.pid`, log `logs/app/<app-id>.log` (`--app`, default `review-webhooks`)
+conveyor review-webhook [--status|--stop]   # opt-in connector (examples/review-webhooks.json, embedded in package examples): loopback listener + `gh webhook forward` per repo with an open PR; a review event schedules that task's check now. Starts detached (re-execs `--serve`), pid `<home>/apps/<app-id>.pid`, log `logs/app/<app-id>.log` (`--app`, default `review-webhooks`)
 conveyor jira source|sync EPIC ...      # Jira epic source (internal/jira): dispatcher poller (app or daemon) ticks 30s, pulls sources past interval_sec; errors land on the source's last_error
 conveyor daemon                       # dispatcher in the foreground
 ```
@@ -76,12 +76,12 @@ Use a throwaway home for experiments: `conveyor --home $(mktemp -d) ...`. Never 
 | Worktrees | `internal/workspace`; PRs `internal/gh`; terminals `internal/term`, `internal/terminal` |
 | Learnings / automations / Jira | `internal/learning`, `internal/automation`, `internal/jira` |
 | Wails bindings (thin) | `internal/ui/app.go`; app entry `main.go` |
-| Example apps | `examples/*.json` (embedded, listed under Apps > Detected, never auto-installed): working manifests to copy when writing a new app |
+| Example connectors | `examples/*.json` (embedded, listed under Connectors > Detected, never auto-installed): working manifests to copy when writing a new connector |
 | UI (React + Mantine) | `frontend/src`: `App.tsx` nav, `views.tsx` board/focus popup/task page, `workspace.tsx` task sidebar, `relations.tsx`, `epic.tsx` + `epicLayout.ts` (epic view on @xyflow/react: cards, groups, header strip; layering tested by `node --experimental-strip-types --test frontend/test/epicLayout.test.mjs`; `ListSkills` binding feeds the skills picker), `forms.tsx` dialogs + settings (incl. Repos tab), `agents.tsx`, `automations.tsx`, `apps.tsx`, `logs.tsx`, `terminals.tsx` |
 
 ## Testing in the repo root (graft)
 
-Some tools only work from the repo's main checkout (a dev stack, Tilt, an IDE or test runner bound to that path). If `conveyor app list` shows a **Graft** app, its `graft` CLI mirrors your worktree's files onto the root checkout so you can run the tests there. Skip it when the tests run fine in the worktree.
+Some tools only work from the repo's main checkout (a dev stack, Tilt, an IDE or test runner bound to that path). If `conveyor app list` shows a **Graft** connector, its `graft` CLI mirrors your worktree's files onto the root checkout so you can run the tests there. Skip it when the tests run fine in the worktree.
 
 ```
 cd ~/.conveyor/workspaces/<KEY>/<repo>
@@ -113,7 +113,7 @@ Known failure modes with confirm/fix steps: `docs/troubleshooting.md` (e.g. a ru
 - Run the UI live: `wails dev` (browser at http://localhost:34115). Install: `scripts/install.sh`.
 - UI on a throwaway home: `CONVEYOR_HOME=<tmp> wails dev -devserver localhost:<port>`.
 - Frontend PRs: add a Playwright screenshot to the PR description (`scripts/screenshot/`, mocks the Wails bindings with a Proxy on `window.go.ui.App`, no Go backend needed). If the latest playwright wants a newer chromium than installed, pass the cached one (e.g. chromium-1243 or the headless shell) via `executablePath`. Don't commit the image: GitHub has no CLI upload for PR images, so ask the human to drag it into the description, or link it by commit SHA and remove the file in a later commit.
-- App commands (`apps`): `{key}` is substituted already shell-quoted, so never put it inside double quotes or the quotes show in the toast. Never open a user-supplied file with a configured app's command (`open -a Terminal file.sh` runs it); limit file opening to known editors and `open -R`.
+- Connector commands (`apps`): `{key}` is substituted already shell-quoted, so never put it inside double quotes or the quotes show in the toast. Never open a user-supplied file with a configured app's command (`open -a Terminal file.sh` runs it); limit file opening to known editors and `open -R`.
 - Bot review comments (cubic, coderabbit) start with HTML comments and tags; strip them before showing a comment in a toast.
 - Sub-tasks: always set `--desc`/`--desc-file` at creation, or the agent has no context. A `spawn:` line in the status block (`spawn: [todo] title | desc` creates it in todo, else backlog) only gives the sub-task the parent's summary/state/next; when it needs real context use `conveyor task new --parent KEY --desc ...`.
 - Keep every major action reachable from the CLI; the UI calls the same `core.Service`.

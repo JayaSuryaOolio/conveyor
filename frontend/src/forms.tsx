@@ -250,13 +250,13 @@ function RequirementsList() {
     )
 }
 
-/** Export or import the portable state (settings, apps, automations, user agents) as a JSON file. */
+/** Export or import the portable state (settings, connectors, automations, user agents) as a JSON file. */
 function StateButtons({reload}: {reload: () => void}) {
     const [msg, setMsg] = useState<string[]>([])
     return (
         <Stack gap={4}>
             <Text size="sm" fw={500}>State</Text>
-            <Text size="xs" c="dimmed">Move settings, apps, automations and user agents to another install. Repos are not exported: automations get placeholders and import disabled. Import only adds what is missing.</Text>
+            <Text size="xs" c="dimmed">Move settings, connectors, automations and user agents to another install. Repos are not exported: automations get placeholders and import disabled. Import only adds what is missing.</Text>
             <Group>
                 <Button variant="default" onClick={() => ExportState().then(p => setMsg(p ? [`Exported to ${p}`] : []), errMsg)}>Export state</Button>
                 <Button variant="default" onClick={() => ImportState().then(l => { setMsg(l ?? []); reload() }, errMsg)}>Import state</Button>

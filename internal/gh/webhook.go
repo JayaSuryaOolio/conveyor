@@ -124,7 +124,7 @@ func openPRRepos(db *sql.DB) []string {
 // logged and retried on the next scan; the backoff checks still run. events are fixed until it restarts.
 func RunWebhook(ctx context.Context, db *sql.DB, events []string) error {
 	if len(events) == 0 {
-		return errors.New("no review webhook events enabled: turn one on in the app's settings")
+		return errors.New("no review webhook events enabled: turn one on in the connector's settings")
 	}
 	if err := CheckWebhookExt(); err != nil {
 		return err
