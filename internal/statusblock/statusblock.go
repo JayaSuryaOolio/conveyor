@@ -63,7 +63,7 @@ func parseBody(body string) (Block, bool) {
 					b.Learnings = append(b.Learnings, v)
 				}
 			case "spawn":
-				if v != "" {
+				if !emptySpawn(v) {
 					b.Spawn = append(b.Spawn, v)
 				}
 			default:
@@ -87,4 +87,11 @@ func parseBody(body string) (Block, bool) {
 	}
 	b.Summary, b.State, b.Next = join("summary"), join("state"), join("next")
 	return b, true
+}
+
+// emptySpawn reports a spawn line with no title or a placeholder title ("none"), which agents write when they have nothing to spawn.
+func emptySpawn(v string) bool {
+	title, _, _ := strings.Cut(v, "|")
+	title = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(title), "[todo]"))
+	return title == "" || strings.EqualFold(title, "none")
 }
