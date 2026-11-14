@@ -2,6 +2,7 @@ package automation
 
 import (
 	"context"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -195,7 +196,7 @@ func TestOneShotFiresOnceIgnoringSchedule(t *testing.T) {
 	if cs, _ := store.ListComments(svc.DB, tk.ID); len(cs) != 1 {
 		t.Fatalf("%d comments, want 1", len(cs))
 	}
-	if as, _ := store.ListAutomations(svc.DB); len(as) != 0 {
+	if as, _ := store.ListAutomations(svc.DB); len(as) != 1 { // only the seeded prune-closed
 		t.Fatalf("not deleted: %+v", as)
 	}
 }
@@ -208,5 +209,99 @@ func TestAddRejectsDuplicateName(t *testing.T) {
 	}
 	if err := Add(svc, a); err == nil || !strings.Contains(err.Error(), "already exists") {
 		t.Fatalf("second Add: %v, want already exists", err)
+	}
+}
+
+func TestPruneClosed(t *testing.T) {
+	svc, _ := env(t)
+	repo, _ := store.GetRepoByName(svc.DB, "a")
+	mk := func(status store.Status, age time.Duration) store.Task {
+		tk, err := store.CreateTask(svc.DB, store.Task{Title: "T", Status: status}, []store.TaskRepo{{RepoID: repo.ID, IsPrimary: true, Branch: "t"}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		ts := time.Now().Add(-age).UTC().Format(time.RFC3339)
+		svc.DB.Exec(`UPDATE tasks SET updated_at=? WHERE id=?`, ts, tk.ID)
+		store.SetSetting(svc.DB, "slack_thread:C:"+tk.Key, tk.Key)
+		store.SetSetting(svc.DB, "slack_task:"+tk.Key, "C:"+tk.Key)
+		return tk
+	}
+	day := 24 * time.Hour
+	oldDone, oldCan := mk(store.StatusDone, 8*day), mk(store.StatusCancelled, 9*day)
+	newDone, run, todo := mk(store.StatusDone, day), mk(store.StatusRunning, 30*day), mk(store.StatusTodo, 30*day)
+	store.SetSetting(svc.DB, "slack_thread:C:orphan", "CV-999")
+	store.SetSetting(svc.DB, "slack_task:CV-998", "C:x")
+
+	a := Templates["prune-closed"]
+	res, err := RunOne(context.Background(), svc, a)
+	if err != nil || res != "pruned 2 tasks, 6 slack links" {
+		t.Fatalf("%q %v", res, err)
+	}
+	for _, k := range []string{oldDone.Key, oldCan.Key} {
+		if _, err := store.GetTaskByKey(svc.DB, k); err == nil {
+			t.Errorf("%s kept", k)
+		}
+	}
+	for _, tk := range []store.Task{newDone, run, todo} {
+		if _, err := store.GetTaskByKey(svc.DB, tk.Key); err != nil {
+			t.Errorf("%s pruned", tk.Key)
+		}
+		if store.GetSetting(svc.DB, "slack_task:"+tk.Key) == "" {
+			t.Errorf("%s link pruned", tk.Key)
+		}
+	}
+}
+
+func TestPruneSeededAndDue(t *testing.T) {
+	svc, _ := env(t)
+	if err := Tick(context.Background(), svc, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	a, err := store.GetAutomation(svc.DB, "prune-closed")
+	if err != nil || a.LastResult == nil || !strings.HasPrefix(*a.LastResult, "pruned") {
+		t.Fatalf("%+v %v", a, err)
+	}
+	store.DeleteAutomation(svc.DB, "prune-closed")
+	Tick(context.Background(), svc, time.Now())
+	if _, err := store.GetAutomation(svc.DB, "prune-closed"); err == nil {
+		t.Error("reseeded after rm")
+	}
+}
+
+// close-tracker automations (created per task by agents) must skip while the task is running:
+// running -> done is not a legal move, so the action would fail on every tick.
+func TestCloseTrackerSkipsWhileRunning(t *testing.T) {
+	svc, log := env(t)
+	stub := t.TempDir()
+	st := filepath.Join(stub, "status")
+	os.WriteFile(filepath.Join(stub, "conveyor"), []byte("#!/bin/sh\nprintf '{\\n  \"status\": \"%s\",\\n}\\n' \"$(cat "+st+")\"\n"), 0o755)
+	t.Setenv("PATH", stub+":"+os.Getenv("PATH"))
+	pre := `st=$(conveyor task show CV-1 --json | grep -m1 "^  \"status\": " | cut -d\" -f4); case "$st" in running|done|cancelled) exit 1;; esac`
+	a := mk(t, "cli", `{"args":["task","move","CV-1","done","--stop"]}`, pre)
+	for status, want := range map[string]string{"running": "skipped: precheck failed", "review": "cli-ok", "done": "skipped: precheck failed"} {
+		os.WriteFile(st, []byte(status), 0o644)
+		if res, err := RunOne(context.Background(), svc, a); err != nil || res != want {
+			t.Errorf("%s: %q %v, want %q", status, res, err, want)
+		}
+	}
+	if b, _ := os.ReadFile(log); strings.Count(string(b), "task move CV-1 done --stop") != 1 {
+		t.Errorf("move should run exactly once: %s", b)
+	}
+}
+
+func TestRunOneLogsFailure(t *testing.T) {
+	svc, _ := env(t)
+	a := mk(t, "bad", `{"task_key":"CV-1"}`, "")
+	a.ActionKind = "nope"
+	var buf strings.Builder
+	log.SetOutput(&buf)
+	defer log.SetOutput(os.Stderr)
+	if _, err := RunOne(context.Background(), svc, a); err == nil {
+		t.Fatal("want error")
+	}
+	for _, w := range []string{"automation run failed", "automation=x", "task=CV-1", `unknown action kind`} {
+		if !strings.Contains(buf.String(), w) {
+			t.Fatalf("missing %q in %s", w, buf.String())
+		}
 	}
 }

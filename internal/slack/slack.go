@@ -38,7 +38,7 @@ var mine sync.Map
 // slack_thread:CHANNEL:ROOT_TS -> KEY routes a reply to its task, slack_task:KEY -> CHANNEL:ROOT_TS
 // keeps a task's notifications in one thread. Message text is only parsed (keyOf) for threads
 // that predate this.
-// ponytail: rows are never pruned (a few bytes per task); delete old ones if that matters.
+// The prune-closed automation (store.PruneClosed) removes a task's rows when it deletes the task.
 
 // link records that the thread rooted at ts in channel belongs to key.
 func (s *Slack) link(channel, ts, key string) {
@@ -411,7 +411,7 @@ func (s *Slack) event(payload []byte, handle func(chat.In) string) {
 		return
 	}
 	if key := s.taskOf(e.Channel, e.ThreadTS); key != "" { // the usual path: no API call, no parsing
-		reply(e.ThreadTS, ":speech_balloon: "+handle(chat.In{Key: key, Text: e.Text}))
+		reply(e.ThreadTS, commented(handle(chat.In{Key: key, Text: e.Text})))
 		return
 	}
 	// unlinked thread: a forward to run "new" under, or one from before links were stored
@@ -447,8 +447,19 @@ func (s *Slack) event(payload []byte, handle func(chat.In) string) {
 		reply(e.ThreadTS, "I can't tell which task this thread is about. Start the message with the task key (`CV-12 your comment`) or send a command like `list`.")
 		return
 	}
-	s.link(e.Channel, e.ThreadTS, key) // the agent's answer comes back into this thread
-	reply(e.ThreadTS, ":speech_balloon: "+handle(chat.In{Key: key, Text: e.Text}))
+	out := handle(chat.In{Key: key, Text: e.Text})
+	if !strings.HasPrefix(out, chat.Closed) {
+		s.link(e.Channel, e.ThreadTS, key) // the agent's answer comes back into this thread
+	}
+	reply(e.ThreadTS, commented(out))
+}
+
+// commented marks a successful comment; a closed-task error is shown as is.
+func commented(out string) string {
+	if strings.HasPrefix(out, chat.Closed) {
+		return out
+	}
+	return ":speech_balloon: " + out
 }
 
 // createdRe reads the task key from the "created KEY ..." reply to "new".

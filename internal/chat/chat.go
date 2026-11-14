@@ -10,7 +10,9 @@ package chat
 import (
 	"cmp"
 	"context"
+	"database/sql"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -276,11 +278,22 @@ func (b *bridge) create(text string, fwd func() (string, []File)) string {
 }
 
 func (b *bridge) comment(key, body string) string {
+	t, err := store.GetTaskByKey(b.svc.DB, key)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Closed + key + " is closed or no longer exists. Send `new [REPO] ...` to start a new task."
+	}
+	if err == nil && (t.Status == store.StatusDone || t.Status == store.StatusCancelled) {
+		return Closed + key + " is closed. Send `new [REPO] ...` to start a new task."
+	}
 	if _, err := b.svc.AddCommentVia(key, store.AuthorHuman, b.setting("chat_transport"), strings.TrimSpace(body), core.FollowUp); err != nil {
 		return "warning: " + err.Error()
 	}
 	return "comment added to " + key
 }
+
+// Closed starts the reply to a comment on a done, cancelled or missing task (nothing was
+// commented); transports show it as an error and must not link the thread to the task.
+const Closed = "error: "
 
 // Help is the command guide shown for "help" and unknown commands; transports may reuse it.
 const Help = `*Conveyor commands* (send as a DM, or /conveyor …)

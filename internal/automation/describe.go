@@ -16,9 +16,9 @@ func Validate(a store.Automation) error {
 		return fmt.Errorf("name is required")
 	}
 	switch a.ActionKind {
-	case "create_task", "comment", "cli":
+	case "create_task", "comment", "cli", "prune":
 	default:
-		return fmt.Errorf("action must be create_task, comment or cli")
+		return fmt.Errorf("action must be create_task, comment, cli or prune")
 	}
 	if !json.Valid([]byte(a.ActionArg)) {
 		return fmt.Errorf("action_arg is not valid JSON")
