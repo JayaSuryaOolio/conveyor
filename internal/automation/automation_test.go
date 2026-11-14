@@ -2,6 +2,7 @@ package automation
 
 import (
 	"context"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -285,5 +286,22 @@ func TestCloseTrackerSkipsWhileRunning(t *testing.T) {
 	}
 	if b, _ := os.ReadFile(log); strings.Count(string(b), "task move CV-1 done --stop") != 1 {
 		t.Errorf("move should run exactly once: %s", b)
+	}
+}
+
+func TestRunOneLogsFailure(t *testing.T) {
+	svc, _ := env(t)
+	a := mk(t, "bad", `{"task_key":"CV-1"}`, "")
+	a.ActionKind = "nope"
+	var buf strings.Builder
+	log.SetOutput(&buf)
+	defer log.SetOutput(os.Stderr)
+	if _, err := RunOne(context.Background(), svc, a); err == nil {
+		t.Fatal("want error")
+	}
+	for _, w := range []string{"automation run failed", "automation=x", "task=CV-1", `unknown action kind`} {
+		if !strings.Contains(buf.String(), w) {
+			t.Fatalf("missing %q in %s", w, buf.String())
+		}
 	}
 }

@@ -53,6 +53,10 @@ For 2-3 sampled tasks (prefer follow-ups, `source: followup`, and tasks the huma
 
 `~/.conveyor/conveyor.log` (+ `conveyor.log.1`), `~/.conveyor/logs/dispatcher.log`, `~/.conveyor/logs/hook.log`: errors and warnings from the last 7 days, grouped by message. Launch failures, hook errors and reaps explain bad runs that the transcript can't. Match what you find against `docs/troubleshooting.md` in the Conveyor repo: a known failure gets its recipe applied or cited, not a new diagnosis.
 
+### Automation failures
+
+Every failed automation run logs one line: `automation run failed: automation=NAME run_id=ID task=KEY error="..." output="..."` (`run_id` is the automation's id; automations have no run table). Grep the logs for it, and read the records: `conveyor automation list` shows each automation's `last_result`, which starts with `error:` after a failure. Group by automation name, count, and for each give the error text and the likely root cause (run the failing command by hand; `output` holds a CLI action's combined output). A failure that repeats every tick is a bug in the automation or Conveyor: propose a fix or a backlog task. Fixing the automation's own definition goes through `conveyor automation` commands, never the DB. Failures before this logging existed only show as `automations: automation NAME: ...` lines with no output.
+
 ### Doc drift
 
 Check `docs/guide.md`, `.claude/skills/conveyor/SKILL.md` and the repo `CLAUDE.md` against the code in your worktree. Agents load these files and act on them as if they were true. Check what they name: CLI commands and flags (`go run . <cmd> --help`, `cmd/`), settings and their defaults (`conveyor config list`, the defaults in `internal/store`), functions and files cited by name (`dispatch.sessionDirective`, `core.followUp`, ...: grep that they exist and still do what the doc says), statuses and allowed moves (`internal/store/status.go`). List each mismatch as doc line → code fact. Fix the doc in the same PR: it does not count toward the 3-prompt-change limit, because a doc fix changes no behavior. A mismatch where the doc is right and the code is wrong is a Conveyor bug (see the table below).

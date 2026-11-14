@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"strings"
@@ -118,7 +119,19 @@ func baseEnv(a store.Automation, extra ...string) []string {
 
 // RunOne runs the automation's precheck and action and returns a one-line result.
 // A failing precheck is a skip, not an error.
+// A failure is logged with the automation name, id (it has no run table, the id is its run id),
+// task key and output, so it can be found in conveyor.log afterwards.
 func RunOne(ctx context.Context, svc *core.Service, a store.Automation) (string, error) {
+	res, err := runOne(ctx, svc, a)
+	if err != nil {
+		var act action
+		_ = json.Unmarshal([]byte(a.ActionArg), &act)
+		log.Printf("automation run failed: automation=%s run_id=%d task=%s error=%q output=%q", a.Name, a.ID, act.TaskKey, err.Error(), res)
+	}
+	return res, err
+}
+
+func runOne(ctx context.Context, svc *core.Service, a store.Automation) (string, error) {
 	var act action
 	if err := json.Unmarshal([]byte(a.ActionArg), &act); err != nil {
 		return "", fmt.Errorf("action_arg: %w", err)
