@@ -4,7 +4,7 @@ import {useLocalStorage} from '@mantine/hooks'
 import {IconCode, IconExternalLink, IconGitPullRequest, IconMessageQuestion, IconPlayerPlay, IconPlayerStop, IconPlus, IconTerminal2} from '@tabler/icons-react'
 import {Background, Controls, Handle, MarkerType, Position, ReactFlow, useEdgesState, useNodesState, type Connection, type Edge, type Node, type NodeProps} from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import {CreateTask, EpicApprove, EpicGraph, EpicRestart, InstallExample, ListApps, Move, OpenApp, RunAction, Stop, Link, Unlink} from '../wailsjs/go/ui/App'
+import {CreateTask, EpicApprove, EpicGraph, EpicRestart, InstallExample, ListConnectors, Move, OpenConnector, RunAction, Stop, Link, Unlink} from '../wailsjs/go/ui/App'
 import {BrowserOpenURL} from '../wailsjs/runtime/runtime'
 import {core, store} from '../wailsjs/go/models'
 import {Nav, StatusBadge, errMsg} from './components'
@@ -55,7 +55,7 @@ function TaskNode({data}: NodeProps<Node<CardData>>) {
     const {n, prs} = data
     const {nav, open, lit, hover} = useContext(Ctx)
     const running = n.status === 'running'
-    const [editors, setEditors] = useState<store.App[]>([])
+    const [editors, setEditors] = useState<store.Connector[]>([])
     const stuck = n.status === 'needs_you'
     const skills = skillOf(n.labels)
     // Header controls get `nodrag nowheel` so React Flow doesn't start a node drag or zoom the canvas, and stop clicks reaching the card's open-modal handler.
@@ -91,9 +91,9 @@ function TaskNode({data}: NodeProps<Node<CardData>>) {
                         {prs[0]?.pr_url && <Tooltip label="Open PR"><ActionIcon size="sm" variant="subtle" aria-label="Open PR" onClick={() => BrowserOpenURL(prs[0].pr_url!)}><IconGitPullRequest size={14}/></ActionIcon></Tooltip>}
                         {n.worktrees.length > 0 && <>
                             <Tooltip label="Shell in worktree"><ActionIcon size="sm" variant="subtle" aria-label="Shell" onClick={() => RunAction(n.key, 'shell', n.worktrees[0]).catch(errMsg)}><IconTerminal2 size={14}/></ActionIcon></Tooltip>
-                            <Menu withinPortal onOpen={() => ListApps().then(a => setEditors(a ?? []), errMsg)}>
+                            <Menu withinPortal onOpen={() => ListConnectors().then(a => setEditors(a ?? []), errMsg)}>
                                 <Menu.Target><Tooltip label="Open in…"><ActionIcon size="sm" variant="subtle" aria-label="Open in editor"><IconCode size={14}/></ActionIcon></Tooltip></Menu.Target>
-                                <Menu.Dropdown>{editors.map(a => <Menu.Item key={a.name} onClick={() => OpenApp(a.name, n.key, n.worktrees[0]).catch(errMsg)}>{a.name}</Menu.Item>)}</Menu.Dropdown>
+                                <Menu.Dropdown>{editors.map(a => <Menu.Item key={a.name} onClick={() => OpenConnector(a.name, n.key, n.worktrees[0]).catch(errMsg)}>{a.name}</Menu.Item>)}</Menu.Dropdown>
                             </Menu>
                         </>}
                     </Group>
@@ -136,7 +136,7 @@ function Header({g, nav, root}: {g: core.Graph; nav: Nav; root: core.GraphNode})
     const [restart, setRestart] = useState(false)
     const [reason, setReason] = useState('')
     const [seen, setSeen] = useLocalStorage({key: 'epic-webhooks-dismissed', defaultValue: false})
-    const {data: apps, reload: reloadApps} = useData(ListApps, [])
+    const {data: apps, reload: reloadApps} = useData(ListConnectors, [])
     const epic = g.stage !== ''
     const hasPR = g.prs.some(p => p.pr_url)
     const noHooks = !(apps ?? []).some(a => a.manifest.includes('"autostart"'))

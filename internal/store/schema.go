@@ -189,7 +189,7 @@ CREATE TABLE IF NOT EXISTS jira_sync (
 
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 
-CREATE TABLE IF NOT EXISTS apps (
+CREATE TABLE IF NOT EXISTS connectors (
   id INTEGER PRIMARY KEY,
   name TEXT NOT NULL UNIQUE,
   manifest TEXT NOT NULL DEFAULT '',
@@ -201,6 +201,9 @@ CREATE TABLE IF NOT EXISTS apps (
 // Migrate drops the v1 tables and creates the v2 schema if missing. Later
 // column additions go here as idempotent migrateAddX steps.
 func Migrate(db *sql.DB) error {
+	if err := migrateRenameApps(db); err != nil {
+		return err
+	}
 	if _, err := db.Exec(`DROP TABLE IF EXISTS kanban_task_events; DROP TABLE IF EXISTS kanban_tasks;`); err != nil {
 		return fmt.Errorf("drop v1 tables: %w", err)
 	}
@@ -210,16 +213,19 @@ func Migrate(db *sql.DB) error {
 	if _, err := db.Exec(`DELETE FROM task_links WHERE kind='duplicates'`); err != nil {
 		return fmt.Errorf("drop duplicates links: %w", err)
 	}
-	if err := migrateAppColumns(db); err != nil {
+	if _, err := db.Exec(`UPDATE events SET kind='connector' WHERE kind='app'`); err != nil {
+		return fmt.Errorf("rename app events: %w", err)
+	}
+	if err := migrateConnectorColumns(db); err != nil {
 		return err
 	}
-	if err := migrateAddAppManifest(db); err != nil {
+	if err := migrateAddConnectorManifest(db); err != nil {
 		return err
 	}
-	if err := migrateAddAppDisabled(db); err != nil {
+	if err := migrateAddConnectorDisabled(db); err != nil {
 		return err
 	}
-	if err := migrateAddAppSettings(db); err != nil {
+	if err := migrateAddConnectorSettings(db); err != nil {
 		return err
 	}
 	if err := migrateAddPRReported(db); err != nil {
@@ -383,59 +389,59 @@ func migrateAddRunRunner(db *sql.DB) error {
 	return nil
 }
 
-// migrateAppColumns adds apps.output and drops the legacy apps.global on older databases.
-func migrateAppColumns(db *sql.DB) error {
+// migrateConnectorColumns adds connectors.output and drops the legacy connectors.global on older databases.
+func migrateConnectorColumns(db *sql.DB) error {
 	has := func(col string) (n int, err error) {
-		err = db.QueryRow(`SELECT count(*) FROM pragma_table_info('apps') WHERE name=?`, col).Scan(&n)
+		err = db.QueryRow(`SELECT count(*) FROM pragma_table_info('connectors') WHERE name=?`, col).Scan(&n)
 		return n, err
 	}
 	if n, err := has("global"); err != nil {
-		return fmt.Errorf("check apps.global: %w", err)
+		return fmt.Errorf("check connectors.global: %w", err)
 	} else if n > 0 {
-		if _, err := db.Exec(`ALTER TABLE apps DROP COLUMN global`); err != nil {
-			return fmt.Errorf("drop apps.global: %w", err)
+		if _, err := db.Exec(`ALTER TABLE connectors DROP COLUMN global`); err != nil {
+			return fmt.Errorf("drop connectors.global: %w", err)
 		}
 	}
 	return nil
 }
 
-// migrateAddAppManifest adds apps.manifest (the plugin manifest JSON, "" for a plain app).
-func migrateAddAppManifest(db *sql.DB) error {
+// migrateAddConnectorManifest adds connectors.manifest (the plugin manifest JSON, "" for a plain app).
+func migrateAddConnectorManifest(db *sql.DB) error {
 	var n int
-	if err := db.QueryRow(`SELECT count(*) FROM pragma_table_info('apps') WHERE name='manifest'`).Scan(&n); err != nil {
-		return fmt.Errorf("check apps.manifest: %w", err)
+	if err := db.QueryRow(`SELECT count(*) FROM pragma_table_info('connectors') WHERE name='manifest'`).Scan(&n); err != nil {
+		return fmt.Errorf("check connectors.manifest: %w", err)
 	}
 	if n == 0 {
-		if _, err := db.Exec(`ALTER TABLE apps ADD COLUMN manifest TEXT NOT NULL DEFAULT ''`); err != nil {
-			return fmt.Errorf("add apps.manifest: %w", err)
+		if _, err := db.Exec(`ALTER TABLE connectors ADD COLUMN manifest TEXT NOT NULL DEFAULT ''`); err != nil {
+			return fmt.Errorf("add connectors.manifest: %w", err)
 		}
 	}
 	return nil
 }
 
-// migrateAddAppDisabled adds apps.disabled.
-func migrateAddAppDisabled(db *sql.DB) error {
+// migrateAddConnectorDisabled adds connectors.disabled.
+func migrateAddConnectorDisabled(db *sql.DB) error {
 	var n int
-	if err := db.QueryRow(`SELECT count(*) FROM pragma_table_info('apps') WHERE name='disabled'`).Scan(&n); err != nil {
-		return fmt.Errorf("check apps.disabled: %w", err)
+	if err := db.QueryRow(`SELECT count(*) FROM pragma_table_info('connectors') WHERE name='disabled'`).Scan(&n); err != nil {
+		return fmt.Errorf("check connectors.disabled: %w", err)
 	}
 	if n == 0 {
-		if _, err := db.Exec(`ALTER TABLE apps ADD COLUMN disabled INTEGER NOT NULL DEFAULT 0`); err != nil {
-			return fmt.Errorf("add apps.disabled: %w", err)
+		if _, err := db.Exec(`ALTER TABLE connectors ADD COLUMN disabled INTEGER NOT NULL DEFAULT 0`); err != nil {
+			return fmt.Errorf("add connectors.disabled: %w", err)
 		}
 	}
 	return nil
 }
 
-// migrateAddAppSettings adds apps.settings (JSON object of the user's values for the manifest's settings).
-func migrateAddAppSettings(db *sql.DB) error {
+// migrateAddConnectorSettings adds connectors.settings (JSON object of the user's values for the manifest's settings).
+func migrateAddConnectorSettings(db *sql.DB) error {
 	var n int
-	if err := db.QueryRow(`SELECT count(*) FROM pragma_table_info('apps') WHERE name='settings'`).Scan(&n); err != nil {
-		return fmt.Errorf("check apps.settings: %w", err)
+	if err := db.QueryRow(`SELECT count(*) FROM pragma_table_info('connectors') WHERE name='settings'`).Scan(&n); err != nil {
+		return fmt.Errorf("check connectors.settings: %w", err)
 	}
 	if n == 0 {
-		if _, err := db.Exec(`ALTER TABLE apps ADD COLUMN settings TEXT NOT NULL DEFAULT '{}'`); err != nil {
-			return fmt.Errorf("add apps.settings: %w", err)
+		if _, err := db.Exec(`ALTER TABLE connectors ADD COLUMN settings TEXT NOT NULL DEFAULT '{}'`); err != nil {
+			return fmt.Errorf("add connectors.settings: %w", err)
 		}
 	}
 	return nil
@@ -450,6 +456,24 @@ func migrateAddPRReported(db *sql.DB) error {
 	if n == 0 {
 		if _, err := db.Exec(`ALTER TABLE pr_reviews ADD COLUMN reported TEXT NOT NULL DEFAULT ''`); err != nil {
 			return fmt.Errorf("add pr_reviews.reported: %w", err)
+		}
+	}
+	return nil
+}
+
+// migrateRenameApps renames the pre-rebrand apps table to connectors (CV-161). It runs before
+// the schema so databases keep their rows; a fresh database has no apps table and skips it.
+func migrateRenameApps(db *sql.DB) error {
+	var apps, conns int
+	if err := db.QueryRow(`SELECT count(*) FROM sqlite_master WHERE type='table' AND name='apps'`).Scan(&apps); err != nil {
+		return fmt.Errorf("check apps table: %w", err)
+	}
+	if err := db.QueryRow(`SELECT count(*) FROM sqlite_master WHERE type='table' AND name='connectors'`).Scan(&conns); err != nil {
+		return fmt.Errorf("check connectors table: %w", err)
+	}
+	if apps == 1 && conns == 0 {
+		if _, err := db.Exec(`ALTER TABLE apps RENAME TO connectors`); err != nil {
+			return fmt.Errorf("rename apps to connectors: %w", err)
 		}
 	}
 	return nil

@@ -419,7 +419,7 @@ func (d *Dispatcher) ensureWebhook() {
 		return
 	}
 	args := []string{"--home", d.Svc.Home, "review-webhook"}
-	if id := d.Svc.ReviewWebhookAppID(); id != "" { // share the installed app's instance
+	if id := d.Svc.ReviewWebhookConnectorID(); id != "" { // share the installed app's instance
 		args = append(args, "--app", id)
 	}
 	if out, err := exec.Command(d.Svc.Bin, args...).CombinedOutput(); err != nil {

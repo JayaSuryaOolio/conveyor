@@ -53,7 +53,7 @@ func runState(home string, args []string) error {
 			if err := os.WriteFile(args[1], append(b, '\n'), 0o600); err != nil {
 				return err
 			}
-			fmt.Fprintf(out, "exported %d settings, %d apps, %d automations, %d agents to %s\n", len(st.Settings), len(st.Apps), len(st.Automations), len(st.Agents), args[1])
+			fmt.Fprintf(out, "exported %d settings, %d connectors, %d automations, %d agents to %s\n", len(st.Settings), len(st.Connectors), len(st.Automations), len(st.Agents), args[1])
 			if len(st.Repos) > 0 {
 				fmt.Fprintf(out, "automations use repo placeholders %s; map them on import with --repo %s=<name>\n", strings.Join(st.Repos, ","), st.Repos[0])
 			}

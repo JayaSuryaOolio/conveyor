@@ -1,4 +1,4 @@
-package apps
+package connectors
 
 import (
 	"os"
@@ -47,8 +47,8 @@ func bundleIcns(app string) string {
 	return ""
 }
 
-// AppIcons maps app name to the icon (data: URL) of its manifest; apps without one are omitted.
-func AppIcons(apps []store.App) map[string]string {
+// ConnectorIcons maps app name to the icon (data: URL) of its manifest; apps without one are omitted.
+func ConnectorIcons(apps []store.Connector) map[string]string {
 	out := map[string]string{}
 	for _, a := range apps {
 		if u := manifestIcon(a.Manifest); u != "" {

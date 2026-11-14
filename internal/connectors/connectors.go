@@ -1,6 +1,6 @@
 // Package apps holds app manifests, presets and macOS icon extraction: the external tools a
 // worktree can be opened in or a task can run actions with.
-package apps
+package connectors
 
 import (
 	"database/sql"
@@ -46,12 +46,12 @@ func GraftBin() string {
 	return filepath.Join(h, ".local", "bin", "graft")
 }
 
-// AppPresets returns Finder plus every preset app installed on this Mac, as manifest apps.
-func AppPresets() []store.App {
-	preset := func(name, command string) store.App {
-		return store.App{Name: name, Manifest: CommandManifest(name, command, false)}
+// ConnectorPresets returns Finder plus every preset app installed on this Mac, as manifest apps.
+func ConnectorPresets() []store.Connector {
+	preset := func(name, command string) store.Connector {
+		return store.Connector{Name: name, Manifest: CommandManifest(name, command, false)}
 	}
-	out := []store.App{preset("Finder", "open {cwd}")}
+	out := []store.Connector{preset("Finder", "open {cwd}")}
 	for _, name := range presetApps {
 		for _, d := range appDirs() {
 			if _, err := os.Stat(filepath.Join(d, name+".app")); err == nil {
@@ -95,10 +95,10 @@ func WorktreePath(db *sql.DB, key, repo string) (string, error) {
 	return "", fmt.Errorf("%s: no worktree for repo %q", key, repo)
 }
 
-// OpenApp runs the app's first action in the task repo's worktree ("" repo = primary)
+// OpenConnector runs the app's first action in the task repo's worktree ("" repo = primary)
 // and returns an output action's output.
-func OpenApp(db *sql.DB, name, key, repo string) (string, error) {
-	a, err := store.GetApp(db, name)
+func OpenConnector(db *sql.DB, name, key, repo string) (string, error) {
+	a, err := store.GetConnector(db, name)
 	if err != nil {
 		return "", err
 	}
@@ -109,5 +109,5 @@ func OpenApp(db *sql.DB, name, key, repo string) (string, error) {
 	if len(m.Actions) == 0 {
 		return "", fmt.Errorf("app %q has no actions", name)
 	}
-	return runAppAction(db, name, m.Actions[0].ID, "", key, repo)
+	return runConnectorAction(db, name, m.Actions[0].ID, "", key, repo)
 }
