@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/JayaSuryaOolio/conveyor/internal/apps"
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 	"github.com/JayaSuryaOolio/conveyor/internal/workspace"
 )
@@ -222,6 +223,9 @@ func Build(db *sql.DB, task store.Task) (string, error) {
 		fmt.Fprintf(&b, "- %s: %s %s (%s)\n", l.Label, l.Task.Key, l.Task.Title, l.Task.Status)
 	}
 	b.WriteString(relationsHelp)
+	if x := apps.Injected(db, true, func(i apps.ManifestInject) string { return i.Brief }); x != "" {
+		b.WriteString("\n" + x + "\n")
+	}
 	fmt.Fprintf(&b, "\n%s\n## Rules\n\n%s\n## Older history\n\nFull thread: `conveyor task show %s --thread --json`\n", statusBlock, rulesForTask(db, task, true), task.Key)
 	return b.String(), nil
 }
@@ -369,6 +373,14 @@ func ResumePrompt(task store.Task, briefPath string, delta []store.Comment, tmpl
 	return fill(tmpl, def, task, briefPath, delta)
 }
 
+// WithInjected appends the prompt text enabled apps inject to a launch prompt.
+func WithInjected(db *sql.DB, prompt string) string {
+	if x := apps.Injected(db, false, func(i apps.ManifestInject) string { return i.Prompt }); x != "" {
+		return prompt + "\n\n" + x
+	}
+	return prompt
+}
+
 // Preview renders the brief and the fresh prompt as a launch would, writing nothing.
 func Preview(db *sql.DB, home string, task store.Task) (text, prompt string, err error) {
 	if text, err = Build(db, task); err != nil {
@@ -378,5 +390,5 @@ func Preview(db *sql.DB, home string, task store.Task) (text, prompt string, err
 	if err != nil {
 		return "", "", err
 	}
-	return text, FreshPrompt(task, Path(home, task), delta, store.GetSetting(db, "prompt_fresh")), nil
+	return text, WithInjected(db, FreshPrompt(task, Path(home, task), delta, store.GetSetting(db, "prompt_fresh"))), nil
 }

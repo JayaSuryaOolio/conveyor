@@ -35,6 +35,18 @@ type Manifest struct {
 	Actions     []ManifestAction  `json:"actions,omitempty"`
 	Agents      []ManifestAgent   `json:"agents,omitempty"`
 	Automations []ManifestAuto    `json:"automations,omitempty"`
+	// Inject (v4) adds text to what agents see while the app is enabled.
+	Inject *ManifestInject `json:"inject,omitempty"`
+}
+
+// ManifestInject is plain text (no placeholders) Conveyor adds for every task while the app is enabled.
+type ManifestInject struct {
+	// Prompt is appended to each launch prompt (fresh and resume).
+	Prompt string `json:"prompt,omitempty"`
+	// Brief becomes a "## App: <name>" section of BRIEF.md.
+	Brief string `json:"brief,omitempty"`
+	// Review is appended to the comment that hands PR review feedback to the agent.
+	Review string `json:"review,omitempty"`
 }
 
 // ManifestSetting declares one setting, modelled on VS Code extension settings. Type is string,
@@ -54,6 +66,8 @@ type ManifestAction struct {
 	Run    string   `json:"run"`
 	Places []string `json:"places"`
 	Output bool     `json:"output,omitempty"`
+	// Timeline (v4) records an "app" entry in the task's timeline whenever the action runs for a task.
+	Timeline bool `json:"timeline,omitempty"`
 	// Confirm, when set, is asked (OK/Cancel) before the action runs or starts its service; stopping is never confirmed.
 	Confirm string `json:"confirm,omitempty"`
 	// Icon, a data:image/ URL (e.g. an inline SVG), shows the action as an icon button with
@@ -98,12 +112,13 @@ type ManifestAuto struct {
 }
 
 // ManifestVersion is the schema version this build writes and understands.
-const ManifestVersion = 3
+const ManifestVersion = 4
 
 // migrateManifest upgrades m to ManifestVersion in place, so installed apps keep working.
 // When the schema changes, bump ManifestVersion and convert vN to vN+1 here.
 // v1 -> v2: an action's single `service` becomes `services` at each of its places.
 // v2 -> v3: adds `settings`; nothing to convert.
+// v3 -> v4: adds `inject` and an action's `timeline`; nothing to convert.
 func migrateManifest(m *Manifest) error {
 	if m.Version == 0 {
 		m.Version = 1
@@ -113,6 +128,16 @@ func migrateManifest(m *Manifest) error {
 	}
 	if m.Version < 3 && len(m.Settings) > 0 {
 		return fmt.Errorf("manifest: settings needs \"version\": 3")
+	}
+	if m.Version < 4 {
+		if m.Inject != nil {
+			return fmt.Errorf("manifest: inject needs \"version\": 4")
+		}
+		for _, a := range m.Actions {
+			if a.Timeline {
+				return fmt.Errorf("manifest: action %q: timeline needs \"version\": 4", a.ID)
+			}
+		}
 	}
 	for i := range m.Actions {
 		a := &m.Actions[i]
@@ -445,6 +470,11 @@ func runAppAction(db *sql.DB, app, id, place, key, repo string) (string, error) 
 		run = sv.Run
 	}
 	cmd := RenderManifest(run, vars)
+	if act.Timeline && key != "" {
+		if t, err := store.GetTaskByKey(db, key); err == nil {
+			_ = store.RecordEvent(db, t.ID, "app", app+": "+act.Label)
+		}
+	}
 	if !act.Output {
 		return "", runShell("open app", cmd)
 	}
@@ -668,4 +698,24 @@ func EnsureServices(db *sql.DB) error {
 		}
 	}
 	return errors.Join(errs...)
+}
+
+// Injected joins the text enabled apps inject with pick (e.g. func(i ManifestInject) string { return i.Prompt }),
+// one block per app, headed by the app name when named is true. "" when no app injects any.
+func Injected(db *sql.DB, named bool, pick func(ManifestInject) string) string {
+	list, _ := store.ListApps(db)
+	var out []string
+	for _, a := range list {
+		m, err := ParseManifest(a.Manifest)
+		if a.Manifest == "" || a.Disabled || err != nil || m.Inject == nil {
+			continue
+		}
+		if t := strings.TrimSpace(pick(*m.Inject)); t != "" {
+			if named {
+				t = "## App: " + m.Name + "\n\n" + t
+			}
+			out = append(out, t)
+		}
+	}
+	return strings.Join(out, "\n\n")
 }
