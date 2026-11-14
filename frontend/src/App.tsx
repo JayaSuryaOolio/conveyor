@@ -24,7 +24,7 @@ const NAV: {name: string; key?: string; label: string; icon: typeof IconBolt; fi
     {name: 'board', label: 'Epics', icon: IconSitemap, filter: 'epic'},
     {name: 'learnings', label: 'Learnings', icon: IconBook2},
     {name: 'automations', label: 'Automations', icon: IconClock},
-    {name: 'apps', label: 'Apps', icon: IconApps},
+    {name: 'apps', label: 'Connectors', icon: IconApps},
     {name: 'agents', key: 'a', label: 'Agents', icon: IconRobot},
     {name: 'logs', key: 'l', label: 'Logs', icon: IconLogs},
     {name: 'settings', label: 'Settings', icon: IconSettings},

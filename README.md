@@ -16,7 +16,7 @@
     <td width="50%"><img src="docs/images/image-1.webp" alt="Jump in to interact with claude session"></td>
   </tr>
   <tr>
-    <td width="50%" align="center"><img src="docs/images/image-2.webp" alt="Apps & Integrations" height="240"></td>
+    <td width="50%" align="center"><img src="docs/images/image-2.webp" alt="Connectors & Integrations" height="240"></td>
     <td width="50%" align="center"><img src="docs/images/image-3.webp" alt="Introspect and improve prompt setup" height="240"></td>
   </tr>
 </table>
@@ -80,8 +80,8 @@ conveyor repo add ~/work/my-repo
 conveyor task new "Fix the thing" --repo my-repo --desc "..." --todo
 conveyor daemon                          # or just open the app
 conveyor task comment CV-1 "also do X"   # send it back for another pass
-conveyor state export ~/cv.json          # settings/apps/automations/agents as JSON, no repos; `state import` on a fresh install
-conveyor --home /tmp/mock mock seed      # empty home -> mock repos, one task per board scenario, plus settings/apps/automations (all in internal/core/mock.go)
+conveyor state export ~/cv.json          # settings/connectors/automations/agents as JSON, no repos; `state import` on a fresh install
+conveyor --home /tmp/mock mock seed      # empty home -> mock repos, one task per board scenario, plus settings/connectors/automations (all in internal/core/mock.go)
 ```
 
 `claude --bg` refuses untrusted folders, so do the trust step once per repo. A "workspace not trusted" launch failure means it was skipped. `CONVEYOR_HOME` (default `~/.conveyor`) holds the DB, logs and workspaces.
@@ -106,7 +106,7 @@ Start with [`.claude/skills/conveyor/SKILL.md`](.claude/skills/conveyor/SKILL.md
 agent  app  automation  config  daemon  hook  hooks  import  learning  repo  task
 ```
 
-Integrations (terminal templates, external apps, global hooks, automations, Jira import) are covered in the [guide](docs/guide.md).
+Integrations (terminal templates, external connectors, global hooks, automations, Jira import) are covered in the [guide](docs/guide.md).
 
 **Checks:** `gofmt -l .`, `go vet ./...`, `go test ./...`; frontend: `cd frontend && npm ci && npm run build`. End-to-end: `scripts/e2e.sh` against real `claude` (haiku) on two pre-trusted throwaway repos in `~/work/conveyor-e2e/` (override with `E2E_ROOT`).
 

@@ -13,11 +13,11 @@ This guide covers day-to-day use. For setup see the [README](../README.md); for 
 - **Models.** The model pickers list the Anthropic Models API result when `ANTHROPIC_API_KEY` is set (`ANTHROPIC_BASE_URL` honoured), else a built-in list (`builtinModels` in `internal/core/models.go`; refresh it when models ship). A tier alias (`opus`, `sonnet`, `haiku`, `fable`) resolves to the newest id of that tier; `conveyor models` shows the list. Model names are not validated when set. If one is wrong, the Claude session fails at startup and the dispatcher moves the task to `needs_you` with a comment saying so (fix the model on the task, its agent or `default_model`, then comment to retry). A blank model means the default: the agent's, else `default_model`, else Claude Code's. `agent list` shows what an alias resolves to and `(default: X)` for a blank.
 - **Learning.** A lesson an agent proposes at the end of a run. You accept or reject it; accepted ones go to Conveyor's own `repos/<repo>/LEARNINGS.md`, which every task on that repo loads, or, if you choose, into the repo's `CLAUDE.md` by a follow-up task.
 - **Automation.** A cron schedule with an optional shell check that creates a task, comments on tasks, or runs a CLI command.
-- **App.** A named shell command that opens a task worktree in an editor, terminal or other program.
+- **Connector.** A named shell command that opens a task worktree in an editor, terminal or other program.
 
 ## The board and the task page
 
-The sidebar has Board, Focus, Learnings, Automations, Apps, Agents, Logs and Settings (repos are a Settings tab). Board, Focus, Agents and Logs have the shortcuts `b`, `f`, `a` and `l`.
+The sidebar has Board, Focus, Learnings, Automations, Connectors, Agents, Logs and Settings (repos are a Settings tab). Board, Focus, Agents and Logs have the shortcuts `b`, `f`, `a` and `l`.
 
 The board has a column per status: Backlog, Todo, Running, Needs you, Review, Failed (only shown when something has failed), Done and Cancelled. Done and Cancelled are collapsed and show the last 7 days. A bar above the board searches key and title (`/` focuses it, Esc clears), sorts every column by priority, last update, key or title (click the active sort again to reverse it), and filters by repo: click repo pills to show only those repos, combine several, Clear resets. Sort and repo picks are remembered; filtering is all in the UI. Focus is a single list of what wants your attention, in this order: needs_you, review, failed, running, todo.
 
@@ -197,9 +197,9 @@ conveyor automation list | enable NAME | disable NAME | run NAME | rm NAME
 
 **Doc drift.** `scripts/install.sh` also adds the `conveyor-drift` automation (same registered-repo condition): every Wednesday at 09:00 it creates and starts a "Conveyor docs: drift check" task that runs the plugin's `conveyor-drift` skill (`skills/conveyor-drift`). Its agent checks this guide, the conveyor skill and `CLAUDE.md` against the code (commands and flags, settings and defaults in `internal/store/settings.go`, named functions and files), fixes the docs to match the code in one PR, lists suspected missing features it didn't fix, or reports "No drift detected". Run it now with `conveyor automation run conveyor-drift`.
 
-## Apps
+## Connectors
 
-Every app is a manifest app. `app add --command` (and the New app form) wraps a shell command in a one-action manifest, replacing `{cwd}` with the quoted worktree path and `{key}` with the task key; apps from older versions are converted on start. The Apps page offers presets detected on your Mac (editors, terminals, git clients, Finder). Apps show up as a row of icons on each repo of the task page; hover for the name. A launched icon flashes a check or a cross, and Graft shows a green dot while it runs for that worktree (click again to stop it).
+Every connector is a manifest connector. `app add --command` (and the New connector form) wraps a shell command in a one-action manifest, replacing `{cwd}` with the quoted worktree path and `{key}` with the task key; apps from older versions are converted on start. The Apps page offers presets detected on your Mac (editors, terminals, git clients, Finder). Apps show up as a row of icons on each repo of the task page; hover for the name. A launched icon flashes a check or a cross, and Graft shows a green dot while it runs for that worktree (click again to stop it).
 
 ```
 conveyor app presets
@@ -208,13 +208,13 @@ conveyor app add Zed --command 'zed {cwd}'
 conveyor app open Zed CV-12 [--repo r]
 ```
 
-**Quick actions.** An app with the Quick action switch on (`--output`) is not an opener: it runs to completion in the task's primary worktree, and its output shows as a toast (or is printed by `conveyor app open`). It appears as a button in the task sidebar. There are no special variables beyond `{cwd}` and `{key}`; scripts get anything else from the CLI, for example `conveyor task sessions KEY [--json]`, which lists the task's Claude session ids (Conveyor runs plus sessions you started in its worktrees). A task's Claude cost through [ccusage](https://github.com/ryoppippi/ccusage) (needs `npx` and `jq`, takes a few seconds):
+**Quick actions.** A connector with the Quick action switch on (`--output`) is not an opener: it runs to completion in the task's primary worktree, and its output shows as a toast (or is printed by `conveyor app open`). It appears as a button in the task sidebar. There are no special variables beyond `{cwd}` and `{key}`; scripts get anything else from the CLI, for example `conveyor task sessions KEY [--json]`, which lists the task's Claude session ids (Conveyor runs plus sessions you started in its worktrees). A task's Claude cost through [ccusage](https://github.com/ryoppippi/ccusage) (needs `npx` and `jq`, takes a few seconds):
 
 ```
 conveyor app add Usage --output --command 'ids=$(conveyor task sessions {key} --json) && npx -y ccusage session --json --offline | jq -r --argjson ids "$ids" '"'"'[.session[] | select(.period as $p | $ids | index($p))] | "Claude usage: $\((map(.totalCost) | add // 0) * 100 | round / 100) across \(length) of \($ids | length) sessions"'"'"
 ```
 
-**Manifest apps.** A manifest (`conveyor app install FILE`, or the Apps page) declares actions placed in UI slots (`global_nav`, `task_sidebar`, `board_card`), plus agents and automations installed with the app. Run scripts use `${{ var }}` placeholders (`task.key`, `worktree.path`, ...). A manifest may set `check`, a shell sample run (30 s limit); install fails and stores nothing if it exits non-zero (the bundled `acli` example checks `acli --version`). An action can carry a `confirm` text, asked before it runs or starts its service (never before stopping). An action can carry an `icon` (a `data:image/` URL) to show as an icon button, and `"timeline": true` to log an `app` entry in the task's timeline each time it runs for a task. Version 4 adds `inject`, plain text added for every task while the app is enabled: `prompt` (appended to each launch prompt), `brief` (an `## App: <name>` section of BRIEF.md) and `review` (appended to the comment that hands PR review feedback to the agent).
+**Manifest connectors.** A manifest (`conveyor app install FILE`, or the Connectors page) declares actions placed in UI slots (`global_nav`, `task_sidebar`, `board_card`), plus agents and automations installed with the app. Run scripts use `${{ var }}` placeholders (`task.key`, `worktree.path`, ...). A manifest may set `check`, a shell sample run (30 s limit); install fails and stores nothing if it exits non-zero (the bundled `acli` example checks `acli --version`). An action can carry a `confirm` text, asked before it runs or starts its service (never before stopping). An action can carry an `icon` (a `data:image/` URL) to show as an icon button, and `"timeline": true` to log an `app` entry in the task's timeline each time it runs for a task. Version 4 adds `inject`, plain text added for every task while the app is enabled: `prompt` (appended to each launch prompt), `brief` (an `## App: <name>` section of BRIEF.md) and `review` (appended to the comment that hands PR review feedback to the agent).
 
 An action's icon is either `icon` (an inline `data:image/` URL: base64 PNG, or SVG with `%23` for `#`) or `iconPath` (an absolute or `~/` png, jpg, gif, webp, svg or icns file of at most 1 MB (icns is converted to png), or a macOS `.app` bundle whose icon is extracted, e.g. `/Applications/Visual Studio Code.app`). Installing copies an `iconPath` file to `<home>/app-icons` and stores the manifest pointing at the copy, so the original can move or be deleted; uninstall removes the copy. Export (`ExportApp`, state export) inlines the icon so manifests move between machines.
 
@@ -230,9 +230,9 @@ An action is a long-running **service** at a place when `services` has an entry 
 
 `conveyor app run APP ACTION [KEY] --place p` runs an action as shown at a place. Manifests carry a `version` (current: 4; absent means 1). Older versions keep working: a version 1 action's single `service` becomes the service at each of its places.
 
-**App settings (v3).** A manifest may declare `settings`: `{key, type, default, description, options}` with `type` one of `string`, `boolean`, `number`, `enum` (`options` lists the choices); keys match `[a-z0-9_]+`. The Apps page shows a Settings icon for such apps that opens a modal to edit them; values are stored per app in the DB (`apps.settings`) and scripts read them as `${{ setting.key }}` (shell-quoted; booleans are `true`/`false`). Unsaved settings use the default. Uninstalling or replacing an app drops its values. The bundled Review webhooks app has one boolean per forwarded GitHub event; the listener reads them when it starts, so restart it after a change.
+**Connector settings (v3).** A manifest may declare `settings`: `{key, type, default, description, options}` with `type` one of `string`, `boolean`, `number`, `enum` (`options` lists the choices); keys match `[a-z0-9_]+`. The Apps page shows a Settings icon for such apps that opens a modal to edit them; values are stored per app in the DB (`apps.settings`) and scripts read them as `${{ setting.key }}` (shell-quoted; booleans are `true`/`false`). Unsaved settings use the default. Uninstalling or replacing an app drops its values. The bundled Review webhooks app has one boolean per forwarded GitHub event; the listener reads them when it starts, so restart it after a change.
 
-Not yet: app hooks (an app reacting to task events). Later, Claude itself could be an app: the agent that works a task would come from a manifest, with other agents (Codex, Gemini CLI, ...) installed as alternative apps instead of being built in.
+Not yet: connector hooks (a connector reacting to task events). Later, Claude itself could be a connector: the agent that works a task would come from a manifest, with other agents (Codex, Gemini CLI, ...) installed as alternative apps instead of being built in.
 
 ## Pull requests
 
@@ -240,7 +240,7 @@ For tasks in review, every 60 seconds Conveyor runs `gh pr list --head <branch>`
 
 ### Review webhooks (opt-in)
 
-PR review checks run on push and a backoff (30 min, 2 h, 8 h). For instant checks, Conveyor starts the review-webhook listener by itself (under the id of the enabled app whose action runs `conveyor review-webhook`, found by manifest so a variant with another id shares one instance; `review-webhooks` when none is installed) while an epic task (label `epic` or `epic:<name>`) is unfinished; for non-epic tasks, add the bundled **Review webhooks** example from "Detected on this Mac" on the Apps screen (or `conveyor app install examples/review-webhooks.json`). Once started (by an epic or the app), Conveyor runs `conveyor review-webhook` itself: a listener on `127.0.0.1` (random port, pid in `<home>/apps/<app-id>.pid`, log `logs/app/<app-id>.log`; the id is the manifest `id`, else its name as a slug, and is `${{ app.id }}` in scripts so two versions of an app can run side by side) plus one `gh webhook forward` per repo with an open PR of any unfinished task (needs `gh extension install cli/gh-webhook` and admin on the repo; GitHub allows one forward per repo). A review or review comment schedules that task's check for now. Without an open epic, the app or the extension, tasks keep the timed checks. `--status` exits 0 when running; `--stop` stops it (Conveyor restarts it within a minute while the app is enabled (its service is `"autostart": true`, which the dispatcher honors for any app) or an epic is open; uninstall the app and finish the epic to opt out).
+PR review checks run on push and a backoff (30 min, 2 h, 8 h). For instant checks, Conveyor starts the review-webhook listener by itself (under the id of the enabled connector whose action runs `conveyor review-webhook`, found by manifest so a variant with another id shares one instance; `review-webhooks` when none is installed) while an epic task (label `epic` or `epic:<name>`) is unfinished; for non-epic tasks, add the bundled **Review webhooks** example from "Detected on this Mac" on the Apps screen (or `conveyor app install examples/review-webhooks.json`). Once started (by an epic or the app), Conveyor runs `conveyor review-webhook` itself: a listener on `127.0.0.1` (random port, pid in `<home>/apps/<app-id>.pid`, log `logs/app/<app-id>.log`; the id is the manifest `id`, else its name as a slug, and is `${{ app.id }}` in scripts so two versions of an app can run side by side) plus one `gh webhook forward` per repo with an open PR of any unfinished task (needs `gh extension install cli/gh-webhook` and admin on the repo; GitHub allows one forward per repo). A review or review comment schedules that task's check for now. Without an open epic, the app or the extension, tasks keep the timed checks. `--status` exits 0 when running; `--stop` stops it (Conveyor restarts it within a minute while the app is enabled (its service is `"autostart": true`, which the dispatcher honors for any app) or an epic is open; uninstall the app and finish the epic to opt out).
 
 ## Settings
 
@@ -251,7 +251,7 @@ Settings are in the app (Settings page) or `conveyor config list|get|set`.
 - **External terminal**: `terminal_template`, the command for external terminals (`{cwd}` and `{cmd}` are substituted; default uses macOS Terminal).
 - **Prompts**: `pr_comment_prefix`, `brief_extra_rules`, and `prompt_fresh` / `prompt_resume` to replace the launch prompts (placeholders `{key}`, `{title}`, `{brief}`, `{comments}`). Empty means the built-in prompt. The page also shows the status block protocol the agent is given.
 - **Repos**: registered repos and their setup scripts (see Workspace and worktree).
-- **Moving to a fresh install**: `conveyor state export [file]` / `import <file> [--repo A=name]` (or the Export state / Import state buttons on Settings → General, which import without repo mapping) carries settings, apps, automations and user agents as JSON; repos are never exported (automations get placeholders `A`, `B`, ...), import only adds what's missing, and `scripts/uninstall.sh` saves it to `<home>/state.json` for the next `install.sh` to pick up.
+- **Moving to a fresh install**: `conveyor state export [file]` / `import <file> [--repo A=name]` (or the Export state / Import state buttons on Settings → General, which import without repo mapping) carries settings, connectors, automations and user agents as JSON; repos are never exported (automations get placeholders `A`, `B`, ...), import only adds what's missing, and `scripts/uninstall.sh` saves it to `<home>/state.json` for the next `install.sh` to pick up.
 
 ## CLI cheat-sheet
 
@@ -285,11 +285,11 @@ conveyor learning list|accept|reject|edit|apply
 conveyor automation list|add|enable|disable|run|rm
 conveyor app list|presets|add|rm|open
 conveyor hooks status|install|uninstall
-conveyor review-webhook [--status|--stop]      # opt-in review-webhooks app (see Apps)
+conveyor review-webhook [--status|--stop]      # opt-in review-webhooks connector (see Connectors)
 conveyor config list | get <key> | set <key> <value>
 conveyor state export [file] | import <file> [--repo A=name ...] | backup [--keep N]
-conveyor --home <empty dir> mock seed          # mock repos, tasks, settings, apps, automations (fixtures: internal/core/mock.go)
-conveyor import jira --jql "..." --repo a      # needs acli: install it from the Apps page (Templates) after `brew install acli` and `acli jira auth login`
+conveyor --home <empty dir> mock seed          # mock repos, tasks, settings, connectors, automations (fixtures: internal/core/mock.go)
+conveyor import jira --jql "..." --repo a      # needs acli: install it from the Connectors page (Templates) after `brew install acli` and `acli jira auth login`
 conveyor jira source EPIC [--key PROJ-1 --repo R --interval SEC --status-map JSON | --clear]   # attach/show/detach a Jira epic as the epic's source
 conveyor jira sync EPIC                  # pull now; the dispatcher (app or `conveyor daemon`) also polls every source per its interval (default 300s)
 conveyor daemon                                # run the dispatcher in the foreground

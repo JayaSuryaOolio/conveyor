@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Removes the conveyor CLI, Conveyor.app, its skills and its ~/.claude hooks.
-# First saves settings, apps, automations and user agents (no repos) to
+# First saves settings, connectors, automations and user agents (no repos) to
 # ~/conveyor-state.json and $CONVEYOR_HOME/state.json, which the next install imports.
 # The data folder ($CONVEYOR_HOME, default ~/.conveyor) is left in place.
 set -euo pipefail
