@@ -161,6 +161,12 @@ func (act action) run(ctx context.Context, svc *core.Service, name, kind, out, k
 			return res, fmt.Errorf("conveyor %s: %w", strings.Join(act.Args, " "), err)
 		}
 		return res, nil
+	case "prune":
+		t, l, err := store.PruneClosed(svc.DB, 7*24*time.Hour, time.Now())
+		if err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("pruned %d tasks, %d slack links", t, l), nil
 	case "comment":
 		if key == "" || act.Body == "" {
 			return "", errors.New("comment needs task_status or task_key, and body")
@@ -218,6 +224,9 @@ func deref(s *string) string {
 
 // Tick runs every due automation and records last_run_at and last_result.
 func Tick(ctx context.Context, svc *core.Service, now time.Time) error {
+	if err := seedBuiltins(svc); err != nil {
+		return err
+	}
 	list, err := store.ListAutomations(svc.DB)
 	if err != nil {
 		return err
@@ -312,6 +321,13 @@ var Templates = map[string]store.Automation{
 		ActionArg:  `{"task_status":"review","body":"New PR review comments since the last sweep. Address them, push, and reply on the PR threads."}`,
 		Enabled:    true,
 	},
+	"prune-closed": {
+		Name:       "prune-closed",
+		Schedule:   "17 3 * * *",
+		ActionKind: "prune",
+		ActionArg:  `{}`,
+		Enabled:    true,
+	},
 	"state-backup": {
 		Name:       "state-backup",
 		Schedule:   "0 */6 * * *",
@@ -319,4 +335,21 @@ var Templates = map[string]store.Automation{
 		ActionArg:  `{"args":["state","backup","--keep","5"]}`,
 		Enabled:    true,
 	},
+}
+
+// seedBuiltins installs prune-closed once (so `automation rm` or disable sticks). It is created
+// as never run, so the first tick clears the existing backlog.
+func seedBuiltins(svc *core.Service) error {
+	if store.GetSetting(svc.DB, "seeded_prune_closed") != "" {
+		return nil
+	}
+	a := Templates["prune-closed"]
+	never := "1970-01-01T00:00:00Z"
+	a.LastRunAt = &never
+	if _, err := store.GetAutomation(svc.DB, a.Name); errors.Is(err, sql.ErrNoRows) {
+		if _, err := store.CreateAutomation(svc.DB, a); err != nil {
+			return err
+		}
+	}
+	return store.SetSetting(svc.DB, "seeded_prune_closed", "1")
 }
