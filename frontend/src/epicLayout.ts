@@ -4,7 +4,8 @@ export type LLink = {from: string; to: string; kind: string}
 export type Placed = {key: string; x: number; y: number; w: number; h: number; group: boolean; parent?: string}
 
 // CARD.h is only the first-paint estimate; layout() takes measured heights (React Flow node.measured) and re-runs once they arrive.
-export const CARD = {w: 260, h: 112, gap: 20, pad: 16, head: 44}
+// colGap is wider than gap so a labelled edge ("blocks · running") fits between two columns.
+export const CARD = {w: 260, h: 112, gap: 20, colGap: 90, pad: 16, head: 44}
 
 /** Column of each key within its group: the longest `blocks` path from a blocker in the same group. Cross-group edges never count. */
 export function columns(keys: string[], links: LLink[]): Map<string, number> {
@@ -53,17 +54,31 @@ export function layout(nodes: LNode[], links: LLink[], heights: ReadonlyMap<stri
         let h = 0
         for (const k of keys) {
             const c = col.get(k)!, s = sub(k)
-            const x = ox + colW.slice(0, c).reduce((a, w) => a + w + CARD.gap, 0), y = oy + rowY[c]
+            const x = ox + colW.slice(0, c).reduce((a, w) => a + w + CARD.colGap, 0), y = oy + rowY[c]
             out.push({key: k, x, y, w: s.w, h: s.h, group: kids.has(k), parent: parent || undefined})
             rowY[c] += s.h + CARD.gap
             h = Math.max(h, rowY[c] - CARD.gap)
             if (kids.has(k)) place(k, CARD.pad, CARD.head)
         }
-        return {w: colW.reduce((a, w) => a + w + CARD.gap, -CARD.gap), h}
+        return {w: colW.reduce((a, w) => a + w + CARD.colGap, -CARD.colGap), h}
     }
     // A group's own children are placed relative to it, so the root level starts at the origin.
     const rootKeys = kids.get('') ?? []
     if (rootKeys.length === 0) return out
     place('', 0, 0)
     return out
+}
+
+/** Every key linked to `key` through any chain of links, upstream and downstream (the hover trace), including `key`. */
+export function trace(key: string, links: LLink[]): Set<string> {
+    const seen = new Set([key])
+    // Walk one direction at a time so a sibling (shares a blocker) isn't pulled in through the blocker.
+    for (const [from, to] of [['from', 'to'], ['to', 'from']] as const) {
+        const todo = [key], dir = new Set([key])
+        while (todo.length) {
+            const k = todo.pop()!
+            for (const l of links) if (l[from] === k && !dir.has(l[to])) { dir.add(l[to]); seen.add(l[to]); todo.push(l[to]) }
+        }
+    }
+    return seen
 }

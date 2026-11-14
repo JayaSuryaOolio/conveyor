@@ -1,5 +1,5 @@
 import {createContext, useContext, useEffect, useMemo, useRef, useState} from 'react'
-import {ActionIcon, Alert, Anchor, Badge, Box, Button, Group, Indicator, Menu, Modal, Paper, Stack, Text, Textarea, TextInput, Tooltip} from '@mantine/core'
+import {ActionIcon, Alert, Anchor, Badge, Box, Button, Group, Indicator, Menu, Modal, Paper, ScrollArea, SegmentedControl, SimpleGrid, Stack, Table, Text, Textarea, TextInput, Tooltip} from '@mantine/core'
 import {useLocalStorage} from '@mantine/hooks'
 import {IconCode, IconExternalLink, IconGitPullRequest, IconMessageQuestion, IconPlayerPlay, IconPlayerStop, IconPlus, IconTerminal2} from '@tabler/icons-react'
 import {Background, Controls, Handle, MarkerType, Position, ReactFlow, useEdgesState, useNodesState, type Connection, type Edge, type Node, type NodeProps} from '@xyflow/react'
@@ -8,20 +8,35 @@ import {CreateTask, EpicApprove, EpicGraph, EpicRestart, InstallExample, ListApp
 import {BrowserOpenURL} from '../wailsjs/runtime/runtime'
 import {core, store} from '../wailsjs/go/models'
 import {Nav, StatusBadge, errMsg} from './components'
-import {CARD, layout} from './epicLayout'
-import {useData} from './util'
+import {CARD, columns, layout, trace} from './epicLayout'
+import {STATUS_COLOR, useData} from './util'
 import {JiraSource} from './jiraSource'
 import {TaskPreview} from './views'
 
 const STAGES = ['chart', 'decide', 'spec', 'build', 'verify', 'done']
 const KIND_COLOR: Record<string, string> = {grilling: 'orange', prototype: 'grape', research: 'teal', build: 'blue'}
 const NO_RUN = new Set(['running', 'done'])
+const FINISHED = new Set(['done', 'cancelled'])
+const READY = new Set(['backlog', 'todo', 'failed'])
+const c6 = (color: string) => `var(--mantine-color-${color}-6)`
 
-type Ctx = {nav: Nav; addSub: (parent: string) => void; open: (key: string) => void}
-const Ctx = createContext<Ctx>({nav: () => {}, addSub: () => {}, open: () => {}})
+type Ctx = {nav: Nav; addSub: (parent: string) => void; open: (key: string) => void; lit: Set<string> | null; hover: (key: string) => void}
+const Ctx = createContext<Ctx>({nav: () => {}, addSub: () => {}, open: () => {}, lit: null, hover: () => {}})
 type CardData = {n: core.GraphNode; prs: store.FlowPR[]}
 
 const skillOf = (labels: string[]) => labels.filter(l => l.startsWith('skill:')).map(l => l.slice(6))
+
+/** Edge colour says whether the link still holds its target back: done blocker = satisfied, running = in progress, else waiting. */
+function edgeState(l: store.Link, status: (k: string) => string): {color: string; label: string; animated?: boolean} {
+    if (l.kind !== 'blocks') return {color: 'gray', label: 'relates'}
+    const s = status(l.from)
+    if (FINISHED.has(s)) return {color: 'green', label: 'unblocked'}
+    if (s === 'running') return {color: 'cyan', label: 'blocks · running', animated: true}
+    return {color: 'orange', label: 'blocks'}
+}
+
+/** Leaf tasks only: groups are containers, not work. */
+const leavesOf = (g: core.Graph) => g.nodes.filter(n => !g.nodes.some(c => c.parent === n.key))
 
 function PrChip({p}: {p: store.FlowPR}) {
     const bits = [p.review, p.checks, p.unresolved ? `${p.unresolved} unresolved` : ''].filter(Boolean) // blank until the review check has data (sub-task A)
@@ -38,7 +53,7 @@ function PrChip({p}: {p: store.FlowPR}) {
 /** Compact card: header icons + title + one line of read-only details. Clicking the card or any detail opens the task in a modal, where agent/model/skills/kind are edited. */
 function TaskNode({data}: NodeProps<Node<CardData>>) {
     const {n, prs} = data
-    const {nav, open} = useContext(Ctx)
+    const {nav, open, lit, hover} = useContext(Ctx)
     const running = n.status === 'running'
     const [editors, setEditors] = useState<store.App[]>([])
     const stuck = n.status === 'needs_you'
@@ -55,7 +70,10 @@ function TaskNode({data}: NodeProps<Node<CardData>>) {
         n.worktrees.length > 0 && <Tooltip key="wt" label={'worktree: ' + n.worktrees.join(', ')}><Badge size="xs" variant="outline" color="gray">worktree</Badge></Tooltip>,
     ].filter(Boolean)
     return (
-        <Paper withBorder radius="md" p="xs" w={CARD.w} shadow="sm" style={{cursor: 'pointer'}} onClick={() => open(n.key)}>
+        <Paper withBorder radius="md" p="xs" w={CARD.w} shadow="sm" onClick={() => open(n.key)} onMouseEnter={() => hover(n.key)} onMouseLeave={() => hover('')}
+               style={{cursor: 'pointer', borderLeft: `4px solid ${c6(KIND_COLOR[n.kind] ?? 'gray')}`,
+                       opacity: lit && !lit.has(n.key) ? 0.3 : 1, transition: 'opacity 120ms',
+                       outline: lit?.has(n.key) ? `1px solid ${c6('blue')}` : undefined}}>
             <Handle type="target" position={Position.Left}/>
             <Handle type="source" position={Position.Right}/>
             <Stack gap={6}>
@@ -128,7 +146,10 @@ function Header({g, nav, root}: {g: core.Graph; nav: Nav; root: core.GraphNode})
                 <Group gap="sm">
                     <Anchor component="button" fw={600} onClick={() => nav({name: 'task', key: root.key})}>{root.key}</Anchor>
                     <Text size="sm" truncate maw={320}>{root.title}</Text>
-                    {epic && <Group gap={4}>{STAGES.map((s, i) => <Badge key={s} size="sm" variant={s === g.stage ? 'filled' : 'light'} color={s === g.stage ? 'blue' : 'gray'}>{i + 1}. {s}</Badge>)}</Group>}
+                    {epic && <Group gap={4}>{STAGES.map((s, i) => {
+                        const at = STAGES.indexOf(g.stage)
+                        return <Badge key={s} size="sm" variant={i === at ? 'filled' : 'light'} color={i === at ? 'blue' : i < at ? 'green' : 'gray'}>{i + 1}. {s}</Badge>
+                    })}</Group>}
                 </Group>
                 <Group gap="sm">
                     <Text size="sm">{live.filter(n => n.status === 'done').length}/{live.length} done</Text>
@@ -158,6 +179,122 @@ function Header({g, nav, root}: {g: core.Graph; nav: Nav; root: core.GraphNode})
             </Stack>
         </Modal>
     </Stack>
+}
+
+const VIEW_HINT: Record<string, string> = {
+    graph: 'Hover a card or a row below to trace what it waits on and what waits on it. Drag right handle → left handle to add a blocker.',
+    waves: 'Tasks grouped by how many blockers deep they sit: a wave can run once the waves before it are done.',
+    prs: "The flow's pull requests with review state, checks and unresolved comments.",
+}
+
+/** Open blockers of key: `blocks` links into it whose source isn't finished. */
+const openBlockers = (g: core.Graph, key: string) => g.links
+    .filter(l => l.kind === 'blocks' && l.to === key && !FINISHED.has(g.nodes.find(n => n.key === l.from)?.status ?? 'done'))
+    .map(l => l.from)
+
+/** One task as a list row: click opens it, hover traces it on the graph. */
+function TaskRow({n, note}: {n: core.GraphNode; note?: string}) {
+    const {open, hover} = useContext(Ctx)
+    return (
+        <Group gap={6} wrap="nowrap" px={6} py={2} style={{cursor: 'pointer', borderRadius: 4, borderLeft: `3px solid ${c6(KIND_COLOR[n.kind] ?? 'gray')}`}}
+               className="epic-row" onClick={() => open(n.key)} onMouseEnter={() => hover(n.key)} onMouseLeave={() => hover('')}>
+            <Text size="xs" fw={600} c="dimmed" style={{flexShrink: 0}}>{n.key}</Text>
+            <StatusBadge status={n.status}/>
+            <Text size="xs" truncate style={{flex: 1}}>{n.title}</Text>
+            {note && <Text size="xs" c="dimmed" style={{flexShrink: 0}}>{note}</Text>}
+        </Group>
+    )
+}
+
+function Legend() {
+    const swatch = (color: string, label: string, dashed = false) => (
+        <Group key={label} gap={4} wrap="nowrap">
+            <Box w={18} h={0} style={{borderTop: `2px ${dashed ? 'dashed' : 'solid'} ${c6(color)}`}}/>
+            <Text size="xs" c="dimmed">{label}</Text>
+        </Group>
+    )
+    return (
+        <Group gap="md" wrap="wrap">
+            {Object.entries(KIND_COLOR).map(([k, c]) => <Group key={k} gap={4} wrap="nowrap"><Box w={10} h={10} bg={c6(c)} style={{borderRadius: 2}}/><Text size="xs" c="dimmed">{k}</Text></Group>)}
+            <Text size="xs" c="dimmed">·</Text>
+            {swatch('orange', 'blocks (waiting)')}{swatch('cyan', 'blocker running')}{swatch('green', 'unblocked')}{swatch('gray', 'relates', true)}
+        </Group>
+    )
+}
+
+/** The boxes under the graph: what needs a human, what is moving, what can start, what is held back and by whom. */
+function InfoBoxes({g}: {g: core.Graph}) {
+    const live = leavesOf(g).filter(n => !FINISHED.has(n.status))
+    const boxes: [string, string, {n: core.GraphNode; note?: string}[]][] = [
+        ['Wants you', 'orange', live.filter(n => n.status === 'needs_you').map(n => ({n}))],
+        ['Running', 'cyan', live.filter(n => n.status === 'running').map(n => ({n}))],
+        ['Ready to run', 'blue', live.filter(n => READY.has(n.status) && openBlockers(g, n.key).length === 0).map(n => ({n}))],
+        ['Waiting on', 'gray', live.flatMap(n => { const b = openBlockers(g, n.key); return b.length ? [{n, note: '← ' + b.join(', ')}] : [] })],
+    ]
+    return (
+        <SimpleGrid cols={{base: 2, md: 4}} spacing="xs">
+            {boxes.map(([title, color, rows]) => (
+                <Paper key={title} withBorder radius="md" p="xs" style={{borderTop: `3px solid ${c6(color)}`}}>
+                    <Group justify="space-between" mb={4}><Text size="xs" fw={700} tt="uppercase" c={color}>{title}</Text><Text size="xs" c="dimmed">{rows.length}</Text></Group>
+                    <ScrollArea.Autosize mah={120}>
+                        {rows.length ? rows.map(r => <TaskRow key={r.n.key} {...r}/>) : <Text size="xs" c="dimmed">None</Text>}
+                    </ScrollArea.Autosize>
+                </Paper>
+            ))}
+        </SimpleGrid>
+    )
+}
+
+/** Leaves bucketed by blocker depth across the whole tree (groups ignored), so the order of work reads top to bottom. */
+function Waves({g}: {g: core.Graph}) {
+    const leaves = leavesOf(g).filter(n => n.status !== 'cancelled')
+    const col = columns(leaves.map(n => n.key), g.links)
+    const waves: core.GraphNode[][] = []
+    for (const n of leaves) (waves[col.get(n.key)!] ??= []).push(n)
+    return (
+        <ScrollArea style={{flex: 1}}>
+            <Stack gap="xs">
+                {waves.map((ns, i) => {
+                    const done = ns.filter(n => n.status === 'done').length
+                    const color = done === ns.length ? 'green' : ns.some(n => n.status !== 'backlog' && n.status !== 'todo') ? 'cyan' : 'gray'
+                    return (
+                        <Paper key={i} withBorder radius="md" p="xs" style={{borderLeft: `4px solid ${c6(color)}`}}>
+                            <Group justify="space-between" mb={4}>
+                                <Text size="sm" fw={700}>Wave {i + 1}{i === 0 ? ' · no blockers' : ` · after wave ${i}`}</Text>
+                                <Badge size="sm" variant="light" color={color}>{done}/{ns.length} done</Badge>
+                            </Group>
+                            {ns.map(n => <TaskRow key={n.key} n={n} note={openBlockers(g, n.key).length ? '← ' + openBlockers(g, n.key).join(', ') : undefined}/>)}
+                        </Paper>
+                    )
+                })}
+                {waves.length === 0 && <Text c="dimmed" size="sm">No tasks yet.</Text>}
+            </Stack>
+        </ScrollArea>
+    )
+}
+
+function PRTable({g}: {g: core.Graph}) {
+    const {open} = useContext(Ctx)
+    const rows = g.prs.filter(p => p.pr_url)
+    if (!rows.length) return <Text c="dimmed" size="sm">No PRs yet{g.stage ? '' : ' (PR rows are tracked for epics only)'}.</Text>
+    const tone = (s?: string) => !s ? 'gray' : /approved|success|pass/i.test(s) ? 'green' : /changes|fail|error/i.test(s) ? 'red' : 'yellow'
+    return (
+        <ScrollArea style={{flex: 1}}>
+            <Table highlightOnHover verticalSpacing={4}>
+                <Table.Thead><Table.Tr><Table.Th>Task</Table.Th><Table.Th>Repo</Table.Th><Table.Th>PR</Table.Th><Table.Th>Review</Table.Th><Table.Th>Checks</Table.Th><Table.Th>Unresolved</Table.Th></Table.Tr></Table.Thead>
+                <Table.Tbody>{rows.map(p => (
+                    <Table.Tr key={p.task + p.repo}>
+                        <Table.Td><Anchor component="button" size="sm" onClick={() => open(p.task)}>{p.task}</Anchor></Table.Td>
+                        <Table.Td><Badge size="sm" variant="light">{p.repo}</Badge></Table.Td>
+                        <Table.Td><Anchor size="sm" onClick={() => BrowserOpenURL(p.pr_url!)}>{p.pr_url!.replace(/^.*\/pull\//, '#')}</Anchor></Table.Td>
+                        <Table.Td><Badge size="sm" variant="light" color={tone(p.review)}>{p.review || '—'}</Badge></Table.Td>
+                        <Table.Td><Badge size="sm" variant="light" color={tone(p.checks)}>{p.checks || '—'}</Badge></Table.Td>
+                        <Table.Td><Text size="sm" c={p.unresolved ? 'orange' : 'dimmed'}>{p.unresolved}</Text></Table.Td>
+                    </Table.Tr>
+                ))}</Table.Tbody>
+            </Table>
+        </ScrollArea>
+    )
 }
 
 /** The epic view: the whole tree of key's root on a canvas, live on db:changed (useData reloads). */
@@ -196,11 +333,25 @@ export function EpicView({k, task = '', nav}: {k: string; task?: string; nav: Na
         }))
     }, [g, heights])
 
-    const derived: Edge[] = useMemo(() => (g?.links ?? []).map(l => ({
-        id: `${l.kind}:${l.from}:${l.to}`, source: l.from, target: l.to, deletable: true,
-        markerEnd: l.kind === 'blocks' ? {type: MarkerType.ArrowClosed} : undefined, // blocks: solid + arrow; relates: dashed
-        style: l.kind === 'relates' ? {strokeDasharray: '5 4'} : undefined,
-    })), [g])
+    // Hover trace: the hovered task plus everything it waits on and everything waiting on it; the rest dims.
+    const [hovered, setHovered] = useState('')
+    const lit = useMemo(() => hovered && g ? trace(hovered, g.links) : null, [hovered, g])
+    const [view, setView] = useLocalStorage({key: 'epic-view', defaultValue: 'graph'})
+
+    const derived: Edge[] = useMemo(() => {
+        const status = (k: string) => g?.nodes.find(n => n.key === k)?.status ?? ''
+        return (g?.links ?? []).map(l => {
+            const st = edgeState(l, status), on = !!lit && lit.has(l.from) && lit.has(l.to)
+            const color = c6(st.color)
+            return {
+                id: `${l.kind}:${l.from}:${l.to}`, source: l.from, target: l.to, deletable: true, animated: st.animated,
+                markerEnd: l.kind === 'blocks' ? {type: MarkerType.ArrowClosed, color} : undefined, // blocks: solid + arrow; relates: dashed
+                style: {stroke: color, strokeWidth: on ? 2.5 : 1.5, opacity: lit && !on ? 0.15 : 1, strokeDasharray: l.kind === 'relates' ? '5 4' : undefined},
+                // Labels only on the traced chain, as the reference diagram does; on every edge they bury the cards.
+                label: on ? st.label : undefined, labelStyle: {fill: color, fontSize: 11}, labelBgStyle: {fill: 'var(--mantine-color-body)'},
+            }
+        })
+    }, [g, lit])
     // Controlled edges need their own state or selection (and so delete-to-unlink) never sticks.
     const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
     useEffect(() => setEdges(derived), [derived, setEdges])
@@ -208,22 +359,33 @@ export function EpicView({k, task = '', nav}: {k: string; task?: string; nav: Na
     if (error) return <Text c="red">{error}</Text>
     if (!g) return <Text c="dimmed">Loading…</Text>
     const root = g.nodes.find(n => n.key === g.root)!
-    const ctx: Ctx = {nav, addSub: setAdding, open: setTask}
+    const ctx: Ctx = {nav, addSub: setAdding, open: setTask, lit, hover: setHovered}
     const connect = (c: Connection) => c.source && c.target && c.source !== c.target && Link(c.source, 'blocks', c.target).catch(errMsg)
     const create = () => CreateTask(core.NewTaskInput.createFrom({Title: title, ParentKey: adding})).then(() => { setAdding(''); setTitle('') }, errMsg)
     return (
         <Ctx.Provider value={ctx}>
             <Stack gap="sm" h="calc(100vh - 2 * var(--mantine-spacing-md))">
                 <Header g={g} nav={nav} root={root}/>
-                <Box style={{flex: 1, minHeight: 0, border: '1px solid var(--mantine-color-default-border)', borderRadius: 8}}>
-                    <ReactFlow nodes={nodes} edges={edges} onEdgesChange={onEdgesChange} nodeTypes={nodeTypes} onNodesChange={measure} fitView minZoom={0.2}
-                               onNodeDragStop={(_, n) => dragged.current.set(n.id, n.position)}
-                               onConnect={connect}
-                               onEdgesDelete={es => es.forEach(e => { const [kind, from, to] = e.id.split(':'); Unlink(from, kind, to).catch(errMsg) })}>
-                        <Background/>
-                        <Controls showInteractive={false}/>
-                    </ReactFlow>
-                </Box>
+                <Group justify="space-between" wrap="nowrap">
+                    <SegmentedControl size="xs" value={view} onChange={setView} data={[
+                        {value: 'graph', label: 'Graph'}, {value: 'waves', label: 'Waves'}, {value: 'prs', label: `PRs (${g.prs.filter(p => p.pr_url).length})`}]}/>
+                    <Text size="xs" c="dimmed" truncate>{VIEW_HINT[view]}</Text>
+                </Group>
+                {view === 'graph' && <>
+                    <Box style={{flex: 1, minHeight: 0, border: '1px solid var(--mantine-color-default-border)', borderRadius: 8}}>
+                        <ReactFlow nodes={nodes} edges={edges} onEdgesChange={onEdgesChange} nodeTypes={nodeTypes} onNodesChange={measure} fitView minZoom={0.2}
+                                   onNodeDragStop={(_, n) => dragged.current.set(n.id, n.position)}
+                                   onConnect={connect}
+                                   onEdgesDelete={es => es.forEach(e => { const [kind, from, to] = e.id.split(':'); Unlink(from, kind, to).catch(errMsg) })}>
+                            <Background/>
+                            <Controls showInteractive={false}/>
+                        </ReactFlow>
+                    </Box>
+                    <Legend/>
+                    <InfoBoxes g={g}/>
+                </>}
+                {view === 'waves' && <Waves g={g}/>}
+                {view === 'prs' && <PRTable g={g}/>}
                 <TaskPreview k={task ?? ''} onClose={() => setTask('')} nav={nav}/>
                 <Modal opened={!!adding} onClose={() => setAdding('')} title={`New sub-task of ${adding}`}>
                     <form onSubmit={e => { e.preventDefault(); if (title.trim()) create() }}>
