@@ -1,7 +1,7 @@
 import {useEffect, useState} from 'react'
 import {ActionIcon, Badge, Box, Button, Card as MCard, Group, Indicator, Menu, Modal, Notification, Paper, Popover, ScrollArea, Select, Stack, Text, Tooltip} from '@mantine/core'
 import {IconAppWindow, IconCheck, IconDots, IconMessageSearch, IconPencil, IconSitemap, IconX} from '@tabler/icons-react'
-import {AddComment, AppServiceRunning, CheckReviews, MergedPR, Move, PlacedActions, RunAppAction, ShowError, StopAppService, TakeQueuedComment} from '../wailsjs/go/ui/App'
+import {AddComment, ConnectorServiceRunning, CheckReviews, MergedPR, Move, PlacedActions, RunConnectorAction, ShowError, StopConnectorService, TakeQueuedComment} from '../wailsjs/go/ui/App'
 import {store, ui} from '../wailsjs/go/models'
 import {Markdown, MarkdownEditor} from './markdown'
 import {ALL_STATUSES, STATUS_COLOR, STATUS_LABEL, ago, fmtK, fmtTime, useData, useDraft} from './util'
@@ -46,9 +46,9 @@ export function PlacedButtons({place, k = '', size = 'xs'}: {place: string; k?: 
     if (!data?.length) return null
     // A manifest action's `confirm` text is asked before it runs (or starts its service).
     const guard = (a: {label: string; confirm?: string}, go: () => void) => (a.confirm ? setAsk({label: a.label, msg: a.confirm, go}) : go())
-    const run = (a: {app: string; id: string; label: string; output: boolean; icon?: string; confirm?: string}) => guard(a, () => {
-        setBusy(a.app + a.id)
-        RunAppAction(a.app, a.id, place, k).then(out => { if (a.output) toast(out || `${a.label}: done`) }, appErr).finally(() => setBusy(''))
+    const run = (a: {connector: string; id: string; label: string; output: boolean; icon?: string; confirm?: string}) => guard(a, () => {
+        setBusy(a.connector + a.id)
+        RunConnectorAction(a.connector, a.id, place, k).then(out => { if (a.output) toast(out || `${a.label}: done`) }, appErr).finally(() => setBusy(''))
     })
     return (
         <Group gap={4} onClick={e => e.stopPropagation()}>
@@ -61,10 +61,10 @@ export function PlacedButtons({place, k = '', size = 'xs'}: {place: string; k?: 
             </Modal>
             {/* icon actions first, then text buttons (sort is stable, so manifest order holds within each group) */}
             {[...data].sort((x, y) => Number(!!y.icon) - Number(!!x.icon)).map(a => a.service
-                ? <ServiceButton key={a.app + a.id} a={a} place={place} k={k} size={size} guard={guard}/>
+                ? <ServiceButton key={a.connector + a.id} a={a} place={place} k={k} size={size} guard={guard}/>
                 : a.icon
-                    ? <Tooltip key={a.app + a.id} label={a.label}><ActionIcon size={iconSize(size)} variant="default" aria-label={a.label} loading={busy === a.app + a.id} onClick={() => run(a)}><ActionImg src={a.icon}/></ActionIcon></Tooltip>
-                    : <Button key={a.app + a.id} size={size} variant="default" loading={busy === a.app + a.id} title={a.app} onClick={() => run(a)}>{a.label}</Button>)}
+                    ? <Tooltip key={a.connector + a.id} label={a.label}><ActionIcon size={iconSize(size)} variant="default" aria-label={a.label} loading={busy === a.connector + a.id} onClick={() => run(a)}><ActionImg src={a.icon}/></ActionIcon></Tooltip>
+                    : <Button key={a.connector + a.id} size={size} variant="default" loading={busy === a.connector + a.id} title={a.connector} onClick={() => run(a)}>{a.label}</Button>)}
         </Group>
     )
 }
@@ -74,12 +74,12 @@ const ActionImg = ({src}: {src: string}) => <img src={src} alt="" width={16} hei
 const iconSize = (size: string) => (size.startsWith('compact') ? 'sm' : 'md')
 
 /** A service action at `place` (each place has its own service): a green pulsing dot while its status script succeeds, a click then stops it; otherwise a click starts it and flashes a check/cross. */
-function ServiceButton({a, place, k, size, guard}: {a: {app: string; id: string; label: string; icon?: string; confirm?: string}; place: string; k: string; size: string; guard: (a: {label: string; confirm?: string}, go: () => void) => void}) {
+function ServiceButton({a, place, k, size, guard}: {a: {connector: string; id: string; label: string; icon?: string; confirm?: string}; place: string; k: string; size: string; guard: (a: {label: string; confirm?: string}, go: () => void) => void}) {
     const [running, setRunning] = useState(false)
     const [res, setRes] = useState<boolean | null>(null)
-    const check = () => AppServiceRunning(a.app, a.id, place, k).then(setRunning, () => setRunning(false))
-    useEffect(() => { check() }, [a.app, a.id, place, k]) // eslint-disable-line react-hooks/exhaustive-deps
-    const go = () => (running ? StopAppService(a.app, a.id, place, k) : RunAppAction(a.app, a.id, place, k).then(() => {}))
+    const check = () => ConnectorServiceRunning(a.connector, a.id, place, k).then(setRunning, () => setRunning(false))
+    useEffect(() => { check() }, [a.connector, a.id, place, k]) // eslint-disable-line react-hooks/exhaustive-deps
+    const go = () => (running ? StopConnectorService(a.connector, a.id, place, k) : RunConnectorAction(a.connector, a.id, place, k).then(() => {}))
         .then(() => setRes(true), e => { setRes(false); appErr(e) })
         .finally(() => { setTimeout(() => setRes(null), 1500); check() })
     const click = () => (running ? go() : guard(a, go))
@@ -89,13 +89,13 @@ function ServiceButton({a, place, k, size, guard}: {a: {app: string; id: string;
             <Indicator disabled={!running} color="green" size={8} processing>
                 {a.icon
                     ? <ActionIcon size={iconSize(size)} variant="default" aria-label={a.label} onClick={click}>{flash ?? <ActionImg src={a.icon}/>}</ActionIcon>
-                    : <Button size={size} variant="default" title={a.app} onClick={click} leftSection={flash}>{a.label}</Button>}
+                    : <Button size={size} variant="default" title={a.connector} onClick={click} leftSection={flash}>{a.label}</Button>}
             </Indicator>
         </Tooltip>
     )
 }
 
-/** The app's macOS icon (from AppIcons), else a generic window glyph. */
+/** The app's macOS icon (from ConnectorIcons), else a generic window glyph. */
 export const AppIcon = ({name, icons, size = 18}: {name: string; icons?: Record<string, string>; size?: number}) =>
     icons?.[name] ? <img src={icons[name]} alt="" width={size} height={size}/> : <IconAppWindow size={size}/>
 

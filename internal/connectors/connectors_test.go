@@ -1,4 +1,4 @@
-package apps
+package connectors
 
 import (
 	"os"
@@ -16,7 +16,7 @@ func TestAppPresets(t *testing.T) {
 	old := appDirs
 	appDirs = func() []string { return []string{dir} }
 	t.Cleanup(func() { appDirs = old })
-	ps := AppPresets()
+	ps := ConnectorPresets()
 	if ps[0].Name != "Finder" || ps[1].Name != "Zed" || !strings.Contains(ps[1].Manifest, "open -a 'Zed' ${{ worktree.path }}") {
 		t.Fatal(ps)
 	}
@@ -115,7 +115,7 @@ func TestManifestIconFromApp(t *testing.T) {
 	}
 	t.Cleanup(func() { db.Close() })
 	// a legacy plain app migrates to a manifest app with its icon, and the columns go
-	if _, err := db.Exec(`ALTER TABLE apps ADD COLUMN command TEXT NOT NULL DEFAULT ''; ALTER TABLE apps ADD COLUMN output INTEGER NOT NULL DEFAULT 0; INSERT INTO apps (name, command) VALUES ('Zed', 'open -a Zed {cwd}')`); err != nil {
+	if _, err := db.Exec(`ALTER TABLE connectors ADD COLUMN command TEXT NOT NULL DEFAULT ''; ALTER TABLE connectors ADD COLUMN output INTEGER NOT NULL DEFAULT 0; INSERT INTO connectors (name, command) VALUES ('Zed', 'open -a Zed {cwd}')`); err != nil {
 		t.Fatal(err)
 	}
 	for i := 0; i < 2; i++ { // second run is a no-op
@@ -167,7 +167,7 @@ func TestManifestSettingsValidation(t *testing.T) {
 }
 
 func TestExampleApps(t *testing.T) {
-	apps := ExampleApps()
+	apps := ExampleConnectors()
 	if len(apps) == 0 {
 		t.Fatal("no example apps found")
 	}

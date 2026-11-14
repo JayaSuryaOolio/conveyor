@@ -1,4 +1,4 @@
-package apps
+package connectors
 
 import (
 	"database/sql"
@@ -9,8 +9,8 @@ import (
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 )
 
-// AppSetting is a declared setting with its current value (saved, else the default).
-type AppSetting struct {
+// ConnectorSetting is a declared setting with its current value (saved, else the default).
+type ConnectorSetting struct {
 	ManifestSetting
 	Value string `json:"value"`
 }
@@ -37,10 +37,10 @@ func (st ManifestSetting) check(v string) error {
 	return nil
 }
 
-// AppSettings lists the app's settings with current values; saved values that no longer
+// ConnectorSettings lists the app's settings with current values; saved values that no longer
 // validate (the manifest changed) fall back to the default.
-func AppSettings(db *sql.DB, name string) ([]AppSetting, error) {
-	a, err := store.GetApp(db, name)
+func ConnectorSettings(db *sql.DB, name string) ([]ConnectorSetting, error) {
+	a, err := store.GetConnector(db, name)
 	if err != nil {
 		return nil, err
 	}
@@ -48,29 +48,29 @@ func AppSettings(db *sql.DB, name string) ([]AppSetting, error) {
 	if err != nil {
 		return nil, err
 	}
-	saved, err := store.GetAppSettings(db, name)
+	saved, err := store.GetConnectorSettings(db, name)
 	if err != nil {
 		return nil, err
 	}
-	out := make([]AppSetting, 0, len(m.Settings))
+	out := make([]ConnectorSetting, 0, len(m.Settings))
 	for _, st := range m.Settings {
 		v, ok := saved[st.Key]
 		if !ok || st.check(v) != nil {
 			v = fmt.Sprint(st.Default)
 		}
-		out = append(out, AppSetting{st, v})
+		out = append(out, ConnectorSetting{st, v})
 	}
 	return out, nil
 }
 
-// SaveAppSettings validates and stores vals (key -> value) as the app's settings; unknown keys are an error.
-func SaveAppSettings(db *sql.DB, name string, vals map[string]string) error {
-	cur, err := AppSettings(db, name)
+// SaveConnectorSettings validates and stores vals (key -> value) as the app's settings; unknown keys are an error.
+func SaveConnectorSettings(db *sql.DB, name string, vals map[string]string) error {
+	cur, err := ConnectorSettings(db, name)
 	if err != nil {
 		return err
 	}
 	for k := range vals {
-		if !slices.ContainsFunc(cur, func(x AppSetting) bool { return x.Key == k }) {
+		if !slices.ContainsFunc(cur, func(x ConnectorSetting) bool { return x.Key == k }) {
 			return fmt.Errorf("app %q has no setting %q", name, k)
 		}
 	}
@@ -82,7 +82,7 @@ func SaveAppSettings(db *sql.DB, name string, vals map[string]string) error {
 			return fmt.Errorf("setting %q: %w", x.Key, err)
 		}
 	}
-	return store.SetAppSettings(db, name, vals)
+	return store.SetConnectorSettings(db, name, vals)
 }
 
 // settingValues maps each setting key to its current value, for ${{ setting.key }}.
@@ -90,7 +90,7 @@ func settingValues(db *sql.DB, m Manifest, app string) (map[string]string, error
 	if len(m.Settings) == 0 {
 		return nil, nil
 	}
-	cur, err := AppSettings(db, app)
+	cur, err := ConnectorSettings(db, app)
 	if err != nil {
 		return nil, err
 	}

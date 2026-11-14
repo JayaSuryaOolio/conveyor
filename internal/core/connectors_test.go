@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/JayaSuryaOolio/conveyor/internal/apps"
+	"github.com/JayaSuryaOolio/conveyor/internal/connectors"
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 )
 
@@ -33,7 +33,7 @@ func TestOpenApp(t *testing.T) {
 	}
 	out := filepath.Join(t.TempDir(), "out")
 	s.InstallCommand("t", "echo {cwd} > "+shq(out), false)
-	if _, err := s.OpenApp("t", tk.Key, "b"); err != nil {
+	if _, err := s.OpenConnector("t", tk.Key, "b"); err != nil {
 		t.Fatal(err)
 	}
 	if b, _ := os.ReadFile(out); filepath.Base(strings.TrimSpace(string(b))) != "b" {
@@ -47,11 +47,11 @@ func TestOutputApp(t *testing.T) {
 	wt, _ := s.WorktreePath(tk.Key, "")
 	os.MkdirAll(wt, 0o755)
 	s.InstallCommand("o", "echo {key}; basename \"$PWD\"", true)
-	if got, err := s.OpenApp("o", tk.Key, ""); err != nil || got != tk.Key+"\na" {
+	if got, err := s.OpenConnector("o", tk.Key, ""); err != nil || got != tk.Key+"\na" {
 		t.Fatalf("%q %v", got, err)
 	}
 	s.InstallCommand("f", "echo nope; exit 3", true)
-	if _, err := s.OpenApp("f", tk.Key, ""); err == nil || !strings.Contains(err.Error(), "nope") {
+	if _, err := s.OpenConnector("f", tk.Key, ""); err == nil || !strings.Contains(err.Error(), "nope") {
 		t.Fatal(err)
 	}
 }
@@ -90,7 +90,7 @@ func TestInstallManifest(t *testing.T) {
 	if _, err := s.InstallManifest(raw, true); err != nil {
 		t.Fatal("replace:", err)
 	}
-	if exp, err := s.ExportApp("Demo"); err != nil || exp != raw {
+	if exp, err := s.ExportConnector("Demo"); err != nil || exp != raw {
 		t.Fatal("export:", exp, err)
 	}
 	if p, _ := s.PlacedActions("global_nav"); len(p) != 1 || p[0].ID != "hi" {
@@ -99,10 +99,10 @@ func TestInstallManifest(t *testing.T) {
 	if p, _ := s.PlacedActions("board_card"); len(p) != 0 {
 		t.Fatal(p)
 	}
-	if out, err := s.RunAppAction("Demo", "hi", "", ""); err != nil || !strings.HasPrefix(out, "Demo in ") {
+	if out, err := s.RunConnectorAction("Demo", "hi", "", ""); err != nil || !strings.HasPrefix(out, "Demo in ") {
 		t.Fatal(out, err)
 	}
-	if err := s.UninstallApp("Demo"); err != nil {
+	if err := s.UninstallConnector("Demo"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := store.GetAutomation(s.DB, "demo-auto"); err == nil {
@@ -111,7 +111,7 @@ func TestInstallManifest(t *testing.T) {
 }
 
 func TestManifestVersion(t *testing.T) {
-	if _, err := apps.ParseManifest(`{"version":99,"name":"x","actions":[{"id":"a","label":"A","run":"x","places":["global_nav"]}]}`); err == nil {
+	if _, err := connectors.ParseManifest(`{"version":99,"name":"x","actions":[{"id":"a","label":"A","run":"x","places":["global_nav"]}]}`); err == nil {
 		t.Fatal("accepted future version")
 	}
 }
@@ -119,16 +119,16 @@ func TestManifestVersion(t *testing.T) {
 func TestServiceManifest(t *testing.T) {
 	bad := `{"name":"X","actions":[{"id":"a","label":"A","run":"true","places":["%s"],%s}]}`
 	svc := `"service":{"status":"true","stop":"true"}`
-	if _, err := apps.ParseManifest(fmt.Sprintf(bad, "task_sidebar", svc)); err != nil {
+	if _, err := connectors.ParseManifest(fmt.Sprintf(bad, "task_sidebar", svc)); err != nil {
 		t.Fatal(err)
 	}
 	for _, c := range [][2]string{{"task_sidebar", `"service":{"status":"true"}`}, {"task_sidebar", `"output":true,` + svc}} {
-		if _, err := apps.ParseManifest(fmt.Sprintf(bad, c[0], c[1])); err == nil {
+		if _, err := connectors.ParseManifest(fmt.Sprintf(bad, c[0], c[1])); err == nil {
 			t.Fatalf("accepted %v", c)
 		}
 	}
 	// v1 `service` migrates to `services` at each place; v2 rejects it, v1 rejects `services`
-	if m, err := apps.ParseManifest(fmt.Sprintf(bad, "board_card", svc)); err != nil || m.Version != apps.ManifestVersion || m.Actions[0].Services["board_card"].Stop != "true" {
+	if m, err := connectors.ParseManifest(fmt.Sprintf(bad, "board_card", svc)); err != nil || m.Version != connectors.ManifestVersion || m.Actions[0].Services["board_card"].Stop != "true" {
 		t.Fatal("migrate:", m, err)
 	}
 	for _, x := range []string{
@@ -136,7 +136,7 @@ func TestServiceManifest(t *testing.T) {
 		`{"name":"X","actions":[{"id":"a","label":"A","run":"x","places":["task_sidebar"],"services":{"task_sidebar":{"status":"true","stop":"true"}}}]}`,
 		`{"version":2,"name":"X","actions":[{"id":"a","label":"A","run":"x","places":["task_sidebar"],"services":{"board_card":{"status":"true","stop":"true"}}}]}`,
 	} {
-		if _, err := apps.ParseManifest(x); err == nil {
+		if _, err := connectors.ParseManifest(x); err == nil {
 			t.Fatalf("accepted %s", x)
 		}
 	}
@@ -151,13 +151,13 @@ func TestServiceManifest(t *testing.T) {
 			t.Fatal(place, p)
 		}
 	}
-	if on, err := s.AppServiceRunning("Multi", "a", "global_nav", ""); !on || err != nil {
+	if on, err := s.ConnectorServiceRunning("Multi", "a", "global_nav", ""); !on || err != nil {
 		t.Fatal("global_nav service not running", err)
 	}
-	if on, _ := s.AppServiceRunning("Multi", "a", "board_card", ""); on {
+	if on, _ := s.ConnectorServiceRunning("Multi", "a", "board_card", ""); on {
 		t.Fatal("board_card has no service")
 	}
-	if err := s.StopAppService("Multi", "a", "board_card", ""); err == nil {
+	if err := s.StopConnectorService("Multi", "a", "board_card", ""); err == nil {
 		t.Fatal("stopped a missing service")
 	}
 }
@@ -176,10 +176,10 @@ func TestManifestIconPath(t *testing.T) {
 	if err != nil || len(p) != 1 || p[0].Icon != "data:image/png;base64,cG5n" {
 		t.Fatal(p, err)
 	}
-	if err := s.UninstallApp("Ic"); err != nil {
+	if err := s.UninstallConnector("Ic"); err != nil {
 		t.Fatal(err)
 	}
-	if m, _ := filepath.Glob(filepath.Join(apps.IconsDir(s.Home), "*")); len(m) != 0 {
+	if m, _ := filepath.Glob(filepath.Join(connectors.IconsDir(s.Home), "*")); len(m) != 0 {
 		t.Fatal("icon copy left behind", m)
 	}
 	for _, bad := range []string{
@@ -187,7 +187,7 @@ func TestManifestIconPath(t *testing.T) {
 		`{"name":"x","actions":[{"id":"a","label":"A","run":"x","places":["global_nav"],"iconPath":"/a.exe"}]}`,
 		`{"name":"x","actions":[{"id":"a","label":"A","run":"x","places":["global_nav"],"iconPath":"/a.png","icon":"data:image/png,x"}]}`,
 	} {
-		if _, err := apps.ParseManifest(bad); err == nil {
+		if _, err := connectors.ParseManifest(bad); err == nil {
 			t.Errorf("accepted %s", bad)
 		}
 	}
@@ -211,8 +211,8 @@ func TestAppBundleIconAndStateExport(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(st.Apps) != 1 || !strings.Contains(st.Apps[0].Manifest, `"icon": "data:image/png;base64,`) || strings.Contains(st.Apps[0].Manifest, "iconPath") {
-		t.Fatal(st.Apps)
+	if len(st.Connectors) != 1 || !strings.Contains(st.Connectors[0].Manifest, `"icon": "data:image/png;base64,`) || strings.Contains(st.Connectors[0].Manifest, "iconPath") {
+		t.Fatal(st.Connectors)
 	}
 	dst := newSvc(t)
 	if _, err := dst.ImportState(st, nil); err != nil {
@@ -225,17 +225,17 @@ func TestAppBundleIconAndStateExport(t *testing.T) {
 
 func TestManifestInject(t *testing.T) {
 	const m = `{"version":%d,"name":"X","inject":{"prompt":"P"},"actions":[{"id":"a","label":"A","run":"true","places":["global_nav"]}]}`
-	if _, err := apps.ParseManifest(fmt.Sprintf(m, 3)); err == nil {
+	if _, err := connectors.ParseManifest(fmt.Sprintf(m, 3)); err == nil {
 		t.Fatal("inject accepted below v4")
 	}
 	s := newSvc(t)
 	if _, err := s.InstallManifest(fmt.Sprintf(m, 4), false); err != nil {
 		t.Fatal(err)
 	}
-	if got := apps.Injected(s.DB, false, func(i apps.ManifestInject) string { return i.Prompt }); got != "P" {
+	if got := connectors.Injected(s.DB, false, func(i connectors.ManifestInject) string { return i.Prompt }); got != "P" {
 		t.Fatal(got)
 	}
-	if got := apps.Injected(s.DB, true, func(i apps.ManifestInject) string { return i.Prompt }); got != "## App: X\n\nP" {
+	if got := connectors.Injected(s.DB, true, func(i connectors.ManifestInject) string { return i.Prompt }); got != "## App: X\n\nP" {
 		t.Fatal(got)
 	}
 }

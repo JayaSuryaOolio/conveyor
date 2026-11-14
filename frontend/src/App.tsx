@@ -6,7 +6,7 @@ import {IconApps, IconBolt, IconArrowLeft, IconBook2, IconClock, IconLayoutKanba
 import {AppVersion, DispatcherState, Learnings, ShellPATHError} from '../wailsjs/go/ui/App'
 import {Agents} from './agents'
 import {EpicView} from './epic'
-import {Apps} from './apps'
+import {Connectors} from './connectors'
 import {Automations} from './automations'
 import {Nav, PlacedButtons, Toasts, View, toast} from './components'
 import {NewTask, Settings} from './forms'
@@ -130,7 +130,7 @@ export default function App() {
                 {view.name === 'epic' && <EpicView k={view.key!} task={view.task} nav={nav}/>}
                 {view.name === 'learnings' && <LearningsPage nav={nav}/>}
                 {view.name === 'automations' && <Automations/>}
-                {view.name === 'apps' && <Apps/>}
+                {view.name === 'apps' && <Connectors/>}
                 {view.name === 'agents' && <Agents/>}
                 {view.name === 'logs' && <Logs/>}
                 {view.name === 'settings' && <Settings/>}

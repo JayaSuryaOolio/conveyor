@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/JayaSuryaOolio/conveyor/internal/apps"
+	"github.com/JayaSuryaOolio/conveyor/internal/connectors"
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 	"github.com/JayaSuryaOolio/conveyor/internal/workspace"
 )
@@ -223,7 +223,7 @@ func Build(db *sql.DB, task store.Task) (string, error) {
 		fmt.Fprintf(&b, "- %s: %s %s (%s)\n", l.Label, l.Task.Key, l.Task.Title, l.Task.Status)
 	}
 	b.WriteString(relationsHelp)
-	if x := apps.Injected(db, true, func(i apps.ManifestInject) string { return i.Brief }); x != "" {
+	if x := connectors.Injected(db, true, func(i connectors.ManifestInject) string { return i.Brief }); x != "" {
 		b.WriteString("\n" + x + "\n")
 	}
 	fmt.Fprintf(&b, "\n%s\n## Rules\n\n%s\n## Older history\n\nFull thread: `conveyor task show %s --thread --json`\n", statusBlock, rulesForTask(db, task, true), task.Key)
@@ -375,7 +375,7 @@ func ResumePrompt(task store.Task, briefPath string, delta []store.Comment, tmpl
 
 // WithInjected appends the prompt text enabled apps inject to a launch prompt.
 func WithInjected(db *sql.DB, prompt string) string {
-	if x := apps.Injected(db, false, func(i apps.ManifestInject) string { return i.Prompt }); x != "" {
+	if x := connectors.Injected(db, false, func(i connectors.ManifestInject) string { return i.Prompt }); x != "" {
 		return prompt + "\n\n" + x
 	}
 	return prompt

@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/JayaSuryaOolio/conveyor/internal/apps"
+	"github.com/JayaSuryaOolio/conveyor/internal/connectors"
 )
 
 var graftLine = regexp.MustCompile(`^(.+)  <-  (.+)  \(pid \d+\)$`)
@@ -31,7 +31,7 @@ func graftRoot(list, worktree string) string {
 
 // GraftRoot returns the root graft mirrors worktree into, "" when it is not active for it.
 func GraftRoot(worktree string) string {
-	out, err := exec.Command(apps.GraftBin(), "list").Output()
+	out, err := exec.Command(connectors.GraftBin(), "list").Output()
 	if err != nil {
 		return ""
 	}
@@ -40,5 +40,5 @@ func GraftRoot(worktree string) string {
 
 // GraftStop stops the graft instance mirroring into root.
 func GraftStop(root string) error {
-	return runShell("stop graft", shq(apps.GraftBin())+" stop "+shq(root))
+	return runShell("stop graft", shq(connectors.GraftBin())+" stop "+shq(root))
 }

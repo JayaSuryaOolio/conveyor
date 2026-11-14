@@ -1,18 +1,18 @@
 import {useEffect, useRef, useState} from 'react'
 import {ActionIcon, Badge, Button, Checkbox, Code, FileButton, Group, Modal, MultiSelect, NumberInput, Pagination, Paper, Select, Stack, Switch, Table, Tabs, Text, TextInput, Textarea, Title} from '@mantine/core'
 import {IconDownload, IconPlus, IconPuzzle, IconSettings, IconTrash, IconUpload} from '@tabler/icons-react'
-import {AddApp, AppSettings, SaveAppSettings, ExampleApps, InstallExample, GetSettings, SetSetting, AppIcons, AppPresets, Confirm, SetAppDisabled, DeleteApp, ExportApp, InstallManifest, InstallPreset, ListApps, SlackLinks, ManifestSchema, Plugin, ValidateManifest} from '../wailsjs/go/ui/App'
+import {AddConnector, ConnectorSettings, SaveConnectorSettings, ExampleConnectors, InstallExample, GetSettings, SetSetting, ConnectorIcons, ConnectorPresets, Confirm, SetConnectorDisabled, DeleteConnector, ExportConnector, InstallManifest, InstallPreset, ListConnectors, SlackLinks, ManifestSchema, Plugin, ValidateManifest} from '../wailsjs/go/ui/App'
 import {runner, store} from '../wailsjs/go/models'
 import {AppIcon, errMsg, toast} from './components'
 import {Field, SettingRow} from './forms'
 import {useData} from './util'
 
-/** Wraps a shell command in a one-action manifest app (see AddApp). */
+/** Wraps a shell command in a one-action manifest app (see AddConnector). */
 function AppForm({onClose}: {onClose: (saved: boolean) => void}) {
     const [name, setName] = useState('')
     const [command, setCommand] = useState('')
     const [output, setOutput] = useState(false)
-    const save = () => AddApp(name, command, output).then(() => onClose(true), errMsg)
+    const save = () => AddConnector(name, command, output).then(() => onClose(true), errMsg)
     return (
         <Stack gap="sm">
             <TextInput data-autofocus label="Name" value={name} onChange={e => setName(e.target.value)}/>
@@ -92,7 +92,7 @@ function ManifestForm({onClose}: {onClose: (saved: boolean) => void}) {
     )
 }
 
-function manifestSummary(a: store.App) {
+function manifestSummary(a: store.Connector) {
     try {
         const m = JSON.parse(a.manifest)
         return [`${m.actions?.length ?? 0} actions`, m.agents?.length && `${m.agents.length} agents`, m.automations?.length && `${m.automations.length} automations`].filter(Boolean).join(', ')
@@ -101,7 +101,7 @@ function manifestSummary(a: store.App) {
 
 /** Settings declared by the app's manifest, one row per setting like VS Code's extension settings; values are strings. */
 function SettingsForm({app, onClose}: {app: string; onClose: () => void}) {
-    const {data, error} = useData(() => AppSettings(app), [app])
+    const {data, error} = useData(() => ConnectorSettings(app), [app])
     const [vals, setVals] = useState<Record<string, string>>({})
     // seed once: db:changed reloads must not wipe edits
     useEffect(() => { if (data) setVals(v => Object.keys(v).length ? v : Object.fromEntries(data.map(s => [s.key, s.value]))) }, [data])
@@ -126,13 +126,13 @@ function SettingsForm({app, onClose}: {app: string; onClose: () => void}) {
             })}
             <Group justify="flex-end">
                 <Button variant="default" onClick={onClose}>Cancel</Button>
-                <Button onClick={() => SaveAppSettings(app, vals).then(onClose, errMsg)}>Save</Button>
+                <Button onClick={() => SaveConnectorSettings(app, vals).then(onClose, errMsg)}>Save</Button>
             </Group>
         </Stack>
     )
 }
 
-function hasSettings(a: store.App) {
+function hasSettings(a: store.Connector) {
     try { return JSON.parse(a.manifest).settings?.length > 0 } catch { return false }
 }
 
@@ -176,11 +176,11 @@ function ConveyorPlugin() {
     )
 }
 
-function AppList() {
-    const {data, error, reload} = useData(ListApps, [])
-    const {data: presets} = useData(AppPresets, [], {static: true})
-    const {data: examples} = useData(ExampleApps, [], {static: true})
-    const {data: icons} = useData(AppIcons, [])
+function ConnectorList() {
+    const {data, error, reload} = useData(ListConnectors, [])
+    const {data: presets} = useData(ConnectorPresets, [], {static: true})
+    const {data: examples} = useData(ExampleConnectors, [], {static: true})
+    const {data: icons} = useData(ConnectorIcons, [])
     const [adding, setAdding] = useState(false)
     const [importing, setImporting] = useState(false)
     const [settingsApp, setSettingsApp] = useState('')
@@ -209,10 +209,10 @@ function AppList() {
                                 <Table.Td><Code title={a.manifest} style={{display: 'block', maxWidth: 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>{manifestSummary(a)}</Code></Table.Td>
                                 <Table.Td>
                                     <Group gap="xs" wrap="nowrap" justify="flex-end">
-                                        <Switch size="xs" aria-label={`Enable ${a.name}`} title={a.disabled ? 'Disabled: enable to use it again' : 'Disable (keeps its settings)'} checked={!a.disabled} onChange={e => SetAppDisabled(a.name, !e.currentTarget.checked).then(reload, errMsg)}/>
+                                        <Switch size="xs" aria-label={`Enable ${a.name}`} title={a.disabled ? 'Disabled: enable to use it again' : 'Disable (keeps its settings)'} checked={!a.disabled} onChange={e => SetConnectorDisabled(a.name, !e.currentTarget.checked).then(reload, errMsg)}/>
                                         {hasSettings(a) && <ActionIcon variant="subtle" color="gray" aria-label="Settings" title="Settings" onClick={() => setSettingsApp(a.name)}><IconSettings size={16}/></ActionIcon>}
-                                        <ActionIcon variant="subtle" color="gray" aria-label="Export" title="Export manifest as .json" onClick={() => ExportApp(a.name).then(p => p && toast(`Exported to ${p}`), errMsg)}><IconDownload size={16}/></ActionIcon>
-                                        <ActionIcon variant="subtle" color="red" aria-label="Delete" onClick={() => Confirm(`Delete connector ${a.name}?`).then(ok => { if (ok) return DeleteApp(a.name).then(reload) }).catch(errMsg)}><IconTrash size={16}/></ActionIcon>
+                                        <ActionIcon variant="subtle" color="gray" aria-label="Export" title="Export manifest as .json" onClick={() => ExportConnector(a.name).then(p => p && toast(`Exported to ${p}`), errMsg)}><IconDownload size={16}/></ActionIcon>
+                                        <ActionIcon variant="subtle" color="red" aria-label="Delete" onClick={() => Confirm(`Delete connector ${a.name}?`).then(ok => { if (ok) return DeleteConnector(a.name).then(reload) }).catch(errMsg)}><IconTrash size={16}/></ActionIcon>
                                     </Group>
                                 </Table.Td>
                             </Table.Tr>
@@ -323,11 +323,11 @@ function Integrations() {
     )
 }
 
-export function Apps() {
+export function Connectors() {
     return (
         <Tabs defaultValue="apps" keepMounted={false}>
             <Tabs.List mb="md"><Tabs.Tab value="apps">Connectors</Tabs.Tab><Tabs.Tab value="integrations">Integrations</Tabs.Tab></Tabs.List>
-            <Tabs.Panel value="apps"><AppList/></Tabs.Panel>
+            <Tabs.Panel value="apps"><ConnectorList/></Tabs.Panel>
             <Tabs.Panel value="integrations"><Stack maw={900}><Title order={3}>Integrations</Title><Integrations/></Stack></Tabs.Panel>
         </Tabs>
     )
