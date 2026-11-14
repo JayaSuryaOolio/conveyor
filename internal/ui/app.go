@@ -484,6 +484,19 @@ func (a *App) TakeQueuedComment(key string, id int64) (string, error) {
 	return body, err
 }
 
+// SendQueuedNow releases the task's queued messages past the debounce; it errors if the agent already received them.
+func (a *App) SendQueuedNow(key string) error {
+	t, err := store.GetTaskByKey(a.svc.DB, key)
+	if err != nil {
+		return err
+	}
+	n, err := store.SendQueuedNow(a.svc.DB, t.ID)
+	if err == nil && n == 0 {
+		err = fmt.Errorf("the agent already received this message")
+	}
+	return err
+}
+
 // Stop stops the task's running session and moves the task to needs_you.
 func (a *App) Stop(key string) error { return a.svc.Stop(key) }
 

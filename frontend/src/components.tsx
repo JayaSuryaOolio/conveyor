@@ -1,7 +1,7 @@
 import {useEffect, useState} from 'react'
 import {ActionIcon, Badge, Box, Button, Card as MCard, Group, Indicator, Menu, Modal, Notification, Paper, Popover, ScrollArea, Select, Stack, Text, Tooltip} from '@mantine/core'
 import {IconAppWindow, IconCheck, IconDots, IconMessageSearch, IconPencil, IconSitemap, IconX} from '@tabler/icons-react'
-import {AddComment, AppServiceRunning, CheckReviews, MergedPR, Move, PlacedActions, RunAppAction, ShowError, StopAppService, TakeQueuedComment} from '../wailsjs/go/ui/App'
+import {AddComment, AppServiceRunning, CheckReviews, MergedPR, Move, PlacedActions, RunAppAction, ShowError, SendQueuedNow, StopAppService, TakeQueuedComment} from '../wailsjs/go/ui/App'
 import {store, ui} from '../wailsjs/go/models'
 import {Markdown, MarkdownEditor} from './markdown'
 import {ALL_STATUSES, STATUS_COLOR, STATUS_LABEL, ago, fmtK, fmtTime, useData, useDraft} from './util'
@@ -231,17 +231,28 @@ function Edits({edits}: {edits: store.CommentEdit[]}) {
 }
 
 /** One comment in the thread. */
-export function Message({m, onEdit}: {m: store.Comment; onEdit?: () => void}) {
+// onSendNow: refactor idea: Message owns modal state; if more confirm dialogs appear, adopt @mantine/modals' openConfirmModal.
+export function Message({m, onEdit, onSendNow}: {m: store.Comment; onEdit?: () => void; onSendNow?: () => void}) {
+    const [asking, setAsking] = useState(false)
     return (
         <Paper withBorder p="sm" radius="md" bg={m.author === 'human' ? 'var(--mantine-color-default-hover)' : undefined}>
             <Group gap="xs" mb={4}>
                 <Text size="xs" fw={600}>{m.author}{m.source ? ` (via ${m.source})` : ''}</Text>
                 <Time iso={m.created_at}/>
-                {onEdit && <Tooltip label="Sent to the agent when the next run starts"><Badge size="xs" variant="light" color="gray">queued</Badge></Tooltip>}
+                {onEdit && (onSendNow
+                    ? <Tooltip label="Click to send now"><Badge size="xs" variant="light" color="gray" style={{cursor: 'pointer'}} component="button" type="button" onClick={() => setAsking(true)}>queued</Badge></Tooltip>
+                    : <Tooltip label="Sent to the agent when the next run starts"><Badge size="xs" variant="light" color="gray">queued</Badge></Tooltip>)}
                 {onEdit && <Tooltip label="Move back to the editor"><ActionIcon variant="subtle" color="gray" size="xs" aria-label="Edit queued message" onClick={onEdit}><IconPencil size={12}/></ActionIcon></Tooltip>}
                 {!!m.edits?.length && <Edits edits={m.edits}/>}
             </Group>
             <Markdown>{m.body}</Markdown>
+            <Modal opened={asking} onClose={() => setAsking(false)} title="Send now?">
+                <Text size="sm" mb="sm">Skip the wait and start the agent with this message now.</Text>
+                <Group justify="flex-end">
+                    <Button variant="default" onClick={() => setAsking(false)}>Cancel</Button>
+                    <Button data-autofocus onClick={() => { setAsking(false); onSendNow?.() }}>Send now</Button>
+                </Group>
+            </Modal>
         </Paper>
     )
 }

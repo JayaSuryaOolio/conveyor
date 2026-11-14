@@ -249,7 +249,10 @@ func Migrate(db *sql.DB) error {
 	if err := migrateTerminalTemplate(db); err != nil {
 		return err
 	}
-	return migrateAddAutomationOneShot(db)
+	if err := migrateAddCommentSendNow(db); err != nil {
+return err
+}
+return migrateAddAutomationOneShot(db)
 }
 
 // migrateTerminalTemplate replaces hardcoded macOS osascript templates with the OS default on non-macOS systems.
@@ -308,6 +311,20 @@ func migrateAddRepoSetupScript(db *sql.DB) error {
 	if n == 0 {
 		if _, err := db.Exec(`ALTER TABLE repos ADD COLUMN setup_script TEXT NOT NULL DEFAULT ''`); err != nil {
 			return fmt.Errorf("add repos.setup_script: %w", err)
+		}
+	}
+	return nil
+}
+
+// migrateAddCommentSendNow adds comments.send_now (a queued comment released past the debounce).
+func migrateAddCommentSendNow(db *sql.DB) error {
+	var n int
+	if err := db.QueryRow(`SELECT count(*) FROM pragma_table_info('comments') WHERE name='send_now'`).Scan(&n); err != nil {
+		return fmt.Errorf("check comments.send_now: %w", err)
+	}
+	if n == 0 {
+		if _, err := db.Exec(`ALTER TABLE comments ADD COLUMN send_now INTEGER NOT NULL DEFAULT 0`); err != nil {
+			return fmt.Errorf("add comments.send_now: %w", err)
 		}
 	}
 	return nil
