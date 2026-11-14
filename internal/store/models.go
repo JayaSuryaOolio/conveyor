@@ -100,6 +100,7 @@ type Comment struct {
 	RunID           *int64        `json:"run_id"`
 	ConsumedByRunID *int64        `json:"consumed_by_run_id"`
 	CreatedAt       string        `json:"created_at"`
+	SendNow         bool          `json:"send_now"` // human chose "Send now": the dispatcher skips the comment debounce
 	Edits           []CommentEdit `json:"edits"` // earlier versions, oldest first; a run's agent comment is updated, not re-posted
 }
 

@@ -6,7 +6,7 @@ import (
 	"fmt"
 )
 
-const commentCols = `id, task_id, author, body, source, run_id, consumed_by_run_id, created_at, edits`
+const commentCols = `id, task_id, author, body, source, run_id, consumed_by_run_id, created_at, edits, send_now`
 
 func queryComments(db dbtx, where string, args ...any) ([]Comment, error) {
 	rows, err := db.Query(`SELECT `+commentCols+` FROM comments WHERE `+where+` ORDER BY id`, args...)
@@ -18,7 +18,7 @@ func queryComments(db dbtx, where string, args ...any) ([]Comment, error) {
 	for rows.Next() {
 		var c Comment
 		var edits string
-		if err := rows.Scan(&c.ID, &c.TaskID, &c.Author, &c.Body, &c.Source, &c.RunID, &c.ConsumedByRunID, &c.CreatedAt, &edits); err != nil {
+		if err := rows.Scan(&c.ID, &c.TaskID, &c.Author, &c.Body, &c.Source, &c.RunID, &c.ConsumedByRunID, &c.CreatedAt, &edits, &c.SendNow); err != nil {
 			return nil, fmt.Errorf("scan comment: %w", err)
 		}
 		if edits != "" {
@@ -77,6 +77,16 @@ func ListComments(db *sql.DB, taskID int64) ([]Comment, error) {
 // UnconsumedComments returns human/system comments no run has received yet.
 func UnconsumedComments(db *sql.DB, taskID int64) ([]Comment, error) {
 	return queryComments(db, `task_id=? AND author IN ('human','system') AND consumed_by_run_id IS NULL`, taskID)
+}
+
+// SendQueuedNow flags the task's queued human comments so the dispatcher launches without waiting
+// out the debounce. It returns how many were flagged; 0 means a run already received them.
+func SendQueuedNow(db *sql.DB, taskID int64) (int64, error) {
+	res, err := db.Exec(`UPDATE comments SET send_now=1 WHERE task_id=? AND author='human' AND consumed_by_run_id IS NULL`, taskID)
+	if err != nil {
+		return 0, fmt.Errorf("send now: %w", err)
+	}
+	return res.RowsAffected()
 }
 
 // ConsumeComments marks comments as received by a run.

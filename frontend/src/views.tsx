@@ -2,7 +2,7 @@ import {lazy, Ref, Suspense, useEffect, useRef, useState} from 'react'
 import {ActionIcon, Anchor, Badge, Box, Breadcrumbs, Button, CloseButton, Code, CopyButton, Divider, Group, Kbd, Modal, Paper, Popover, Stack, Text, TextInput, Timeline, Title, Tooltip} from '@mantine/core'
 import {useLocalStorage} from '@mantine/hooks'
 import {IconAbc, IconSitemap, IconArrowDown, IconArrowUp, IconClock, IconFlame, IconHash, IconPencil, IconSearch, IconTerminal, IconX, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconMessage, IconPlayerPlay} from '@tabler/icons-react'
-import {Actions, GetTask, RunLog, SetTaskDescription, Stop, TakeQueuedComment, TermStart} from '../wailsjs/go/ui/App'
+import {Actions, GetTask, RunLog, SendQueuedNow, SetTaskDescription, Stop, TakeQueuedComment, TermStart} from '../wailsjs/go/ui/App'
 import {core, store, ui} from '../wailsjs/go/models'
 import {Card, CommentBox, Message, Nav, StatusBadge, Time, View, errMsg} from './components'
 import {Markdown, MarkdownEditor, TaskKey} from './markdown'
@@ -311,6 +311,7 @@ export function TaskPage({k, nav, height = 'calc(100vh - 2 * var(--mantine-spaci
     const t = d.task
     // Takes the queued message out of the thread and drops its text into the editor.
     const edit = (id: number) => TakeQueuedComment(k, id).then(body => setRestored({body}), errMsg).finally(reload)
+    const sendNow = () => SendQueuedNow(k).catch(errMsg).finally(reload)
     const stop = () => Stop(k).catch(errMsg).finally(reload)
     const items: Item[] = [
         ...d.runs.map((run): Item => ({t: run.started_at, run})),
@@ -357,7 +358,7 @@ export function TaskPage({k, nav, height = 'calc(100vh - 2 * var(--mantine-spaci
                                 </Timeline.Item>
                             ) : (
                                 <Timeline.Item key={'c' + it.comment!.id} bullet={<IconMessage size={12}/>}>
-                                    <Message m={it.comment!} onEdit={it.comment!.author === 'human' && !it.comment!.consumed_by_run_id ? () => edit(it.comment!.id) : undefined}/>
+                                    <Message m={it.comment!} onEdit={it.comment!.author === 'human' && !it.comment!.consumed_by_run_id ? () => edit(it.comment!.id) : undefined} onSendNow={it.comment!.author === 'human' && !it.comment!.consumed_by_run_id ? sendNow : undefined}/>
                                 </Timeline.Item>
                             ))}
                         </Timeline>

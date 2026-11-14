@@ -79,3 +79,15 @@ func TestPostRunCommentUpdates(t *testing.T) {
 		t.Fatalf("got %+v", cs)
 	}
 }
+
+func TestSendQueuedNow(t *testing.T) {
+	db := openTest(t)
+	task := mkTask(t, db, StatusTodo)
+	AddComment(db, Comment{TaskID: task.ID, Author: AuthorHuman, Body: "hi"})
+	if n, err := SendQueuedNow(db, task.ID); err != nil || n != 1 {
+		t.Fatalf("n=%d err=%v", n, err)
+	}
+	if cs, _ := UnconsumedComments(db, task.ID); len(cs) != 1 || !cs[0].SendNow {
+		t.Fatalf("not flagged: %+v", cs)
+	}
+}

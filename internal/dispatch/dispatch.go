@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -468,7 +469,7 @@ func (d *Dispatcher) launchTodo(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		if n := len(pending); n > 0 && d.now().Sub(parseTime(pending[n-1].CreatedAt)) < debounce {
+		if n := len(pending); n > 0 && d.now().Sub(parseTime(pending[n-1].CreatedAt)) < debounce && !slices.ContainsFunc(pending, func(c store.Comment) bool { return c.SendNow }) {
 			continue
 		}
 		run, err := d.start(ctx, t, pending)
