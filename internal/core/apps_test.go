@@ -222,3 +222,20 @@ func TestAppBundleIconAndStateExport(t *testing.T) {
 		t.Fatal(p)
 	}
 }
+
+func TestManifestInject(t *testing.T) {
+	const m = `{"version":%d,"name":"X","inject":{"prompt":"P"},"actions":[{"id":"a","label":"A","run":"true","places":["global_nav"]}]}`
+	if _, err := apps.ParseManifest(fmt.Sprintf(m, 3)); err == nil {
+		t.Fatal("inject accepted below v4")
+	}
+	s := newSvc(t)
+	if _, err := s.InstallManifest(fmt.Sprintf(m, 4), false); err != nil {
+		t.Fatal(err)
+	}
+	if got := apps.Injected(s.DB, false, func(i apps.ManifestInject) string { return i.Prompt }); got != "P" {
+		t.Fatal(got)
+	}
+	if got := apps.Injected(s.DB, true, func(i apps.ManifestInject) string { return i.Prompt }); got != "## App: X\n\nP" {
+		t.Fatal(got)
+	}
+}

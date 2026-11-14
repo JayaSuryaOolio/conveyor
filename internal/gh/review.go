@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/JayaSuryaOolio/conveyor/internal/apps"
 	"github.com/JayaSuryaOolio/conveyor/internal/core"
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 )
@@ -163,6 +164,9 @@ func ReviewCheck(ctx context.Context, svc *core.Service, key string, step int) (
 	}
 	switch {
 	case body.Len() > 0:
+		if x := apps.Injected(svc.DB, false, func(i apps.ManifestInject) string { return i.Review }); x != "" {
+			body.WriteString("\n" + x)
+		}
 		_, err := svc.AddComment(key, store.AuthorSystem, strings.TrimSpace(body.String()), core.FollowUp)
 		return "new review feedback", err
 	case open > 0 && step < len(backoff):
