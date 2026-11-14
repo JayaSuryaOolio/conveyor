@@ -195,7 +195,7 @@ func TestOneShotFiresOnceIgnoringSchedule(t *testing.T) {
 	if cs, _ := store.ListComments(svc.DB, tk.ID); len(cs) != 1 {
 		t.Fatalf("%d comments, want 1", len(cs))
 	}
-	if as, _ := store.ListAutomations(svc.DB); len(as) != 0 {
+	if as, _ := store.ListAutomations(svc.DB); len(as) != 1 { // only the seeded prune-closed
 		t.Fatalf("not deleted: %+v", as)
 	}
 }
@@ -208,5 +208,61 @@ func TestAddRejectsDuplicateName(t *testing.T) {
 	}
 	if err := Add(svc, a); err == nil || !strings.Contains(err.Error(), "already exists") {
 		t.Fatalf("second Add: %v, want already exists", err)
+	}
+}
+
+func TestPruneClosed(t *testing.T) {
+	svc, _ := env(t)
+	repo, _ := store.GetRepoByName(svc.DB, "a")
+	mk := func(status store.Status, age time.Duration) store.Task {
+		tk, err := store.CreateTask(svc.DB, store.Task{Title: "T", Status: status}, []store.TaskRepo{{RepoID: repo.ID, IsPrimary: true, Branch: "t"}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		ts := time.Now().Add(-age).UTC().Format(time.RFC3339)
+		svc.DB.Exec(`UPDATE tasks SET updated_at=? WHERE id=?`, ts, tk.ID)
+		store.SetSetting(svc.DB, "slack_thread:C:"+tk.Key, tk.Key)
+		store.SetSetting(svc.DB, "slack_task:"+tk.Key, "C:"+tk.Key)
+		return tk
+	}
+	day := 24 * time.Hour
+	oldDone, oldCan := mk(store.StatusDone, 8*day), mk(store.StatusCancelled, 9*day)
+	newDone, run, todo := mk(store.StatusDone, day), mk(store.StatusRunning, 30*day), mk(store.StatusTodo, 30*day)
+	store.SetSetting(svc.DB, "slack_thread:C:orphan", "CV-999")
+	store.SetSetting(svc.DB, "slack_task:CV-998", "C:x")
+
+	a := Templates["prune-closed"]
+	res, err := RunOne(context.Background(), svc, a)
+	if err != nil || res != "pruned 2 tasks, 6 slack links" {
+		t.Fatalf("%q %v", res, err)
+	}
+	for _, k := range []string{oldDone.Key, oldCan.Key} {
+		if _, err := store.GetTaskByKey(svc.DB, k); err == nil {
+			t.Errorf("%s kept", k)
+		}
+	}
+	for _, tk := range []store.Task{newDone, run, todo} {
+		if _, err := store.GetTaskByKey(svc.DB, tk.Key); err != nil {
+			t.Errorf("%s pruned", tk.Key)
+		}
+		if store.GetSetting(svc.DB, "slack_task:"+tk.Key) == "" {
+			t.Errorf("%s link pruned", tk.Key)
+		}
+	}
+}
+
+func TestPruneSeededAndDue(t *testing.T) {
+	svc, _ := env(t)
+	if err := Tick(context.Background(), svc, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	a, err := store.GetAutomation(svc.DB, "prune-closed")
+	if err != nil || a.LastResult == nil || !strings.HasPrefix(*a.LastResult, "pruned") {
+		t.Fatalf("%+v %v", a, err)
+	}
+	store.DeleteAutomation(svc.DB, "prune-closed")
+	Tick(context.Background(), svc, time.Now())
+	if _, err := store.GetAutomation(svc.DB, "prune-closed"); err == nil {
+		t.Error("reseeded after rm")
 	}
 }
