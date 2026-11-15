@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Installs the conveyor CLI and the Conveyor desktop app.
-# BIN_DIR overrides where the CLI goes (default ~/.local/bin, where claude installs itself);
-# APP_DIR overrides where Conveyor.app goes (default /Applications).
+# BIN_DIR overrides where the CLI and Linux desktop app go (default ~/.local/bin, where claude installs itself);
+# APP_DIR overrides where Conveyor.app (macOS, default /Applications) or desktop entries (Linux, default ~/.local/share/applications) go.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -33,12 +33,33 @@ git fetch --tags --quiet || echo "warning: could not fetch tags; version may be 
 wails build -clean -ldflags "-X github.com/JayaSuryaOolio/conveyor/internal/ui.Version=$(git describe --tags --always --dirty)"
 git checkout -- frontend/dist/.gitkeep 2>/dev/null || true
 git checkout -- frontend/package.json.md5 2>/dev/null || true # rewritten on every build; frontend/wailsjs is gitignored
-mkdir -p "$APP_DIR"
 if [ -d build/bin/Conveyor.app ]; then
+	mkdir -p "$APP_DIR"
 	rm -rf "$APP_DIR/Conveyor.app"
 	cp -R build/bin/Conveyor.app "$APP_DIR/"
 elif [ -f build/bin/Conveyor ]; then
-	cp build/bin/Conveyor "$APP_DIR/"
+	mkdir -p "$BIN_DIR"
+	cp build/bin/Conveyor "$BIN_DIR/Conveyor"
+	chmod +x "$BIN_DIR/Conveyor"
+	# Clean up any misplaced binary from previous install script versions
+	[ -f "$APP_DIR/Conveyor" ] && rm -f "$APP_DIR/Conveyor"
+	mkdir -p "$APP_DIR"
+	icon_dir="$HOME/.local/share/icons/hicolor/512x512/apps"
+	mkdir -p "$icon_dir"
+	if [ -f build/appicon.png ]; then
+		cp build/appicon.png "$icon_dir/conveyor.png"
+	fi
+	cat <<EOF > "$APP_DIR/conveyor.desktop"
+[Desktop Entry]
+Name=Conveyor
+Comment=Local kanban that orchestrates agentic tasks
+Exec=$BIN_DIR/Conveyor
+Icon=conveyor
+Terminal=false
+Type=Application
+Categories=Development;
+EOF
+	command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database "$APP_DIR" 2>/dev/null || true
 fi
 
 echo "==> Plugin"
@@ -119,7 +140,12 @@ else
 fi
 
 echo "installed: $BIN_DIR/conveyor"
-echo "installed: $APP_DIR/Conveyor.app"
+if [ "$(uname)" = "Darwin" ]; then
+	echo "installed: $APP_DIR/Conveyor.app"
+else
+	echo "installed: $BIN_DIR/Conveyor"
+	echo "installed: $APP_DIR/conveyor.desktop"
+fi
 case ":$user_path:" in
 *":$BIN_DIR:"*) ;;
 *) echo "note: add $BIN_DIR to your PATH; the app and hooks find conveyor through it" ;;
