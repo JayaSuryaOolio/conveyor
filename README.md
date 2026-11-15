@@ -74,7 +74,7 @@ More: [the showcase page](docs/showcase.md) (decisions and trade-offs) and the [
 Requires Go 1.25, `git`, the `claude` CLI, and `gh` for PR tracking.
 
 ```sh
-scripts/install.sh                       # CLI → ~/.local/bin, Conveyor.app → /Applications
+scripts/install.sh                       # CLI + desktop app (macOS: /Applications, Linux: ~/.local)
 claude                                   # once per repo: accept the trust prompt, then exit
 conveyor repo add ~/work/my-repo
 conveyor task new "Fix the thing" --repo my-repo --desc "..." --todo
