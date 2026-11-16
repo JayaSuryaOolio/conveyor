@@ -142,7 +142,7 @@ export function Automations() {
                                 <Table.Tr key={a.name}>
                                     <Table.Td><Switch checked={a.enabled} onChange={e => SetAutomationEnabled(a.name, e.currentTarget.checked).then(reload, errMsg)}/></Table.Td>
                                     <Table.Td fw={600}>{a.name}</Table.Td>
-                                    <Table.Td><Group gap={4} wrap="nowrap"><Code>{a.schedule}</Code><NextRuns schedule={a.schedule}/></Group></Table.Td>
+                                    <Table.Td>{a.schedule ? <Group gap={4} wrap="nowrap"><Code>{a.schedule}</Code><NextRuns schedule={a.schedule}/></Group> : a.run_at ? <Group gap={4} wrap="nowrap"><Text size="sm" c="dimmed">once</Text><Time iso={a.run_at}/></Group> : null}</Table.Td>
                                     <Table.Td>{a.action_kind}</Table.Td>
                                     <Table.Td>{a.last_run_at ? <Time iso={a.last_run_at}/> : ''}</Table.Td>
                                     <Table.Td><Text size="sm" lineClamp={1}>{a.last_result ?? ''}</Text></Table.Td>
