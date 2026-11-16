@@ -13,6 +13,8 @@ export const THEMES: Theme[] = [
     {id: 'nord', label: 'Nord', scheme: 'dark', theme: {primaryColor: 'cyan', colors: {dark: tuple('#eceff4 #d8dee9 #a3abba #7b8598 #4c566a #434c5e #3b4252 #2e3440 #292e39 #22262f')}}},
     {id: 'mocha', label: 'Mocha', scheme: 'dark', theme: {primaryColor: 'violet', colors: {dark: tuple('#cdd6f4 #bac2de #9399b2 #7f849c #585b70 #45475a #313244 #1e1e2e #181825 #11111b')}}},
     {id: 'evergreen', label: 'Evergreen', scheme: 'dark', theme: {primaryColor: 'teal', colors: {dark: tuple('#d3dfd8 #b5c5bc #84988d #647a6e #3f5248 #33453b #283930 #1e2c25 #18241e #101a15')}}},
+    // Same recipe as Evergreen (muted neutrals tinted toward the accent), tinted warm brown with an orange accent.
+    {id: 'ember', label: 'Ember', scheme: 'dark', theme: {primaryColor: 'orange', colors: {dark: tuple('#e3d8d0 #c8b9ad #9a8a7d #7b6c60 #53443a #45382f #382d25 #2b221c #221a15 #19120e')}}},
     {id: 'sky', label: 'Sky', scheme: 'light', theme: {primaryColor: 'blue', white: '#f6f9fd', black: '#1c2b3a', colors: {gray: tuple('#eef3f9 #e2e9f2 #d0dae7 #b8c5d6 #93a3b8 #73849b #56677d #3e4d61 #2a3747 #18222f')}}},
     {id: 'paper', label: 'Paper', scheme: 'light', theme: {primaryColor: 'teal', white: '#fbf8f1', black: '#3b3a36', colors: {gray: tuple('#f5f1e8 #ede7da #e2dac9 #d3c9b4 #b8ad97 #9a8f7a #7c7261 #5f574a #433d34 #2b2721')}}},
 ]
