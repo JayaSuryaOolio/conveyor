@@ -4,7 +4,7 @@ import {IconAppWindow, IconCheck, IconDots, IconMessageSearch, IconPencil, IconS
 import {AddComment, ConnectorServiceRunning, CheckReviews, MergedPR, Move, PlacedActions, RunConnectorAction, ShowError, SendQueuedNow, StopConnectorService, TakeQueuedComment} from '../wailsjs/go/ui/App'
 import {store, ui} from '../wailsjs/go/models'
 import {Markdown, MarkdownEditor} from './markdown'
-import {ALL_STATUSES, STATUS_COLOR, STATUS_LABEL, ago, fmtK, fmtTime, useData, useDraft} from './util'
+import {ALL_STATUSES, STATUS_COLOR, STATUS_LABEL, ago, fmtK, fmtTime, prNumbers, useData, useDraft} from './util'
 
 /** A screen to show; board views may carry a label or repo filter to apply (deep link); epic views a task key for the open modal. */
 export type View = {name: string; key?: string; label?: string; repo?: string; task?: string}
@@ -154,11 +154,12 @@ function StatusMenu({k, status}: {k: string; status: string}) {
 }
 
 /** `onLabel` adds a clicked label to the board's filters. */
-export function Card({c, nav, onLabel}: {c: ui.TaskCard; nav: Nav; onLabel: (l: string) => void}) {
+/** showPR (a search is active) adds the card's PR numbers beside the key, so a PR-number hit is explained without crowding idle cards. */
+export function Card({c, nav, onLabel, showPR}: {c: ui.TaskCard; nav: Nav; onLabel: (l: string) => void; showPR?: boolean}) {
     return (
         <MCard withBorder padding="sm" radius="md" style={{cursor: 'pointer'}} onClick={() => nav({name: 'task', key: c.key})}>
             <Group justify="space-between" wrap="nowrap" gap="xs">
-                <Text size="xs" fw={600} c="dimmed">{c.key}{c.parent && <Text span size="xs" fw={400}> ↑ {c.parent}</Text>}</Text>
+                <Text size="xs" fw={600} c="dimmed">{c.key}{c.parent && <Text span size="xs" fw={400}> ↑ {c.parent}</Text>}{showPR && c.prUrls.length > 0 && <Text span size="xs" fw={400} c="violet"> {prNumbers(c.prUrls).join(' ')}</Text>}</Text>
                 <Group gap={4} wrap="nowrap">
                     {c.ctxPeak > 0 && <Badge variant="outline" color="gray" size="xs" title="context peak">{fmtK(c.ctxPeak)}</Badge>}
                     {c.openPR && <Tooltip label="Check PR now (reviews, CI, conflicts)"><ActionIcon variant="subtle" color="gray" size="sm" aria-label="Check PR" onClick={e => { e.stopPropagation(); CheckReviews(c.key).then(() => toast('Checking the PR for reviews, CI and conflicts…', false, 3000), errMsg) }}><IconMessageSearch size={16}/></ActionIcon></Tooltip>}
@@ -166,7 +167,7 @@ export function Card({c, nav, onLabel}: {c: ui.TaskCard; nav: Nav; onLabel: (l: 
                     <StatusMenu k={c.key} status={c.status}/>
                 </Group>
             </Group>
-            <Text size="sm" fw={500} mt={2}>{c.title}</Text>
+            <Text size="sm" fw={500} mt={2} lineClamp={2} title={c.title}>{c.title}</Text>
             {(c.repos.length > 0 || c.labels.length > 0) && <Group gap={4} mt="xs">
                 {c.repos.map(r => <Badge key={r} variant="light" size="xs">{r}</Badge>)}
                 {c.labels.map(l => <Badge key={'l:' + l} component="button" variant="outline" color="gray" size="xs" title={'Filter by ' + l}

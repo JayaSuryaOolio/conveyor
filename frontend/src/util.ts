@@ -67,6 +67,9 @@ export function useDraft(key: string): [string, (v: string | ((prev: string) => 
     return [val, set]
 }
 
+/** "#123" for each PR url (a task has one PR per repo); the number is the url's last path segment. */
+export const prNumbers = (urls: string[]) => urls.map(u => '#' + u.replace(/^.*\/pull\//, ''))
+
 export const fmtK = (n: number) => (n >= 1000 ? Math.round(n / 1000) + 'K' : String(n))
 
 export function fmtDuration(start: string, end?: string | null): string {

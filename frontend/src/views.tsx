@@ -8,7 +8,7 @@ import {Card, CommentBox, Message, Nav, StatusBadge, Time, View, errMsg} from '.
 import {Markdown, MarkdownEditor, TaskKey} from './markdown'
 import {Relations} from './relations'
 import {TaskSidebar} from './workspace'
-import {fmtDuration, fmtK, listTasks, useData} from './util'
+import {fmtDuration, fmtK, listTasks, prNumbers, useData} from './util'
 
 const TermDock = lazy(() => import('./terminals'))
 
@@ -63,7 +63,7 @@ export function Board({nav, q, setQ, search, link}: {nav: Nav; q: string; setQ: 
     const needle = q.toLowerCase()
     // Array.sort is stable, so ties keep the server order (priority desc, created asc).
     const cards = all
-        .filter(c => (!needle || (c.key + ' ' + c.title).toLowerCase().includes(needle)) && (!sel.length || c.repos.some(r => sel.includes(r))) && (!selL.length || c.labels.some(l => selL.includes(l))))
+        .filter(c => (!needle || (c.key + ' ' + c.title + ' ' + prNumbers(c.prUrls).join(' ')).toLowerCase().includes(needle)) && (!sel.length || c.repos.some(r => sel.includes(r))) && (!selL.length || c.labels.some(l => selL.includes(l))))
         .sort((a, b) => sort.desc ? s.cmp(b, a) : s.cmp(a, b))
     const filtered = !!needle || sel.length > 0 || selL.length > 0
     const cols = [...COLUMNS]
@@ -138,7 +138,7 @@ export function Board({nav, q, setQ, search, link}: {nav: Nav; q: string; setQ: 
                             <Text size="sm" fw={600}>{label}</Text>
                             <Text size="xs" c="dimmed">{list.length}</Text>
                         </Group>
-                        <Stack gap="xs">{list.map(c => <Card key={c.key} c={c} nav={nav} onLabel={l => !selL.includes(l) && setPickedLabels([...selL, l])}/>)}</Stack>
+                        <Stack gap="xs">{list.map(c => <Card key={c.key} c={c} nav={nav} showPR={!!needle} onLabel={l => !selL.includes(l) && setPickedLabels([...selL, l])}/>)}</Stack>
                     </Paper>
                 )
             })}
