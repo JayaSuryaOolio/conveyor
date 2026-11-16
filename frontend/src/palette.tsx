@@ -45,7 +45,8 @@ export function CommandPalette({nav, onFocus}: {nav: Nav; onFocus: () => void}) 
     const r = raw ?? {tasks: [], agents: [], labels: [], repos: []}
     const groups: {title: string; icon: typeof IconSearch; items: Item[]}[] = [
         {title: 'Go to', icon: IconBolt, items: pick([0], () => 'focus waiting on you', () => ({id: 'focus', label: 'Focus', hint: 'waiting on you', go: onFocus}))},
-        {title: 'Tasks', icon: IconLayoutKanban, items: pick(r.tasks, t => `${t.key} ${t.title} ${t.prs.join(' ')}`, t => ({id: 't' + t.key, label: `${t.key} ${t.title}` + (words.length && t.prs.length ? ` ${t.prs.join(' ')}` : ''), hint: t.status, go: () => nav({name: 'task', key: t.key})}))},
+        // PR numbers go in the badge, not the label: a long title would clip them off the end.
+        {title: 'Tasks', icon: IconLayoutKanban, items: pick(r.tasks, t => `${t.key} ${t.title} ${t.prs.join(' ')}`, t => ({id: 't' + t.key, label: `${t.key} ${t.title}`, hint: words.length && t.prs.length ? t.prs.join(' ') : t.status, go: () => nav({name: 'task', key: t.key})}))},
         {title: 'Filters', icon: IconFilter, items: [
             ...pick(r.labels, l => 'label ' + l, l => ({id: 'l' + l, label: l, hint: 'label', go: () => nav({name: 'board', label: l})})),
             ...pick(r.repos, x => 'repo ' + x, x => ({id: 'r' + x, label: x, hint: 'repo', go: () => nav({name: 'board', repo: x})})),
@@ -68,7 +69,7 @@ export function CommandPalette({nav, onFocus}: {nav: Nav; onFocus: () => void}) 
                             <Spotlight.Action key={i.id} onClick={i.go}>
                                 <Group wrap="nowrap" w="100%">
                                     <Icon size={18}/>
-                                    <Text flex={1} truncate>{i.label}</Text>
+                                    <Text flex={1} miw={0} truncate>{i.label}</Text>
                                     {i.hint && <Badge variant="light" color="gray">{i.hint}</Badge>}
                                 </Group>
                             </Spotlight.Action>
