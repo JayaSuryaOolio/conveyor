@@ -6,6 +6,7 @@ import {core, store} from '../wailsjs/go/models'
 import {Nav, errMsg} from './components'
 import {Markdown, MarkdownEditor} from './markdown'
 import {listTasks, useData, useDraft} from './util'
+import {ThemePicker} from './themes'
 
 export function NewTask({nav, close}: {nav: Nav; close: () => void}) {
     const {data: repos} = useData(ListRepos, [])
@@ -210,7 +211,7 @@ export function Settings() {
             {error && <Text c="red">{error}</Text>}
             {data && (
                 <Tabs defaultValue="General" keepMounted={false}>
-                    <Tabs.List mb="md">{TABS.map(t => <Tabs.Tab key={t.name} value={t.name}>{t.name}</Tabs.Tab>)}<Tabs.Tab value="Repos">Repos</Tabs.Tab><Tabs.Tab value="Requirements">Requirements</Tabs.Tab></Tabs.List>
+                    <Tabs.List mb="md">{TABS.map(t => <Tabs.Tab key={t.name} value={t.name}>{t.name}</Tabs.Tab>)}<Tabs.Tab value="UI">UI</Tabs.Tab><Tabs.Tab value="Repos">Repos</Tabs.Tab><Tabs.Tab value="Requirements">Requirements</Tabs.Tab></Tabs.List>
                     {TABS.map(t => (
                         <Tabs.Panel key={t.name} value={t.name}>
                             <Stack>
@@ -220,6 +221,7 @@ export function Settings() {
                             </Stack>
                         </Tabs.Panel>
                     ))}
+                    <Tabs.Panel value="UI"><ThemePicker/></Tabs.Panel>
                     <Tabs.Panel value="Repos"><Repos/></Tabs.Panel>
                     <Tabs.Panel value="Requirements"><RequirementsList/></Tabs.Panel>
                 </Tabs>

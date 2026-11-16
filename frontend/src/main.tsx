@@ -1,10 +1,11 @@
 import React from 'react'
 import {createRoot} from 'react-dom/client'
-import {Anchor, MantineProvider, MultiSelect, Select, createTheme} from '@mantine/core'
+import {Anchor, MultiSelect, Select, createTheme} from '@mantine/core'
 import '@mantine/core/styles.css'
 import {HashRouter} from 'react-router'
 import './style.css'
 import App from './App'
+import {ThemeRoot} from './themes'
 import {Ready} from '../wailsjs/go/ui/App'
 
 // Every dropdown can be typed into to filter it.
@@ -25,10 +26,10 @@ const root = createRoot(container!)
 // so wait for it before mounting anything that loads data.
 Ready().then(() => root.render(
     <React.StrictMode>
-        <MantineProvider theme={theme} defaultColorScheme="dark">
+        <ThemeRoot base={theme}>
             <HashRouter>
                 <App/>
             </HashRouter>
-        </MantineProvider>
+        </ThemeRoot>
     </React.StrictMode>
 ))
