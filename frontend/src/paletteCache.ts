@@ -1,9 +1,9 @@
 import {useEffect, useState} from 'react'
 import {GetSettings, ListAgents, ListRepos} from '../wailsjs/go/ui/App'
-import {listTasks, onDbChanged, perDbVersion} from './util'
+import {listTasks, prNumbers, onDbChanged, perDbVersion} from './util'
 
 export type Raw = {
-    tasks: {key: string; title: string; status: string}[]
+    tasks: {key: string; title: string; status: string; prs: string[]}[]
     agents: {name: string; scope: string; description: string}[]
     titles: Record<string, string> // every task incl. done/cancelled, for task key tooltips in rendered markdown
     labels: string[]
@@ -15,7 +15,7 @@ async function fetchRaw(): Promise<Raw> {
     const repos = (await ListRepos()).map(r => r.name)
     const [tasks, agents, settings] = await Promise.all([listTasks(), ListAgents(repos), GetSettings()])
     return {
-        tasks: tasks.filter(t => t.status !== 'done' && t.status !== 'cancelled').map(t => ({key: t.key, title: t.title, status: t.status})),
+        tasks: tasks.filter(t => t.status !== 'done' && t.status !== 'cancelled').map(t => ({key: t.key, title: t.title, status: t.status, prs: prNumbers(t.prUrls)})),
         agents: agents.map(a => ({name: a.name, scope: a.scope, description: a.description})),
         titles: Object.fromEntries(tasks.map(t => [t.key, t.title])),
         labels: [...new Set(tasks.flatMap(t => t.labels))].sort(),

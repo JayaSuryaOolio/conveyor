@@ -279,6 +279,7 @@ type TaskCard struct {
 	LastMsgAt   string   `json:"lastMsgAt"` // newest comment (human or agent); "" when none
 	LastMsgBy   string   `json:"lastMsgBy"` // its author: human, agent or system
 	OpenPR      bool     `json:"openPR"`    // any repo has an OPEN PR (shows the board's "check reviews" button)
+	PRURLs      []string `json:"prUrls"`    // every repo's PR url, for search by PR number
 }
 
 // TaskDetail is the task page payload; Runs are oldest first (newest last).
@@ -341,7 +342,7 @@ func (a *App) ListTasks() ([]TaskCard, error) {
 		keys[t.ID] = t.Key
 	}
 	for _, t := range tasks {
-		c := TaskCard{Key: t.Key, Title: t.Title, Status: string(t.Status), Priority: t.Priority, Repos: []string{}, Labels: t.Labels, UpdatedAt: t.UpdatedAt}
+		c := TaskCard{Key: t.Key, Title: t.Title, Status: string(t.Status), Priority: t.Priority, Repos: []string{}, Labels: t.Labels, UpdatedAt: t.UpdatedAt, PRURLs: []string{}}
 		if t.Runner != nil {
 			c.Runner = *t.Runner
 		}
@@ -351,6 +352,9 @@ func (a *App) ListTasks() ([]TaskCard, error) {
 		for _, r := range t.Repos {
 			c.Repos = append(c.Repos, r.RepoName)
 			c.OpenPR = c.OpenPR || (r.PRState != nil && *r.PRState == "OPEN")
+			if r.PRURL != nil && *r.PRURL != "" {
+				c.PRURLs = append(c.PRURLs, *r.PRURL)
+			}
 		}
 		if r, ok := runs[t.ID]; ok {
 			c.CtxPeak = r.CtxPeak
