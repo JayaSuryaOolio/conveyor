@@ -125,6 +125,14 @@ function NextRuns({schedule}: {schedule: string}) {
 export function Automations() {
     const {data, error, reload} = useData(ListAutomations, [])
     const [form, setForm] = useState<{initial: Form; edit: boolean}>()
+    const [running, setRunning] = useState<string>() // automation being run now
+    const [ran, setRan] = useState<string>() // last one that finished, shown as "Ran" for a moment
+    const run = (name: string) => {
+        setRunning(name)
+        RunAutomation(name)
+            .then(() => { setRan(name); setTimeout(() => setRan(undefined), 2500) }, errMsg)
+            .finally(() => { setRunning(undefined); reload() })
+    }
     return (
         <Stack>
             <Group justify="space-between">
@@ -148,7 +156,7 @@ export function Automations() {
                                     <Table.Td><Text size="sm" lineClamp={1}>{a.last_result ?? ''}</Text></Table.Td>
                                     <Table.Td>
                                         <Group gap="xs" wrap="nowrap">
-                                            <Button size="xs" variant="default" onClick={() => RunAutomation(a.name).then(reload, e => { errMsg(e); reload() })}>Run now</Button>
+                                            <Button size="xs" variant="default" loading={running === a.name} disabled={!!running} color={ran === a.name ? 'green' : undefined} onClick={() => run(a.name)}>{ran === a.name ? 'Ran ✓' : 'Run now'}</Button>
                                             <ActionIcon variant="subtle" color="gray" aria-label="Edit" onClick={() => setForm({initial: toForm(a), edit: true})}><IconPencil size={16}/></ActionIcon>
                                             <ActionIcon variant="subtle" color="red" aria-label="Delete" onClick={() => Confirm(`Delete automation ${a.name}?`).then(ok => { if (ok) return DeleteAutomation(a.name).then(reload) }).catch(errMsg)}><IconTrash size={16}/></ActionIcon>
                                         </Group>

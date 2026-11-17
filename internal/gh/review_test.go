@@ -19,6 +19,7 @@ func fakeAPI(t *testing.T, reviews, comments, threads string) string {
 	script := `#!/bin/sh
 case "$2" in
 */reviews*) cat "$FAKE/reviews.json";;
+*/issues/*/comments*) cat "$FAKE/convo.json";;
 */comments*) cat "$FAKE/comments.json";;
 graphql) cat "$FAKE/threads.json";;
 */check-runs*) cat "$FAKE/runs.json";;
@@ -26,7 +27,7 @@ graphql) cat "$FAKE/threads.json";;
 esac
 `
 	os.WriteFile(filepath.Join(dir, "gh"), []byte(script), 0o755)
-	for n, v := range map[string]string{"reviews": reviews, "comments": comments, "threads": threads, "runs": `{"check_runs":[]}`, "pulls": `{}`} {
+	for n, v := range map[string]string{"reviews": reviews, "comments": comments, "threads": threads, "convo": `[]`, "runs": `{"check_runs":[]}`, "pulls": `{}`} {
 		os.WriteFile(filepath.Join(dir, n+".json"), []byte(v), 0o644)
 	}
 	t.Setenv("PATH", dir+":"+os.Getenv("PATH"))
@@ -59,6 +60,7 @@ func TestReviewCheckPostsOnceThenBacksOff(t *testing.T) {
 		threads)
 	os.WriteFile(filepath.Join(dir, "runs.json"), []byte(`{"check_runs":[{"name":"test","conclusion":"failure"},{"name":"lint","conclusion":"success"}]}`), 0o644)
 	os.WriteFile(filepath.Join(dir, "pulls.json"), []byte(`{"mergeable_state":"dirty","head":{"sha":"abc"}}`), 0o644)
+	os.WriteFile(filepath.Join(dir, "convo.json"), []byte(`[{"id":14,"body":"human says hi","user":{"login":"carol"}}]`), 0o644)
 	svc, tk := reviewTask(t)
 	ctx := context.Background()
 
@@ -69,7 +71,7 @@ func TestReviewCheckPostsOnceThenBacksOff(t *testing.T) {
 	if len(cs) != 1 || cs[0].Author != store.AuthorSystem {
 		t.Fatalf("want one system comment, got %+v", cs)
 	}
-	for _, want := range []string{"PR review on https://github.com/o/r/pull/7:", "> a.go:3 (bob)\nnil deref", "please rename", "Failing CI checks: test.", "merge conflicts"} {
+	for _, want := range []string{"PR review on https://github.com/o/r/pull/7:", "> a.go:3 (bob)\nnil deref", "please rename", "> comment (carol)\nhuman says hi", "Failing CI checks: test.", "merge conflicts"} {
 		if !strings.Contains(cs[0].Body, want) {
 			t.Errorf("missing %q in %q", want, cs[0].Body)
 		}
@@ -83,7 +85,7 @@ func TestReviewCheckPostsOnceThenBacksOff(t *testing.T) {
 		t.Errorf("task not requeued: %s", got.Status)
 	}
 	st, _ := store.GetPRReview(svc.DB, tk.ID, tk.Repos[0].RepoID)
-	if st.SeenCommentID != 13 || st.Unresolved != 1 || st.Review != "CHANGES_REQUESTED" {
+	if st.SeenCommentID != 14 || st.Unresolved != 1 || st.Review != "CHANGES_REQUESTED" {
 		t.Errorf("state %+v", st)
 	}
 
