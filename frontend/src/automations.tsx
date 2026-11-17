@@ -107,19 +107,55 @@ function AutomationForm({initial, edit, onClose}: {initial: Form; edit: boolean;
     )
 }
 
-function NextRuns({schedule}: {schedule: string}) {
+type PastRun = {at: string; result: string}
+const PAST_CAP = 10
+
+/** Completed runs the server reports are remembered per automation in localStorage (it keeps only the latest). */
+function usePastRuns(name: string, at?: string | null, result?: string | null): PastRun[] {
+    const key = 'automation-runs:' + name
+    const read = (): PastRun[] => { try { return JSON.parse(localStorage.getItem(key) ?? '[]') } catch { return [] } }
+    const [runs, setRuns] = useState(read)
+    useEffect(() => {
+        if (!at) return
+        const cur = read()
+        if (cur.some(r => r.at === at)) return
+        const next = [{at, result: result ?? ''}, ...cur].slice(0, PAST_CAP)
+        try { localStorage.setItem(key, JSON.stringify(next)) } catch { /* private mode */ }
+        setRuns(next)
+    }, [key, at, result])
+    return runs
+}
+
+function NextRuns({schedule, name, lastRunAt, lastResult}: {schedule: string; name: string; lastRunAt?: string | null; lastResult?: string | null}) {
     const [info, setInfo] = useState<ui.ScheduleInfo>()
+    const past = usePastRuns(name, lastRunAt, lastResult)
     return (
-        <Popover width={240} withArrow position="bottom">
+        <Popover width={300} withArrow position="bottom">
             <Popover.Target>
                 <ActionIcon variant="subtle" color="gray" aria-label="Next runs" onClick={() => DescribeSchedule(schedule).then(setInfo, errMsg)}><IconCalendarTime size={16}/></ActionIcon>
             </Popover.Target>
             <Popover.Dropdown>
-                <Text size="xs" c="dimmed" mb={4}>Next runs</Text>
+                {past.length > 0 && <>
+                    <Text size="xs" c="dimmed" mb={4}>Completed runs</Text>
+                    {past.map(r => <Group key={r.at} gap={6} wrap="nowrap"><Time iso={r.at}/><Text size="xs" c="dimmed" lineClamp={1}>{r.result}</Text></Group>)}
+                    <Text size="xs" c="dimmed" mt="xs" mb={4}>Next runs</Text>
+                </>}
+                {past.length === 0 && <Text size="xs" c="dimmed" mb={4}>Next runs</Text>}
                 {info?.valid ? info.next.map(t => <Text key={t} size="sm">{t}</Text>) : <Text size="sm" c="red">{info?.error}</Text>}
             </Popover.Dropdown>
         </Popover>
     )
+}
+
+function RunButton({name, onDone}: {name: string; onDone: () => void}) {
+    const [state, setState] = useState<'idle' | 'running' | 'ran'>('idle')
+    const run = () => {
+        setState('running')
+        RunAutomation(name)
+            .then(() => { setState('ran'); setTimeout(() => setState('idle'), 2500) }, e => { errMsg(e); setState('idle') })
+            .finally(onDone)
+    }
+    return <Button size="xs" variant="default" loading={state === 'running'} color={state === 'ran' ? 'green' : undefined} onClick={run}>{state === 'ran' ? 'Ran ✓' : 'Run now'}</Button>
 }
 
 export function Automations() {
@@ -142,13 +178,13 @@ export function Automations() {
                                 <Table.Tr key={a.name}>
                                     <Table.Td><Switch checked={a.enabled} onChange={e => SetAutomationEnabled(a.name, e.currentTarget.checked).then(reload, errMsg)}/></Table.Td>
                                     <Table.Td fw={600}>{a.name}</Table.Td>
-                                    <Table.Td>{a.schedule ? <Group gap={4} wrap="nowrap"><Code>{a.schedule}</Code><NextRuns schedule={a.schedule}/></Group> : a.run_at ? <Group gap={4} wrap="nowrap"><Text size="sm" c="dimmed">once</Text><Time iso={a.run_at}/></Group> : null}</Table.Td>
+                                    <Table.Td>{a.schedule ? <Group gap={4} wrap="nowrap"><Code>{a.schedule}</Code><NextRuns schedule={a.schedule} name={a.name} lastRunAt={a.last_run_at} lastResult={a.last_result}/></Group> : a.run_at ? <Group gap={4} wrap="nowrap"><Text size="sm" c="dimmed">once</Text><Time iso={a.run_at}/></Group> : null}</Table.Td>
                                     <Table.Td>{a.action_kind}</Table.Td>
                                     <Table.Td>{a.last_run_at ? <Time iso={a.last_run_at}/> : ''}</Table.Td>
                                     <Table.Td><Text size="sm" lineClamp={1}>{a.last_result ?? ''}</Text></Table.Td>
                                     <Table.Td>
                                         <Group gap="xs" wrap="nowrap">
-                                            <Button size="xs" variant="default" onClick={() => RunAutomation(a.name).then(reload, e => { errMsg(e); reload() })}>Run now</Button>
+                                            <RunButton name={a.name} onDone={reload}/>
                                             <ActionIcon variant="subtle" color="gray" aria-label="Edit" onClick={() => setForm({initial: toForm(a), edit: true})}><IconPencil size={16}/></ActionIcon>
                                             <ActionIcon variant="subtle" color="red" aria-label="Delete" onClick={() => Confirm(`Delete automation ${a.name}?`).then(ok => { if (ok) return DeleteAutomation(a.name).then(reload) }).catch(errMsg)}><IconTrash size={16}/></ActionIcon>
                                         </Group>

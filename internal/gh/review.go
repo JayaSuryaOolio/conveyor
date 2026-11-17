@@ -184,7 +184,7 @@ func checkPR(ctx context.Context, db *sql.DB, taskID, repoID int64, dir, url str
 	base := fmt.Sprintf("repos/%s/%s/pulls/%d", owner, repo, n)
 	// ponytail: first 100 only; add pagination if a PR outgrows it.
 	var reviews []review
-	var comments []comment
+	var comments, convo []comment // inline diff comments; PR conversation comments
 	var pr struct {
 		MergeableState string `json:"mergeable_state"`
 		Head           struct{ SHA string }
@@ -212,6 +212,7 @@ func checkPR(ctx context.Context, db *sql.DB, taskID, repoID int64, dir, url str
 	}{
 		{&reviews, []string{base + "/reviews?per_page=100"}},
 		{&comments, []string{base + "/comments?per_page=100"}},
+		{&convo, []string{fmt.Sprintf("repos/%s/%s/issues/%d/comments?per_page=100", owner, repo, n)}},
 		{&pr, []string{base}},
 		{&threads, []string{"graphql", "-f", "query=" + threadsQuery, "-F", "o=" + owner, "-F", "r=" + repo, "-F", "n=" + strconv.Itoa(n)}},
 	} {
@@ -257,6 +258,11 @@ func checkPR(ctx context.Context, db *sql.DB, taskID, repoID int64, dir, url str
 	for _, c := range comments {
 		if keep(c.ID, c.Body) && !resolved[c.ID] {
 			add(fmt.Sprintf("%s:%d (%s)", c.Path, c.Line, c.User.Login), c.Body)
+		}
+	}
+	for _, c := range convo {
+		if keep(c.ID, c.Body) {
+			add(fmt.Sprintf("comment (%s)", c.User.Login), c.Body)
 		}
 	}
 	st.SeenCommentID, st.Unresolved = mark, unresolved
