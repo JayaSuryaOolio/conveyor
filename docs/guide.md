@@ -182,7 +182,7 @@ Kinds:
 - `comment`: `{task_key | task_status, body}`. With `task_status` it comments on every task in that status, running the precheck once per task with `CONVEYOR_TASK_KEY`, `CONVEYOR_TASK_BRANCH` and `CONVEYOR_TASK_PR` set.
 - `cli`: `{args}`, run as a `conveyor` command.
 
-There is one built-in template, `pr-sweep` (every 15 minutes, comments on tasks in review that have new PR reviews):
+Built-in templates: `pr-sweep` (every 15 minutes, comments on tasks in review that have new PR reviews) and `state-backup`:
 
 ```
 conveyor automation add --template pr-sweep
@@ -232,7 +232,7 @@ An action is a long-running **service** at a place when `services` has an entry 
 
 `conveyor app run APP ACTION [KEY] --place p` runs an action as shown at a place. Manifests carry a `version` (current: 4; absent means 1). Older versions keep working: a version 1 action's single `service` becomes the service at each of its places.
 
-**Connector settings (v3).** A manifest may declare `settings`: `{key, type, default, description, options}` with `type` one of `string`, `boolean`, `number`, `enum` (`options` lists the choices); keys match `[a-z0-9_]+`. The Apps page shows a Settings icon for such apps that opens a modal to edit them; values are stored per app in the DB (`apps.settings`) and scripts read them as `${{ setting.key }}` (shell-quoted; booleans are `true`/`false`). Unsaved settings use the default. Uninstalling or replacing an app drops its values. The bundled Review webhooks app has one boolean per forwarded GitHub event; the listener reads them when it starts, so restart it after a change.
+**Connector settings (v3).** A manifest may declare `settings`: `{key, type, default, description, options}` with `type` one of `string`, `boolean`, `number`, `enum` (`options` lists the choices); keys match `[a-z0-9_]+`. The Apps page shows a Settings icon for such apps that opens a modal to edit them; values are stored per app in the DB (`connectors.settings`) and scripts read them as `${{ setting.key }}` (shell-quoted; booleans are `true`/`false`). Unsaved settings use the default. Uninstalling or replacing an app drops its values. The bundled Review webhooks app has one boolean per forwarded GitHub event; the listener reads them when it starts, so restart it after a change.
 
 Not yet: connector hooks (a connector reacting to task events). Later, Claude itself could be a connector: the agent that works a task would come from a manifest, with other agents (Codex, Gemini CLI, ...) installed as alternative apps instead of being built in.
 
@@ -248,7 +248,8 @@ PR review checks run on push and a backoff (30 min, 2 h, 8 h). For instant check
 
 Settings are in the app (Settings page) or `conveyor config list|get|set`. Secret settings (keys containing `token`, `secret` or `password`, or ending `_key`) are masked in `config list` (first 4 characters + `****`) and `config get` refuses them; add `--reveal` to print them.
 
-- **General**: `key_prefix` (CV), `default_model`.
+- **General**: `key_prefix` (CV), `user_name`, `default_model`, `default_runner` (`claude`, or `agy` for Antigravity; a task can override it with `--runner`; `conveyor detect [--fix]` shows the installed runners).
+- **Chat** (Slack bridge, see [slack.md](slack.md)): `chat_enabled` (on), `chat_transport` (slack), `chat_statuses` (`needs_you,review,done,failed`) and the `slack_*` tokens and ids.
 - **Dispatch**: `max_parallel` (3), `resume_threshold` (60000), `comment_debounce_secs` (20), `max_consecutive_failures` (3).
 - **External terminal**: `terminal_template`, the command for external terminals (`{cwd}` and `{cmd}` are substituted; default uses macOS Terminal).
 - **Prompts**: `pr_comment_prefix`, `brief_extra_rules`, and `prompt_fresh` / `prompt_resume` to replace the launch prompts (placeholders `{key}`, `{title}`, `{brief}`, `{comments}`). Empty means the built-in prompt. The page also shows the status block protocol the agent is given.
@@ -263,11 +264,12 @@ Global flag: `conveyor [--home dir] <command>`. Running a command with no argume
 conveyor repo add <path> [--name n]       conveyor repo list | rm <name> | setup <name> [script|-]
 
 conveyor task new "<title>" --repo a[,b] [--primary r] [--desc t | --desc-file f]
-                  [--todo] [--model m] [--agent a] [--parent KEY] [--priority n]
+                  [--todo] [--model m] [--agent a] [--runner r] [--parent KEY] [--priority n]
 conveyor task list [--status a,b]         conveyor task show KEY [--thread] [--runs]
 conveyor task comment KEY <text|-> [--ask|--note]   conveyor task move KEY <status> [--stop]
 conveyor task done KEY [--stop]           conveyor task cancel KEY
-conveyor task stop KEY
+conveyor task stop KEY                    conveyor task sessions KEY [--json]
+conveyor task repo KEY add|rm NAME
 conveyor task set KEY [--repo r] [--branch b] [--pr url] [--model m] [--desc d | --desc-file f]
 conveyor task link KEY blocks|relates OTHER    conveyor task unlink KEY kind OTHER
 conveyor task parent KEY PARENT|--none   conveyor task label KEY add|rm NAME | set <prefix>:<value>
@@ -275,6 +277,8 @@ conveyor task graph KEY [--json]          conveyor task new "t" --repo r --epic 
 conveyor epic status KEY [--flow N] [--json]    conveyor epic check KEY [--fix]
 conveyor epic prs KEY [--commits] [--json]      conveyor epic search KEY <regex>
 conveyor epic sessions KEY [--grep text]        conveyor epic flows KEY
+conveyor epic log KEY "<message>"               conveyor epic audit KEY
+conveyor epic review-check KEY [--step N]
 conveyor epic approve KEY                       conveyor epic restart KEY --reason "..."
 conveyor task sync KEY                    conveyor task brief KEY [--preview]
 conveyor task log KEY [--follow]          conveyor task attach KEY
@@ -285,8 +289,9 @@ conveyor agent model <name> <model|""> [--repo r]   ("" inherits default_model)
 conveyor models [--json]                  # model list, tier and alias
 conveyor learning list|accept|reject|edit|apply
 conveyor automation list|add|enable|disable|run|rm
-conveyor app list|presets|add|rm|open
-conveyor hooks status|install|uninstall
+conveyor app list|presets|add|install|export|run|enable|disable|rm|open
+conveyor plugin status|install|uninstall [claude|agy]   # `hooks` is an alias
+conveyor detect [--fix]                        # agent runners found, active default_runner
 conveyor review-webhook [--status|--stop]      # opt-in review-webhooks connector (see Connectors)
 conveyor config list [--reveal] | get <key> [--reveal] | set <key> <value>
 conveyor state export [file] | import <file> [--repo A=name ...] | backup [--keep N]
@@ -303,7 +308,7 @@ conveyor daemon                                # run the dispatcher in the foreg
 
 ```
 repos/<repo>/LEARNINGS.md   accepted local learnings, loaded into that repo's tasks
-conveyor.db                 tasks, runs, comments, events, learnings, automations, settings, apps
+conveyor.db                 tasks, runs, comments, events, learnings, automations, settings, connectors
 conveyor.log                app log (rotated at 5 MB to conveyor.log.1)
 claude-settings.json        hooks and options passed to launched sessions, rewritten at each launch
 dispatcher.lock             held by whichever process is dispatching
