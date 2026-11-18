@@ -310,3 +310,23 @@ func TestClosedTaskReplyIsError(t *testing.T) {
 		t.Fatal("closed task linked to thread")
 	}
 }
+
+func TestBackfillHandlesMissedMessages(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"ok":true,"ts":"9.9","messages":[
+			{"type":"message","user":"U1","text":"new msg","ts":"3.0","client_msg_id":"a"},
+			{"type":"message","user":"U1","text":"our own post","ts":"2.0"},
+			{"type":"message","user":"U1","text":"old","ts":"1.0","client_msg_id":"b"}]}`))
+	}))
+	defer srv.Close()
+	old := api
+	api = srv.URL + "/"
+	defer func() { api = old }()
+	cfg := map[string]string{"slack_bot_token": "x", "slack_user_id": "U1", "slack_cursor": "D1:1.0"}
+	s := &Slack{get: func(k string) string { return cfg[k] }, set: func(k, v string) error { cfg[k] = v; return nil }}
+	var got []string
+	s.backfill(func(in chat.In) string { got = append(got, in.Text); return "ok" })
+	if len(got) != 1 || got[0] != "new msg" || cfg["slack_cursor"] != "D1:3.0" {
+		t.Fatalf("got %v cursor %q", got, cfg["slack_cursor"])
+	}
+}

@@ -19,6 +19,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -285,6 +286,11 @@ func (s *Slack) Listen(ctx context.Context, h func(chat.In) string) error {
 	// the Home tab keeps its content, so publishing the guide once per connection is enough
 	call(s.token(), "views.publish", map[string]any{"user_id": s.get("slack_user_id"), "view": map[string]any{"type": "home", "blocks": home}})
 	go func() { <-ctx.Done(); c.Close() }()
+	// After sleep the TCP connection is dead but reads block for ages. Slack pings about every
+	// 30s, so silence for 90s means the link is gone: return and reconnect.
+	c.SetReadDeadline(time.Now().Add(90 * time.Second))
+	ping := c.PingHandler()
+	c.SetPingHandler(func(m string) error { c.SetReadDeadline(time.Now().Add(90 * time.Second)); return ping(m) })
 	// Handling an event does Web API calls and downloads, so it runs on one worker (in order)
 	// instead of the read loop: Slack redelivers an envelope not acked within 3s and drops a
 	// connection that keeps missing acks.
@@ -295,11 +301,13 @@ func (s *Slack) Listen(ctx context.Context, h func(chat.In) string) error {
 			f()
 		}
 	}()
+	work <- func() { s.backfill(h) } // messages sent while we were offline are not redelivered
 	for {
 		var e envelope
 		if err := c.ReadJSON(&e); err != nil {
 			return err
 		}
+		c.SetReadDeadline(time.Now().Add(90 * time.Second))
 		switch e.Type {
 		case "disconnect":
 			return nil // Slack asks for a fresh connection
@@ -331,6 +339,63 @@ func (s *Slack) Listen(ctx context.Context, h func(chat.In) string) error {
 				}
 			}()
 		}
+	}
+}
+
+// advance records the newest message handled in the DM (slack_cursor = CHANNEL:TS) so backfill
+// knows where the offline gap starts.
+func (s *Slack) advance(channel, ts string) {
+	if s.set == nil {
+		return
+	}
+	if ch, old, ok := strings.Cut(s.get("slack_cursor"), ":"); ok && ch == channel && old >= ts && len(old) >= len(ts) {
+		return
+	}
+	s.set("slack_cursor", channel+":"+ts)
+}
+
+// backfill handles messages (and thread replies) that arrived after the cursor while Conveyor
+// was asleep or offline: Slack does not redeliver them over Socket Mode.
+// ponytail: looks at the last 50 top-level messages only; page history if a gap can be longer.
+func (s *Slack) backfill(handle func(chat.In) string) {
+	channel, since, ok := strings.Cut(s.get("slack_cursor"), ":")
+	if !ok {
+		return
+	}
+	h, err := call(s.token(), "conversations.history", map[string]any{"channel": channel, "oldest": since, "limit": 50})
+	if err != nil {
+		log.Printf("chat: slack backfill: %v", err)
+		return
+	}
+	var missed []map[string]any
+	msgs, _ := h["messages"].([]any)
+	for _, m := range msgs {
+		m, _ := m.(map[string]any)
+		if n, _ := m["reply_count"].(float64); n > 0 {
+			ts, _ := m["ts"].(string)
+			if r, err := call(s.token(), "conversations.replies", map[string]any{"channel": channel, "ts": ts, "oldest": since, "limit": 200}); err == nil {
+				rs, _ := r["messages"].([]any)
+				for _, x := range rs {
+					if x, _ := x.(map[string]any); x["ts"] != ts {
+						missed = append(missed, x)
+					}
+				}
+			}
+		}
+		missed = append(missed, m)
+	}
+	sort.Slice(missed, func(i, j int) bool { return fmt.Sprint(missed[i]["ts"]) < fmt.Sprint(missed[j]["ts"]) })
+	for _, m := range missed {
+		// our own posts (user-token mode) carry no client_msg_id; only the human's messages do
+		if ts, _ := m["ts"].(string); ts <= since || m["client_msg_id"] == nil {
+			continue
+		}
+		m["channel"] = channel
+		if m["type"] == nil {
+			m["type"] = "message"
+		}
+		b, _ := json.Marshal(map[string]any{"event": m})
+		s.event(b, handle)
 	}
 }
 
@@ -384,8 +449,7 @@ func (s *Slack) event(payload []byte, handle func(chat.In) string) {
 	if _, dup := seen.LoadOrStore(e.Channel+"/"+e.TS, true); dup {
 		return
 	}
-	// acknowledge at once; needs the reactions:write scope, best effort
-	call(bot, "reactions.add", map[string]any{"channel": e.Channel, "timestamp": e.TS, "name": "eyes"})
+	s.advance(e.Channel, e.TS)
 	// reply answers in thread (the command's own thread for a top-level DM) and keeps a created
 	// task's later notifications in that thread too
 	reply := func(thread, text string) {
@@ -443,7 +507,7 @@ func (s *Slack) event(payload []byte, handle func(chat.In) string) {
 			}
 		}
 	}
-	if key == "" { // not a thread we can route: say so rather than leave only the :eyes:
+	if key == "" { // not a thread we can route: say so rather than say nothing
 		reply(e.ThreadTS, "I can't tell which task this thread is about. Start the message with the task key (`CV-12 your comment`) or send a command like `list`.")
 		return
 	}
