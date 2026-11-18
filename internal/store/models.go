@@ -69,6 +69,7 @@ type Run struct {
 	Status       string  `json:"status"`
 	Prompt       string  `json:"prompt"`
 	BlockStatus  *string `json:"block_status"`
+	Verdict      string  `json:"verdict"` // "approved" | "changes" from the status block; "" when absent (loops, core/loop.go)
 	Summary      *string `json:"summary"`
 	State        *string `json:"state"`
 	Next         *string `json:"next"`

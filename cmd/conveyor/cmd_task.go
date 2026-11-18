@@ -17,10 +17,10 @@ import (
 )
 
 func init() {
-	register("task", runTask, "manage tasks (new|list|show|comment|move|set|repo|link|unlink|loop|parent|sessions|stop|cancel|done|sync|brief|log|attach|open|label|graph)")
+	register("task", runTask, "manage tasks (new|list|show|comment|message|move|set|repo|link|unlink|loop|parent|sessions|stop|cancel|done|sync|brief|log|attach|open|label|graph)")
 }
 
-const taskUsage = "usage: conveyor task new|list|show|comment|move|set|link|unlink|loop|parent|sessions|stop|cancel|done|sync|brief|log|attach|open|label|graph ..."
+const taskUsage = "usage: conveyor task new|list|show|comment|message|move|set|link|unlink|loop|parent|sessions|stop|cancel|done|sync|brief|log|attach|open|label|graph ..."
 
 func runTask(home string, args []string) error {
 	if len(args) == 0 {
@@ -37,6 +37,8 @@ func runTask(home string, args []string) error {
 			return taskShow(s, rest)
 		case "comment":
 			return taskComment(s, rest)
+		case "message":
+			return taskMessage(s, rest)
 		case "move":
 			stop := len(rest) == 3 && rest[2] == "--stop"
 			if len(rest) != 2 && !stop {
@@ -337,6 +339,39 @@ func taskComment(s *core.Service, args []string) error {
 		body = strings.TrimSpace(body)
 	}
 	_, err = s.AddComment(args[0], store.AuthorHuman, body, after)
+	return err
+}
+
+// taskMessage sends text from one task to another: a system comment "via task:FROM" in the target's
+// thread, delivered like any comment. FROM defaults to $CONVEYOR_TASK_KEY (set in agent sessions).
+func taskMessage(s *core.Service, args []string) error {
+	fs := flag.NewFlagSet("task message", flag.ContinueOnError)
+	from := fs.String("from", os.Getenv("CONVEYOR_TASK_KEY"), "sending task key (default $CONVEYOR_TASK_KEY)")
+	ask := fs.Bool("ask", false, "after a merged PR: requeue the task to answer, without changing code")
+	note := fs.Bool("note", false, "after a merged PR: only add the message")
+	args, err := parseArgs(fs, args)
+	if err != nil {
+		return err
+	}
+	if len(args) != 2 || *ask && *note || *from == "" {
+		return fmt.Errorf("usage: conveyor task message TO <text|-> [--from KEY] [--ask|--note]")
+	}
+	after := core.FollowUp
+	if *ask {
+		after = core.Ask
+	} else if *note {
+		after = core.Note
+	}
+	body := args[1]
+	if body == "-" {
+		if body, err = readText("-"); err != nil {
+			return fmt.Errorf("read stdin: %w", err)
+		}
+	}
+	res, err := s.Message(*from, args[0], strings.TrimSpace(body), after)
+	if err == nil {
+		fmt.Println(res)
+	}
 	return err
 }
 

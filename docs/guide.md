@@ -99,7 +99,9 @@ conveyor task unlink CV-1A blocks CV-1B
 conveyor task label CV-1A add bug        # labels: shown on cards, filterable on the Board; `rm` removes
 ```
 
-**Loops** coordinate two tasks: a worker produces (usually a PR) and a checker judges it, turn by turn, with no human relaying comments. `conveyor task loop WORKER CHECKER [--kind peer-review|spec-review|custom] [--max-rounds 3] [--prompt text]` starts one (`task loop KEY [--json]` lists a task's loops; `task unlink WORKER loop CHECKER`, or the trash icon, removes it). Turns pass when a run finishes (`core.LoopOnStop`, called from the Stop hook), never by polling:
+**Task messages**: `conveyor task message TO <text|-> [--from KEY] [--ask|--note]` (`--from` defaults to `$CONVEYOR_TASK_KEY`, set in agent sessions) puts a system comment from one task in another's thread (`Service.Message`), shown as "from CV-5". It goes through the same inbox as any comment: a running or todo target reads it with its next run, a finished one is requeued, and the command prints which. A backlog or cancelled target is refused with an error, never silently dropped. It is not a human comment, so it does not stop loops (`task comment` is human-authored).
+
+**Loops** coordinate two tasks: a worker produces (usually a PR) and a checker judges it, turn by turn, with no human relaying comments. `conveyor task loop WORKER CHECKER [--kind peer-review|spec-review|custom] [--max-rounds 3] [--prompt text]` starts one (`task loop KEY [--json]` lists a task's loops; `task unlink WORKER loop CHECKER`, or the trash icon, removes it). The Stop hook only records the run (status block, `verdict`); the dispatcher tick (`Service.TickLoops`, like epics) passes the turn from it, idempotently (a `turn_run` watermark in the `loops` table). Each turn is a task message (below), so it shows in the receiving task's thread:
 
 - worker ends with `status: done` (task in review) -> round+1 and a system comment asks the checker (requeues it; a checker that is mid-run gets it on its next run). The kind sets what it is asked: `peer-review` reads the diff, `spec-review` checks it against the worker's description and criteria, `custom` uses `--prompt` (which any kind appends).
 - checker ends with `verdict: approved` in its `<conveyor>` block -> loop approved (a note on the worker, no requeue); `verdict: changes` -> its reply is posted on the worker (requeues it).
@@ -281,6 +283,7 @@ conveyor task repo KEY add|rm NAME
 conveyor task set KEY [--repo r] [--branch b] [--pr url] [--model m] [--desc d | --desc-file f]
 conveyor task link KEY blocks|relates OTHER    conveyor task unlink KEY kind OTHER
 conveyor task loop WORKER CHECKER [--kind peer-review|spec-review|custom] [--max-rounds N] [--prompt p]   conveyor task loop KEY [--json]
+conveyor task message TO <text|-> [--from KEY] [--ask|--note]
 conveyor task parent KEY PARENT|--none   conveyor task label KEY add|rm NAME | set <prefix>:<value>
 conveyor task graph KEY [--json]          conveyor task new "t" --repo r --epic [--epic-name n]
 conveyor epic status KEY [--flow N] [--json]    conveyor epic check KEY [--fix]

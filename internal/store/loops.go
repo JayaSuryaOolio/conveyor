@@ -27,13 +27,14 @@ type Loop struct {
 	MaxRounds int    `json:"max_rounds"`
 	Round     int    `json:"round"`
 	Turn      string `json:"turn"`
+	TurnRun   int64  `json:"-"` // see schema: the holder must finish a run newer than this
 	State     string `json:"state"`
 	Reason    string `json:"reason"`
 	LastSHA   string `json:"last_sha"` // worker PR head sent to the checker in the last round
 	UpdatedAt string `json:"updated_at"`
 }
 
-const loopSelect = `SELECT l.id, l.worker_id, l.checker_id, w.key, c.key, l.kind, l.prompt, l.max_rounds, l.round, l.turn, l.state, l.reason, l.last_sha, l.updated_at
+const loopSelect = `SELECT l.id, l.worker_id, l.checker_id, w.key, c.key, l.kind, l.prompt, l.max_rounds, l.round, l.turn, l.turn_run, l.state, l.reason, l.last_sha, l.updated_at
  FROM loops l JOIN tasks w ON w.id=l.worker_id JOIN tasks c ON c.id=l.checker_id`
 
 func scanLoops(db *sql.DB, where string, args ...any) ([]Loop, error) {
@@ -45,7 +46,7 @@ func scanLoops(db *sql.DB, where string, args ...any) ([]Loop, error) {
 	out := []Loop{}
 	for rows.Next() {
 		var l Loop
-		if err := rows.Scan(&l.ID, &l.WorkerID, &l.CheckerID, &l.Worker, &l.Checker, &l.Kind, &l.Prompt, &l.MaxRounds, &l.Round, &l.Turn, &l.State, &l.Reason, &l.LastSHA, &l.UpdatedAt); err != nil {
+		if err := rows.Scan(&l.ID, &l.WorkerID, &l.CheckerID, &l.Worker, &l.Checker, &l.Kind, &l.Prompt, &l.MaxRounds, &l.Round, &l.Turn, &l.TurnRun, &l.State, &l.Reason, &l.LastSHA, &l.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan loop: %w", err)
 		}
 		out = append(out, l)
@@ -68,8 +69,8 @@ func ListLoops(db *sql.DB) ([]Loop, error) { return scanLoops(db, "") }
 // CreateLoop inserts l and returns it with its id.
 func CreateLoop(db *sql.DB, l Loop) (Loop, error) {
 	l.UpdatedAt = now()
-	res, err := db.Exec(`INSERT INTO loops (worker_id, checker_id, kind, prompt, max_rounds, round, turn, state, reason, last_sha, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
-		l.WorkerID, l.CheckerID, l.Kind, l.Prompt, l.MaxRounds, l.Round, l.Turn, l.State, l.Reason, l.LastSHA, l.UpdatedAt)
+	res, err := db.Exec(`INSERT INTO loops (worker_id, checker_id, kind, prompt, max_rounds, round, turn, turn_run, state, reason, last_sha, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+		l.WorkerID, l.CheckerID, l.Kind, l.Prompt, l.MaxRounds, l.Round, l.Turn, l.TurnRun, l.State, l.Reason, l.LastSHA, l.UpdatedAt)
 	if err != nil {
 		return l, fmt.Errorf("create loop: %w", err)
 	}
@@ -79,8 +80,8 @@ func CreateLoop(db *sql.DB, l Loop) (Loop, error) {
 
 // SaveLoop stores l's progress (round, turn, state, reason, last sha).
 func SaveLoop(db *sql.DB, l Loop) error {
-	_, err := db.Exec(`UPDATE loops SET round=?, turn=?, state=?, reason=?, last_sha=?, updated_at=? WHERE id=?`,
-		l.Round, l.Turn, l.State, l.Reason, l.LastSHA, now(), l.ID)
+	_, err := db.Exec(`UPDATE loops SET round=?, turn=?, turn_run=?, state=?, reason=?, last_sha=?, updated_at=? WHERE id=?`,
+		l.Round, l.Turn, l.TurnRun, l.State, l.Reason, l.LastSHA, now(), l.ID)
 	if err != nil {
 		return fmt.Errorf("save loop: %w", err)
 	}

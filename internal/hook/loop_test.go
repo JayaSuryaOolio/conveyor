@@ -62,6 +62,9 @@ func (le loopEnv) finish(t *testing.T, key, msg string) {
 	if err := ProcessStop(le.db, tk, r, msg, ""); err != nil {
 		t.Fatal(err)
 	}
+	if err := le.svc.TickLoops(); err != nil { // the dispatcher tick passes the turn
+		t.Fatal(err)
+	}
 }
 
 func (le loopEnv) head(t *testing.T, sha string) {
@@ -195,5 +198,36 @@ func TestLoopStartGuards(t *testing.T) {
 	}
 	if ls, _ := store.TaskLoops(le.db, le.task.ID, false); len(ls) != 0 {
 		t.Fatalf("unlink left %v", ls)
+	}
+}
+
+// The turn passes once however often the tick runs, and the message is visible in the target's thread with its sender.
+func TestLoopTickIdempotentAndMessageProvenance(t *testing.T) {
+	le := newLoop(t, "peer-review", 3)
+	le.head(t, "aaa")
+	le.finish(t, le.task.Key, doneMsg)
+	for range 3 {
+		if err := le.svc.TickLoops(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cs, _ := store.ListComments(le.db, le.checker.ID)
+	if len(cs) != 1 || cs[0].Source != "task:"+le.task.Key || cs[0].Author != store.AuthorSystem {
+		t.Fatalf("%+v", cs)
+	}
+}
+
+func TestMessageRefusesBacklogAndReports(t *testing.T) {
+	le := newLoop(t, "peer-review", 3)
+	bl, err := store.CreateTask(le.db, store.Task{Title: "b", Status: store.StatusBacklog}, []store.TaskRepo{{RepoID: le.task.Repos[0].RepoID, IsPrimary: true, Branch: "b"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := le.svc.Message(le.task.Key, bl.Key, "hi", core.FollowUp); err == nil {
+		t.Fatal("backlog target accepted")
+	}
+	res, err := le.svc.Message(le.task.Key, le.checker.Key, "hi", core.FollowUp)
+	if err != nil || !strings.Contains(res, "requeued") {
+		t.Fatalf("%q %v", res, err)
 	}
 }

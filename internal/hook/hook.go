@@ -251,7 +251,7 @@ func ProcessStop(db *sql.DB, task store.Task, run store.Run, lastAssistantMessag
 	ended := time.Now().UTC().Format(time.RFC3339)
 	run.Status, run.EndedAt = "finished", &ended
 	if hasBlock {
-		run.BlockStatus, run.Summary, run.State, run.Next = &block.Status, &block.Summary, &block.State, &block.Next
+		run.BlockStatus, run.Verdict, run.Summary, run.State, run.Next = &block.Status, block.Verdict, &block.Summary, &block.State, &block.Next
 		var sb strings.Builder
 		for _, c := range block.Criteria {
 			mark := " "
@@ -355,13 +355,8 @@ func ProcessStop(db *sql.DB, task store.Task, run store.Run, lastAssistantMessag
 			return err
 		}
 	}
-	if _, err = store.UpdateTaskStatus(db, task.ID, to, store.ActorSystem); err != nil {
-		return err
-	}
-	if err := core.LoopOnStop(db, task, block, hasBlock, body); err != nil { // the run is recorded either way
-		store.RecordEvent(db, task.ID, "error", "loop: "+err.Error())
-	}
-	return nil
+	_, err = store.UpdateTaskStatus(db, task.ID, to, store.ActorSystem)
+	return err
 }
 
 // settleInteractive hands a running task back once an outside (manual) session goes idle, so
