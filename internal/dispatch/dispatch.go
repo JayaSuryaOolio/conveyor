@@ -218,6 +218,17 @@ func (d *Dispatcher) reap(ctx context.Context) error {
 		ok = ok && r.BgID != nil
 		// A session that errored at startup (e.g. an unknown model) stays listed as failed and never ends.
 		failed := ok && a.State == "failed"
+		// A finished session stays listed (state done/stopped) and a cancelled task's can outlive its run:
+		// neither is "vanished", yet the run would hold a max_parallel slot forever.
+		stale := ok && taskErr == nil && d.now().Sub(parseTime(r.StartedAt)) > reapGrace &&
+			(task.Status == store.StatusCancelled || task.Status == store.StatusDone ||
+				(task.Status != store.StatusRunning && (a.State == "done" || a.State == "stopped")))
+		if stale {
+			if task.Status == store.StatusCancelled || task.Status == store.StatusDone {
+				bgRunner.Stop(ctx, *r.BgID)
+			}
+			ok = false
+		}
 		// The agents list knows the bg session's real id: adopt it when no hook fired yet, and follow it when
 		// a resume ran as a copy under a new id, so the run's later hooks (its Stop) still find it.
 		if ok && !failed && a.SessionID != "" && (r.Status == "launching" || deref(r.SessionID) != a.SessionID) {
@@ -231,7 +242,9 @@ func (d *Dispatcher) reap(ctx context.Context) error {
 			continue
 		}
 		reason, note := "session vanished", "The Claude session vanished before finishing."
-		if failed {
+		if stale {
+			reason = "task " + string(task.Status) + ", session finished"
+		} else if failed {
 			reason, note = "session failed", "The Claude session failed to start or run. A common cause is an unknown model: check the task's model, its agent's model and the default_model setting (`claude logs "+deref(r.BgID)+"` shows the error), fix it, then comment to retry."
 		} else if r.BgID == nil {
 			reason, note = "launch interrupted", "The Claude launch was interrupted before a session started."
@@ -448,6 +461,9 @@ func (d *Dispatcher) launchTodo(ctx context.Context) error {
 	debounce := time.Duration(d.intSetting("comment_debounce_secs")) * time.Second
 	for _, t := range tasks {
 		if auto >= max || ctx.Err() != nil {
+			if auto >= max {
+				d.logf("max_parallel %d reached (%d auto runs active): %d todo task(s) waiting", max, auto, len(tasks))
+			}
 			break
 		}
 		if busy[t.ID] {
