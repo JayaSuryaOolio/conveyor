@@ -212,3 +212,30 @@ func maxEvent(db *sql.DB) int64 {
 	n, _ := store.MaxEventID(db)
 	return n
 }
+
+func TestListShowsPRAndRunAndKeyFirst(t *testing.T) {
+	db, err := store.Open(filepath.Join(t.TempDir(), "c.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	repo, _ := store.AddRepo(db, store.Repo{Name: "a", Path: "/x/a", DefaultBranch: "main"})
+	tk, _ := store.CreateTask(db, store.Task{Title: "hello", Status: store.StatusReview}, []store.TaskRepo{{RepoID: repo.ID, IsPrimary: true, Branch: "t"}})
+	db.Exec(`UPDATE task_repos SET pr_url='https://github.com/o/a/pull/42' WHERE task_id=?`, tk.ID)
+	b := &bridge{&core.Service{DB: db}, t.Logf}
+	if got := b.command("list"); !strings.Contains(got, "<https://github.com/o/a/pull/42|#42>") {
+		t.Fatalf("list: %s", got)
+	}
+	if got := b.command(tk.Key + " run nope:x"); !strings.Contains(got, "no app nope") {
+		t.Fatalf("run: %s", got)
+	}
+	if got := b.command("run list"); !strings.Contains(got, "conveyor:check-pr") {
+		t.Fatalf("run list: %s", got)
+	}
+	if got := b.command(tk.Key + " move done"); strings.Contains(got, "warning") {
+		t.Fatal(got)
+	}
+	if got := threadCmd("CV-1", "run graft:open"); got != "run CV-1 graft:open" {
+		t.Fatalf("threadCmd: %q", got)
+	}
+}
