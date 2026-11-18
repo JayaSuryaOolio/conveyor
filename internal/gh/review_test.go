@@ -96,7 +96,7 @@ func TestReviewCheckPostsOnceThenBacksOff(t *testing.T) {
 	if cs, _ = store.ListComments(svc.DB, tk.ID); len(cs) != 1 {
 		t.Fatalf("second check commented: %d comments", len(cs))
 	}
-	a, err := store.GetAutomation(svc.DB, "review-check:"+tk.Key)
+	a, err := store.GetAutomation(svc.DB, "track-pr:"+tk.Key)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -115,7 +115,7 @@ func TestBackoffSchedule(t *testing.T) {
 		if _, err := ReviewCheck(context.Background(), svc, tk.Key, step); err != nil {
 			t.Fatal(err)
 		}
-		a, err := store.GetAutomation(svc.DB, "review-check:"+tk.Key)
+		a, err := store.GetAutomation(svc.DB, "track-pr:"+tk.Key)
 		if err != nil {
 			t.Fatalf("step %d: %v", step, err)
 		}
@@ -123,7 +123,7 @@ func TestBackoffSchedule(t *testing.T) {
 			t.Errorf("step %d: next in %v, want %v", step, d, want)
 		}
 	}
-	store.DeleteAutomation(svc.DB, "review-check:"+tk.Key)
+	store.DeleteAutomation(svc.DB, "track-pr:"+tk.Key)
 	if _, err := ReviewCheck(context.Background(), svc, tk.Key, len(backoff)); err != nil {
 		t.Fatal(err)
 	}
@@ -137,13 +137,13 @@ func TestNewHeadSchedulesCheckIn10Min(t *testing.T) {
 	db, tk := newTask(t, 1)
 	setPRHead(t, dir, tk.Repos[0].Branch, "aaa")
 	sync(t, db, tk)
-	a, err := store.GetAutomation(db, "review-check:"+tk.Key)
+	a, err := store.GetAutomation(db, "track-pr:"+tk.Key)
 	if err != nil {
 		t.Fatal(err)
 	}
 	first := *a.RunAt
 	sync(t, db, tk) // same head: untouched
-	if a, _ = store.GetAutomation(db, "review-check:"+tk.Key); *a.RunAt != first {
+	if a, _ = store.GetAutomation(db, "track-pr:"+tk.Key); *a.RunAt != first {
 		t.Error("rescheduled without a push")
 	}
 	if d := time.Until(mustTime(t, first)); d < 9*time.Minute || d > 11*time.Minute {

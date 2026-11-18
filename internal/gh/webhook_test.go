@@ -39,7 +39,7 @@ func TestWebhookSchedulesCheckNow(t *testing.T) {
 		t.Fatalf("issue_comment: %d", c)
 	}
 	as, _ := store.ListAutomations(svc.DB)
-	if len(as) != 1 || as[0].Name != "review-check:"+tk.Key || as[0].RunAt == nil {
+	if len(as) != 1 || as[0].Name != "track-pr:"+tk.Key || as[0].RunAt == nil {
 		t.Fatalf("want one review-check, got %+v", as)
 	}
 	if at, _ := time.Parse(time.RFC3339, *as[0].RunAt); time.Since(at) > time.Minute || at.After(time.Now().Add(time.Second)) {
