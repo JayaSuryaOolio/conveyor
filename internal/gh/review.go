@@ -28,6 +28,18 @@ const (
 
 var htmlComment = regexp.MustCompile(`(?s)<!--.*?-->`)
 
+// noise marks automated notices that carry no finding (changeset-bot, CodeRabbit skipping a draft).
+var noise = []string{"No Changeset found", "Changeset detected", "Draft PR not reviewed", "Review skipped", "Rate limit exceeded"}
+
+func isNoise(s string) bool {
+	for _, n := range noise {
+		if strings.Contains(s, n) {
+			return true
+		}
+	}
+	return false
+}
+
 // clean strips review-bot boilerplate: HTML comments, everything from the first <details>
 // (agent-prompt copies, tool logs), checkbox and rule lines; then caps the length.
 func clean(s string) string {
@@ -245,7 +257,7 @@ func checkPR(ctx context.Context, db *sql.DB, taskID, repoID int64, dir, url str
 	}
 	add := func(head, body string) {
 		// ponytail: items past totalCap are dropped but the watermark still advances; raise totalCap if that bites.
-		if body = clean(body); body != "" && sb.Len() < totalCap {
+		if body = clean(body); body != "" && !isNoise(body) && sb.Len() < totalCap {
 			fmt.Fprintf(&sb, "> %s\n%s\n\n", head, body)
 		}
 	}
