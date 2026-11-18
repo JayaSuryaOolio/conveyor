@@ -8,13 +8,15 @@ import App from './App'
 import {ThemeRoot} from './themes'
 import {Ready} from '../wailsjs/go/ui/App'
 
-// Every dropdown can be typed into to filter it. autoComplete off: the browser's own suggestion popover swallows the arrow keys meant for the options.
-// Plain TextInputs keep it. Refactor idea: a shared `selectDefaults` const if a 4th select-like component is added.
+// Every dropdown can be typed into to filter it. The browser's own suggestion popover swallows the arrow keys meant for the options,
+// and autoComplete off alone doesn't stop WebKit's (macOS) inline text prediction in the Wails webview; autoCorrect off + spellCheck false does.
+// Plain TextInputs keep all of it.
+const noSuggest = {autoComplete: 'off', autoCorrect: 'off', spellCheck: false} as const
 const theme = createTheme({
     components: {
-        Select: Select.extend({defaultProps: {searchable: true, autoComplete: 'off'}}),
-        MultiSelect: MultiSelect.extend({defaultProps: {searchable: true, autoComplete: 'off'}}),
-        TagsInput: TagsInput.extend({defaultProps: {autoComplete: 'off'}}),
+        Select: Select.extend({defaultProps: {searchable: true, ...noSuggest}}),
+        MultiSelect: MultiSelect.extend({defaultProps: {searchable: true, ...noSuggest}}),
+        TagsInput: TagsInput.extend({defaultProps: noSuggest}),
         // Links: muted gray (not blue) so they read as clickable without grabbing attention; underline is the affordance.
         Anchor: Anchor.extend({defaultProps: {c: 'light-dark(var(--mantine-color-gray-7), var(--mantine-color-gray-4))', underline: 'always'}}),
     },
