@@ -180,3 +180,9 @@ func TestCleanStripsBotBoilerplate(t *testing.T) {
 		t.Errorf("not capped: %d", len(got))
 	}
 }
+
+func TestIsNoise(t *testing.T) {
+	if !isNoise("### ⚠️ No Changeset found\n\nLatest commit") || !isNoise("## Draft PR not reviewed") || isNoise("real finding") {
+		t.Fatal("isNoise")
+	}
+}
