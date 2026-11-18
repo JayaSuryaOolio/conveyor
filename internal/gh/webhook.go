@@ -120,6 +120,24 @@ func openPRRepos(db *sql.DB) []string {
 	return out
 }
 
+// dropStaleForwards deletes the repo's `gh webhook forward` hooks (name "cli", GitHub's forwarder
+// URL): GitHub allows one per repo and no forward of ours is running when this is called, so any
+// left by a crashed run or another machine would fail the next forward with 422. Best effort.
+func dropStaleForwards(ctx context.Context, repo string) {
+	out, err := run(ctx, "", "list hooks", "api", "repos/"+repo+"/hooks", "--jq",
+		`.[] | select(.name=="cli" and (.config.url|test("webhook-forwarder"))) | .id`)
+	if err != nil {
+		return
+	}
+	for _, id := range strings.Fields(string(out)) {
+		if _, err := run(ctx, "", "delete hook", "api", "-X", "DELETE", "repos/"+repo+"/hooks/"+id); err != nil {
+			log.Printf("review webhook: %s: %v", repo, err)
+			continue
+		}
+		log.Printf("review webhook: removed stale forward hook %s on %s", id, repo)
+	}
+}
+
 // firstLine is the first non-empty line of out: gh prints its usage text after an error.
 func firstLine(out []byte) string {
 	l, _, _ := strings.Cut(strings.TrimSpace(string(out)), "\n")
