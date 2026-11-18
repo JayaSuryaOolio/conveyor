@@ -72,7 +72,7 @@ state: branch ..., PR #N, tests: pass|fail|not run
 next: what remains
 criteria:
 - [x] AC1 - evidence
-learning: only if this repo had a trap that cost you >10 min and is not in CLAUDE.md/SKILL.md/LEARNINGS.md. Name the file or command. Omit the line otherwise. (repeatable line)
+learning: only a repo-wide trap (not specific to one task or feature) that cost you >10 min and is not in CLAUDE.md/SKILL.md/LEARNINGS.md. Name the file or command. Feature-level facts go in that feature's SKILL.md or a code comment, not here. Omit the line otherwise. (repeatable line)
 spawn: [todo] title of a follow-up task | its description
 </conveyor>
 ```
