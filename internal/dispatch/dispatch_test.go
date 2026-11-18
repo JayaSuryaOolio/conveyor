@@ -971,3 +971,28 @@ func TestRunStartsJiraPoller(t *testing.T) {
 		t.Fatal("dispatcher did not start the Jira poller")
 	}
 }
+
+// A run whose task was cancelled, or whose finished session is still listed as done, must not hold a
+// max_parallel slot forever.
+func TestReapStaleListedSession(t *testing.T) {
+	for _, c := range []struct{ status, state string }{
+		{"cancelled", "working"},
+		{"needs_you", "done"},
+	} {
+		e := setup(t)
+		tk := e.task(t, "t", 0)
+		e.tick(t) // launches, bg abcd0001
+		run, _ := store.LatestRun(e.db, tk.ID)
+
+		os.WriteFile(filepath.Join(e.fake, "agents.json"), []byte(`[{"id":"abcd0001","sessionId":"s1","state":"`+c.state+`"}]`), 0o644)
+		e.now = time.Now().Add(time.Minute)
+		e.tick(t) // adopts the session id: still a live running task
+		if _, err := e.db.Exec(`UPDATE tasks SET status=? WHERE id=?`, c.status, tk.ID); err != nil {
+			t.Fatal(err)
+		}
+		e.tick(t)
+		if got, _ := store.GetRun(e.db, run.ID); got.Status != "failed" {
+			t.Fatalf("%s/%s: run %+v", c.status, c.state, got)
+		}
+	}
+}
