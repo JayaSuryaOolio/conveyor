@@ -89,13 +89,13 @@ export const STATUS_COLOR: Record<string, string> = {
     review: 'violet', done: 'green', failed: 'red', cancelled: 'gray',
 }
 
-/** "5m ago" style relative time; pair with fmtTime for the absolute one. */
+/** "5m ago" / "in 5m" style relative time; pair with fmtTime for the absolute one. */
 export function ago(iso: string): string {
-    const s = Math.round((Date.now() - Date.parse(iso)) / 1000)
-    if (!(s >= 60)) return 'just now'
-    if (s < 3600) return Math.floor(s / 60) + 'm ago'
-    if (s < 86400) return Math.floor(s / 3600) + 'h ago'
-    return Math.floor(s / 86400) + 'd ago'
+    const d = Math.round((Date.now() - Date.parse(iso)) / 1000)
+    const s = Math.abs(d)
+    if (s < 60) return 'just now'
+    const n = s < 3600 ? Math.floor(s / 60) + 'm' : s < 86400 ? Math.floor(s / 3600) + 'h' : Math.floor(s / 86400) + 'd'
+    return d < 0 ? 'in ' + n : n + ' ago'
 }
 
 export const fmtTime = (iso: string) => new Date(iso).toLocaleString()
