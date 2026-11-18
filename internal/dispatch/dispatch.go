@@ -103,6 +103,9 @@ func (d *Dispatcher) Tick(ctx context.Context) error {
 	d.ensureWebhook()
 	d.tickAutomations(ctx)
 	d.wakeEpics()
+	if err := d.Svc.TickLoops(); err != nil {
+		d.logf("loops: %v", err)
+	}
 	return d.launchTodo(ctx)
 }
 

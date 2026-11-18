@@ -28,6 +28,7 @@ const skillOf = (labels: string[]) => labels.filter(l => l.startsWith('skill:'))
 
 /** Edge colour says whether the link still holds its target back: done blocker = satisfied, running = in progress, else waiting. */
 function edgeState(l: store.Link, status: (k: string) => string): {color: string; label: string; animated?: boolean} {
+    if (l.kind === 'loop') return {color: 'grape', label: '⟳ loop', animated: true} // worker -> checker (`conveyor task loop`)
     if (l.kind !== 'blocks') return {color: 'gray', label: 'relates'}
     const s = status(l.from)
     if (FINISHED.has(s)) return {color: 'green', label: 'unblocked'}

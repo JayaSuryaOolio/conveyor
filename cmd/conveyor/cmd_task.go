@@ -17,10 +17,10 @@ import (
 )
 
 func init() {
-	register("task", runTask, "manage tasks (new|list|show|comment|move|set|repo|link|unlink|parent|sessions|stop|cancel|done|sync|brief|log|attach|open|label|graph)")
+	register("task", runTask, "manage tasks (new|list|show|comment|message|move|set|repo|link|unlink|loop|parent|sessions|stop|cancel|done|sync|brief|log|attach|open|label|graph)")
 }
 
-const taskUsage = "usage: conveyor task new|list|show|comment|move|set|link|unlink|parent|sessions|stop|cancel|done|sync|brief|log|attach|open|label|graph ..."
+const taskUsage = "usage: conveyor task new|list|show|comment|message|move|set|link|unlink|loop|parent|sessions|stop|cancel|done|sync|brief|log|attach|open|label|graph ..."
 
 func runTask(home string, args []string) error {
 	if len(args) == 0 {
@@ -37,6 +37,8 @@ func runTask(home string, args []string) error {
 			return taskShow(s, rest)
 		case "comment":
 			return taskComment(s, rest)
+		case "message":
+			return taskMessage(s, rest)
 		case "move":
 			stop := len(rest) == 3 && rest[2] == "--stop"
 			if len(rest) != 2 && !stop {
@@ -49,9 +51,11 @@ func runTask(home string, args []string) error {
 			return withStopHint(s.Move(rest[0], to, stop))
 		case "set":
 			return taskSet(s, rest)
+		case "loop":
+			return taskLoop(s, rest)
 		case "link", "unlink":
 			if len(rest) != 3 {
-				return fmt.Errorf("usage: conveyor task %s KEY blocks|relates OTHER", cmd)
+				return fmt.Errorf("usage: conveyor task %s KEY blocks|relates|loop OTHER (link a loop with `task loop`)", cmd)
 			}
 			if cmd == "link" {
 				return s.Link(rest[0], rest[1], rest[2])
@@ -338,6 +342,39 @@ func taskComment(s *core.Service, args []string) error {
 	return err
 }
 
+// taskMessage sends text from one task to another: a system comment "via task:FROM" in the target's
+// thread, delivered like any comment. FROM defaults to $CONVEYOR_TASK_KEY (set in agent sessions).
+func taskMessage(s *core.Service, args []string) error {
+	fs := flag.NewFlagSet("task message", flag.ContinueOnError)
+	from := fs.String("from", os.Getenv("CONVEYOR_TASK_KEY"), "sending task key (default $CONVEYOR_TASK_KEY)")
+	ask := fs.Bool("ask", false, "after a merged PR: requeue the task to answer, without changing code")
+	note := fs.Bool("note", false, "after a merged PR: only add the message")
+	args, err := parseArgs(fs, args)
+	if err != nil {
+		return err
+	}
+	if len(args) != 2 || *ask && *note || *from == "" {
+		return fmt.Errorf("usage: conveyor task message TO <text|-> [--from KEY] [--ask|--note]")
+	}
+	after := core.FollowUp
+	if *ask {
+		after = core.Ask
+	} else if *note {
+		after = core.Note
+	}
+	body := args[1]
+	if body == "-" {
+		if body, err = readText("-"); err != nil {
+			return fmt.Errorf("read stdin: %w", err)
+		}
+	}
+	res, err := s.Message(*from, args[0], strings.TrimSpace(body), after)
+	if err == nil {
+		fmt.Println(res)
+	}
+	return err
+}
+
 // taskSet changes the branch and/or PR URL of one of the task's repos.
 // Omitted flags keep the current value; --pr "" clears the PR.
 func taskSet(s *core.Service, args []string) error {
@@ -558,6 +595,44 @@ func taskGraph(s *core.Service, args []string) error {
 	}
 	for _, l := range g.Links {
 		fmt.Fprintf(out, "%s %s %s\n", l.From, l.Kind, l.To)
+	}
+	return nil
+}
+
+const loopUsage = "usage: conveyor task loop WORKER CHECKER [--kind peer-review|spec-review|custom] [--max-rounds N] [--prompt text]  |  conveyor task loop KEY [--json]"
+
+// taskLoop starts a loop where CHECKER checks WORKER, or lists KEY's loops.
+func taskLoop(s *core.Service, args []string) error {
+	fs := flag.NewFlagSet("task loop", flag.ContinueOnError)
+	kind := fs.String("kind", "peer-review", "what the checker does each round")
+	rounds := fs.Int("max-rounds", core.DefaultLoopRounds, "requests to the checker before the loop stops")
+	prompt := fs.String("prompt", "", "extra instructions for the checker (required for custom)")
+	asJSON := fs.Bool("json", false, "JSON output (list)")
+	pos, err := parseArgs(fs, args)
+	if err != nil || len(pos) < 1 || len(pos) > 2 {
+		return fmt.Errorf("%s", loopUsage)
+	}
+	if len(pos) == 2 {
+		l, err := s.StartLoop(pos[0], pos[1], *kind, *prompt, *rounds)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(out, "%s -> %s: %s\n", l.Worker, l.Checker, store.LoopLabel(l))
+		return nil
+	}
+	t, err := store.GetTaskByKey(s.DB, pos[0])
+	if err != nil {
+		return err
+	}
+	loops, err := store.TaskLoops(s.DB, t.ID, false)
+	if err != nil {
+		return err
+	}
+	if *asJSON {
+		return printJSON(loops)
+	}
+	for _, l := range loops {
+		fmt.Fprintf(out, "%s -> %s: %s\n", l.Worker, l.Checker, store.LoopLabel(l))
 	}
 	return nil
 }

@@ -134,6 +134,23 @@ CREATE TABLE IF NOT EXISTS task_links (
   PRIMARY KEY (from_id, to_id, kind)
 );
 
+-- A loop hands turns between a worker task and a checker task (core/loop.go).
+CREATE TABLE IF NOT EXISTS loops (
+  id INTEGER PRIMARY KEY,
+  worker_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  checker_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL,
+  prompt TEXT NOT NULL DEFAULT '',
+  max_rounds INTEGER NOT NULL,
+  round INTEGER NOT NULL DEFAULT 0,
+  turn TEXT NOT NULL DEFAULT 'worker',
+  turn_run INTEGER NOT NULL DEFAULT 0, -- the turn holder's newest run id when the turn passed: it must finish a later one
+  state TEXT NOT NULL DEFAULT 'active',
+  reason TEXT NOT NULL DEFAULT '',
+  last_sha TEXT NOT NULL DEFAULT '',
+  updated_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS labels (
   id INTEGER PRIMARY KEY,
   name TEXT NOT NULL UNIQUE COLLATE NOCASE
@@ -256,9 +273,26 @@ func Migrate(db *sql.DB) error {
 		return err
 	}
 	if err := migrateAddCommentSendNow(db); err != nil {
-return err
+		return err
+	}
+	if err := migrateAddRunVerdict(db); err != nil {
+		return err
+	}
+	return migrateAddAutomationOneShot(db)
 }
-return migrateAddAutomationOneShot(db)
+
+// migrateAddRunVerdict adds runs.verdict; older runs read "".
+func migrateAddRunVerdict(db *sql.DB) error {
+	var n int
+	if err := db.QueryRow(`SELECT count(*) FROM pragma_table_info('runs') WHERE name='verdict'`).Scan(&n); err != nil {
+		return fmt.Errorf("check runs.verdict: %w", err)
+	}
+	if n == 0 {
+		if _, err := db.Exec(`ALTER TABLE runs ADD COLUMN verdict TEXT NOT NULL DEFAULT ''`); err != nil {
+			return fmt.Errorf("add runs.verdict: %w", err)
+		}
+	}
+	return nil
 }
 
 // migrateTerminalTemplate replaces hardcoded macOS osascript templates with the OS default on non-macOS systems.

@@ -428,9 +428,10 @@ type Link struct {
 	Kind string `json:"kind"`
 }
 
-// ListLinks returns every link between tasks, as keys.
+// ListLinks returns every link between tasks, as keys, plus one "loop" link per worker/checker pair.
 func ListLinks(db *sql.DB) ([]Link, error) {
-	rows, err := db.Query(`SELECT f.key, t.key, l.kind FROM task_links l JOIN tasks f ON f.id=l.from_id JOIN tasks t ON t.id=l.to_id ORDER BY l.rowid`)
+	rows, err := db.Query(`SELECT * FROM (SELECT f.key, t.key, l.kind FROM task_links l JOIN tasks f ON f.id=l.from_id JOIN tasks t ON t.id=l.to_id ORDER BY l.rowid)
+ UNION ALL SELECT DISTINCT f.key, t.key, 'loop' FROM loops l JOIN tasks f ON f.id=l.worker_id JOIN tasks t ON t.id=l.checker_id`)
 	if err != nil {
 		return nil, fmt.Errorf("list links: %w", err)
 	}

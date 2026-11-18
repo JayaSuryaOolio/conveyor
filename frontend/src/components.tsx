@@ -238,7 +238,7 @@ export function Message({m, onEdit, onSendNow}: {m: store.Comment; onEdit?: () =
     return (
         <Paper withBorder p="sm" radius="md" bg={m.author === 'human' ? 'var(--mantine-color-default-hover)' : undefined}>
             <Group gap="xs" mb={4}>
-                <Text size="xs" fw={600}>{m.author}{m.source ? ` (via ${m.source})` : ''}</Text>
+                <Text size="xs" fw={600}>{m.source?.startsWith('task:') ? `from ${m.source.slice(5)}` : <>{m.author}{m.source ? ` (via ${m.source})` : ''}</>}</Text>
                 <Time iso={m.created_at}/>
                 {onEdit && (onSendNow
                     ? <Tooltip label="Click to send now"><Badge size="xs" variant="light" color="gray" style={{cursor: 'pointer'}} component="button" type="button" onClick={() => setAsking(true)}>queued</Badge></Tooltip>

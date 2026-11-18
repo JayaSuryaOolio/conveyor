@@ -16,6 +16,7 @@ criteria:
 learning: first lesson
 LEARNING: second lesson
 spawn: child one
+verdict: Changes
 bogus: ignored
 </conveyor>
 trailing`
@@ -31,7 +32,7 @@ func TestFull(t *testing.T) {
 	if len(b.Criteria) != 2 || !b.Criteria[0].Met || b.Criteria[1].Met || b.Criteria[1].Text != "AC2 — why not" {
 		t.Fatalf("criteria %+v", b.Criteria)
 	}
-	if len(b.Learnings) != 2 || b.Learnings[1] != "second lesson" || len(b.Spawn) != 1 {
+	if len(b.Learnings) != 2 || b.Learnings[1] != "second lesson" || len(b.Spawn) != 1 || b.Verdict != "changes" {
 		t.Fatalf("%+v", b)
 	}
 	if rest != "Did the work.\n\n\ntrailing" {
