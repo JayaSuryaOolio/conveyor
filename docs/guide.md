@@ -246,7 +246,7 @@ PR review checks run on push and a backoff (30 min, 2 h, 8 h). For instant check
 
 ## Settings
 
-Settings are in the app (Settings page) or `conveyor config list|get|set`.
+Settings are in the app (Settings page) or `conveyor config list|get|set`. Secret settings (keys containing `token`, `secret` or `password`, or ending `_key`) are masked in `config list` (first 4 characters + `****`) and `config get` refuses them; add `--reveal` to print them.
 
 - **General**: `key_prefix` (CV), `default_model`.
 - **Dispatch**: `max_parallel` (3), `resume_threshold` (60000), `comment_debounce_secs` (20), `max_consecutive_failures` (3).
@@ -288,7 +288,7 @@ conveyor automation list|add|enable|disable|run|rm
 conveyor app list|presets|add|rm|open
 conveyor hooks status|install|uninstall
 conveyor review-webhook [--status|--stop]      # opt-in review-webhooks connector (see Connectors)
-conveyor config list | get <key> | set <key> <value>
+conveyor config list [--reveal] | get <key> [--reveal] | set <key> <value>
 conveyor state export [file] | import <file> [--repo A=name ...] | backup [--keep N]
 conveyor --home <empty dir> mock seed          # mock repos, tasks, settings, connectors, automations (fixtures: internal/core/mock.go)
 conveyor import jira --jql "..." --repo a      # needs acli: install it from the Connectors page (Templates) after `brew install acli` and `acli jira auth login`

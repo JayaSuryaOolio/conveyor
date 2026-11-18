@@ -73,6 +73,16 @@ func TestCLIFlow(t *testing.T) {
 	if out := cv(t, home, "config", "get", "max_parallel"); strings.TrimSpace(out) != "7" {
 		t.Fatal(out)
 	}
+	cv(t, home, "config", "set", "slack_bot_token", "xoxb-1234567890-secret")
+	if out := cv(t, home, "config", "list"); strings.Contains(out, "1234567890") || !strings.Contains(out, "slack_bot_token=xoxb****") {
+		t.Fatal(out)
+	}
+	if out := cv(t, home, "config", "list", "--reveal"); !strings.Contains(out, "slack_bot_token=xoxb-1234567890-secret") {
+		t.Fatal(out)
+	}
+	if out := cv(t, home, "config", "get", "slack_bot_token", "--reveal"); strings.TrimSpace(out) != "xoxb-1234567890-secret" {
+		t.Fatal(out)
+	}
 	cv(t, home, "task", "set", "CV-1", "--branch", "feat/x", "--pr", "https://gh/pr/1")
 	if out := cv(t, home, "task", "show", "CV-1"); !strings.Contains(out, "branch feat/x") || !strings.Contains(out, "https://gh/pr/1") {
 		t.Fatal(out)
