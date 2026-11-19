@@ -9,7 +9,7 @@ import {BrowserOpenURL} from '../wailsjs/runtime/runtime'
 import {core, store} from '../wailsjs/go/models'
 import {Nav, StatusBadge, errMsg} from './components'
 import {CARD, columns, layout, trace} from './epicLayout'
-import {STATUS_COLOR, useData} from './util'
+import {STATUS_COLOR, clickable, useData} from './util'
 import {JiraSource} from './jiraSource'
 import {TaskPreview} from './views'
 
@@ -70,7 +70,7 @@ function TaskNode({data}: NodeProps<Node<CardData>>) {
         n.worktrees.length > 0 && <Tooltip key="wt" label={'worktree: ' + n.worktrees.join(', ')}><Badge size="xs" variant="outline" color="gray">worktree</Badge></Tooltip>,
     ].filter(Boolean)
     return (
-        <Paper withBorder radius="md" p="xs" w={CARD.w} shadow="sm" onClick={() => open(n.key)} onMouseEnter={() => hover(n.key)} onMouseLeave={() => hover('')}
+        <Paper withBorder radius="md" p="xs" w={CARD.w} shadow="sm" {...clickable(() => open(n.key))} onMouseEnter={() => hover(n.key)} onMouseLeave={() => hover('')}
                style={{cursor: 'pointer', borderLeft: `4px solid ${c6(KIND_COLOR[n.kind] ?? 'gray')}`,
                        opacity: lit && !lit.has(n.key) ? 0.3 : 1, transition: 'opacity 120ms',
                        outline: lit?.has(n.key) ? `1px solid ${c6('blue')}` : undefined}}>
@@ -197,7 +197,7 @@ function TaskRow({n, note}: {n: core.GraphNode; note?: string}) {
     const {open, hover} = useContext(Ctx)
     return (
         <Group gap={6} wrap="nowrap" px={6} py={2} style={{cursor: 'pointer', borderRadius: 4, borderLeft: `3px solid ${c6(KIND_COLOR[n.kind] ?? 'gray')}`}}
-               className="epic-row" onClick={() => open(n.key)} onMouseEnter={() => hover(n.key)} onMouseLeave={() => hover('')}>
+               className="epic-row" {...clickable(() => open(n.key))} onFocus={() => hover(n.key)} onBlur={() => hover('')} onMouseEnter={() => hover(n.key)} onMouseLeave={() => hover('')}>
             <Text size="xs" fw={600} c="dimmed" style={{flexShrink: 0}}>{n.key}</Text>
             <StatusBadge status={n.status}/>
             <Text size="xs" truncate style={{flex: 1}}>{n.title}</Text>

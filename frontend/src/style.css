@@ -20,3 +20,8 @@ a.md-ref-file { text-decoration: none; cursor: pointer; } a.md-ref-file:hover { 
 /* Mantine ScrollArea wraps content in display:table and flex items default to min-width:auto, so the widest nowrap row grows past the modal and clips palette badges; cap them so `truncate` works. */
 .mantine-Spotlight-actionsList .mantine-ScrollArea-viewport > div { display: block !important; min-width: 0 !important; }
 .mantine-Spotlight-actionsGroup, .mantine-Spotlight-action { min-width: 0 !important; max-width: 100% !important; box-sizing: border-box; }
+
+/* Keyboard focus ring for what Mantine does not style itself: Badge buttons, role=button containers (cards, rows), and the unstyled search box (ring on its bar). tabindex=-1 (modal bodies) is skipped. */
+:is(button, a[href], [role='button'], [tabindex]:not([tabindex='-1'])):focus-visible { outline: 2px solid var(--mantine-primary-color-filled); outline-offset: 2px; }
+.find-box:focus-within { outline: 2px solid var(--mantine-primary-color-filled); outline-offset: 1px; }
+.find-box input:focus-visible { outline: none; }

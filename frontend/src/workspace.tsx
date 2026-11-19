@@ -7,7 +7,7 @@ import {core, store, ui} from '../wailsjs/go/models'
 import {BrowserOpenURL} from '../wailsjs/runtime/runtime'
 import {PlacedButtons, StatusSelect, Time, errMsg, toast} from './components'
 import {TaskAgent, TaskSettings} from './forms'
-import {useData} from './util'
+import {clickable, useData} from './util'
 
 /** Confirmation popup: renders while `msg` is set; run `ok` on confirm, `close` on cancel. */
 function Confirm({msg, ok, close}: {msg: string | null; ok: () => void; close: () => void}) {
@@ -63,7 +63,7 @@ function Mono({text}: {text: string}) {
     const cb = useClipboard({timeout: 1200})
     return (
         <Tooltip label="Copied" opened={cb.copied} position="top-start">
-            <Code style={{display: 'block', cursor: 'pointer', whiteSpace: 'pre-wrap', wordBreak: 'break-all'}} title="Click to copy" onClick={() => cb.copy(text)}>{text}</Code>
+            <Code style={{display: 'block', cursor: 'pointer', whiteSpace: 'pre-wrap', wordBreak: 'break-all'}} title="Click to copy" {...clickable(() => cb.copy(text))}>{text}</Code>
         </Tooltip>
     )
 }

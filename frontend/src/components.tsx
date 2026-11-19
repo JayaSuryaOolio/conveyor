@@ -4,7 +4,7 @@ import {IconAppWindow, IconCheck, IconChevronLeft, IconChevronRight, IconDots, I
 import {AddComment, ConnectorServiceRunning, CheckReviews, MergedPR, Move, PlacedActions, RunConnectorAction, ShowError, SendQueuedNow, StopConnectorService, TakeQueuedComment} from '../wailsjs/go/ui/App'
 import {store, ui} from '../wailsjs/go/models'
 import {Markdown, MarkdownEditor} from './markdown'
-import {ALL_STATUSES, STATUS_COLOR, STATUS_LABEL, ago, fmtK, fmtTime, prNumbers, useData, useDraft} from './util'
+import {ALL_STATUSES, STATUS_COLOR, STATUS_LABEL, ago, clickable, fmtK, fmtTime, prNumbers, useData, useDraft} from './util'
 
 /** A screen to show; board views may carry a label or repo filter to apply (deep link); epic views a task key for the open modal. */
 export type View = {name: string; key?: string; label?: string; repo?: string; task?: string}
@@ -157,7 +157,7 @@ function StatusMenu({k, status}: {k: string; status: string}) {
 /** showPR (a search is active) adds the card's PR numbers beside the key, so a PR-number hit is explained without crowding idle cards. */
 export function Card({c, nav, onLabel, showPR}: {c: ui.TaskCard; nav: Nav; onLabel: (l: string) => void; showPR?: boolean}) {
     return (
-        <MCard withBorder padding="sm" radius="md" style={{cursor: 'pointer'}} onClick={() => nav({name: 'task', key: c.key})}>
+        <MCard withBorder padding="sm" radius="md" style={{cursor: 'pointer'}} {...clickable(() => nav({name: 'task', key: c.key}))}>
             <Group justify="space-between" wrap="nowrap" gap="xs">
                 <Text size="xs" fw={600} c="dimmed">{c.key}{c.parent && <Text span size="xs" fw={400}> ↑ {c.parent}</Text>}{showPR && c.prUrls.length > 0 && <Text span size="xs" fw={400} c="violet"> {prNumbers(c.prUrls).join(' ')}</Text>}</Text>
                 <Group gap={4} wrap="nowrap">

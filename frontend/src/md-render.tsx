@@ -5,6 +5,7 @@ import remarkGfm from 'remark-gfm'
 import {FileOpeners, Home, OpenFile, ShowError} from '../wailsjs/go/ui/App'
 import {NavContext, TaskKey} from './markdown'
 import {escapeRe, load, useKeyPrefix} from './paletteCache'
+import {clickable} from './util'
 import {BrowserOpenURL} from '../wailsjs/runtime/runtime'
 
 let homeP: Promise<string> | undefined
@@ -21,7 +22,7 @@ function Img({src, alt}: {src?: string; alt?: string}) {
     const url = src && home && src.startsWith(home + '/') ? '/attachments' + src : src
     return (
         <>
-            <img src={url} alt={alt} style={{maxWidth: '100%', cursor: 'zoom-in'}} onClick={() => setOpen(true)}/>
+            <img src={url} alt={alt} style={{maxWidth: '100%', cursor: 'zoom-in'}} {...clickable(() => setOpen(true))}/>
             <Modal opened={open} onClose={() => setOpen(false)} size="auto" centered withCloseButton={false}>
                 <img src={url} alt={alt} style={{maxWidth: '100%', display: 'block'}}/>
             </Modal>

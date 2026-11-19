@@ -5,7 +5,7 @@ import {AddLabel, AddRepo, CreateTask, ExportState, GetPromptDefaults, GetTask, 
 import {core, store} from '../wailsjs/go/models'
 import {Nav, errMsg} from './components'
 import {Markdown, MarkdownEditor} from './markdown'
-import {listTasks, useData, useDraft} from './util'
+import {listTasks, useData, useDraft, useReturnFocus} from './util'
 import {ThemePicker} from './themes'
 
 export function NewTask({nav, close}: {nav: Nav; close: () => void}) {
@@ -25,6 +25,7 @@ export function NewTask({nav, close}: {nav: Nav; close: () => void}) {
     const [epic, setEpic] = useState(false)
     const [epicName, setEpicName] = useState('')
     const prim = sel.includes(primary) ? primary : sel[0] ?? ''
+    useReturnFocus() // mounted only while open
     const submit = () =>
         CreateTask(core.NewTaskInput.createFrom({
             Title: title, Description: desc, Repos: sel, Primary: prim,

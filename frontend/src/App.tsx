@@ -109,7 +109,7 @@ export default function App() {
                     <Stack gap={2} mt="xs">
                         {NAV.map(({name, key, label, icon: Icon, filter}) => (
                             <Tooltip key={label} label={label} position="right" disabled={!mini}>
-                                <NavLink label={mini ? undefined : label} active={view.name === name && (view.label ?? undefined) === filter} leftSection={<Icon size={18}/>} aria-label={label}
+                                <NavLink component="button" label={mini ? undefined : label} active={view.name === name && (view.label ?? undefined) === filter} leftSection={<Icon size={18}/>} aria-label={label}
                                          rightSection={mini ? undefined : name === 'learnings' && proposed > 0 ? <Badge size="sm" circle>{proposed}</Badge> : key ? <Kbd size="xs" title={`g then ${key}`}>g {key}</Kbd> : undefined}
                                          onClick={() => setView(filter ? {name, label: filter} : {name})}/>
                             </Tooltip>

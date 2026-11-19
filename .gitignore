@@ -10,3 +10,5 @@ frontend/dist/*
 build/bin
 .playwright-mcp/
 frontend/wailsjs/
+frontend/test-results/
+frontend/playwright-report/
