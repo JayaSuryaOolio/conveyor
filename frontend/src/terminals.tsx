@@ -1,5 +1,6 @@
 import {useEffect, useRef, useState} from 'react'
-import {ActionIcon, Group, Text, Tooltip, UnstyledButton} from '@mantine/core'
+import {ActionIcon, Text, Tooltip, UnstyledButton} from '@mantine/core'
+import {Group, Stack} from './ui'
 import {IconArrowsMaximize, IconArrowsMinimize, IconChevronDown, IconChevronUp, IconX} from '@tabler/icons-react'
 import {FitAddon} from '@xterm/addon-fit'
 import {Terminal} from '@xterm/xterm'
@@ -112,11 +113,11 @@ export default function TermDock({k, added}: {k: string; added?: ui.TermInfo}) {
     return (
         <div style={{position: 'sticky', bottom: 0, zIndex: 10, height, display: 'flex', flexDirection: 'column', background: 'var(--mantine-color-body)', borderTop: '1px solid var(--mantine-color-default-border)'}}>
             {open && !max && <div onMouseDown={drag} style={{position: 'absolute', top: -3, left: 0, right: 0, height: 6, cursor: 'ns-resize', zIndex: 1}}/>}
-            <Group gap={4} px="xs" h={HEADER} wrap="nowrap" style={{flex: 'none'}} justify="space-between">
-                <Group gap={2} wrap="nowrap" style={{overflowX: 'auto'}}>
+            <Group gap={4} wrap={false} justify="between" style={{paddingInline: 'var(--mantine-spacing-xs)', height: HEADER, flex: 'none'}}>
+                <Group gap={2} wrap={false} style={{overflowX: 'auto'}}>
                     {tabs.length === 0 && <Text size="xs" c="dimmed">Terminals</Text>}
                     {tabs.map(t => (
-                        <Group key={t.id} gap={2} wrap="nowrap" px={6} style={{borderRadius: 4, background: t.id === active && open ? 'var(--mantine-color-default-hover)' : undefined}}>
+                        <Group key={t.id} gap={2} wrap={false} style={{paddingInline: 6, borderRadius: 4, background: t.id === active && open ? 'var(--mantine-color-default-hover)' : undefined}}>
                             <UnstyledButton onClick={() => { setActive(t.id); setOpen(true) }}>
                                 <Text size="xs" fw={t.id === active ? 600 : 400} style={{whiteSpace: 'nowrap'}}>{t.title}</Text>
                             </UnstyledButton>
@@ -124,7 +125,7 @@ export default function TermDock({k, added}: {k: string; added?: ui.TermInfo}) {
                         </Group>
                     ))}
                 </Group>
-                <Group gap={2} wrap="nowrap">
+                <Group gap={2} wrap={false}>
                     {open && (
                         <Tooltip label={max ? 'Restore' : 'Maximize'}>
                             <ActionIcon variant="subtle" color="gray" size="sm" aria-label="Maximize" onClick={() => setMax(!max)}>{max ? <IconArrowsMinimize size={14}/> : <IconArrowsMaximize size={14}/>}</ActionIcon>
