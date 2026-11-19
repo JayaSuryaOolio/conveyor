@@ -1,6 +1,6 @@
 import {useEffect, useState} from 'react'
-import {ActionIcon, Chip, Code, CopyButton, Group, MultiSelect, Popover, SegmentedControl, Select, Stack, Switch, Table, Text, TextInput, Textarea, Title, Tooltip} from '@mantine/core'
-import {Button, Modal} from './ui'
+import {ActionIcon, Chip, Code, CopyButton, MultiSelect, Popover, SegmentedControl, Select, Switch, Table, Text, TextInput, Textarea, Title, Tooltip} from '@mantine/core'
+import {Button, Group, Modal, Stack} from './ui'
 import {IconCheck, IconCopy, IconCalendarTime, IconPencil, IconPlus, IconTrash} from '@tabler/icons-react'
 import {AddAutomation, Confirm, DeleteAutomation, DescribeSchedule, ListAutomations, ListRepos, RunAutomation, SetAutomationEnabled, UpdateAutomation} from '../wailsjs/go/ui/App'
 import {store, ui} from '../wailsjs/go/models'
@@ -93,14 +93,14 @@ function AutomationForm({initial, edit, onClose}: {initial: Form; edit: boolean;
             </>}
             {f.kind === 'cli' && <TextInput label="Conveyor args" description="Run as `conveyor ARGS`, e.g. task new --repo a" ff="monospace" value={f.args} onChange={e => set({args: e.target.value})}/>}
             <div>
-                <Group justify="space-between"><Text size="sm" fw={500}>Equivalent CLI command</Text>
+                <Group justify="between"><Text size="sm" fw={500}>Equivalent CLI command</Text>
                     <CopyButton value={cmd}>{({copied, copy}) => (
                         <Tooltip label={copied ? 'Copied' : 'Copy'}><ActionIcon variant="subtle" color={copied ? 'teal' : 'gray'} onClick={copy} aria-label="Copy command">{copied ? <IconCheck size={16}/> : <IconCopy size={16}/>}</ActionIcon></Tooltip>
                     )}</CopyButton>
                 </Group>
                 <Code block style={{whiteSpace: 'pre-wrap', wordBreak: 'break-all'}}>{cmd}</Code>
             </div>
-            <Group justify="flex-end">
+            <Group justify="end">
                 <Button variant="secondary" onClick={() => onClose(false)}>Cancel</Button>
                 <Button onClick={save} disabled={!ready}>{edit ? 'Save' : 'Create'}</Button>
             </Group>
@@ -138,7 +138,7 @@ function NextRuns({schedule, name, lastRunAt, lastResult}: {schedule: string; na
             <Popover.Dropdown>
                 {past.length > 0 && <>
                     <Text size="xs" c="dimmed" mb={4}>Completed runs</Text>
-                    {past.map(r => <Group key={r.at} gap={6} wrap="nowrap"><Time iso={r.at}/><Text size="xs" c="dimmed" lineClamp={1}>{r.result}</Text></Group>)}
+                    {past.map(r => <Group key={r.at} gap={6} wrap={false}><Time iso={r.at}/><Text size="xs" c="dimmed" lineClamp={1}>{r.result}</Text></Group>)}
                     <Text size="xs" c="dimmed" mt="xs" mb={4}>Next runs</Text>
                 </>}
                 {past.length === 0 && <Text size="xs" c="dimmed" mb={4}>Next runs</Text>}
@@ -164,7 +164,7 @@ export function Automations() {
     const [form, setForm] = useState<{initial: Form; edit: boolean}>()
     return (
         <Stack>
-            <Group justify="space-between">
+            <Group justify="between">
                 <Title order={3}>Automations</Title>
                 <Button icon={<IconPlus size={16}/>} onClick={() => setForm({initial: EMPTY, edit: false})}>New automation</Button>
             </Group>
@@ -179,12 +179,12 @@ export function Automations() {
                                 <Table.Tr key={a.name}>
                                     <Table.Td><Switch checked={a.enabled} onChange={e => SetAutomationEnabled(a.name, e.currentTarget.checked).then(reload, errMsg)}/></Table.Td>
                                     <Table.Td fw={600}>{a.name}</Table.Td>
-                                    <Table.Td>{a.schedule ? <Group gap={4} wrap="nowrap"><Code>{a.schedule}</Code><NextRuns schedule={a.schedule} name={a.name} lastRunAt={a.last_run_at} lastResult={a.last_result}/></Group> : a.run_at ? <Group gap={4} wrap="nowrap"><Text size="sm" c="dimmed">once</Text><Time iso={a.run_at}/></Group> : null}</Table.Td>
+                                    <Table.Td>{a.schedule ? <Group gap={4} wrap={false}><Code>{a.schedule}</Code><NextRuns schedule={a.schedule} name={a.name} lastRunAt={a.last_run_at} lastResult={a.last_result}/></Group> : a.run_at ? <Group gap={4} wrap={false}><Text size="sm" c="dimmed">once</Text><Time iso={a.run_at}/></Group> : null}</Table.Td>
                                     <Table.Td>{a.action_kind}</Table.Td>
                                     <Table.Td>{a.last_run_at ? <Time iso={a.last_run_at}/> : ''}</Table.Td>
                                     <Table.Td><Text size="sm" lineClamp={1}>{a.last_result ?? ''}</Text></Table.Td>
                                     <Table.Td>
-                                        <Group gap="xs" wrap="nowrap">
+                                        <Group gap="xs" wrap={false}>
                                             <RunButton name={a.name} onDone={reload}/>
                                             <ActionIcon variant="subtle" color="gray" aria-label="Edit" onClick={() => setForm({initial: toForm(a), edit: true})}><IconPencil size={16}/></ActionIcon>
                                             <ActionIcon variant="subtle" color="red" aria-label="Delete" onClick={() => Confirm(`Delete automation ${a.name}?`).then(ok => { if (ok) return DeleteAutomation(a.name).then(reload) }).catch(errMsg)}><IconTrash size={16}/></ActionIcon>
