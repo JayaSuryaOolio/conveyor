@@ -1,6 +1,6 @@
 import {createContext, lazy, Suspense, useRef, useState} from 'react'
-import {ActionIcon, Box, Group, Popover, SegmentedControl, Stack, Text, Textarea, Tooltip, Typography} from '@mantine/core'
-import {Button} from './ui'
+import {ActionIcon, Box, Popover, SegmentedControl, Text, Textarea, Tooltip, Typography} from '@mantine/core'
+import {Button, Group, Stack} from './ui'
 import {IconBold, IconCode, IconItalic, IconLink, IconList, IconListCheck} from '@tabler/icons-react'
 import {Complete, SaveAttachment, ShowError} from '../wailsjs/go/ui/App'
 import {core} from '../wailsjs/go/models'
@@ -178,11 +178,10 @@ export function MarkdownEditor({value, onChange, onSubmit, submitLabel = 'Send',
                 boxShadow: focus ? '0 0 0 2px var(--mantine-primary-color-light)' : undefined,
                 background: over ? 'var(--mantine-primary-color-light)' : undefined,
             }}>
-            <Group justify="space-between" wrap="nowrap" px="xs" py={6} bg="var(--mantine-color-default-hover)"
-                   style={{borderBottom: '1px solid var(--mantine-color-default-border)'}}>
+            <Group justify="between" wrap={false} style={{paddingInline: 'var(--mantine-spacing-xs)', paddingBlock: 6, background: 'var(--mantine-color-default-hover)', borderBottom: '1px solid var(--mantine-color-default-border)'}}>
                 <SegmentedControl size="xs" value={tab} onChange={setTab} data={[{value: 'write', label: 'Write'}, {value: 'preview', label: 'Preview'}]}/>
                 {tab === 'write' && (
-                    <Group gap={2} wrap="nowrap">
+                    <Group gap={2} wrap={false}>
                         {tools.map(([label, icon, fn]) => (
                             <Tooltip key={label} label={label}>
                                 <ActionIcon variant="subtle" color="gray" size="sm" aria-label={label} onMouseDown={e => e.preventDefault()} onClick={fn}>{icon}</ActionIcon>
@@ -202,19 +201,17 @@ export function MarkdownEditor({value, onChange, onSubmit, submitLabel = 'Send',
                     </Popover.Target>
                     <Popover.Dropdown p={4}>
                         {items.map((i, n) => (
-                            <Group key={i.insert} gap="xs" wrap="nowrap" px="xs" py={2} style={{cursor: 'pointer', borderRadius: 4}}
-                                   bg={n === hi ? 'var(--mantine-color-default-hover)' : undefined}
-                                   onMouseEnter={() => setHi(n)} onMouseDown={e => { e.preventDefault(); pick(i) }}>
+                            <Group key={i.insert} gap="xs" wrap={false} onMouseEnter={() => setHi(n)} onMouseDown={e => { e.preventDefault(); pick(i) }} style={{paddingInline: 'var(--mantine-spacing-xs)', paddingBlock: 2, background: n === hi ? 'var(--mantine-color-default-hover)' : undefined, cursor: 'pointer', borderRadius: 4}}>
                                 <Text size="sm" ff="monospace" c={trig?.kind === '/' ? 'violet' : 'blue'} truncate={trig?.kind === '@' ? 'start' : 'end'} style={{flex: 'none', maxWidth: '100%'}}><span dir="ltr">{i.label}</span></Text>
                                 {i.hint && <Text size="xs" c="dimmed" truncate>{i.hint}</Text>}
                             </Group>
                         ))}
                     </Popover.Dropdown>
                 </Popover>
-                : <Stack mih={minRows * 24} p="sm">
+                : <Stack style={{minHeight: minRows * 24, padding: 'var(--mantine-spacing-sm)'}}>
                     {value.trim() ? <Markdown>{value}</Markdown> : <Text size="sm" c="dimmed">Nothing to preview</Text>}
                 </Stack>}
-            <Group justify="space-between" wrap="nowrap" px="xs" py={6} style={{borderTop: '1px solid var(--mantine-color-default-border)'}}>
+            <Group justify="between" wrap={false} style={{paddingInline: 'var(--mantine-spacing-xs)', paddingBlock: 6, borderTop: '1px solid var(--mantine-color-default-border)'}}>
                 <Text size="xs" c="dimmed">{pending ? 'Uploading…' : <>Markdown supported · @ files · / commands ·{keyPrefix && ` ${keyPrefix} tasks ·`} paste or drop images{onSubmit && ' · ⌘↵ to send'}</>}</Text>
                 {onSubmit && <Button size="sm" compact onClick={submit} loading={submitting} disabled={!canSubmit || pending > 0}>{submitLabel}</Button>}
             </Group>
