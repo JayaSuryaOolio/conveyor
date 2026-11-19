@@ -1,6 +1,6 @@
 import {useState} from 'react'
-import {Group, Select, Stack, Table, Text, TextInput, Textarea, Title} from '@mantine/core'
-import {Button, Modal} from './ui'
+import {Select, Table, Text, TextInput, Textarea, Title} from '@mantine/core'
+import {Button, Group, Modal, Stack} from './ui'
 import {IconPlus} from '@tabler/icons-react'
 import {AddAgent, ListAgents, ListRepos, SetAgentModel} from '../wailsjs/go/ui/App'
 import {errMsg} from './components'
@@ -25,8 +25,8 @@ export function Agents() {
     }, errMsg)
     const shown = data?.filter(a => filter === 'all' || a.scope === filter)
     return (
-        <Stack maw={900}>
-            <Group justify="space-between">
+        <Stack style={{maxWidth: 900}}>
+            <Group justify="between">
                 <Title order={3}>Agents</Title>
                 <Group>
                     <Select aria-label="Scope" allowDeselect={false} value={filter} onChange={v => setFilter(v ?? 'all')}
@@ -62,7 +62,7 @@ export function Agents() {
                     <Select label="Scope" allowDeselect={false} value={scope} onChange={v => setScope(v ?? 'user')}
                             data={[{value: 'user', label: 'user (~/.claude/agents)'}, ...repos.map(r => ({value: r, label: r}))]}/>
                     <ModelSelect label="Model" value={model} onChange={setModel}/>
-                    <Group justify="flex-end">
+                    <Group justify="end">
                         <Button variant="secondary" onClick={() => setOpen(false)}>Cancel</Button>
                         <Button onClick={add} disabled={!name || !desc.trim()}>Add agent</Button>
                     </Group>
