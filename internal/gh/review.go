@@ -248,12 +248,18 @@ func checkPR(ctx context.Context, db *sql.DB, taskID, repoID int64, dir, url str
 	if err != nil {
 		return "", err
 	}
-	// ponytail: one watermark over review and comment ids; split them if GitHub ids stop being roughly monotonic.
-	mark := st.SeenCommentID
+	// GitHub numbers reviews, inline comments and issue comments in separate ranges (issue comment
+	// ids run far higher), so each type keeps its own watermark. -1 means not yet baselined (a row
+	// from before the split): that check records the current max of the type without reporting it.
+	seen := [3]*int64{&st.SeenReviewID, &st.SeenInlineID, &st.SeenCommentID}
+	var was, mark [3]int64
+	for i, p := range seen {
+		was[i], mark[i] = *p, max(*p, 0)
+	}
 	var sb strings.Builder
-	keep := func(id int64, text string) bool {
-		mark = max(mark, id)
-		return id > st.SeenCommentID && strings.TrimSpace(text) != "" && !strings.HasPrefix(strings.TrimSpace(text), agentPrefix)
+	keep := func(kind int, id int64, text string) bool {
+		mark[kind] = max(mark[kind], id)
+		return was[kind] >= 0 && id > was[kind] && strings.TrimSpace(text) != "" && !strings.HasPrefix(strings.TrimSpace(text), agentPrefix)
 	}
 	add := func(head, body string) {
 		// ponytail: items past totalCap are dropped but the watermark still advances; raise totalCap if that bites.
@@ -263,21 +269,24 @@ func checkPR(ctx context.Context, db *sql.DB, taskID, repoID int64, dir, url str
 	}
 	for _, r := range reviews {
 		st.Review = r.State
-		if keep(r.ID, r.Body) {
+		if keep(0, r.ID, r.Body) {
 			add(fmt.Sprintf("review (%s) by %s", r.State, r.User.Login), r.Body)
 		}
 	}
 	for _, c := range comments {
-		if keep(c.ID, c.Body) && !resolved[c.ID] {
+		if keep(1, c.ID, c.Body) && !resolved[c.ID] {
 			add(fmt.Sprintf("%s:%d (%s)", c.Path, c.Line, c.User.Login), c.Body)
 		}
 	}
 	for _, c := range convo {
-		if keep(c.ID, c.Body) {
+		if keep(2, c.ID, c.Body) {
 			add(fmt.Sprintf("comment (%s)", c.User.Login), c.Body)
 		}
 	}
-	st.SeenCommentID, st.Unresolved = mark, unresolved
+	for i, p := range seen {
+		*p = mark[i]
+	}
+	st.Unresolved = unresolved
 	// CI failures and merge conflicts: sent once per distinct state, so a repeat check stays quiet.
 	state, ci := ciState(pr.MergeableState, runs.CheckRuns, pr.Head.SHA)
 	if state != st.Reported && state != "" {

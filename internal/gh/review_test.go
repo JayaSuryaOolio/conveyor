@@ -85,7 +85,7 @@ func TestReviewCheckPostsOnceThenBacksOff(t *testing.T) {
 		t.Errorf("task not requeued: %s", got.Status)
 	}
 	st, _ := store.GetPRReview(svc.DB, tk.ID, tk.Repos[0].RepoID)
-	if st.SeenCommentID != 14 || st.Unresolved != 1 || st.Review != "CHANGES_REQUESTED" {
+	if st.SeenReviewID != 10 || st.SeenInlineID != 13 || st.SeenCommentID != 14 || st.Unresolved != 1 || st.Review != "CHANGES_REQUESTED" {
 		t.Errorf("state %+v", st)
 	}
 
@@ -105,6 +105,56 @@ func TestReviewCheckPostsOnceThenBacksOff(t *testing.T) {
 	}
 	if !strings.Contains(a.ActionArg, `"--step","1"`) {
 		t.Errorf("arg %s", a.ActionArg)
+	}
+}
+
+// CV-195: GitHub issue comment ids run above inline comment and review ids, so a newer issue
+// comment must not hide inline comments and reviews posted after it.
+func TestReviewCheckWatermarkPerType(t *testing.T) {
+	noThreads := `{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[]}}}}}`
+	dir := fakeAPI(t, `[]`, `[]`, noThreads)
+	os.WriteFile(filepath.Join(dir, "convo.json"), []byte(`[{"id":6954124677,"body":"Changeset detected","user":{"login":"changeset-bot"}}]`), 0o644)
+	svc, tk := reviewTask(t)
+	ctx := context.Background()
+	if _, err := ReviewCheck(ctx, svc, tk.Key, 0); err != nil {
+		t.Fatal(err)
+	}
+	os.WriteFile(filepath.Join(dir, "reviews.json"), []byte(`[{"id":5950000000,"body":"looks off","state":"COMMENTED","user":{"login":"bob"}}]`), 0o644)
+	os.WriteFile(filepath.Join(dir, "comments.json"), []byte(`[{"id":4610000000,"body":"handle nil","path":"update_overrides.go","line":5,"user":{"login":"bob"}}]`), 0o644)
+	if _, err := ReviewCheck(ctx, svc, tk.Key, 0); err != nil {
+		t.Fatal(err)
+	}
+	cs, _ := store.ListComments(svc.DB, tk.ID)
+	if len(cs) != 1 || !strings.Contains(cs[0].Body, "handle nil") || !strings.Contains(cs[0].Body, "looks off") {
+		t.Fatalf("missed inline comment or review: %+v", cs)
+	}
+}
+
+// A row migrated from the single watermark (-1 marks) baselines reviews and inline comments
+// on its next check instead of resending feedback the agent already handled.
+func TestReviewCheckBaselinesMigratedRow(t *testing.T) {
+	dir := fakeAPI(t, `[{"id":10,"body":"old review","state":"COMMENTED","user":{"login":"bob"}}]`,
+		`[{"id":11,"body":"old inline","path":"a.go","line":1,"user":{"login":"bob"}}]`,
+		`{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[]}}}}}`)
+	svc, tk := reviewTask(t)
+	rid := tk.Repos[0].RepoID
+	store.SavePRReview(svc.DB, store.PRReview{TaskID: tk.ID, RepoID: rid, SeenReviewID: -1, SeenInlineID: -1, SeenCommentID: 99})
+	ctx := context.Background()
+	if _, err := ReviewCheck(ctx, svc, tk.Key, 0); err != nil {
+		t.Fatal(err)
+	}
+	if cs, _ := store.ListComments(svc.DB, tk.ID); len(cs) != 0 {
+		t.Fatalf("resent old feedback: %+v", cs)
+	}
+	if st, _ := store.GetPRReview(svc.DB, tk.ID, rid); st.SeenReviewID != 10 || st.SeenInlineID != 11 || st.SeenCommentID != 99 {
+		t.Fatalf("state %+v", st)
+	}
+	os.WriteFile(filepath.Join(dir, "comments.json"), []byte(`[{"id":11,"body":"old inline","path":"a.go","line":1,"user":{"login":"bob"}},{"id":12,"body":"new inline","path":"a.go","line":2,"user":{"login":"bob"}}]`), 0o644)
+	if _, err := ReviewCheck(ctx, svc, tk.Key, 0); err != nil {
+		t.Fatal(err)
+	}
+	if cs, _ := store.ListComments(svc.DB, tk.ID); len(cs) != 1 || !strings.Contains(cs[0].Body, "new inline") || strings.Contains(cs[0].Body, "old inline") {
+		t.Fatalf("want only the new inline comment: %+v", cs)
 	}
 }
 
