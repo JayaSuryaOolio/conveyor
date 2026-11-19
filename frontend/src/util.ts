@@ -109,15 +109,3 @@ export const clickable = (go: () => void) => ({
     onKeyDown: (e: KeyboardEvent) => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); go() } },
 })
 
-// The last element focused outside any dialog/palette: where a popup that unmounts instead of closing (Mantine only returns focus on close) hands focus back.
-let outside: HTMLElement | null = null
-if (typeof document !== 'undefined') document.addEventListener('focusin', e => { const t = e.target as HTMLElement; if (!t.closest('[role=dialog]')) outside = t })
-
-/** For a popup component that is mounted only while open (pass its `open`, or true): on close or unmount focus goes back to what had it before. Nested popups: the inner one returns to the outer's controls. */
-export function useReturnFocus(open = true) {
-    useEffect(() => {
-        if (!open) return
-        const from = outside
-        return () => { setTimeout(() => { if (from?.isConnected) from.focus() }) } // after Mantine's own return and the unmount
-    }, [open])
-}

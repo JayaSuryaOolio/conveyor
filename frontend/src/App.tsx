@@ -1,6 +1,6 @@
 import {useEffect, useMemo, useRef, useState} from 'react'
 import {useLocation, useNavigate} from 'react-router'
-import {ActionIcon, AppShell, Badge, Box, Button, Group, Kbd, NavLink, Stack, Text, Title, Tooltip} from '@mantine/core'
+import {ActionIcon, AppShell, Badge, Box, Button, Group, Kbd, Modal, NavLink, Stack, Text, Title, Tooltip} from '@mantine/core'
 import {useLocalStorage} from '@mantine/hooks'
 import {IconApps, IconBolt, IconArrowLeft, IconBook2, IconClock, IconLayoutKanban, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconLogs, IconPlus, IconRobot, IconSettings, IconSitemap} from '@tabler/icons-react'
 import {AppVersion, DispatcherState, Learnings, ShellPATHError} from '../wailsjs/go/ui/App'
@@ -135,9 +135,9 @@ export default function App() {
                 {view.name === 'logs' && <Logs/>}
                 {view.name === 'settings' && <Settings/>}
             </AppShell.Main>
-            {showFocus && <Focus nav={nav} onClose={() => setShowFocus(false)}/>}
-            {showNew && <NewTask nav={nav} close={() => setShowNew(false)}/>}
-            <CommandPalette nav={nav} onFocus={() => setShowFocus(true)}/>
+            <Modal opened={showFocus} onClose={() => setShowFocus(false)} size="min(800px, 96vw)" title="Focus"><Focus nav={nav} onClose={() => setShowFocus(false)}/></Modal>
+            <Modal opened={showNew} onClose={() => setShowNew(false)} size="clamp(28rem, 60vw, 64rem)" title="New task"><NewTask nav={nav} close={() => setShowNew(false)}/></Modal>
+            <CommandPalette nav={nav} onFocus={() => setTimeout(() => setShowFocus(true), 300)} /* ponytail: open after the palette's close transition so Mantine records the real opener (not the palette's input) for return-focus; refactor: Spotlight onSpotlightClose callback *//>
             <Toasts/>
         </AppShell>
         </NavContext.Provider>

@@ -8,7 +8,7 @@ import {Card, CommentBox, Message, Nav, StatusBadge, Time, View, errMsg} from '.
 import {Markdown, MarkdownEditor, TaskKey} from './markdown'
 import {Relations} from './relations'
 import {TaskSidebar} from './workspace'
-import {clickable, fmtDuration, fmtK, listTasks, prNumbers, useData, useReturnFocus} from './util'
+import {clickable, fmtDuration, fmtK, listTasks, prNumbers, useData} from './util'
 
 const TermDock = lazy(() => import('./terminals'))
 
@@ -146,9 +146,8 @@ export function Board({nav, q, setQ, search, link}: {nav: Nav; q: string; setQ: 
     </Stack>)
 }
 
-/** Focus popup: what is waiting on you, each card showing only the last message. Preview opens the task page in a nested modal. */
+/** Body of the Focus popup (App owns the <Modal>, see NewTask): what is waiting on you, each card showing only the last message. Preview opens the task page in a nested modal. */
 export function Focus({nav, onClose}: {nav: Nav; onClose: () => void}) {
-    useReturnFocus() // mounted only while open
     const {data, error} = useData(listTasks, [])
     const [peek, setPeek] = useState('')
     const go: Nav = v => { onClose(); nav(v) } // leaving for the task page also closes the popup
@@ -156,7 +155,6 @@ export function Focus({nav, onClose}: {nav: Nav; onClose: () => void}) {
         .filter(c => FOCUS_ORDER.includes(c.status))
         .sort((a, b) => waiting(a) - waiting(b) || lastAt(b) - lastAt(a) || a.priority - b.priority)
     return <>
-        <Modal opened onClose={onClose} size="min(800px, 96vw)" title="Focus">
             {error && <Text c="red">{error}</Text>}
             {!error && rows.length === 0 && <Text c="dimmed">Nothing needs you.</Text>}
             <Stack>
@@ -178,7 +176,6 @@ export function Focus({nav, onClose}: {nav: Nav; onClose: () => void}) {
                     </Paper>
                 ))}
             </Stack>
-        </Modal>
         <TaskPreview k={peek} onClose={() => setPeek('')} nav={go}/>
     </>
 }
