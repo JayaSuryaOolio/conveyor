@@ -1,6 +1,6 @@
 import {createContext, useContext, useEffect, useMemo, useRef, useState} from 'react'
-import {ActionIcon, Alert, Anchor, Badge, Box, Group, Indicator, Menu, Paper, ScrollArea, SegmentedControl, SimpleGrid, Stack, Table, Text, Textarea, TextInput, Tooltip} from '@mantine/core'
-import {Button, Clickable, ClickableCard, Modal} from './ui'
+import {ActionIcon, Alert, Anchor, Badge, Box, Indicator, Menu, Paper, ScrollArea, SegmentedControl, SimpleGrid, Table, Text, Textarea, TextInput, Tooltip} from '@mantine/core'
+import {Button, Clickable, ClickableCard, Group, Modal, Stack} from './ui'
 import {useLocalStorage} from '@mantine/hooks'
 import {IconCode, IconExternalLink, IconGitPullRequest, IconMessageQuestion, IconPlayerPlay, IconPlayerStop, IconPlus, IconTerminal2} from '@tabler/icons-react'
 import {Background, Controls, Handle, MarkerType, Position, ReactFlow, useEdgesState, useNodesState, type Connection, type Edge, type Node, type NodeProps} from '@xyflow/react'
@@ -78,12 +78,12 @@ function TaskNode({data}: NodeProps<Node<CardData>>) {
             <Handle type="target" position={Position.Left}/>
             <Handle type="source" position={Position.Right}/>
             <Stack gap={6}>
-                <Group justify="space-between" wrap="nowrap" gap="xs">
-                    <Group gap={6} wrap="nowrap">
+                <Group justify="between" wrap={false} gap="xs">
+                    <Group gap={6} wrap={false}>
                         <Text size="xs" fw={600} c="dimmed">{n.key}</Text>
                         <Indicator disabled={!running} processing color="cyan" size={8} offset={-2}><StatusBadge status={n.status}/></Indicator>
                     </Group>
-                    <Group gap={2} wrap="nowrap" className={nd} onClick={stop}>
+                    <Group gap={2} wrap={false} className={nd} onClick={stop}>
                         <Tooltip label="Open task page"><ActionIcon size="sm" variant="subtle" aria-label="Open task" onClick={() => nav({name: 'task', key: n.key})}><IconExternalLink size={14}/></ActionIcon></Tooltip>
                         {running
                             ? <Tooltip label="Stop the run"><ActionIcon size="sm" variant="subtle" color="red" aria-label="Stop" onClick={() => Stop(n.key).catch(errMsg)}><IconPlayerStop size={14}/></ActionIcon></Tooltip>
@@ -100,7 +100,7 @@ function TaskNode({data}: NodeProps<Node<CardData>>) {
                     </Group>
                 </Group>
                 <Text size="sm" fw={500} lineClamp={2}>{n.title}</Text>
-                <Group gap={6} wrap="wrap">
+                <Group gap={6} wrap>
                     {details}
                     {prs.filter(p => p.pr_url).map(p => <PrChip key={p.repo} p={p}/>)}
                 </Group>
@@ -116,8 +116,8 @@ function GroupNode({data}: NodeProps<Node<{n: core.GraphNode}>>) {
         <Box w="100%" h="100%" style={{border: '1px dashed var(--mantine-color-default-border)', borderRadius: 12, background: 'var(--mantine-color-default-hover)'}}>
             <Handle type="target" position={Position.Left}/>
             <Handle type="source" position={Position.Right}/>
-            <Group px="sm" py={8} justify="space-between" wrap="nowrap">
-                <Group gap={6} wrap="nowrap" style={{minWidth: 0}}>
+            <Group justify="between" wrap={false} style={{paddingInline: 'var(--mantine-spacing-sm)', paddingBlock: 8}}>
+                <Group gap={6} wrap={false} style={{minWidth: 0}}>
                     <Anchor component="button" size="xs" fw={600} onClick={() => nav({name: 'task', key: n.key})}>{n.key}</Anchor>
                     <Text size="xs" truncate>{n.title}</Text>
                     <StatusBadge status={n.status}/>
@@ -143,7 +143,7 @@ function Header({g, nav, root}: {g: core.Graph; nav: Nav; root: core.GraphNode})
     const noHooks = !(apps ?? []).some(a => a.manifest.includes('"autostart"'))
     return <Stack gap="xs">
         <Paper withBorder radius="md" px="sm" py={6}>
-            <Group justify="space-between" wrap="wrap">
+            <Group justify="between" wrap>
                 <Group gap="sm">
                     <Anchor component="button" fw={600} onClick={() => nav({name: 'task', key: root.key})}>{root.key}</Anchor>
                     <Text size="sm" truncate maw={320}>{root.title}</Text>
@@ -173,7 +173,7 @@ function Header({g, nav, root}: {g: core.Graph; nav: Nav; root: core.GraphNode})
             <Stack gap="sm">
                 <Text size="sm">Abandons the current flow, cancels its open sub-tasks and starts a new flow at spec.</Text>
                 <Textarea data-autofocus label="Reason" required autosize minRows={2} value={reason} onChange={e => setReason(e.currentTarget.value)}/>
-                <Group justify="flex-end">
+                <Group justify="end">
                     <Button variant="secondary" onClick={() => setRestart(false)}>Cancel</Button>
                     <Button tone="danger" disabled={!reason.trim()} onClick={() => EpicRestart(g.root, reason).then(() => { setRestart(false); setReason('') }, errMsg)}>Restart</Button>
                 </Group>
@@ -209,14 +209,14 @@ function TaskRow({n, note}: {n: core.GraphNode; note?: string}) {
 
 function Legend() {
     const swatch = (color: string, label: string, dashed = false) => (
-        <Group key={label} gap={4} wrap="nowrap">
+        <Group key={label} gap={4} wrap={false}>
             <Box w={18} h={0} style={{borderTop: `2px ${dashed ? 'dashed' : 'solid'} ${c6(color)}`}}/>
             <Text size="xs" c="dimmed">{label}</Text>
         </Group>
     )
     return (
-        <Group gap="md" wrap="wrap">
-            {Object.entries(KIND_COLOR).map(([k, c]) => <Group key={k} gap={4} wrap="nowrap"><Box w={10} h={10} bg={c6(c)} style={{borderRadius: 2}}/><Text size="xs" c="dimmed">{k}</Text></Group>)}
+        <Group gap="md" wrap>
+            {Object.entries(KIND_COLOR).map(([k, c]) => <Group key={k} gap={4} wrap={false}><Box w={10} h={10} bg={c6(c)} style={{borderRadius: 2}}/><Text size="xs" c="dimmed">{k}</Text></Group>)}
             <Text size="xs" c="dimmed">·</Text>
             {swatch('orange', 'blocks (waiting)')}{swatch('cyan', 'blocker running')}{swatch('green', 'unblocked')}{swatch('gray', 'relates', true)}
         </Group>
@@ -236,7 +236,7 @@ function InfoBoxes({g}: {g: core.Graph}) {
         <SimpleGrid cols={{base: 2, md: 4}} spacing="xs">
             {boxes.map(([title, color, rows]) => (
                 <Paper key={title} withBorder radius="md" p="xs" style={{background: `color-mix(in srgb, ${c6(color)} 10%, transparent)`}}>
-                    <Group justify="space-between" mb={4}><Text size="xs" fw={700} tt="uppercase" c={color}>{title}</Text><Text size="xs" c="dimmed">{rows.length}</Text></Group>
+                    <Group justify="between" style={{marginBottom: 4}}><Text size="xs" fw={700} tt="uppercase" c={color}>{title}</Text><Text size="xs" c="dimmed">{rows.length}</Text></Group>
                     <ScrollArea.Autosize mah={120}>
                         {rows.length ? <Stack gap={1}>{rows.map(r => <TaskRow key={r.n.key} {...r}/>)}</Stack> : <Text size="xs" c="dimmed">None</Text>}
                     </ScrollArea.Autosize>
@@ -260,7 +260,7 @@ function Waves({g}: {g: core.Graph}) {
                     const color = done === ns.length ? 'green' : ns.some(n => n.status !== 'backlog' && n.status !== 'todo') ? 'cyan' : 'gray'
                     return (
                         <Paper key={i} withBorder radius="md" p="xs" style={{borderLeft: `4px solid ${c6(color)}`}}>
-                            <Group justify="space-between" mb={4}>
+                            <Group justify="between" style={{marginBottom: 4}}>
                                 <Text size="sm" fw={700}>Wave {i + 1}{i === 0 ? ' · no blockers' : ` · after wave ${i}`}</Text>
                                 <Badge size="sm" variant="light" color={color}>{done}/{ns.length} done</Badge>
                             </Group>
@@ -365,9 +365,9 @@ export function EpicView({k, task = '', nav}: {k: string; task?: string; nav: Na
     const create = () => CreateTask(core.NewTaskInput.createFrom({Title: title, ParentKey: adding})).then(() => { setAdding(''); setTitle('') }, errMsg)
     return (
         <Ctx.Provider value={ctx}>
-            <Stack gap="sm" h="calc(100vh - 2 * var(--mantine-spacing-md))">
+            <Stack gap="sm" style={{height: 'calc(100vh - 2 * var(--mantine-spacing-md))'}}>
                 <Header g={g} nav={nav} root={root}/>
-                <Group justify="space-between" wrap="nowrap">
+                <Group justify="between" wrap={false}>
                     <SegmentedControl size="xs" value={view} onChange={setView} data={[
                         {value: 'graph', label: 'Graph'}, {value: 'waves', label: 'Waves'}, {value: 'prs', label: `PRs (${g.prs.filter(p => p.pr_url).length})`}]}/>
                     <Text size="xs" c="dimmed" truncate>{VIEW_HINT[view]}</Text>
@@ -392,7 +392,7 @@ export function EpicView({k, task = '', nav}: {k: string; task?: string; nav: Na
                     <form onSubmit={e => { e.preventDefault(); if (title.trim()) create() }}>
                         <Stack gap="sm">
                             <TextInput data-autofocus label="Title" value={title} onChange={e => setTitle(e.currentTarget.value)}/>
-                            <Group justify="flex-end"><Button type="submit" disabled={!title.trim()}>Create</Button></Group>
+                            <Group justify="end"><Button type="submit" disabled={!title.trim()}>Create</Button></Group>
                         </Stack>
                     </form>
                 </Modal>

@@ -1,6 +1,6 @@
 import {useState} from 'react'
-import {ActionIcon, Anchor, Badge, Code, Divider, Group, Menu, Paper, Stack, TagsInput, Text, TextInput, Title, Tooltip} from '@mantine/core'
-import {Button, ClickableCode, Modal} from './ui'
+import {ActionIcon, Anchor, Badge, Code, Divider, Menu, Paper, TagsInput, Text, TextInput, Title, Tooltip} from '@mantine/core'
+import {Button, ClickableCode, Group, Modal, Stack} from './ui'
 import {useClipboard} from '@mantine/hooks'
 import {IconCopy, IconMessageSearch, IconPencil, IconPlus, IconStar, IconX, IconTerminal, IconTerminal2} from '@tabler/icons-react'
 import {Actions, AddLabel, AddTaskRepo, CheckReviews, EnsureWorkspace, ListLabels, ListRepos, RemoveLabel, RemoveTaskRepo, RunAction, Sessions, SetTaskRepo, TermStart} from '../wailsjs/go/ui/App'
@@ -15,7 +15,7 @@ function Confirm({msg, ok, close}: {msg: string | null; ok: () => void; close: (
     return (
         <Modal opened={!!msg} onClose={close} title="Please confirm" size="sm" centered>
             <Text size="sm">{msg}</Text>
-            <Group justify="flex-end" mt="md">
+            <Group justify="end" style={{marginTop: 'var(--mantine-spacing-md)'}}>
                 <Button variant="secondary" onClick={close}>Cancel</Button>
                 <Button onClick={() => { close(); ok() }}>Confirm</Button>
             </Group>
@@ -30,7 +30,7 @@ const cdCmd = (a: core.Action) => 'cd ' + sq(a.cwd) + (a.cmd ? ' && ' + a.cmd : 
 /** One full-width row: label left, copy / external terminal / internal terminal icons right. */
 function ActionRow({k, a, kind, onTerm}: {k: string; a: core.Action; kind?: string; onTerm: (t: ui.TermInfo) => void}) {
     return (
-        <Group justify="space-between" wrap="nowrap" gap="xs">
+        <Group justify="between" wrap={false} gap="xs">
             <Text size="sm" style={{wordBreak: 'break-word'}}>{a.label}</Text>
             <ActionIcons k={k} a={a} kind={kind} onTerm={onTerm}/>
         </Group>
@@ -41,7 +41,7 @@ function ActionRow({k, a, kind, onTerm}: {k: string; a: core.Action; kind?: stri
 function ActionIcons({k, a, kind, onTerm}: {k: string; a: core.Action; kind?: string; onTerm: (t: ui.TermInfo) => void}) {
     return (
         <>
-            <Group gap={2} wrap="nowrap">
+            <Group gap={2} wrap={false}>
                 <Tooltip label="Copy command">
                     <ActionIcon variant="default" size="sm" aria-label="Copy command" onClick={() => copy(cdCmd(a))}><IconCopy size={14}/></ActionIcon>
                 </Tooltip>
@@ -84,7 +84,7 @@ function RepoFields({k, r, reload, canRemove, children}: {k: string; r: store.Ta
             <Confirm msg={rm ? `Remove ${r.repo_name} from ${k}?` : null} close={() => setRm(false)}
                      ok={() => RemoveTaskRepo(k, r.repo_name).then(reload).catch(errMsg)}/>
             <Stack gap="xs">
-                <Group gap={6} justify="space-between" wrap="nowrap">
+                <Group gap={6} justify="between" wrap={false}>
                     <Group gap={6}>
                         <Text size="sm" fw={600}>{r.repo_name}</Text>
                         {r.is_primary && <Badge size="xs" variant="light" leftSection={<IconStar size={10}/>}>primary</Badge>}
@@ -107,7 +107,7 @@ function RepoFields({k, r, reload, canRemove, children}: {k: string; r: store.Ta
                     {r.worktree_path ? <Mono text={r.worktree_path}/> : <Text size="xs" c="dimmed">not created yet</Text>}
                 </div>
                 <div>
-                    <Group gap={6} mb={2}>
+                    <Group gap={6} style={{marginBottom: 2}}>
                         <Text size="xs" c="dimmed">PR</Text>
                         {r.pr_url && r.pr_state && <Badge size="xs" variant="light" color={PR_COLOR[r.pr_state.toLowerCase()] ?? 'gray'}>{r.pr_state}</Badge>}
                         {r.pr_url && <Anchor size="xs" href={r.pr_url} onClick={e => { e.preventDefault(); BrowserOpenURL(r.pr_url!) }}>Open PR</Anchor>}
@@ -173,20 +173,20 @@ export function TaskSidebar({t, by, runs, reload, onTerm}: {t: store.Task; by: s
     const resume = new Map((actions ?? []).filter(a => /^(resume|attach):/.test(a.kind)).map(a => [a.kind.split(':')[1], a]))
     const hasWorktree = repos.some(r => r.worktree_path)
     return (
-        <Stack gap="sm" component="aside" miw={0}>
-            <Group justify="space-between" wrap="nowrap">
+        <Stack gap="sm" as="aside" style={{minWidth: 0}}>
+            <Group justify="between" wrap={false}>
                 <Group gap={4}><Text size="sm" fw={600}>Agent</Text><TaskSettings k={k} model={t.model ?? ''} runner={t.runner ?? ''} reload={reload}/></Group>
                 <TaskAgent k={k} repos={repos.map(r => r.repo_name)} agent={t.agent ?? ''}/>
             </Group>
-            <Group justify="space-between">
+            <Group justify="between">
                 <Text size="sm" fw={600}>Status</Text>
                 <StatusSelect k={k} status={t.status}/>
             </Group>
-            <Group justify="space-between"><Text size="xs" c="dimmed">Created</Text><Group gap={4} wrap="nowrap"><Text size="xs">{by} ·</Text><Time iso={t.created_at}/></Group></Group>
-            <Group justify="space-between"><Text size="xs" c="dimmed">Updated</Text><Time iso={t.updated_at}/></Group>
+            <Group justify="between"><Text size="xs" c="dimmed">Created</Text><Group gap={4} wrap={false}><Text size="xs">{by} ·</Text><Time iso={t.created_at}/></Group></Group>
+            <Group justify="between"><Text size="xs" c="dimmed">Updated</Text><Time iso={t.updated_at}/></Group>
             <Labels k={k} labels={t.labels ?? []} reload={reload}/>
             <Divider/>
-            <Group justify="space-between">
+            <Group justify="between">
                 <Title order={6}>Repos</Title>
                 <AddRepo k={k} have={repos.map(r => r.repo_name)} reload={reload}/>
             </Group>
@@ -204,7 +204,7 @@ export function TaskSidebar({t, by, runs, reload, onTerm}: {t: store.Task; by: s
             {sessionsError && <Text size="xs" c="red">Failed to load sessions: {sessionsError}</Text>}
             {runs.length + (sessions?.length ?? 0) === 0 && <Text size="xs" c="dimmed">None yet.</Text>}
             {runs.map((r, i) => (
-                <Group key={r.id} justify="space-between" wrap="nowrap" gap="xs">
+                <Group key={r.id} justify="between" wrap={false} gap="xs">
                     <Anchor size="xs" c="dimmed" component="button" ta="left" title={r.session_id ? `Session ${r.session_id}` : 'Show in thread'}
                             onClick={() => document.getElementById('run-' + r.id)?.scrollIntoView({behavior: 'smooth', block: 'start'})}>
                         #{i + 1} {r.kind} · {r.status}{r.block_status ? ' · ' + r.block_status : ''}

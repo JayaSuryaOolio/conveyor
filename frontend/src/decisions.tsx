@@ -1,5 +1,6 @@
 import {useState} from 'react'
-import {ActionIcon, Group, Stack, Text, TextInput, Title, Tooltip} from '@mantine/core'
+import {ActionIcon, Text, TextInput, Title, Tooltip} from '@mantine/core'
+import {Group, Stack} from './ui'
 import {IconAlertTriangle, IconCheck, IconPlus, IconTrash} from '@tabler/icons-react'
 import {AddDecision, Decisions as ListDecisions, DisputeDecision, RemoveDecision} from '../wailsjs/go/ui/App'
 import {errMsg} from './components'
@@ -17,7 +18,7 @@ export function Decisions({k}: {k: string}) {
             <Title order={5}>Decisions</Title>
             {(data ?? []).map(d => (
                 <Stack key={d.id} gap={0}>
-                    <Group gap={4} wrap="nowrap" align="flex-start">
+                    <Group gap={4} wrap={false} align="start">
                         <Text size="sm" style={{flex: 1}}><b>D{d.id}</b> ({d.author}) {d.body}</Text>
                         <Tooltip label={d.disputed_by ? 'Resolved: remove the pitfall' : 'Dispute'}>
                             <ActionIcon size="sm" variant="subtle" color={d.disputed_by ? 'green' : 'orange'} aria-label={d.disputed_by ? 'Unmark dispute' : 'Dispute decision'}
@@ -30,7 +31,7 @@ export function Decisions({k}: {k: string}) {
                     {d.disputed_by && <Text size="xs" c="orange" ml="md">pitfall ({d.disputed_by}): {d.dispute}</Text>}
                 </Stack>
             ))}
-            <Group gap={4} wrap="nowrap">
+            <Group gap={4} wrap={false}>
                 <TextInput size="xs" style={{flex: 1}} placeholder="what — why" value={text} onChange={e => setText(e.currentTarget.value)} onKeyDown={e => e.key === 'Enter' && add()}/>
                 <ActionIcon variant="default" size="md" aria-label="Add decision" disabled={!text.trim()} onClick={add}><IconPlus size={14}/></ActionIcon>
             </Group>

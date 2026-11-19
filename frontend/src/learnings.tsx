@@ -1,6 +1,6 @@
 import {useState} from 'react'
-import {Group, Stack, Text, TextInput, Title} from '@mantine/core'
-import {Button} from './ui'
+import {Text, TextInput, Title} from '@mantine/core'
+import {Button, Group, Stack} from './ui'
 import {AcceptLearning, ApplyLearnings, EditLearning, Learnings as ListLearnings, RejectLearning, RejectLearningCategory, RejectSimilarLearnings} from '../wailsjs/go/ui/App'
 import {ui} from '../wailsjs/go/models'
 import {Nav, errMsg} from './components'
@@ -11,7 +11,7 @@ export function LearningsPage({nav}: {nav: Nav}) {
     const groups: Record<string, ui.LearningRow[]> = {}
     data?.forEach(l => (groups[l.repo || '(personal)'] ||= []).push(l))
     return (
-        <Stack maw={1000}>
+        <Stack style={{maxWidth: 1000}}>
             <Title order={3}>Learnings</Title>
             {error && <Text c="red">{error}</Text>}
             <Group gap="xs">
@@ -22,7 +22,7 @@ export function LearningsPage({nav}: {nav: Nav}) {
             {data?.length === 0 && <Text c="dimmed">Nothing proposed.</Text>}
             {Object.keys(groups).sort().map(repo => (
                 <Stack key={repo} gap="xs">
-                    <Group justify="space-between">
+                    <Group justify="between">
                         <Title order={5}>{repo}</Title>
                         {repo !== '(personal)' && groups[repo].some(l => l.status === 'accepted') && (
                             <Button size="xs" onClick={() => ApplyLearnings(repo).then(k => k && nav({name: 'task', key: k}), errMsg)}>Apply to {repo}</Button>
@@ -40,7 +40,7 @@ function LearningItem({l, reload}: {l: ui.LearningRow; reload: () => void}) {
     const [target, setTarget] = useState(l.target ?? (l.repo ? 'local' : 'CLAUDE.md'))
     const done = () => reload()
     return (
-        <Group wrap="nowrap" gap="xs">
+        <Group wrap={false} gap="xs">
             <Text size="xs" c="dimmed" miw={32} title="Learning ID, as in `conveyor learning reject ID`">#{l.id}</Text>
             <TextInput style={{flex: 1}} value={body} onChange={e => setBody(e.target.value)}/>
             <Button variant="secondary" disabled={body === l.body} onClick={() => EditLearning(l.id, body).then(done, errMsg)}>Save</Button>

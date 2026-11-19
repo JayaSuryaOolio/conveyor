@@ -1,6 +1,6 @@
 import {useEffect, useRef, useState} from 'react'
-import {ActionIcon, Badge, Checkbox, Code, FileButton, Group, MultiSelect, NumberInput, Pagination, Paper, Select, Stack, Switch, Table, Tabs, Text, TextInput, Textarea, Title} from '@mantine/core'
-import {Button, Modal} from './ui'
+import {ActionIcon, Badge, Checkbox, Code, FileButton, MultiSelect, NumberInput, Pagination, Paper, Select, Switch, Table, Tabs, Text, TextInput, Textarea, Title} from '@mantine/core'
+import {Button, Group, Modal, Stack} from './ui'
 import {IconDownload, IconPlus, IconPuzzle, IconSettings, IconTrash, IconUpload} from '@tabler/icons-react'
 import {AddConnector, ConnectorSettings, SaveConnectorSettings, ExampleConnectors, InstallExample, GetSettings, SetSetting, ConnectorIcons, ConnectorPresets, Confirm, SetConnectorDisabled, DeleteConnector, ExportConnector, InstallManifest, InstallPreset, ListConnectors, SlackLinks, ManifestSchema, Plugin, ValidateManifest} from '../wailsjs/go/ui/App'
 import {runner, store} from '../wailsjs/go/models'
@@ -21,7 +21,7 @@ function AppForm({onClose}: {onClose: (saved: boolean) => void}) {
                        value={command} onChange={e => setCommand(e.target.value)}/>
             <Switch label="Quick action" checked={output} onChange={e => setOutput(e.currentTarget.checked)}
                     description={<>Runs to completion in the task's primary worktree and shows its output as a toast; a button in the task sidebar. Scripts can call <Code>conveyor task sessions {'{key}'}</Code> for the task's Claude session ids.</>}/>
-            <Group justify="flex-end">
+            <Group justify="end">
                 <Button variant="secondary" onClick={() => onClose(false)}>Cancel</Button>
                 <Button onClick={save} disabled={!name.trim() || !command.trim()}>Create</Button>
             </Group>
@@ -73,13 +73,13 @@ function ManifestForm({onClose}: {onClose: (saved: boolean) => void}) {
             <Group gap={6}>
                 {(schema?.vars ?? []).map(v => <Button style={{fontFamily: "monospace"}} key={v} size="xs" compact variant="soft" onClick={() => insert(`\${{ ${v} }}`)}>{v}</Button>)}
             </Group>
-            <Group align="flex-end" gap="xs">
+            <Group align="end" gap="xs">
                 <MultiSelect label="Places" size="xs" data={schema?.places ?? []} value={places} onChange={setPlaces} style={{flex: 1}}/>
                 <Button size="xs" variant="secondary" icon={<IconPlus size={14}/>} disabled={!places.length} onClick={addAction}>Add action</Button>
             </Group>
             <Textarea ref={ref} autosize minRows={10} maxRows={20} ff="monospace" placeholder={MANIFEST_EXAMPLE} value={text} onChange={e => setText(e.target.value)}
                       error={problem || undefined}/>
-            <Group justify="space-between">
+            <Group justify="between">
                 <FileButton accept="application/json,.json" onChange={f => f?.text().then(setText)}>
                     {p => <Button {...p} variant="secondary" icon={<IconUpload size={16}/>}>Load file</Button>}
                 </FileButton>
@@ -125,7 +125,7 @@ function SettingsForm({app, onClose}: {app: string; onClose: () => void}) {
                     </div>
                 )
             })}
-            <Group justify="flex-end">
+            <Group justify="end">
                 <Button variant="secondary" onClick={onClose}>Cancel</Button>
                 <Button onClick={() => SaveConnectorSettings(app, vals).then(onClose, errMsg)}>Save</Button>
             </Group>
@@ -142,7 +142,7 @@ const pluginColor: Record<string, string> = {installed: 'green', outdated: 'oran
 function PluginRow({st, act}: {st: runner.PluginStatus, act: (tool: string, a: string) => void}) {
     const supported = st.status !== 'not supported'
     return (
-        <Group justify="space-between">
+        <Group justify="between">
             <Group gap="xs">
                 <Text size="sm" fw={500}>{st.tool}</Text>
                 <Badge variant="light" color={pluginColor[st.status] ?? 'gray'}>{st.status}</Badge>
@@ -189,8 +189,8 @@ function ConnectorList() {
     const missing = (presets ?? []).filter(p => !have.has(p.name))
     const offered = (examples ?? []).filter(e => !have.has(e.name))
     return (
-        <Stack maw={900}>
-            <Group justify="space-between">
+        <Stack style={{maxWidth: 900}}>
+            <Group justify="between">
                 <Title order={3}>Connectors</Title>
                 <Group gap="xs">
                     <Button variant="secondary" icon={<IconPuzzle size={16}/>} onClick={() => setImporting(true)}>Install manifest</Button>
@@ -206,10 +206,10 @@ function ConnectorList() {
                     <Table.Tbody>
                         {data.map(a => (
                             <Table.Tr key={a.id} opacity={a.disabled ? 0.5 : 1}>
-                                <Table.Td fw={600}><Group gap="xs" wrap="nowrap"><AppIcon name={a.name} icons={icons}/>{a.name}</Group></Table.Td>
+                                <Table.Td fw={600}><Group gap="xs" wrap={false}><AppIcon name={a.name} icons={icons}/>{a.name}</Group></Table.Td>
                                 <Table.Td><Code title={a.manifest} style={{display: 'block', maxWidth: 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>{manifestSummary(a)}</Code></Table.Td>
                                 <Table.Td>
-                                    <Group gap="xs" wrap="nowrap" justify="flex-end">
+                                    <Group gap="xs" wrap={false} justify="end">
                                         <Switch size="xs" aria-label={`Enable ${a.name}`} title={a.disabled ? 'Disabled: enable to use it again' : 'Disable (keeps its settings)'} checked={!a.disabled} onChange={e => SetConnectorDisabled(a.name, !e.currentTarget.checked).then(reload, errMsg)}/>
                                         {hasSettings(a) && <ActionIcon variant="subtle" color="gray" aria-label="Settings" title="Settings" onClick={() => setSettingsApp(a.name)}><IconSettings size={16}/></ActionIcon>}
                                         <ActionIcon variant="subtle" color="gray" aria-label="Export" title="Export manifest as .json" onClick={() => ExportConnector(a.name).then(p => p && toast(`Exported to ${p}`), errMsg)}><IconDownload size={16}/></ActionIcon>
@@ -301,7 +301,7 @@ function Integrations() {
             {data && (
                 <Paper withBorder p="md" radius="md">
                     <Stack gap="sm">
-                        <Group justify="space-between">
+                        <Group justify="between">
                             <Group gap="xs"><Title order={5}>Slack</Title>
                                 <Badge variant="light" color={data.chat_enabled === 'on' && (data.slack_user_token || data.slack_bot_token) && data.slack_app_token && data.slack_user_id ? 'green' : 'gray'}>
                                     {data.chat_enabled !== 'on' ? 'off' : (data.slack_user_token || data.slack_bot_token) && data.slack_app_token && data.slack_user_id ? 'on' : 'needs tokens'}
@@ -329,7 +329,7 @@ export function Connectors() {
         <Tabs defaultValue="apps" keepMounted={false}>
             <Tabs.List mb="md"><Tabs.Tab value="apps">Connectors</Tabs.Tab><Tabs.Tab value="integrations">Integrations</Tabs.Tab></Tabs.List>
             <Tabs.Panel value="apps"><ConnectorList/></Tabs.Panel>
-            <Tabs.Panel value="integrations"><Stack maw={900}><Title order={3}>Integrations</Title><Integrations/></Stack></Tabs.Panel>
+            <Tabs.Panel value="integrations"><Stack style={{maxWidth: 900}}><Title order={3}>Integrations</Title><Integrations/></Stack></Tabs.Panel>
         </Tabs>
     )
 }

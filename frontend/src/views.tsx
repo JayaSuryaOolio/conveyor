@@ -1,6 +1,6 @@
 import {lazy, Ref, Suspense, useEffect, useRef, useState} from 'react'
-import {ActionIcon, Anchor, Badge, Box, Breadcrumbs, CloseButton, Code, CopyButton, Divider, Group, Kbd, Paper, Popover, Stack, Text, TextInput, Timeline, Title, Tooltip} from '@mantine/core'
-import {Button, Clickable, ClickableCode, Modal} from './ui'
+import {ActionIcon, Anchor, Badge, Box, Breadcrumbs, CloseButton, Code, CopyButton, Divider, Kbd, Paper, Popover, Text, TextInput, Timeline, Title, Tooltip} from '@mantine/core'
+import {Button, Clickable, ClickableCode, Group, Modal, Stack} from './ui'
 import {useLocalStorage} from '@mantine/hooks'
 import {IconAbc, IconSitemap, IconArrowDown, IconArrowUp, IconClock, IconFlame, IconHash, IconPencil, IconSearch, IconTerminal, IconX, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconMessage, IconPlayerPlay} from '@tabler/icons-react'
 import {Actions, GetTask, QueueStatus, RunLog, SendQueuedNow, SetTaskDescription, Stop, TakeQueuedComment, TermStart} from '../wailsjs/go/ui/App'
@@ -72,12 +72,12 @@ export function Board({nav, q, setQ, search, link}: {nav: Nav; q: string; setQ: 
     if (cards.some(c => c.status === 'failed')) cols.splice(5, 0, ['failed', 'Failed'])
     return (<Stack gap="sm">
         <Paper withBorder radius="md" px="sm" py={6} className="find-box">
-            <Group gap="sm" wrap="wrap">
+            <Group gap="sm" wrap>
                 <TextInput ref={search} variant="unstyled" size="sm" placeholder="Find a task…" w={200} leftSection={<IconSearch size={16}/>}
                            rightSection={q ? <CloseButton size="sm" aria-label="Clear search" onClick={() => setQ('')}/> : <Kbd size="xs">/</Kbd>}
                            value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => e.key === 'Escape' && (setQ(''), e.currentTarget.blur())}/>
                 <Divider orientation="vertical"/>
-                <Group gap={2} wrap="nowrap" role="group" aria-label="Sort">
+                <Group gap={2} wrap={false} role="group" aria-label="Sort">
                     {SORTS.map(({by, label, icon: Icon, desc}) => {
                         const on = by === s.by
                         const Arrow = sort.desc ? IconArrowDown : IconArrowUp
@@ -92,7 +92,7 @@ export function Board({nav, q, setQ, search, link}: {nav: Nav; q: string; setQ: 
                 </Group>
                 {repos.length > 1 && <>
                     <Divider orientation="vertical"/>
-                    <Group gap={6} wrap="wrap" role="group" aria-label="Repos" style={{flex: 1}}>
+                    <Group gap={6} wrap role="group" aria-label="Repos" style={{flex: 1}}>
                         {repos.map(r => {
                             const on = sel.includes(r)
                             return (
@@ -107,7 +107,7 @@ export function Board({nav, q, setQ, search, link}: {nav: Nav; q: string; setQ: 
                 </>}
                 {selL.length > 0 && <>
                     <Divider orientation="vertical"/>
-                    <Group gap={6} wrap="wrap" role="group" aria-label="Labels">
+                    <Group gap={6} wrap role="group" aria-label="Labels">
                         {selL.map(l => (
                             <Badge key={l} component="button" size="lg" radius="md" color="gray" variant="filled" aria-pressed
                                    title={'Hide ' + l + ' filter'} rightSection={<IconX size={12}/>}
@@ -115,7 +115,7 @@ export function Board({nav, q, setQ, search, link}: {nav: Nav; q: string; setQ: 
                         ))}
                     </Group>
                 </>}
-                {filtered && <Group gap={6} wrap="nowrap" ml="auto">
+                {filtered && <Group gap={6} wrap={false} style={{marginLeft: 'auto'}}>
                     <Badge size="lg" radius="md" color="yellow" variant="light" style={{textTransform: 'none'}}>Filtered: {[...selL, ...sel, ...(needle ? ['"' + q + '"'] : [])].join(', ')}</Badge>
                     <Text size="xs" c="dimmed">{cards.length} of {all.length}</Text>
                     <Button size="xs" compact variant="ghost" tone="muted" icon={<IconX size={12}/>} onClick={() => { setQ(''); setPicked([]); setPickedLabels([]) }}>Clear</Button>
@@ -163,7 +163,7 @@ export function Focus({nav, onClose}: {nav: Nav; onClose: () => void}) {
                 {rows.map(c => (
                     <Paper key={c.key} withBorder p="md" radius="md">
                         <Stack gap="xs">
-                            <Group wrap="nowrap">
+                            <Group wrap={false}>
                                 <StatusBadge status={c.status}/>
                                 <Text size="sm" fw={600}>{c.key}</Text>
                                 <Text size="sm" style={{flex: 1}} lineClamp={1}>{c.title}</Text>
@@ -224,9 +224,9 @@ function SessionLog({run, onStop}: {run: store.Run; onStop?: () => void}) {
     useEffect(() => { box.current?.scrollTo({top: box.current.scrollHeight}) }, [entries])
     const lastTool = [...entries].reverse().find(e => e.kind === 'tool')
     return (
-        <Stack gap={6} mt="xs">
+        <Stack gap={6} style={{marginTop: 'var(--mantine-spacing-xs)'}}>
             {active ? (
-                <Group gap="xs" wrap="nowrap">
+                <Group gap="xs" wrap={false}>
                     <span className="pulse"/>
                     {/* Fixed parts never shrink/wrap; only the last-tool text below takes the remaining space and truncates. */}
                     <Text size="sm" style={{flexShrink: 0, whiteSpace: 'nowrap'}}>Working · {secs(Math.max(0, Math.round((now - Date.parse(run.started_at)) / 1000)))}</Text>
@@ -324,8 +324,8 @@ export function TaskPage({k, nav, height = 'calc(100vh - 2 * var(--mantine-spaci
         <TaskKey.Provider value={t.key}>
         <Box style={{display: 'flex', flexDirection: 'column', height}}>
         <Box style={{flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: `minmax(0, 1fr) ${side ? '300px' : 'auto'}`, gap: side ? 'var(--mantine-spacing-xl)' : 'var(--mantine-spacing-xs)'}}>
-            <Stack gap="sm" mih={0}>
-                <Group justify="space-between" wrap="nowrap" style={{flex: 'none'}}>
+            <Stack gap="sm" style={{minHeight: 0}}>
+                <Group justify="between" wrap={false} style={{flex: 'none'}}>
                 <Breadcrumbs style={{flex: 'none', flexWrap: 'nowrap'}}>
                     {/* A <button> anchor stays keyboard-focusable; only the underline is dropped. */}
                     <Anchor size="sm" component="button" underline="never" onClick={() => nav({name: 'board'})}>Board</Anchor>
@@ -369,7 +369,7 @@ export function TaskPage({k, nav, height = 'calc(100vh - 2 * var(--mantine-spaci
                 <Box style={{flex: 'none'}}><CommentBox k={t.key} onDone={reload} restored={restored}/></Box>
             </Stack>
             <Box mih={0} style={{overflowY: 'auto'}}>
-                <Group justify="flex-end" mb={4}>
+                <Group justify="end" style={{marginBottom: 4}}>
                     <ActionIcon variant="subtle" color="gray" aria-label={side ? 'Hide details' : 'Show details'} title={side ? 'Hide details' : 'Show details'} onClick={() => setSide(!side)}>
                         {side ? <IconLayoutSidebarRightCollapse size={18}/> : <IconLayoutSidebarRightExpand size={18}/>}
                     </ActionIcon>
@@ -413,7 +413,7 @@ function ScrollBox({children, floating}: {children: React.ReactNode; floating?: 
     return (
         <Box pos="relative" style={{flex: 1, minHeight: 0}}>
             <Box ref={el} onScroll={update} h="100%" pr="xs" style={{overflowY: 'auto'}}>{children}</Box>
-            <Stack gap={4} pos="absolute" right={16} bottom={8} align="flex-end">
+            <Stack gap={4} align="end" style={{position: 'absolute', right: 16, bottom: 8}}>
                 {floating}
                 {!pos.top && <ActionIcon variant="default" radius="xl" size="lg" aria-label="Scroll to top" onClick={() => go(0)}><IconArrowUp size={16}/></ActionIcon>}
                 {!pos.bottom && <ActionIcon variant="default" radius="xl" size="lg" aria-label="Scroll to bottom" onClick={() => go(el.current!.scrollHeight)}><IconArrowDown size={16}/></ActionIcon>}
