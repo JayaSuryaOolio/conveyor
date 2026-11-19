@@ -1,7 +1,7 @@
 import {useEffect, useMemo, useRef, useState} from 'react'
 import {useLocation, useNavigate} from 'react-router'
-import {ActionIcon, AppShell, Badge, Box, Group, Kbd, NavLink, Stack, Text, Title, Tooltip} from '@mantine/core'
-import {Button, Modal} from './ui'
+import {ActionIcon, AppShell, Badge, Box, Kbd, NavLink, Text, Title, Tooltip} from '@mantine/core'
+import {Button, Group, Modal, Stack} from './ui'
 import {useLocalStorage} from '@mantine/hooks'
 import {IconApps, IconBolt, IconArrowLeft, IconBook2, IconClock, IconLayoutKanban, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconLogs, IconPlus, IconRobot, IconSettings, IconSitemap} from '@tabler/icons-react'
 import {AppVersion, DispatcherState, Learnings, ShellPATHError} from '../wailsjs/go/ui/App'
@@ -89,9 +89,9 @@ export default function App() {
         <NavContext.Provider value={nav}>
         <AppShell navbar={{width: mini ? 60 : 220, breakpoint: 0}} padding="md">
             <AppShell.Navbar p="sm">
-                <Stack gap="xs" h="100%">
-                    <Group justify={mini ? 'center' : 'space-between'} wrap="nowrap">
-                        {!mini && <Group gap={4} wrap="nowrap">
+                <Stack gap="xs" style={{height: '100%'}}>
+                    <Group justify={mini ? 'center' : 'between'} wrap={false}>
+                        {!mini && <Group gap={4} wrap={false}>
                             <Tooltip label="Back (⌘[)" position="right">
                                 <ActionIcon variant="subtle" color="gray" aria-label="Back" disabled={!canBack} onClick={back}><IconArrowLeft size={18}/></ActionIcon>
                             </Tooltip>
@@ -108,7 +108,7 @@ export default function App() {
                     ) : <>
                         <Button icon={<IconPlus size={16}/>} trailing={<Kbd size="xs">n</Kbd>} onClick={() => setShowNew(true)}>New task</Button>
                     </>}
-                    <Stack gap={2} mt="xs">
+                    <Stack gap={2} style={{marginTop: 'var(--mantine-spacing-xs)'}}>
                         {NAV.map(({name, key, label, icon: Icon, filter}) => (
                             <Tooltip key={label} label={label} position="right" disabled={!mini}>
                                 <NavLink component="button" label={mini ? undefined : label} active={view.name === name && (view.label ?? undefined) === filter} leftSection={<Icon size={18}/>} aria-label={label}
@@ -118,7 +118,7 @@ export default function App() {
                         ))}
                     </Stack>
                     <Box mt="auto">{!mini && <PlacedButtons place="global_nav" size="compact-xs"/>}</Box>
-                    <Group gap="xs" justify={mini ? 'center' : 'space-between'} wrap="nowrap">
+                    <Group gap="xs" justify={mini ? 'center' : 'between'} wrap={false}>
                         <Tooltip label={dispatcher === 'dispatching' ? 'Dispatcher running in this app' : 'UI only: another process dispatches'} position="right">
                             <Box w={8} h={8} style={{borderRadius: '50%', background: `var(--mantine-color-${dispatcher === 'dispatching' ? 'green' : 'gray'}-6)`}}/>
                         </Tooltip>
