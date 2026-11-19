@@ -1,6 +1,6 @@
 import {lazy, Ref, Suspense, useEffect, useRef, useState} from 'react'
 import {ActionIcon, Anchor, Badge, Box, Breadcrumbs, Button, CloseButton, Code, CopyButton, Divider, Group, Kbd, Paper, Popover, Stack, Text, TextInput, Timeline, Title, Tooltip} from '@mantine/core'
-import {Modal} from './ui'
+import {Clickable, ClickableCode, Modal} from './ui'
 import {useLocalStorage} from '@mantine/hooks'
 import {IconAbc, IconSitemap, IconArrowDown, IconArrowUp, IconClock, IconFlame, IconHash, IconPencil, IconSearch, IconTerminal, IconX, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconMessage, IconPlayerPlay} from '@tabler/icons-react'
 import {Actions, GetTask, QueueStatus, RunLog, SendQueuedNow, SetTaskDescription, Stop, TakeQueuedComment, TermStart} from '../wailsjs/go/ui/App'
@@ -10,7 +10,7 @@ import {Markdown, MarkdownEditor, TaskKey} from './markdown'
 import {Decisions} from './decisions'
 import {Relations} from './relations'
 import {TaskSidebar} from './workspace'
-import {clickable, fmtDuration, fmtK, listTasks, prNumbers, useData} from './util'
+import {fmtDuration, fmtK, listTasks, prNumbers, useData} from './util'
 
 const TermDock = lazy(() => import('./terminals'))
 
@@ -127,19 +127,19 @@ export function Board({nav, q, setQ, search, link}: {nav: Nav; q: string; setQ: 
                 let list = cards.filter(c => c.status === s)
                 if (ARCHIVE.includes(s)) list = list.filter(c => Date.now() - Date.parse(c.updatedAt) < WEEK)
                 if (shut(s)) return (
-                    <Paper key={s} bg="var(--mantine-color-default-hover)" radius="md" mih={120} title={'Show ' + label}
-                           style={{cursor: 'pointer', writingMode: 'vertical-rl', padding: '12px 0', display: 'flex', alignItems: 'center', gap: 6}} {...clickable(() => toggle(s))}>
+                    <Clickable key={s} title={'Show ' + label}
+                           style={{background: 'var(--mantine-color-default-hover)', borderRadius: 'var(--mantine-radius-md)', minHeight: 120, writingMode: 'vertical-rl', padding: '12px 0', display: 'flex', alignItems: 'center', gap: 6}} onActivate={() => toggle(s)}>
                         <Text size="sm" fw={600}>{label}</Text>
                         <Text size="xs" c="dimmed">{list.length}</Text>
-                    </Paper>
+                    </Clickable>
                 )
                 return (
                     <Paper key={s} bg="var(--mantine-color-default-hover)" p="xs" radius="md" mih={120}>
-                        <Group gap="xs" mb="xs" px={4} style={ARCHIVE.includes(s) ? {cursor: 'pointer'} : undefined}
-                               title={ARCHIVE.includes(s) ? 'Collapse' : undefined} {...(ARCHIVE.includes(s) ? clickable(() => toggle(s)) : {})}>
+                        <Clickable style={{display: 'flex', alignItems: 'center', gap: 'var(--mantine-spacing-xs)', marginBottom: 'var(--mantine-spacing-xs)', padding: '0 4px'}}
+                               title={ARCHIVE.includes(s) ? 'Collapse' : undefined} onActivate={ARCHIVE.includes(s) ? () => toggle(s) : undefined}>
                             <Text size="sm" fw={600}>{label}</Text>
                             <Text size="xs" c="dimmed">{list.length}</Text>
-                        </Group>
+                        </Clickable>
                         <Stack gap="xs">{list.map(c => <Card key={c.key} c={c} nav={nav} showPR={!!needle} onLabel={l => !selL.includes(l) && setPickedLabels([...selL, l])}/>)}</Stack>
                     </Paper>
                 )
@@ -352,7 +352,7 @@ export function TaskPage({k, nav, height = 'calc(100vh - 2 * var(--mantine-spaci
                                                title={`Run ${runNo.get(it.run.id)} · ${it.run.mode}`}>
                                     <Text size="xs" c="dimmed">
                                         {it.run.session_id && (sid => <><CopyButton value={sid}>{({copied, copy}) => (
-                                            <Tooltip label={copied ? 'Copied' : `Click to copy ${sid}`}><Code style={{cursor: 'pointer'}} {...clickable(copy)}>{sid.slice(0, 8)}</Code></Tooltip>
+                                            <Tooltip label={copied ? 'Copied' : `Click to copy ${sid}`}><ClickableCode onActivate={copy}>{sid.slice(0, 8)}</ClickableCode></Tooltip>
                                         )}</CopyButton> · </>)(it.run.session_id)}{it.run.api_calls} calls · {fmtK(it.run.ctx_peak)} peak · {fmtDuration(it.run.started_at, it.run.ended_at)} · <Time iso={it.run.started_at}/>
                                     </Text>
                                     <SessionLog run={it.run} onStop={it.run.kind !== 'interactive' ? stop : undefined}/>
