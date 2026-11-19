@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -499,6 +500,76 @@ func (a *App) SendQueuedNow(key string) error {
 		err = fmt.Errorf("the agent already received this message")
 	}
 	return err
+}
+
+// QueueStatus feeds the queued-message badge and its popover.
+type QueueStatus struct {
+	DebounceSecs int         `json:"debounce_secs"`
+	Items        []QueueItem `json:"items"`
+}
+
+// QueueItem is one line of the queue popover: a task with a live run, or one holding unsent human messages.
+type QueueItem struct {
+	Key     string `json:"key"`
+	Title   string `json:"title"`
+	Running bool   `json:"running"`
+	Held    string `json:"held"` // why a queued task cannot launch yet; "" when only the debounce is left
+}
+
+// QueueStatus mirrors the checks of dispatch.launchTodo (refactor idea: extract them there as one
+// func so the badge and the dispatcher cannot drift). The debounce itself is left to the UI, which
+// has the comment times; `held` covers the reasons the dispatcher skips a task past the debounce.
+func (a *App) QueueStatus() (QueueStatus, error) {
+	runs, err := store.ActiveRuns(a.svc.DB)
+	if err != nil {
+		return QueueStatus{}, err
+	}
+	max, err := strconv.Atoi(store.GetSetting(a.svc.DB, "max_parallel"))
+	if err != nil {
+		max, _ = strconv.Atoi(store.Defaults["max_parallel"])
+	}
+	debounce, err := strconv.Atoi(store.GetSetting(a.svc.DB, "comment_debounce_secs"))
+	if err != nil {
+		debounce, _ = strconv.Atoi(store.Defaults["comment_debounce_secs"])
+	}
+	out := QueueStatus{DebounceSecs: debounce, Items: []QueueItem{}}
+	busy, auto := map[int64]bool{}, 0
+	for _, r := range runs {
+		busy[r.TaskID] = true
+		if r.Kind == "auto" {
+			auto++
+		}
+		t, err := store.GetTask(a.svc.DB, r.TaskID)
+		if err != nil {
+			return QueueStatus{}, err
+		}
+		out.Items = append(out.Items, QueueItem{Key: t.Key, Title: t.Title, Running: true})
+	}
+	todo, err := store.ListTasks(a.svc.DB, store.StatusTodo)
+	if err != nil {
+		return QueueStatus{}, err
+	}
+	for _, t := range todo {
+		if busy[t.ID] {
+			continue // already listed as running; its pending messages wait for the next run
+		}
+		held := ""
+		if auto >= max {
+			held = fmt.Sprintf("waiting for a free slot (max_parallel %d)", max)
+		} else if blockers, err := store.OpenBlockers(a.svc.DB, t.ID); err != nil {
+			return QueueStatus{}, err
+		} else if len(blockers) > 0 {
+			held = "blocked by " + strings.Join(blockers, ", ")
+		} else if store.IsEpic(t) {
+			if wait, err := store.EpicHasActiveChildren(a.svc.DB, t); err != nil {
+				return QueueStatus{}, err
+			} else if wait {
+				held = "waiting for its sub-tasks"
+			}
+		}
+		out.Items = append(out.Items, QueueItem{Key: t.Key, Title: t.Title, Held: held})
+	}
+	return out, nil
 }
 
 // Stop stops the task's running session and moves the task to needs_you.
