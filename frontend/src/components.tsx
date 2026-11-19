@@ -1,9 +1,9 @@
-import {useEffect, useState} from 'react'
-import {ActionIcon, Badge, Box, Button, Card as MCard, Group, Indicator, Menu, Modal, Notification, Paper, Select, Stack, Text, Tooltip} from '@mantine/core'
+import {useContext, useEffect, useState} from 'react'
+import {ActionIcon, Badge, Box, Button, Card as MCard, Group, Indicator, Menu, Modal, Notification, Paper, Popover, RingProgress, Select, Stack, Text, Tooltip} from '@mantine/core'
 import {IconAppWindow, IconCheck, IconChevronLeft, IconChevronRight, IconDots, IconMessageSearch, IconPencil, IconSitemap, IconX} from '@tabler/icons-react'
 import {AddComment, ConnectorServiceRunning, CheckReviews, MergedPR, Move, PlacedActions, RunConnectorAction, ShowError, SendQueuedNow, StopConnectorService, TakeQueuedComment} from '../wailsjs/go/ui/App'
 import {store, ui} from '../wailsjs/go/models'
-import {Markdown, MarkdownEditor} from './markdown'
+import {Markdown, MarkdownEditor, TaskKey} from './markdown'
 import {ALL_STATUSES, STATUS_COLOR, STATUS_LABEL, ago, clickable, fmtK, fmtTime, prNumbers, useData, useDraft} from './util'
 
 /** A screen to show; board views may carry a label or repo filter to apply (deep link); epic views a task key for the open modal. */
@@ -222,9 +222,53 @@ function Edits({edits, i, setI}: {edits: store.CommentEdit[]; i: number | null; 
     )
 }
 
+/**
+ * Ring that fills over the dispatcher's comment debounce, so a queued message shows whether it will be taken up.
+ * It stays frozen (orange) while the task is held: agent still running, max_parallel full, blockers.
+ * Click lists running and queued tasks. Refactor idea: if more views need the queue, lift `queue` into a context.
+ */
+function QueuedBadge({m, queue, onSendNow}: {m: store.Comment; queue?: ui.QueueStatus; onSendNow?: () => void}) {
+    const k = useContext(TaskKey)
+    const [now, setNow] = useState(Date.now())
+    const self = queue?.items.find(i => i.key === k)
+    const held = self?.running ? 'The agent is running; sent when its next run starts' : self?.held
+    const wait = (queue?.debounce_secs ?? 0) * 1000
+    const done = m.send_now || (wait > 0 ? now - new Date(m.created_at).getTime() >= wait : true)
+    useEffect(() => {
+        if (done || held) return
+        const t = setInterval(() => setNow(Date.now()), 500)
+        return () => clearInterval(t)
+    }, [done, held])
+    const frac = m.send_now || !wait ? 1 : Math.min(1, Math.max(0, (now - new Date(m.created_at).getTime()) / wait))
+    const label = held ?? (done ? 'Starting shortly' : 'Sent to the agent when the debounce ends')
+    return (
+        <Popover width={300} position="bottom-start" withArrow shadow="md">
+            <Popover.Target>
+                <Tooltip label={label}>
+                    <ActionIcon variant="subtle" color={held ? 'orange' : 'gray'} size="sm" aria-label="Queued: show queue">
+                        <RingProgress size={20} thickness={3} roundCaps sections={[{value: frac * 100, color: held ? 'orange' : 'blue'}]} rootColor="var(--mantine-color-default-border)"/>
+                    </ActionIcon>
+                </Tooltip>
+            </Popover.Target>
+            <Popover.Dropdown>
+                <Stack gap={4}>
+                    <Text size="xs" fw={600}>Queued · {label}</Text>
+                    {queue?.items.length ? queue.items.map(i => (
+                        <Group key={i.key} gap={6} wrap="nowrap">
+                            <Badge size="xs" variant="light" color={i.running ? 'green' : i.held ? 'orange' : 'gray'} style={{flex: 'none'}}>{i.running ? 'running' : 'queued'}</Badge>
+                            <Text size="xs" truncate title={i.held || undefined}><b>{i.key}</b> {i.title}</Text>
+                        </Group>
+                    )) : <Text size="xs" c="dimmed">Nothing else in the queue</Text>}
+                    {onSendNow && <Button size="compact-xs" variant="light" mt={4} onClick={onSendNow}>Send now</Button>}
+                </Stack>
+            </Popover.Dropdown>
+        </Popover>
+    )
+}
+
 /** One comment in the thread. */
 // onSendNow: refactor idea: Message owns modal state; if more confirm dialogs appear, adopt @mantine/modals' openConfirmModal.
-export function Message({m, onEdit, onSendNow}: {m: store.Comment; onEdit?: () => void; onSendNow?: () => void}) {
+export function Message({m, onEdit, onSendNow, queue}: {m: store.Comment; onEdit?: () => void; onSendNow?: () => void; queue?: ui.QueueStatus}) {
     const [asking, setAsking] = useState(false)
     const [ver, setVer] = useState<number | null>(null) // not persisted: null shows the current body
     const old = ver === null ? undefined : m.edits?.[ver]
@@ -233,9 +277,7 @@ export function Message({m, onEdit, onSendNow}: {m: store.Comment; onEdit?: () =
             <Group gap="xs" mb={4}>
                 <Text size="xs" fw={600}>{m.author}{m.source ? ` (via ${m.source})` : ''}</Text>
                 <Time iso={m.created_at}/>
-                {onEdit && (onSendNow
-                    ? <Tooltip label="Click to send now"><Badge size="xs" variant="light" color="gray" style={{cursor: 'pointer'}} component="button" type="button" onClick={() => setAsking(true)}>queued</Badge></Tooltip>
-                    : <Tooltip label="Sent to the agent when the next run starts"><Badge size="xs" variant="light" color="gray">queued</Badge></Tooltip>)}
+                {onEdit && <QueuedBadge m={m} queue={queue} onSendNow={onSendNow && (() => setAsking(true))}/>}
                 {onEdit && <Tooltip label="Move back to the editor"><ActionIcon variant="subtle" color="gray" size="xs" aria-label="Edit queued message" onClick={onEdit}><IconPencil size={12}/></ActionIcon></Tooltip>}
                 {!!m.edits?.length && <Edits edits={m.edits} i={ver} setI={setVer}/>}
             </Group>

@@ -2,6 +2,8 @@ package core
 
 import (
 	"fmt"
+	"slices"
+	"strings"
 
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 )
@@ -70,20 +72,39 @@ func (s *Service) AdoptChild(parent, child string) error {
 	return store.SetParent(s.DB, c.ID, &p.ID)
 }
 
-// AddLabel puts a label (created if new) on the task with key.
+// SourceApprovedLabel marks the "spec approved" comment the 'approved' label queues.
+const SourceApprovedLabel = "label:approved"
+
+func isApproved(name string) bool { return strings.EqualFold(strings.TrimSpace(name), "approved") }
+
+// AddLabel puts a label (created if new) on the task with key. Newly adding 'approved' queues a
+// "spec approved" human comment: like a typed one it waits out comment_debounce_secs, then starts the task.
+// It does not pass an epic's gate; that stays the Approve button (an epic stage move can't be withdrawn).
 func (s *Service) AddLabel(key, name string) error {
 	t, err := store.GetTaskByKey(s.DB, key)
 	if err != nil {
 		return err
 	}
-	return store.AddLabel(s.DB, t.ID, name)
+	had := slices.ContainsFunc(t.Labels, isApproved)
+	if err := store.AddLabel(s.DB, t.ID, name); err != nil || had || !isApproved(name) {
+		return err
+	}
+	_, err = s.AddCommentVia(key, store.AuthorHuman, SourceApprovedLabel, "spec approved", Note)
+	return err
 }
 
-// RemoveLabel takes a label off the task with key.
+// RemoveLabel takes a label off the task with key. Removing 'approved' withdraws its queued
+// "spec approved" comment if no run has taken it yet.
 func (s *Service) RemoveLabel(key, name string) error {
 	t, err := store.GetTaskByKey(s.DB, key)
 	if err != nil {
 		return err
 	}
-	return store.RemoveLabel(s.DB, t.ID, name)
+	if err := store.RemoveLabel(s.DB, t.ID, name); err != nil || !isApproved(name) {
+		return err
+	}
+	if n, err := store.DeleteQueuedBySource(s.DB, t.ID, SourceApprovedLabel); err != nil || n == 0 {
+		return err
+	}
+	return store.ReleaseIfNothingQueued(s.DB, t.ID)
 }

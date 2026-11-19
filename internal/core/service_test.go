@@ -319,8 +319,13 @@ func TestStopRun(t *testing.T) {
 	s.DB.Exec(`UPDATE tasks SET status=? WHERE id=?`, store.StatusRunning, tk.ID)
 	// No bg id, so no `claude` call.
 	r, _ := store.CreateRun(s.DB, store.Run{TaskID: tk.ID, Kind: "auto", Mode: "fresh", Status: "launching"})
+	rv, _ := store.AddComment(s.DB, store.Comment{TaskID: tk.ID, Author: store.AuthorSystem, Body: "PR review"})
+	store.ConsumeComments(s.DB, []int64{rv.ID}, r.ID)
 	if err := s.Stop(tk.Key); err != nil {
 		t.Fatal(err)
+	}
+	if q, _ := store.UnconsumedComments(s.DB, tk.ID); len(q) == 0 || q[0].ID != rv.ID {
+		t.Fatalf("stopped run's review not re-delivered: %v", q)
 	}
 	got, _ := store.GetTask(s.DB, tk.ID)
 	run, _ := store.GetRun(s.DB, r.ID)
@@ -393,5 +398,52 @@ func TestAddCommentRejectsEmpty(t *testing.T) {
 	}
 	if _, err := s.AddCommentVia(tk.Key, store.AuthorHuman, "slack", "  \n", FollowUp); err == nil {
 		t.Fatal("empty comment accepted")
+	}
+}
+
+// AC8 (CV-184): the 'approved' label queues a "spec approved" human message; removing the label
+// before a run takes it withdraws it, removing it afterwards changes nothing.
+func TestApprovedLabelQueuesMessage(t *testing.T) {
+	s := newSvc(t)
+	tk, _ := s.CreateTask(NewTaskInput{Title: "t", Repos: []string{"a"}})
+	store.CreateRun(s.DB, store.Run{TaskID: tk.ID, Kind: "auto", Mode: "fresh", Status: "finished"})
+	s.DB.Exec(`UPDATE tasks SET status=? WHERE id=?`, store.StatusNeedsYou, tk.ID)
+	queued := func() []store.Comment { cs, _ := store.UnconsumedComments(s.DB, tk.ID); return cs }
+	status := func() store.Status { got, _ := store.GetTask(s.DB, tk.ID); return got.Status }
+
+	// add: one queued human message, task requeued; adding again does not duplicate it
+	for range 2 {
+		if err := s.AddLabel(tk.Key, "Approved"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if cs := queued(); len(cs) != 1 || cs[0].Body != "spec approved" || cs[0].Author != store.AuthorHuman || cs[0].Source != SourceApprovedLabel {
+		t.Fatalf("after add: %+v", cs)
+	}
+	if st := status(); st != store.StatusTodo {
+		t.Fatalf("after add: %s", st)
+	}
+
+	// remove inside the timeout (no run took it yet): message withdrawn, task back to needs_you
+	if err := s.RemoveLabel(tk.Key, "approved"); err != nil {
+		t.Fatal(err)
+	}
+	if cs := queued(); len(cs) != 0 {
+		t.Fatalf("after early remove: %+v", cs)
+	}
+	if st := status(); st != store.StatusNeedsYou {
+		t.Fatalf("after early remove: %s", st)
+	}
+
+	// remove after a run consumed it: the message stays in the thread
+	s.AddLabel(tk.Key, "approved")
+	run, _ := store.CreateRun(s.DB, store.Run{TaskID: tk.ID, Kind: "auto", Mode: "resume", Status: "running"})
+	store.ConsumeComments(s.DB, []int64{queued()[0].ID}, run.ID)
+	if err := s.RemoveLabel(tk.Key, "approved"); err != nil {
+		t.Fatal(err)
+	}
+	all, _ := store.ListComments(s.DB, tk.ID)
+	if len(all) != 1 || all[0].ConsumedByRunID == nil {
+		t.Fatalf("after late remove: %+v", all)
 	}
 }

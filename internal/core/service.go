@@ -432,6 +432,13 @@ func (s *Service) Stop(key string) error {
 	if err := s.endRuns(runs); err != nil {
 		return err
 	}
+	// A stopped run may not have acted on what it received (e.g. a review check's feedback);
+	// release it so the next run gets it again.
+	for _, r := range runs {
+		if err := store.UnconsumeComments(s.DB, r.ID); err != nil {
+			return err
+		}
+	}
 	if t.Status == store.StatusRunning {
 		if _, err := store.AddComment(s.DB, store.Comment{TaskID: t.ID, Author: store.AuthorSystem, Body: "A human stopped the run."}); err != nil {
 			return err

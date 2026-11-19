@@ -52,6 +52,7 @@ Every 2 seconds the dispatcher:
 2. Every 60 seconds, checks PRs of tasks in review with `gh` (see below).
 3. Every 30 seconds, runs due automations.
 4. Launches `todo` tasks, highest priority first, up to `max_parallel` (default 3) at once. A task with new comments waits `comment_debounce_secs` (default 20) after the last one, so you can write several comments before it starts.
+   Adding the label `approved` to a task queues a `spec approved` comment the same way; removing the label before a run takes it withdraws the comment (and a task that has run goes back to needs_you). It does not pass an epic's gate: use Approve for that.
 
 To launch, it creates the worktrees, writes `claude-settings.json` and `BRIEF.md`, creates a run, marks the comments as consumed, moves the task to running and starts Claude:
 
