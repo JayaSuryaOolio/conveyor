@@ -2,7 +2,7 @@ import {lazy, Ref, Suspense, useEffect, useRef, useState} from 'react'
 import {ActionIcon, Anchor, Badge, Box, Breadcrumbs, Button, CloseButton, Code, CopyButton, Divider, Group, Kbd, Modal, Paper, Popover, Stack, Text, TextInput, Timeline, Title, Tooltip} from '@mantine/core'
 import {useLocalStorage} from '@mantine/hooks'
 import {IconAbc, IconSitemap, IconArrowDown, IconArrowUp, IconClock, IconFlame, IconHash, IconPencil, IconSearch, IconTerminal, IconX, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconMessage, IconPlayerPlay} from '@tabler/icons-react'
-import {Actions, GetTask, RunLog, SendQueuedNow, SetTaskDescription, Stop, TakeQueuedComment, TermStart} from '../wailsjs/go/ui/App'
+import {Actions, GetTask, QueueStatus, RunLog, SendQueuedNow, SetTaskDescription, Stop, TakeQueuedComment, TermStart} from '../wailsjs/go/ui/App'
 import {core, store, ui} from '../wailsjs/go/models'
 import {Card, CommentBox, Message, Nav, StatusBadge, Time, View, errMsg} from './components'
 import {Markdown, MarkdownEditor, TaskKey} from './markdown'
@@ -294,6 +294,7 @@ export function TaskPage({k, nav, height = 'calc(100vh - 2 * var(--mantine-spaci
     const [titleGone, setTitleGone] = useState(false)
     // A question is answered in the session itself: needs_you offers a way into the live session's terminal.
     const needsYou = d?.task.status === 'needs_you'
+    const {data: queue} = useData(() => QueueStatus(), [d?.comments.length, d?.runs.length])
     const {data: actions} = useData(() => needsYou ? Actions(k) : Promise.resolve([]), [k, needsYou, d?.runs.length])
     const runs = d?.runs ?? []
     const latest = runs[runs.length - 1]
@@ -358,7 +359,7 @@ export function TaskPage({k, nav, height = 'calc(100vh - 2 * var(--mantine-spaci
                                 </Timeline.Item>
                             ) : (
                                 <Timeline.Item key={'c' + it.comment!.id} bullet={<IconMessage size={12}/>}>
-                                    <Message m={it.comment!} onEdit={it.comment!.author === 'human' && !it.comment!.consumed_by_run_id ? () => edit(it.comment!.id) : undefined} onSendNow={it.comment!.author === 'human' && !it.comment!.consumed_by_run_id ? sendNow : undefined}/>
+                                    <Message m={it.comment!} onEdit={it.comment!.author === 'human' && !it.comment!.consumed_by_run_id ? () => edit(it.comment!.id) : undefined} onSendNow={it.comment!.author === 'human' && !it.comment!.consumed_by_run_id ? sendNow : undefined} queue={queue}/>
                                 </Timeline.Item>
                             ))}
                         </Timeline>
