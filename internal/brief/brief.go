@@ -108,6 +108,24 @@ func rulesForTask(db *sql.DB, task store.Task, extra bool) string {
 	return r
 }
 
+// approachRule is added to a task's first-run brief unless it is small or states its approach.
+const approachRule = "- First run: before changing any code, post an Approach and end needs_you (omit the status block). Keep it short: files and layer, existing functions and types you will reuse (with paths), new names, open decisions. Change nothing until the human acks; then record the approach as `decision:` lines and build it.\n"
+
+// needsApproach: not labelled small, and the description has no line starting "Approach".
+func needsApproach(task store.Task) bool {
+	for _, l := range task.Labels {
+		if l == "small" {
+			return false
+		}
+	}
+	for _, l := range strings.Split(task.Description, "\n") {
+		if strings.HasPrefix(strings.ToLower(strings.TrimLeft(l, "#* ")), "approach") {
+			return false
+		}
+	}
+	return true
+}
+
 // Protocol is the status-block protocol and the built-in rules (extra rules excluded), for display.
 func Protocol(db *sql.DB) string { return statusBlock + "\n## Rules\n\n" + rules(db, false) }
 
@@ -238,7 +256,11 @@ func Build(db *sql.DB, task store.Task) (string, error) {
 	if x := connectors.Injected(db, true, func(i connectors.ManifestInject) string { return i.Brief }); x != "" {
 		b.WriteString("\n" + x + "\n")
 	}
-	fmt.Fprintf(&b, "\n%s\n## Rules\n\n%s\n## Older history\n\nFull thread: `conveyor task show %s --thread --json`\n", statusBlock, rulesForTask(db, task, true), task.Key)
+	rl := rulesForTask(db, task, true)
+	if len(runs) == 0 && needsApproach(task) {
+		rl += approachRule
+	}
+	fmt.Fprintf(&b, "\n%s\n## Rules\n\n%s\n## Older history\n\nFull thread: `conveyor task show %s --thread --json`\n", statusBlock, rl, task.Key)
 	return b.String(), nil
 }
 
