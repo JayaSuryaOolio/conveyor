@@ -1,6 +1,6 @@
 import {useState} from 'react'
-import {ActionIcon, Checkbox, Code, Group, MultiSelect, PasswordInput, ScrollArea, SegmentedControl, Select, SelectProps, SimpleGrid, Stack, Table, TagsInput, Tabs, Text, TextInput, Textarea, Title, Tooltip} from '@mantine/core'
-import {Button, Modal} from './ui'
+import {ActionIcon, Checkbox, Code, MultiSelect, PasswordInput, ScrollArea, SegmentedControl, Select, SelectProps, SimpleGrid, Table, TagsInput, Tabs, Text, TextInput, Textarea, Title, Tooltip} from '@mantine/core'
+import {Button, Group, Modal, Stack} from './ui'
 import {IconAdjustments} from '@tabler/icons-react'
 import {AddLabel, AddRepo, CreateTask, ExportState, GetPromptDefaults, GetTask, GetSettings, ImportState, ListAgents, ListCLIAgents, ListLabels, ListModels, ListRepos, PreviewBrief, Requirements, ShellPATHError, SetRepoSetupScript, SetSetting, SetTaskAgent, SetTaskModel, SetTaskRunner} from '../wailsjs/go/ui/App'
 import {core, store} from '../wailsjs/go/models'
@@ -66,7 +66,7 @@ export function NewTask({nav, close}: {nav: Nav; close: () => void}) {
                     <Checkbox label="Epic" checked={epic} onChange={e => setEpic(e.currentTarget.checked)}/>
                     {epic && <TextInput label="Epic name" placeholder="default: the lower-cased task key" value={epicName} onChange={e => setEpicName(e.target.value)}/>}
                 </SimpleGrid>
-                <Group justify="flex-end">
+                <Group justify="end">
                     <Button variant="secondary" onClick={() => { setTitle(''); setDesc(''); close() }}>Cancel</Button>
                     <Button onClick={submit} disabled={!title.trim() || sel.length === 0}>Create</Button>
                 </Group>
@@ -149,7 +149,7 @@ function Repos() {
             <Text size="xs" c="dimmed">Each repo's setup script runs with bash in every new worktree before the agent starts (stdin closed, 10 min limit), e.g. to build a nix-direnv dev shell. A failure fails the launch and the script reruns on the next one. Log: workspaces/&lt;KEY&gt;/setup-&lt;repo&gt;.log.</Text>
             {error && <Text c="red">{error}</Text>}
             {data?.map(r => <RepoRow key={r.id} r={r} reload={reload}/>)}
-            <Group align="flex-start" wrap="nowrap">
+            <Group align="start" wrap={false}>
                 <TextInput style={{flex: 2}} placeholder="/path/to/clone" value={path} onChange={e => setPath(e.target.value)}/>
                 <TextInput style={{flex: 1}} placeholder="name (optional)" value={name} onChange={e => setName(e.target.value)}/>
                 <Button onClick={() => AddRepo(path, name).then(() => { setPath(''); setName(''); reload() }, errMsg)}>Add</Button>
@@ -161,7 +161,7 @@ function Repos() {
 function RepoRow({r, reload}: {r: store.Repo; reload: () => void}) {
     const [val, setVal] = useState(r.setup_script)
     return (
-        <Group wrap="nowrap" align="flex-end">
+        <Group wrap={false} align="end">
             <Textarea style={{flex: 1}} autosize minRows={2} maxRows={10} value={val} onChange={e => setVal(e.target.value)}
                       styles={{input: {fontFamily: 'var(--mantine-font-family-monospace)'}}}
                       label={<>{r.name} <Text span c="dimmed" size="xs">{r.default_branch} · {r.path}</Text></>}
@@ -206,7 +206,7 @@ export function Settings() {
     const known = new Set(TABS.flatMap(t => t.fields.map(f => f.k)))
     const extra = Object.keys(data ?? {}).filter(k => !known.has(k)).sort().map((k): Field => ({k, label: k, desc: ""}))
     return (
-        <Stack maw={800}>
+        <Stack style={{maxWidth: 800}}>
             <Title order={3}>Settings</Title>
             {error && <Text c="red">{error}</Text>}
             {data && (
@@ -272,7 +272,7 @@ export function SettingRow({f, v, ph, reload}: {f: Field; v: string; ph?: string
     const [val, setVal] = useState(v)
     const props = {style: {flex: 1}, label: f.label, description: f.desc, placeholder: ph}
     return (
-        <Group wrap="nowrap" align="flex-end">
+        <Group wrap={false} align="end">
             {f.kind === "md" ? <Stack gap={4} style={{flex: 1}}>
                 <Text size="sm" fw={500}>{f.label}</Text><Text size="xs" c="dimmed">{f.desc}</Text>
                 <MarkdownEditor minRows={4} value={val} onChange={setVal}/>
@@ -295,7 +295,7 @@ function PromptsInfo({settings, protocol}: {settings: Record<string, string>; pr
     const sig = JSON.stringify(settings) // refetch when any setting is saved
     const {data: pv, error} = useData(() => key ? PreviewBrief(key) : Promise.resolve(undefined), [key, sig])
     return (
-        <Stack mt="md">
+        <Stack style={{marginTop: 'var(--mantine-spacing-md)'}}>
             <Title order={5}>Built-in protocol and rules</Title>
             <Text size="xs" c="dimmed">Always in the brief. Read-only; add to the rules with Extra rules above.</Text>
             <ScrollArea.Autosize mah={360}><Code block>{protocol}</Code></ScrollArea.Autosize>
