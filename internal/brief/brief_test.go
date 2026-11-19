@@ -119,7 +119,7 @@ func TestSettingsShapeBrief(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	tk := store.Task{Key: "CV-3", Title: "T"}
+	tk := store.Task{Key: "CV-3", Title: "T", Labels: []string{"small"}}
 	store.SetSetting(db, "brief_extra_rules", "- Be kind.")
 	store.SetSetting(db, "pr_comment_prefix", "bot: ")
 	got, err := Build(db, tk)
@@ -130,13 +130,14 @@ func TestSettingsShapeBrief(t *testing.T) {
 		t.Fatal("Build must not write")
 	}
 	store.SetSetting(db, "pr_comment_prefix", "")
+	tk.Labels = nil
 	if got, _ = Build(db, tk); strings.Contains(got, "Start every comment") {
 		t.Fatal("empty prefix should drop the rule")
 	}
 	if strings.Contains(got, "Labels:") {
 		t.Fatal("no labels, no Labels line")
 	}
-	tk.Labels = []string{"epic_kind:grilling", "skill:grill-me"}
+	tk.Labels = []string{"small", "epic_kind:grilling", "skill:grill-me"}
 	if got, _ = Build(db, tk); !strings.Contains(got, "Kind grilling: ") || !strings.Contains(got, "open no PR") ||
 		!strings.Contains(got, "Load these skills before starting: grill-me.") || strings.Contains(got, "Load the epic skill") {
 		t.Fatalf("kind/skills lines:\n%s", got)
@@ -238,5 +239,40 @@ func TestDecisionsCap(t *testing.T) {
 func TestStatusBlockHelpMentionsDecisions(t *testing.T) {
 	if !strings.Contains(statusBlock, "decision: ") || !strings.Contains(statusBlock, "dispute: ") {
 		t.Fatal("status block help must teach decision/dispute lines")
+	}
+}
+
+func TestApproachRule(t *testing.T) {
+	db, err := store.Open(filepath.Join(t.TempDir(), "c.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	r, _ := store.AddRepo(db, store.Repo{Name: "api", Path: "/src/api", DefaultBranch: "main"})
+	mk := func(desc string, labels ...string) store.Task {
+		tk, err := store.CreateTask(db, store.Task{Title: "T", Description: desc, Status: store.StatusTodo}, []store.TaskRepo{{RepoID: r.ID, IsPrimary: true, Branch: "b" + desc + strings.Join(labels, "")}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		tk.Labels = labels
+		return tk
+	}
+	has := func(tk store.Task) bool {
+		got, _ := Build(db, tk)
+		return strings.Contains(got, "post an Approach")
+	}
+	if !has(mk("add a thing")) {
+		t.Error("first run of a plain task needs the Approach rule")
+	}
+	if has(mk("add a thing", "small")) {
+		t.Error("small tasks skip the Approach")
+	}
+	if has(mk("add a thing\n\nApproach: edit x.go, reuse y()")) {
+		t.Error("a stated approach skips the step")
+	}
+	tk := mk("later run")
+	store.CreateRun(db, store.Run{TaskID: tk.ID})
+	if has(tk) {
+		t.Error("only the first run posts an Approach")
 	}
 }
