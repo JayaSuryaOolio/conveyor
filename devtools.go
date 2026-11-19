@@ -10,8 +10,8 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
-// addDevtoolsItem adds Window > Inspect. Compiled only into `wails build -devtools`
-// and `wails dev`; Wails v2 exposes no Go API for the inspector, so we post the
+// addDevtoolsItem adds Window > Inspect. Compiled in via wails.json `build:tags: devtools`
+// (every wails build/dev); a plain go build omits it. Wails v2 exposes no Go API for the inspector, so we post the
 // same message its own Cmd+Shift+Fn+F12 hotkey does. Idle cost is nil: the
 // inspector is a WebKit window that only exists once opened.
 func addDevtoolsItem(win *menu.Menu, getCtx func() context.Context) {
