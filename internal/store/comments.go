@@ -132,6 +132,15 @@ func TakeQueuedComment(db *sql.DB, taskID, id int64) (body string, ok bool, err 
 	return body, n == 1, nil
 }
 
+// DeleteQueuedBySource deletes the task's comments from source that no run has received yet.
+func DeleteQueuedBySource(db *sql.DB, taskID int64, source string) (int64, error) {
+	res, err := db.Exec(`DELETE FROM comments WHERE task_id=? AND source=? AND consumed_by_run_id IS NULL`, taskID, source)
+	if err != nil {
+		return 0, fmt.Errorf("delete queued comments: %w", err)
+	}
+	return res.RowsAffected()
+}
+
 // ReleaseIfNothingQueued undoes a comment's requeue after the comment was taken back: a todo task
 // that has already run and has no human comment queued goes back to needs_you instead of resuming empty.
 // Queued system notes (e.g. "session was interrupted") don't count: they ride along with the next run.
