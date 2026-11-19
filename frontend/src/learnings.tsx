@@ -40,6 +40,7 @@ function LearningItem({l, reload}: {l: ui.LearningRow; reload: () => void}) {
     const done = () => reload()
     return (
         <Group wrap="nowrap" gap="xs">
+            <Text size="xs" c="dimmed" miw={32} title="Learning ID, as in `conveyor learning reject ID`">#{l.id}</Text>
             <TextInput style={{flex: 1}} value={body} onChange={e => setBody(e.target.value)}/>
             <Button variant="default" disabled={body === l.body} onClick={() => EditLearning(l.id, body).then(done, errMsg)}>Save</Button>
             <TextInput w={140} title="local = Conveyor's LEARNINGS.md for this repo, loaded into its tasks; a repo file (CLAUDE.md) = PR via Apply" value={target} onChange={e => setTarget(e.target.value)}/>
