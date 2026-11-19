@@ -1,5 +1,6 @@
 import {createContext, useContext, useEffect, useMemo, useRef, useState} from 'react'
-import {ActionIcon, Alert, Anchor, Badge, Box, Button, Group, Indicator, Menu, Modal, Paper, ScrollArea, SegmentedControl, SimpleGrid, Stack, Table, Text, Textarea, TextInput, Tooltip} from '@mantine/core'
+import {ActionIcon, Alert, Anchor, Badge, Box, Button, Group, Indicator, Menu, Paper, ScrollArea, SegmentedControl, SimpleGrid, Stack, Table, Text, Textarea, TextInput, Tooltip} from '@mantine/core'
+import {ClickablePaper, Modal} from './ui'
 import {useLocalStorage} from '@mantine/hooks'
 import {IconCode, IconExternalLink, IconGitPullRequest, IconMessageQuestion, IconPlayerPlay, IconPlayerStop, IconPlus, IconTerminal2} from '@tabler/icons-react'
 import {Background, Controls, Handle, MarkerType, Position, ReactFlow, useEdgesState, useNodesState, type Connection, type Edge, type Node, type NodeProps} from '@xyflow/react'
@@ -70,7 +71,7 @@ function TaskNode({data}: NodeProps<Node<CardData>>) {
         n.worktrees.length > 0 && <Tooltip key="wt" label={'worktree: ' + n.worktrees.join(', ')}><Badge size="xs" variant="outline" color="gray">worktree</Badge></Tooltip>,
     ].filter(Boolean)
     return (
-        <Paper withBorder radius="md" p="xs" w={CARD.w} shadow="sm" {...clickable(() => open(n.key))} onMouseEnter={() => hover(n.key)} onMouseLeave={() => hover('')}
+        <ClickablePaper withBorder radius="md" p="xs" w={CARD.w} shadow="sm" onActivate={() => open(n.key)} onMouseEnter={() => hover(n.key)} onMouseLeave={() => hover('')}
                style={{cursor: 'pointer', borderLeft: `4px solid ${c6(KIND_COLOR[n.kind] ?? 'gray')}`,
                        opacity: lit && !lit.has(n.key) ? 0.3 : 1, transition: 'opacity 120ms',
                        outline: lit?.has(n.key) ? `1px solid ${c6('blue')}` : undefined}}>
@@ -104,7 +105,7 @@ function TaskNode({data}: NodeProps<Node<CardData>>) {
                     {prs.filter(p => p.pr_url).map(p => <PrChip key={p.repo} p={p}/>)}
                 </Group>
             </Stack>
-        </Paper>
+        </ClickablePaper>
     )
 }
 

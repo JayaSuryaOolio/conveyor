@@ -1,5 +1,6 @@
 import {useContext, useEffect, useMemo, useState} from 'react'
-import {Menu, Modal, Tooltip} from '@mantine/core'
+import {Menu, Tooltip} from '@mantine/core'
+import {Modal} from './ui'
 import Md from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import {FileOpeners, Home, OpenFile, ShowError} from '../wailsjs/go/ui/App'

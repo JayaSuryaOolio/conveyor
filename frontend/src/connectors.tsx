@@ -1,5 +1,6 @@
 import {useEffect, useRef, useState} from 'react'
-import {ActionIcon, Badge, Button, Checkbox, Code, FileButton, Group, Modal, MultiSelect, NumberInput, Pagination, Paper, Select, Stack, Switch, Table, Tabs, Text, TextInput, Textarea, Title} from '@mantine/core'
+import {ActionIcon, Badge, Button, Checkbox, Code, FileButton, Group, MultiSelect, NumberInput, Pagination, Paper, Select, Stack, Switch, Table, Tabs, Text, TextInput, Textarea, Title} from '@mantine/core'
+import {Modal} from './ui'
 import {IconDownload, IconPlus, IconPuzzle, IconSettings, IconTrash, IconUpload} from '@tabler/icons-react'
 import {AddConnector, ConnectorSettings, SaveConnectorSettings, ExampleConnectors, InstallExample, GetSettings, SetSetting, ConnectorIcons, ConnectorPresets, Confirm, SetConnectorDisabled, DeleteConnector, ExportConnector, InstallManifest, InstallPreset, ListConnectors, SlackLinks, ManifestSchema, Plugin, ValidateManifest} from '../wailsjs/go/ui/App'
 import {runner, store} from '../wailsjs/go/models'

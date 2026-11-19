@@ -1,5 +1,6 @@
 import {useState} from 'react'
-import {Button, Group, Modal, Select, Stack, Table, Text, TextInput, Textarea, Title} from '@mantine/core'
+import {Button, Group, Select, Stack, Table, Text, TextInput, Textarea, Title} from '@mantine/core'
+import {Modal} from './ui'
 import {IconPlus} from '@tabler/icons-react'
 import {AddAgent, ListAgents, ListRepos, SetAgentModel} from '../wailsjs/go/ui/App'
 import {errMsg} from './components'

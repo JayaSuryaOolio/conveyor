@@ -1,5 +1,6 @@
 import {lazy, Ref, Suspense, useEffect, useRef, useState} from 'react'
-import {ActionIcon, Anchor, Badge, Box, Breadcrumbs, Button, CloseButton, Code, CopyButton, Divider, Group, Kbd, Modal, Paper, Popover, Stack, Text, TextInput, Timeline, Title, Tooltip} from '@mantine/core'
+import {ActionIcon, Anchor, Badge, Box, Breadcrumbs, Button, CloseButton, Code, CopyButton, Divider, Group, Kbd, Paper, Popover, Stack, Text, TextInput, Timeline, Title, Tooltip} from '@mantine/core'
+import {Modal} from './ui'
 import {useLocalStorage} from '@mantine/hooks'
 import {IconAbc, IconSitemap, IconArrowDown, IconArrowUp, IconClock, IconFlame, IconHash, IconPencil, IconSearch, IconTerminal, IconX, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconMessage, IconPlayerPlay} from '@tabler/icons-react'
 import {Actions, GetTask, QueueStatus, RunLog, SendQueuedNow, SetTaskDescription, Stop, TakeQueuedComment, TermStart} from '../wailsjs/go/ui/App'
