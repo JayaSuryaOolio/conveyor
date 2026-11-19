@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"embed"
 
 	"github.com/JayaSuryaOolio/conveyor/internal/core"
@@ -21,6 +22,7 @@ func main() {
 		println("Error:", err.Error())
 		return
 	}
+	var ctx context.Context // set in OnStartup, read by menu callbacks
 	err = wails.Run(&options.App{
 		Title:            "Conveyor",
 		Width:            1280,
@@ -28,7 +30,8 @@ func main() {
 		AssetServer:      &assetserver.Options{Assets: assets, Handler: core.AttachmentHandler(home)},
 		Mac:              &mac.Options{}, // without it Wails disables the zoom/fullscreen button
 		BackgroundColour: &options.RGBA{R: 27, G: 38, B: 54, A: 1},
-		OnStartup:        app.Startup,
+		Menu:             appMenu(func() context.Context { return ctx }),
+		OnStartup:        func(c context.Context) { ctx = c; app.Startup(c) },
 		OnShutdown:       app.Shutdown,
 		Bind:             []interface{}{app},
 	})
