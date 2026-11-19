@@ -1,6 +1,6 @@
 import {useState} from 'react'
 import {ActionIcon, Anchor, Badge, Button, Code, Divider, Group, Menu, Paper, Stack, TagsInput, Text, TextInput, Title, Tooltip} from '@mantine/core'
-import {Modal} from './ui'
+import {ClickableCode, Modal} from './ui'
 import {useClipboard} from '@mantine/hooks'
 import {IconCopy, IconMessageSearch, IconPencil, IconPlus, IconStar, IconX, IconTerminal, IconTerminal2} from '@tabler/icons-react'
 import {Actions, AddLabel, AddTaskRepo, CheckReviews, EnsureWorkspace, ListLabels, ListRepos, RemoveLabel, RemoveTaskRepo, RunAction, Sessions, SetTaskRepo, TermStart} from '../wailsjs/go/ui/App'
@@ -8,7 +8,7 @@ import {core, store, ui} from '../wailsjs/go/models'
 import {BrowserOpenURL} from '../wailsjs/runtime/runtime'
 import {PlacedButtons, StatusSelect, Time, errMsg, toast} from './components'
 import {TaskAgent, TaskSettings} from './forms'
-import {clickable, useData} from './util'
+import {useData} from './util'
 
 /** Confirmation popup: renders while `msg` is set; run `ok` on confirm, `close` on cancel. */
 function Confirm({msg, ok, close}: {msg: string | null; ok: () => void; close: () => void}) {
@@ -64,7 +64,7 @@ function Mono({text}: {text: string}) {
     const cb = useClipboard({timeout: 1200})
     return (
         <Tooltip label="Copied" opened={cb.copied} position="top-start">
-            <Code style={{display: 'block', cursor: 'pointer', whiteSpace: 'pre-wrap', wordBreak: 'break-all'}} title="Click to copy" {...clickable(() => cb.copy(text))}>{text}</Code>
+            <ClickableCode block style={{whiteSpace: 'pre-wrap', wordBreak: 'break-all'}} title="Click to copy" onActivate={() => cb.copy(text)}>{text}</ClickableCode>
         </Tooltip>
     )
 }

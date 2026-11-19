@@ -1,6 +1,6 @@
 import {createContext, useContext, useEffect, useMemo, useRef, useState} from 'react'
 import {ActionIcon, Alert, Anchor, Badge, Box, Button, Group, Indicator, Menu, Paper, ScrollArea, SegmentedControl, SimpleGrid, Stack, Table, Text, Textarea, TextInput, Tooltip} from '@mantine/core'
-import {ClickableCard, Modal} from './ui'
+import {Clickable, ClickableCard, Modal} from './ui'
 import {useLocalStorage} from '@mantine/hooks'
 import {IconCode, IconExternalLink, IconGitPullRequest, IconMessageQuestion, IconPlayerPlay, IconPlayerStop, IconPlus, IconTerminal2} from '@tabler/icons-react'
 import {Background, Controls, Handle, MarkerType, Position, ReactFlow, useEdgesState, useNodesState, type Connection, type Edge, type Node, type NodeProps} from '@xyflow/react'
@@ -10,7 +10,7 @@ import {BrowserOpenURL} from '../wailsjs/runtime/runtime'
 import {core, store} from '../wailsjs/go/models'
 import {Nav, StatusBadge, errMsg} from './components'
 import {CARD, columns, layout, trace} from './epicLayout'
-import {STATUS_COLOR, clickable, useData} from './util'
+import {STATUS_COLOR, useData} from './util'
 import {JiraSource} from './jiraSource'
 import {TaskPreview} from './views'
 
@@ -197,13 +197,13 @@ const openBlockers = (g: core.Graph, key: string) => g.links
 function TaskRow({n, note}: {n: core.GraphNode; note?: string}) {
     const {open, hover} = useContext(Ctx)
     return (
-        <Group gap={6} wrap="nowrap" px={6} py={2} style={{cursor: 'pointer', borderRadius: 4, borderLeft: `3px solid ${c6(KIND_COLOR[n.kind] ?? 'gray')}`}}
-               className="epic-row" {...clickable(() => open(n.key))} onFocus={() => hover(n.key)} onBlur={() => hover('')} onMouseEnter={() => hover(n.key)} onMouseLeave={() => hover('')}>
+        <Clickable style={{display: 'flex', alignItems: 'center', gap: 6, padding: '2px 6px', borderRadius: 4, borderLeft: `3px solid ${c6(KIND_COLOR[n.kind] ?? 'gray')}`}}
+               className="epic-row" onActivate={() => open(n.key)} onFocus={() => hover(n.key)} onBlur={() => hover('')} onMouseEnter={() => hover(n.key)} onMouseLeave={() => hover('')}>
             <Text size="xs" fw={600} c="dimmed" style={{flexShrink: 0}}>{n.key}</Text>
             <StatusBadge status={n.status}/>
             <Text size="xs" truncate style={{flex: 1}}>{n.title}</Text>
             {note && <Text size="xs" c="dimmed" style={{flexShrink: 0}}>{note}</Text>}
-        </Group>
+        </Clickable>
     )
 }
 
