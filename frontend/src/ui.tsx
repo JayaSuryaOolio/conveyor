@@ -4,8 +4,8 @@
  * Rule: never pass a Mantine prop type or Mantine-only prop (withBorder, radius, p, w, shadow, withCloseButton, ...) through a wrapper; add a neutral prop and map it here.
  * Migrating other widgets (Button, Text, Stack, ...) follows the same pattern, one wrapper at a time.
  */
-import {Code, Modal as MModal, Paper} from '@mantine/core'
-import type {CSSProperties, HTMLAttributes, ImgHTMLAttributes, ReactNode} from 'react'
+import {Button as MButton, Code, Modal as MModal, Paper} from '@mantine/core'
+import type {CSSProperties, HTMLAttributes, ImgHTMLAttributes, MouseEvent, ReactNode} from 'react'
 import {clickable} from './util'
 
 type Size = 'sm' | 'md' | 'lg' | 'auto' | (string & {}) // 'sm'|'md'|'lg' are our tokens; anything else is a CSS width
@@ -52,3 +52,28 @@ export const Clickable = ({as: C = 'div', onActivate, style, ...p}: ClickablePro
 /** Monospace chip that activates on click, Enter or Space (copy-to-clipboard values). */
 export const ClickableCode = ({onActivate, block, style, ...p}: HTMLAttributes<HTMLElement> & {onActivate: () => void; block?: boolean}) =>
     <Code style={{cursor: 'pointer', display: block ? 'block' : undefined, ...style}} {...clickable(onActivate)} {...p}/>
+
+export type ButtonSize = 'md' | 'sm' | 'xs'
+export type ButtonProps = {
+    variant?: 'primary' | 'secondary' | 'ghost' | 'soft' // default primary
+    tone?: 'danger' | 'success' | 'muted'
+    size?: ButtonSize
+    compact?: boolean
+    icon?: ReactNode // leading
+    trailing?: ReactNode
+    loading?: boolean
+    disabled?: boolean
+    type?: 'button' | 'submit'
+    id?: string
+    title?: string
+    style?: CSSProperties
+    onClick?: (e: MouseEvent<HTMLButtonElement>) => void
+    children?: ReactNode
+    'data-autofocus'?: boolean
+    'aria-pressed'?: boolean
+}
+const BTN_VARIANT = {primary: 'filled', secondary: 'default', ghost: 'subtle', soft: 'light'} as const
+const BTN_TONE = {danger: 'red', success: 'green', muted: 'gray'} as const
+
+export const Button = ({variant = 'primary', tone, size, compact, icon, trailing, ...p}: ButtonProps) =>
+    <MButton variant={BTN_VARIANT[variant]} color={tone && BTN_TONE[tone]} size={compact ? `compact-${size ?? 'md'}` : size} leftSection={icon} rightSection={trailing} {...p}/>

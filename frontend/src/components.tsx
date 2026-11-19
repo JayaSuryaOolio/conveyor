@@ -1,6 +1,6 @@
 import {useContext, useEffect, useState} from 'react'
-import {ActionIcon, Badge, Box, Button, Group, Indicator, Menu, Notification, Paper, Popover, RingProgress, Select, Stack, Text, Tooltip} from '@mantine/core'
-import {ClickableCard, Modal} from './ui'
+import {ActionIcon, Badge, Box, Group, Indicator, Menu, Notification, Paper, Popover, RingProgress, Select, Stack, Text, Tooltip} from '@mantine/core'
+import {Button, ButtonSize, ClickableCard, Modal} from './ui'
 import {IconAppWindow, IconCheck, IconChevronLeft, IconChevronRight, IconDots, IconMessageSearch, IconPencil, IconSitemap, IconX} from '@tabler/icons-react'
 import {AddComment, ConnectorServiceRunning, CheckReviews, MergedPR, Move, PlacedActions, RunConnectorAction, ShowError, SendQueuedNow, StopConnectorService, TakeQueuedComment} from '../wailsjs/go/ui/App'
 import {store, ui} from '../wailsjs/go/models'
@@ -56,7 +56,7 @@ export function PlacedButtons({place, k = '', size = 'xs'}: {place: string; k?: 
             <Modal opened={!!ask} onClose={() => setAsk(undefined)} title={ask?.label}>
                 <Text size="sm" mb="sm">{ask?.msg}</Text>
                 <Group justify="flex-end">
-                    <Button variant="default" onClick={() => setAsk(undefined)}>Cancel</Button>
+                    <Button variant="secondary" onClick={() => setAsk(undefined)}>Cancel</Button>
                     <Button data-autofocus onClick={() => { ask?.go(); setAsk(undefined) }}>Continue</Button>
                 </Group>
             </Modal>
@@ -65,7 +65,7 @@ export function PlacedButtons({place, k = '', size = 'xs'}: {place: string; k?: 
                 ? <ServiceButton key={a.connector + a.id} a={a} place={place} k={k} size={size} guard={guard}/>
                 : a.icon
                     ? <Tooltip key={a.connector + a.id} label={a.label}><ActionIcon size={iconSize(size)} variant="default" aria-label={a.label} loading={busy === a.connector + a.id} onClick={() => run(a)}><ActionImg src={a.icon}/></ActionIcon></Tooltip>
-                    : <Button key={a.connector + a.id} size={size} variant="default" loading={busy === a.connector + a.id} title={a.connector} onClick={() => run(a)}>{a.label}</Button>)}
+                    : <Button key={a.connector + a.id} size={size.replace('compact-', '') as ButtonSize} compact={size.startsWith('compact')} variant="secondary" loading={busy === a.connector + a.id} title={a.connector} onClick={() => run(a)}>{a.label}</Button>)}
         </Group>
     )
 }
@@ -90,7 +90,7 @@ function ServiceButton({a, place, k, size, guard}: {a: {connector: string; id: s
             <Indicator disabled={!running} color="green" size={8} processing>
                 {a.icon
                     ? <ActionIcon size={iconSize(size)} variant="default" aria-label={a.label} onClick={click}>{flash ?? <ActionImg src={a.icon}/>}</ActionIcon>
-                    : <Button size={size} variant="default" title={a.connector} onClick={click} leftSection={flash}>{a.label}</Button>}
+                    : <Button size={size.replace('compact-', '') as ButtonSize} compact={size.startsWith('compact')} variant="secondary" title={a.connector} onClick={click} icon={flash}>{a.label}</Button>}
             </Indicator>
         </Tooltip>
     )
@@ -118,8 +118,8 @@ function useMove(k: string) {
         <Modal opened={!!pending} onClose={() => setPending(undefined)} title={`Move ${k} to ${STATUS_LABEL[pending?.to ?? '']}?`}>
             <Text size="sm" mb="sm">{k} has {pending?.n} running run(s). Moving it ends them; the agent stops now.</Text>
             <Group justify="flex-end">
-                <Button variant="default" onClick={() => setPending(undefined)}>Cancel</Button>
-                <Button data-autofocus color="red" onClick={confirm}>Stop and move</Button>
+                <Button variant="secondary" onClick={() => setPending(undefined)}>Cancel</Button>
+                <Button data-autofocus tone="danger" onClick={confirm}>Stop and move</Button>
             </Group>
         </Modal>
     )
@@ -202,8 +202,8 @@ export function CommentBox({k, placeholder = 'Comment…', onDone, restored}: {k
             <Stack gap="sm">
                 <Text size="sm">{merged} is merged, so {k} can't take more changes on its branch: a task keeps one branch and one PR per repo. What is this comment for?</Text>
                 <Button data-autofocus onClick={() => post('')}>More work: start a follow-up sub-task</Button>
-                <Button variant="default" onClick={() => post('ask')}>A question: answer it, no code changes</Button>
-                <Button variant="subtle" color="gray" onClick={() => post('note')}>Just a note: nothing runs</Button>
+                <Button variant="secondary" onClick={() => post('ask')}>A question: answer it, no code changes</Button>
+                <Button variant="ghost" tone="muted" onClick={() => post('note')}>Just a note: nothing runs</Button>
             </Stack>
         </Modal>
     </>
@@ -260,7 +260,7 @@ function QueuedBadge({m, queue, onSendNow}: {m: store.Comment; queue?: ui.QueueS
                             <Text size="xs" truncate title={i.held || undefined}><b>{i.key}</b> {i.title}</Text>
                         </Group>
                     )) : <Text size="xs" c="dimmed">Nothing else in the queue</Text>}
-                    {onSendNow && <Button size="compact-xs" variant="light" mt={4} onClick={onSendNow}>Send now</Button>}
+                    {onSendNow && <Button style={{marginTop: 4}} size="xs" compact variant="soft" onClick={onSendNow}>Send now</Button>}
                 </Stack>
             </Popover.Dropdown>
         </Popover>
@@ -287,7 +287,7 @@ export function Message({m, onEdit, onSendNow, queue}: {m: store.Comment; onEdit
             <Modal opened={asking} onClose={() => setAsking(false)} title="Send now?">
                 <Text size="sm" mb="sm">Skip the wait and start the agent with this message now.</Text>
                 <Group justify="flex-end">
-                    <Button variant="default" onClick={() => setAsking(false)}>Cancel</Button>
+                    <Button variant="secondary" onClick={() => setAsking(false)}>Cancel</Button>
                     <Button data-autofocus onClick={() => { setAsking(false); onSendNow?.() }}>Send now</Button>
                 </Group>
             </Modal>

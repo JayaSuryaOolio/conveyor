@@ -1,7 +1,7 @@
 import {useEffect, useMemo, useRef, useState} from 'react'
 import {useLocation, useNavigate} from 'react-router'
-import {ActionIcon, AppShell, Badge, Box, Button, Group, Kbd, NavLink, Stack, Text, Title, Tooltip} from '@mantine/core'
-import {Modal} from './ui'
+import {ActionIcon, AppShell, Badge, Box, Group, Kbd, NavLink, Stack, Text, Title, Tooltip} from '@mantine/core'
+import {Button, Modal} from './ui'
 import {useLocalStorage} from '@mantine/hooks'
 import {IconApps, IconBolt, IconArrowLeft, IconBook2, IconClock, IconLayoutKanban, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconLogs, IconPlus, IconRobot, IconSettings, IconSitemap} from '@tabler/icons-react'
 import {AppVersion, DispatcherState, Learnings, ShellPATHError} from '../wailsjs/go/ui/App'
@@ -106,7 +106,7 @@ export default function App() {
                             <ActionIcon size="lg" mx="auto" aria-label="New task" onClick={() => setShowNew(true)}><IconPlus size={18}/></ActionIcon>
                         </Tooltip>
                     ) : <>
-                        <Button leftSection={<IconPlus size={16}/>} rightSection={<Kbd size="xs">n</Kbd>} onClick={() => setShowNew(true)}>New task</Button>
+                        <Button icon={<IconPlus size={16}/>} trailing={<Kbd size="xs">n</Kbd>} onClick={() => setShowNew(true)}>New task</Button>
                     </>}
                     <Stack gap={2} mt="xs">
                         {NAV.map(({name, key, label, icon: Icon, filter}) => (

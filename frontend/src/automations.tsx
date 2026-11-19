@@ -1,6 +1,6 @@
 import {useEffect, useState} from 'react'
-import {ActionIcon, Button, Chip, Code, CopyButton, Group, MultiSelect, Popover, SegmentedControl, Select, Stack, Switch, Table, Text, TextInput, Textarea, Title, Tooltip} from '@mantine/core'
-import {Modal} from './ui'
+import {ActionIcon, Chip, Code, CopyButton, Group, MultiSelect, Popover, SegmentedControl, Select, Stack, Switch, Table, Text, TextInput, Textarea, Title, Tooltip} from '@mantine/core'
+import {Button, Modal} from './ui'
 import {IconCheck, IconCopy, IconCalendarTime, IconPencil, IconPlus, IconTrash} from '@tabler/icons-react'
 import {AddAutomation, Confirm, DeleteAutomation, DescribeSchedule, ListAutomations, ListRepos, RunAutomation, SetAutomationEnabled, UpdateAutomation} from '../wailsjs/go/ui/App'
 import {store, ui} from '../wailsjs/go/models'
@@ -101,7 +101,7 @@ function AutomationForm({initial, edit, onClose}: {initial: Form; edit: boolean;
                 <Code block style={{whiteSpace: 'pre-wrap', wordBreak: 'break-all'}}>{cmd}</Code>
             </div>
             <Group justify="flex-end">
-                <Button variant="default" onClick={() => onClose(false)}>Cancel</Button>
+                <Button variant="secondary" onClick={() => onClose(false)}>Cancel</Button>
                 <Button onClick={save} disabled={!ready}>{edit ? 'Save' : 'Create'}</Button>
             </Group>
         </Stack>
@@ -156,7 +156,7 @@ function RunButton({name, onDone}: {name: string; onDone: () => void}) {
             .then(() => { setState('ran'); setTimeout(() => setState('idle'), 2500) }, e => { errMsg(e); setState('idle') })
             .finally(onDone)
     }
-    return <Button size="xs" variant="default" loading={state === 'running'} color={state === 'ran' ? 'green' : undefined} onClick={run}>{state === 'ran' ? 'Ran ✓' : 'Run now'}</Button>
+    return <Button size="xs" variant="secondary" loading={state === 'running'} tone={state === 'ran' ? 'success' : undefined} onClick={run}>{state === 'ran' ? 'Ran ✓' : 'Run now'}</Button>
 }
 
 export function Automations() {
@@ -166,7 +166,7 @@ export function Automations() {
         <Stack>
             <Group justify="space-between">
                 <Title order={3}>Automations</Title>
-                <Button leftSection={<IconPlus size={16}/>} onClick={() => setForm({initial: EMPTY, edit: false})}>New automation</Button>
+                <Button icon={<IconPlus size={16}/>} onClick={() => setForm({initial: EMPTY, edit: false})}>New automation</Button>
             </Group>
             {error && <Text c="red">{error}</Text>}
             {data && data.length === 0 && <Text c="dimmed">None yet. Create one, or use <Code>conveyor automation add --template pr-sweep</Code>.</Text>}

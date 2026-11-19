@@ -1,5 +1,6 @@
 import {createContext, lazy, Suspense, useRef, useState} from 'react'
-import {ActionIcon, Box, Button, Group, Popover, SegmentedControl, Stack, Text, Textarea, Tooltip, Typography} from '@mantine/core'
+import {ActionIcon, Box, Group, Popover, SegmentedControl, Stack, Text, Textarea, Tooltip, Typography} from '@mantine/core'
+import {Button} from './ui'
 import {IconBold, IconCode, IconItalic, IconLink, IconList, IconListCheck} from '@tabler/icons-react'
 import {Complete, SaveAttachment, ShowError} from '../wailsjs/go/ui/App'
 import {core} from '../wailsjs/go/models'
@@ -215,7 +216,7 @@ export function MarkdownEditor({value, onChange, onSubmit, submitLabel = 'Send',
                 </Stack>}
             <Group justify="space-between" wrap="nowrap" px="xs" py={6} style={{borderTop: '1px solid var(--mantine-color-default-border)'}}>
                 <Text size="xs" c="dimmed">{pending ? 'Uploading…' : <>Markdown supported · @ files · / commands ·{keyPrefix && ` ${keyPrefix} tasks ·`} paste or drop images{onSubmit && ' · ⌘↵ to send'}</>}</Text>
-                {onSubmit && <Button size="compact-sm" onClick={submit} loading={submitting} disabled={!canSubmit || pending > 0}>{submitLabel}</Button>}
+                {onSubmit && <Button size="sm" compact onClick={submit} loading={submitting} disabled={!canSubmit || pending > 0}>{submitLabel}</Button>}
             </Group>
         </Box>
     )

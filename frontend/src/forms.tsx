@@ -1,6 +1,6 @@
 import {useState} from 'react'
-import {ActionIcon, Button, Checkbox, Code, Group, MultiSelect, PasswordInput, ScrollArea, SegmentedControl, Select, SelectProps, SimpleGrid, Stack, Table, TagsInput, Tabs, Text, TextInput, Textarea, Title, Tooltip} from '@mantine/core'
-import {Modal} from './ui'
+import {ActionIcon, Checkbox, Code, Group, MultiSelect, PasswordInput, ScrollArea, SegmentedControl, Select, SelectProps, SimpleGrid, Stack, Table, TagsInput, Tabs, Text, TextInput, Textarea, Title, Tooltip} from '@mantine/core'
+import {Button, Modal} from './ui'
 import {IconAdjustments} from '@tabler/icons-react'
 import {AddLabel, AddRepo, CreateTask, ExportState, GetPromptDefaults, GetTask, GetSettings, ImportState, ListAgents, ListCLIAgents, ListLabels, ListModels, ListRepos, PreviewBrief, Requirements, ShellPATHError, SetRepoSetupScript, SetSetting, SetTaskAgent, SetTaskModel, SetTaskRunner} from '../wailsjs/go/ui/App'
 import {core, store} from '../wailsjs/go/models'
@@ -67,7 +67,7 @@ export function NewTask({nav, close}: {nav: Nav; close: () => void}) {
                     {epic && <TextInput label="Epic name" placeholder="default: the lower-cased task key" value={epicName} onChange={e => setEpicName(e.target.value)}/>}
                 </SimpleGrid>
                 <Group justify="flex-end">
-                    <Button variant="default" onClick={() => { setTitle(''); setDesc(''); close() }}>Cancel</Button>
+                    <Button variant="secondary" onClick={() => { setTitle(''); setDesc(''); close() }}>Cancel</Button>
                     <Button onClick={submit} disabled={!title.trim() || sel.length === 0}>Create</Button>
                 </Group>
             </Stack>
@@ -260,8 +260,8 @@ function StateButtons({reload}: {reload: () => void}) {
             <Text size="sm" fw={500}>State</Text>
             <Text size="xs" c="dimmed">Move settings, connectors, automations and user agents to another install. Repos are not exported: automations get placeholders and import disabled. Import only adds what is missing.</Text>
             <Group>
-                <Button variant="default" onClick={() => ExportState().then(p => setMsg(p ? [`Exported to ${p}`] : []), errMsg)}>Export state</Button>
-                <Button variant="default" onClick={() => ImportState().then(l => { setMsg(l ?? []); reload() }, errMsg)}>Import state</Button>
+                <Button variant="secondary" onClick={() => ExportState().then(p => setMsg(p ? [`Exported to ${p}`] : []), errMsg)}>Export state</Button>
+                <Button variant="secondary" onClick={() => ImportState().then(l => { setMsg(l ?? []); reload() }, errMsg)}>Import state</Button>
             </Group>
             {msg.map((l, i) => <Text key={i} size="sm">{l}</Text>)}
         </Stack>

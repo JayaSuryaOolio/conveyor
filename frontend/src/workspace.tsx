@@ -1,6 +1,6 @@
 import {useState} from 'react'
-import {ActionIcon, Anchor, Badge, Button, Code, Divider, Group, Menu, Paper, Stack, TagsInput, Text, TextInput, Title, Tooltip} from '@mantine/core'
-import {ClickableCode, Modal} from './ui'
+import {ActionIcon, Anchor, Badge, Code, Divider, Group, Menu, Paper, Stack, TagsInput, Text, TextInput, Title, Tooltip} from '@mantine/core'
+import {Button, ClickableCode, Modal} from './ui'
 import {useClipboard} from '@mantine/hooks'
 import {IconCopy, IconMessageSearch, IconPencil, IconPlus, IconStar, IconX, IconTerminal, IconTerminal2} from '@tabler/icons-react'
 import {Actions, AddLabel, AddTaskRepo, CheckReviews, EnsureWorkspace, ListLabels, ListRepos, RemoveLabel, RemoveTaskRepo, RunAction, Sessions, SetTaskRepo, TermStart} from '../wailsjs/go/ui/App'
@@ -16,7 +16,7 @@ function Confirm({msg, ok, close}: {msg: string | null; ok: () => void; close: (
         <Modal opened={!!msg} onClose={close} title="Please confirm" size="sm" centered>
             <Text size="sm">{msg}</Text>
             <Group justify="flex-end" mt="md">
-                <Button variant="default" onClick={close}>Cancel</Button>
+                <Button variant="secondary" onClick={close}>Cancel</Button>
                 <Button onClick={() => { close(); ok() }}>Confirm</Button>
             </Group>
         </Modal>
@@ -124,7 +124,7 @@ function RepoFields({k, r, reload, canRemove, children}: {k: string; r: store.Ta
                         ? <TextInput size="xs" value={pr} placeholder="https://github.com/…/pull/1" onChange={e => setPr(e.target.value)} onKeyDown={onKey}/>
                         : <Mono text={r.pr_url}/>}
                 </div>
-                {dirty && <Button size="compact-sm" onClick={save}>Save</Button>}
+                {dirty && <Button size="sm" compact onClick={save}>Save</Button>}
                 {children}
             </Stack>
         </Paper>

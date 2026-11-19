@@ -1,6 +1,6 @@
 import {useState} from 'react'
-import {Button, Group, Select, Stack, Table, Text, TextInput, Textarea, Title} from '@mantine/core'
-import {Modal} from './ui'
+import {Group, Select, Stack, Table, Text, TextInput, Textarea, Title} from '@mantine/core'
+import {Button, Modal} from './ui'
 import {IconPlus} from '@tabler/icons-react'
 import {AddAgent, ListAgents, ListRepos, SetAgentModel} from '../wailsjs/go/ui/App'
 import {errMsg} from './components'
@@ -31,7 +31,7 @@ export function Agents() {
                 <Group>
                     <Select aria-label="Scope" allowDeselect={false} value={filter} onChange={v => setFilter(v ?? 'all')}
                             data={[{value: 'all', label: 'All scopes'}, {value: 'user', label: 'user'}, ...repos.map(r => ({value: r, label: r}))]}/>
-                    <Button leftSection={<IconPlus size={16}/>} onClick={() => setOpen(true)}>Add agent</Button>
+                    <Button icon={<IconPlus size={16}/>} onClick={() => setOpen(true)}>Add agent</Button>
                 </Group>
             </Group>
             <Text size="sm" c="dimmed">Claude Code subagents from each repo's .claude/agents and ~/.claude/agents.</Text>
@@ -63,7 +63,7 @@ export function Agents() {
                             data={[{value: 'user', label: 'user (~/.claude/agents)'}, ...repos.map(r => ({value: r, label: r}))]}/>
                     <ModelSelect label="Model" value={model} onChange={setModel}/>
                     <Group justify="flex-end">
-                        <Button variant="default" onClick={() => setOpen(false)}>Cancel</Button>
+                        <Button variant="secondary" onClick={() => setOpen(false)}>Cancel</Button>
                         <Button onClick={add} disabled={!name || !desc.trim()}>Add agent</Button>
                     </Group>
                 </Stack>
