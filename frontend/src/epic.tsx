@@ -234,10 +234,10 @@ function InfoBoxes({g}: {g: core.Graph}) {
     return (
         <SimpleGrid cols={{base: 2, md: 4}} spacing="xs">
             {boxes.map(([title, color, rows]) => (
-                <Paper key={title} withBorder radius="md" p="xs" style={{borderTop: `3px solid ${c6(color)}`}}>
+                <Paper key={title} withBorder radius="md" p="xs" style={{background: `color-mix(in srgb, ${c6(color)} 10%, transparent)`}}>
                     <Group justify="space-between" mb={4}><Text size="xs" fw={700} tt="uppercase" c={color}>{title}</Text><Text size="xs" c="dimmed">{rows.length}</Text></Group>
                     <ScrollArea.Autosize mah={120}>
-                        {rows.length ? rows.map(r => <TaskRow key={r.n.key} {...r}/>) : <Text size="xs" c="dimmed">None</Text>}
+                        {rows.length ? <Stack gap={1}>{rows.map(r => <TaskRow key={r.n.key} {...r}/>)}</Stack> : <Text size="xs" c="dimmed">None</Text>}
                     </ScrollArea.Autosize>
                 </Paper>
             ))}
