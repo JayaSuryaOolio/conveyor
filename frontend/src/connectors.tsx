@@ -1,6 +1,6 @@
 import {useEffect, useRef, useState} from 'react'
-import {ActionIcon, Badge, Button, Checkbox, Code, FileButton, Group, MultiSelect, NumberInput, Pagination, Paper, Select, Stack, Switch, Table, Tabs, Text, TextInput, Textarea, Title} from '@mantine/core'
-import {Modal} from './ui'
+import {ActionIcon, Badge, Checkbox, Code, FileButton, Group, MultiSelect, NumberInput, Pagination, Paper, Select, Stack, Switch, Table, Tabs, Text, TextInput, Textarea, Title} from '@mantine/core'
+import {Button, Modal} from './ui'
 import {IconDownload, IconPlus, IconPuzzle, IconSettings, IconTrash, IconUpload} from '@tabler/icons-react'
 import {AddConnector, ConnectorSettings, SaveConnectorSettings, ExampleConnectors, InstallExample, GetSettings, SetSetting, ConnectorIcons, ConnectorPresets, Confirm, SetConnectorDisabled, DeleteConnector, ExportConnector, InstallManifest, InstallPreset, ListConnectors, SlackLinks, ManifestSchema, Plugin, ValidateManifest} from '../wailsjs/go/ui/App'
 import {runner, store} from '../wailsjs/go/models'
@@ -22,7 +22,7 @@ function AppForm({onClose}: {onClose: (saved: boolean) => void}) {
             <Switch label="Quick action" checked={output} onChange={e => setOutput(e.currentTarget.checked)}
                     description={<>Runs to completion in the task's primary worktree and shows its output as a toast; a button in the task sidebar. Scripts can call <Code>conveyor task sessions {'{key}'}</Code> for the task's Claude session ids.</>}/>
             <Group justify="flex-end">
-                <Button variant="default" onClick={() => onClose(false)}>Cancel</Button>
+                <Button variant="secondary" onClick={() => onClose(false)}>Cancel</Button>
                 <Button onClick={save} disabled={!name.trim() || !command.trim()}>Create</Button>
             </Group>
         </Stack>
@@ -71,21 +71,21 @@ function ManifestForm({onClose}: {onClose: (saved: boolean) => void}) {
                 Click a placeholder to insert it at the cursor; scripts get its value shell-quoted.
             </Text>
             <Group gap={6}>
-                {(schema?.vars ?? []).map(v => <Button key={v} size="compact-xs" variant="light" ff="monospace" onClick={() => insert(`\${{ ${v} }}`)}>{v}</Button>)}
+                {(schema?.vars ?? []).map(v => <Button style={{fontFamily: "monospace"}} key={v} size="xs" compact variant="soft" onClick={() => insert(`\${{ ${v} }}`)}>{v}</Button>)}
             </Group>
             <Group align="flex-end" gap="xs">
                 <MultiSelect label="Places" size="xs" data={schema?.places ?? []} value={places} onChange={setPlaces} style={{flex: 1}}/>
-                <Button size="xs" variant="default" leftSection={<IconPlus size={14}/>} disabled={!places.length} onClick={addAction}>Add action</Button>
+                <Button size="xs" variant="secondary" icon={<IconPlus size={14}/>} disabled={!places.length} onClick={addAction}>Add action</Button>
             </Group>
             <Textarea ref={ref} autosize minRows={10} maxRows={20} ff="monospace" placeholder={MANIFEST_EXAMPLE} value={text} onChange={e => setText(e.target.value)}
                       error={problem || undefined}/>
             <Group justify="space-between">
                 <FileButton accept="application/json,.json" onChange={f => f?.text().then(setText)}>
-                    {p => <Button {...p} variant="default" leftSection={<IconUpload size={16}/>}>Load file</Button>}
+                    {p => <Button {...p} variant="secondary" icon={<IconUpload size={16}/>}>Load file</Button>}
                 </FileButton>
                 <Group>
                     <Checkbox label="Replace connector with the same name" checked={replace} onChange={e => setReplace(e.currentTarget.checked)}/>
-                    <Button variant="default" onClick={() => onClose(false)}>Cancel</Button>
+                    <Button variant="secondary" onClick={() => onClose(false)}>Cancel</Button>
                     <Button disabled={!text.trim() || !!problem} onClick={() => InstallManifest(text, replace).then(() => onClose(true), errMsg)}>Install</Button>
                 </Group>
             </Group>
@@ -126,7 +126,7 @@ function SettingsForm({app, onClose}: {app: string; onClose: () => void}) {
                 )
             })}
             <Group justify="flex-end">
-                <Button variant="default" onClick={onClose}>Cancel</Button>
+                <Button variant="secondary" onClick={onClose}>Cancel</Button>
                 <Button onClick={() => SaveConnectorSettings(app, vals).then(onClose, errMsg)}>Save</Button>
             </Group>
         </Stack>
@@ -151,7 +151,7 @@ function PluginRow({st, act}: {st: runner.PluginStatus, act: (tool: string, a: s
             </Group>
             {supported && <Group gap="xs">
                 {st.status !== 'installed' && <Button size="xs" onClick={() => act(st.tool, 'install')}>{st.status === 'outdated' ? 'Update' : 'Install'}</Button>}
-                {st.status !== 'not installed' && <Button size="xs" variant="default" onClick={() => act(st.tool, 'uninstall')}>Uninstall</Button>}
+                {st.status !== 'not installed' && <Button size="xs" variant="secondary" onClick={() => act(st.tool, 'uninstall')}>Uninstall</Button>}
             </Group>}
         </Group>
     )
@@ -193,8 +193,8 @@ function ConnectorList() {
             <Group justify="space-between">
                 <Title order={3}>Connectors</Title>
                 <Group gap="xs">
-                    <Button variant="default" leftSection={<IconPuzzle size={16}/>} onClick={() => setImporting(true)}>Install manifest</Button>
-                    <Button leftSection={<IconPlus size={16}/>} onClick={() => setAdding(true)}>New connector</Button>
+                    <Button variant="secondary" icon={<IconPuzzle size={16}/>} onClick={() => setImporting(true)}>Install manifest</Button>
+                    <Button icon={<IconPlus size={16}/>} onClick={() => setAdding(true)}>New connector</Button>
                 </Group>
             </Group>
             <Text size="sm" c="dimmed">Connectors a task worktree can be opened in, from the icons under each repo on the task page or <Code>conveyor app open NAME KEY</Code>.</Text>
@@ -225,7 +225,7 @@ function ConnectorList() {
                 <Title order={5}>Detected on this Mac</Title>
                 <Group gap="xs">
                     {missing.map(p => (
-                        <Button key={p.name} size="xs" variant="light" leftSection={<IconPlus size={14}/>}
+                        <Button key={p.name} size="xs" variant="soft" icon={<IconPlus size={14}/>}
                                 onClick={() => InstallPreset(p).then(reload, errMsg)}>{p.name}</Button>
                     ))}
                 </Group>
@@ -235,7 +235,7 @@ function ConnectorList() {
                 <Text size="xs" c="dimmed">Bundled examples, not detected on this Mac. Install one to use it or as a starting point.</Text>
                 <Group gap="xs">
                     {offered.map(e => (
-                        <Button key={e.file} size="xs" variant="light" leftSection={<IconPlus size={14}/>} title={e.description}
+                        <Button key={e.file} size="xs" variant="soft" icon={<IconPlus size={14}/>} title={e.description}
                                 onClick={() => InstallExample(e.file).then(reload, errMsg)}>{e.name}</Button>
                     ))}
                 </Group>

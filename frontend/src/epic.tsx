@@ -1,6 +1,6 @@
 import {createContext, useContext, useEffect, useMemo, useRef, useState} from 'react'
-import {ActionIcon, Alert, Anchor, Badge, Box, Button, Group, Indicator, Menu, Paper, ScrollArea, SegmentedControl, SimpleGrid, Stack, Table, Text, Textarea, TextInput, Tooltip} from '@mantine/core'
-import {Clickable, ClickableCard, Modal} from './ui'
+import {ActionIcon, Alert, Anchor, Badge, Box, Group, Indicator, Menu, Paper, ScrollArea, SegmentedControl, SimpleGrid, Stack, Table, Text, Textarea, TextInput, Tooltip} from '@mantine/core'
+import {Button, Clickable, ClickableCard, Modal} from './ui'
 import {useLocalStorage} from '@mantine/hooks'
 import {IconCode, IconExternalLink, IconGitPullRequest, IconMessageQuestion, IconPlayerPlay, IconPlayerStop, IconPlus, IconTerminal2} from '@tabler/icons-react'
 import {Background, Controls, Handle, MarkerType, Position, ReactFlow, useEdgesState, useNodesState, type Connection, type Edge, type Node, type NodeProps} from '@xyflow/react'
@@ -155,8 +155,8 @@ function Header({g, nav, root}: {g: core.Graph; nav: Nav; root: core.GraphNode})
                 <Group gap="sm">
                     <Text size="sm">{live.filter(n => n.status === 'done').length}/{live.length} done</Text>
                     <Badge color={wants ? 'orange' : 'gray'} variant={wants ? 'filled' : 'light'}>{wants} want{wants === 1 ? 's' : ''} you</Badge>
-                    {g.gate && <Button size="compact-sm" color="green" onClick={() => EpicApprove(g.root).catch(errMsg)}>Approve plan</Button>}
-                    {epic && <Button size="compact-sm" variant="default" onClick={() => setRestart(true)}>Restart</Button>}
+                    {g.gate && <Button size="sm" compact tone="success" onClick={() => EpicApprove(g.root).catch(errMsg)}>Approve plan</Button>}
+                    {epic && <Button size="sm" compact variant="secondary" onClick={() => setRestart(true)}>Restart</Button>}
                 </Group>
             </Group>
         </Paper>
@@ -165,7 +165,7 @@ function Header({g, nav, root}: {g: core.Graph; nav: Nav; root: core.GraphNode})
             <Alert variant="light" withCloseButton onClose={() => setSeen(true)} title="Review comments arrive by backoff polling">
                 <Group gap="sm">
                     <Text size="sm">Add the review-webhooks connector to get them as they are posted.</Text>
-                    <Button size="compact-xs" onClick={() => InstallExample('review-webhooks').then(reloadApps, errMsg)}>Add review webhooks</Button>
+                    <Button size="xs" compact onClick={() => InstallExample('review-webhooks').then(reloadApps, errMsg)}>Add review webhooks</Button>
                 </Group>
             </Alert>
         )}
@@ -174,8 +174,8 @@ function Header({g, nav, root}: {g: core.Graph; nav: Nav; root: core.GraphNode})
                 <Text size="sm">Abandons the current flow, cancels its open sub-tasks and starts a new flow at spec.</Text>
                 <Textarea data-autofocus label="Reason" required autosize minRows={2} value={reason} onChange={e => setReason(e.currentTarget.value)}/>
                 <Group justify="flex-end">
-                    <Button variant="default" onClick={() => setRestart(false)}>Cancel</Button>
-                    <Button color="red" disabled={!reason.trim()} onClick={() => EpicRestart(g.root, reason).then(() => { setRestart(false); setReason('') }, errMsg)}>Restart</Button>
+                    <Button variant="secondary" onClick={() => setRestart(false)}>Cancel</Button>
+                    <Button tone="danger" disabled={!reason.trim()} onClick={() => EpicRestart(g.root, reason).then(() => { setRestart(false); setReason('') }, errMsg)}>Restart</Button>
                 </Group>
             </Stack>
         </Modal>

@@ -1,6 +1,6 @@
 import {lazy, Ref, Suspense, useEffect, useRef, useState} from 'react'
-import {ActionIcon, Anchor, Badge, Box, Breadcrumbs, Button, CloseButton, Code, CopyButton, Divider, Group, Kbd, Paper, Popover, Stack, Text, TextInput, Timeline, Title, Tooltip} from '@mantine/core'
-import {Clickable, ClickableCode, Modal} from './ui'
+import {ActionIcon, Anchor, Badge, Box, Breadcrumbs, CloseButton, Code, CopyButton, Divider, Group, Kbd, Paper, Popover, Stack, Text, TextInput, Timeline, Title, Tooltip} from '@mantine/core'
+import {Button, Clickable, ClickableCode, Modal} from './ui'
 import {useLocalStorage} from '@mantine/hooks'
 import {IconAbc, IconSitemap, IconArrowDown, IconArrowUp, IconClock, IconFlame, IconHash, IconPencil, IconSearch, IconTerminal, IconX, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconMessage, IconPlayerPlay} from '@tabler/icons-react'
 import {Actions, GetTask, QueueStatus, RunLog, SendQueuedNow, SetTaskDescription, Stop, TakeQueuedComment, TermStart} from '../wailsjs/go/ui/App'
@@ -83,8 +83,8 @@ export function Board({nav, q, setQ, search, link}: {nav: Nav; q: string; setQ: 
                         const Arrow = sort.desc ? IconArrowDown : IconArrowUp
                         return (
                             <Tooltip key={by} label={on ? 'Click to reverse' : 'Sort by ' + label.toLowerCase()}>
-                                <Button size="compact-sm" variant={on ? 'light' : 'subtle'} color={on ? undefined : 'gray'} aria-pressed={on}
-                                        leftSection={<Icon size={14}/>} rightSection={on ? <Arrow size={12}/> : undefined}
+                                <Button size="sm" compact variant={on ? 'soft' : 'ghost'} tone={on ? undefined : 'muted'} aria-pressed={on}
+                                        icon={<Icon size={14}/>} trailing={on ? <Arrow size={12}/> : undefined}
                                         onClick={() => setSort(on ? {by, desc: !sort.desc} : {by, desc})}>{label}</Button>
                             </Tooltip>
                         )
@@ -118,7 +118,7 @@ export function Board({nav, q, setQ, search, link}: {nav: Nav; q: string; setQ: 
                 {filtered && <Group gap={6} wrap="nowrap" ml="auto">
                     <Badge size="lg" radius="md" color="yellow" variant="light" style={{textTransform: 'none'}}>Filtered: {[...selL, ...sel, ...(needle ? ['"' + q + '"'] : [])].join(', ')}</Badge>
                     <Text size="xs" c="dimmed">{cards.length} of {all.length}</Text>
-                    <Button size="compact-xs" variant="subtle" color="gray" leftSection={<IconX size={12}/>} onClick={() => { setQ(''); setPicked([]); setPickedLabels([]) }}>Clear</Button>
+                    <Button size="xs" compact variant="ghost" tone="muted" icon={<IconX size={12}/>} onClick={() => { setQ(''); setPicked([]); setPickedLabels([]) }}>Clear</Button>
                 </Group>}
             </Group>
         </Paper>
@@ -171,8 +171,8 @@ export function Focus({nav, onClose}: {nav: Nav; onClose: () => void}) {
                             </Group>
                             {c.lastSummary && <Box mah={80} style={{overflow: 'hidden'}}><Markdown c="dimmed">{c.lastSummary}</Markdown></Box>}
                             <Group gap="xs">
-                                <Button variant="default" size="compact-xs" onClick={() => setPeek(c.key)}>Preview</Button>
-                                <Button variant="default" size="compact-xs" onClick={() => go({name: 'task', key: c.key})}>Open task</Button>
+                                <Button variant="secondary" size="xs" compact onClick={() => setPeek(c.key)}>Preview</Button>
+                                <Button variant="secondary" size="xs" compact onClick={() => go({name: 'task', key: c.key})}>Open task</Button>
                             </Group>
                         </Stack>
                     </Paper>
@@ -235,14 +235,14 @@ function SessionLog({run, onStop}: {run: store.Run; onStop?: () => void}) {
                             <Popover.Target><Anchor component="button" size="sm" underline="hover" style={{flexShrink: 0, whiteSpace: 'nowrap'}}>Stop run</Anchor></Popover.Target>
                             <Popover.Dropdown>
                                 <Text size="sm" mb="xs">End this session? The agent stops now.</Text>
-                                <Button size="compact-xs" color="red" onClick={onStop}>Stop run</Button>
+                                <Button size="xs" compact tone="danger" onClick={onStop}>Stop run</Button>
                             </Popover.Dropdown>
                         </Popover>
                     )}
                     {lastTool && <Text size="xs" c="dimmed" truncate style={{flex: 1, minWidth: 0}}>· {lastTool.text}</Text>}
                 </Group>
             ) : (
-                <Button variant="subtle" size="compact-xs" w="fit-content" onClick={() => setOpen(!open)}>{open ? 'Hide session' : 'Show session'}</Button>
+                <Button style={{width: "fit-content"}} variant="ghost" size="xs" compact onClick={() => setOpen(!open)}>{open ? 'Hide session' : 'Show session'}</Button>
             )}
             {err && <Text size="xs" c="dimmed">{err}</Text>}
             {show && entries.length > 0 && (
@@ -272,7 +272,7 @@ function Description({t, reload}: {t: store.Task; reload: () => void}) {
         return (
             <Stack gap={4}>
                 <MarkdownEditor minRows={4} value={draft} onChange={setDraft} onSubmit={save} submitLabel="Save" submitting={busy} attachKey={t.key}/>
-                <Button variant="default" size="compact-sm" style={{alignSelf: 'flex-start'}} onClick={() => setDraft(null)}>Cancel</Button>
+                <Button variant="secondary" size="sm" compact style={{alignSelf: 'flex-start'}} onClick={() => setDraft(null)}>Cancel</Button>
             </Stack>
         )
     }
@@ -303,9 +303,9 @@ export function TaskPage({k, nav, height = 'calc(100vh - 2 * var(--mantine-spaci
     // Gated on needsYou: `actions` keeps its last value until the refetch lands, so without it the button lingers after the answer.
     const open = () => attach && TermStart(k, attach.kind, attach.repo).then(setAdded).catch(errMsg)
     const termLabel = attach?.kind === 'resume' ? 'Resume in terminal' : 'Answer in terminal'
-    const answer = needsYou && attach && <Button id="answer-inline" size="compact-sm" leftSection={<IconTerminal size={14}/>} onClick={open}>{termLabel}</Button>
+    const answer = needsYou && attach && <Button id="answer-inline" size="sm" compact icon={<IconTerminal size={14}/>} onClick={open}>{termLabel}</Button>
     // Floating twin: opens the terminal too; scrollIntoView 'nearest' is a no-op when the inline button is already visible.
-    const floatingAnswer = needsYou && attach && <Button variant="default" size="compact-sm" leftSection={<IconTerminal size={14}/>}
+    const floatingAnswer = needsYou && attach && <Button variant="secondary" size="sm" compact icon={<IconTerminal size={14}/>}
         onClick={() => { open(); document.getElementById('answer-inline')?.scrollIntoView({behavior: 'smooth', block: 'nearest'}) }}>{termLabel}</Button>
     if (error) return <Text c="red">{error}</Text>
     if (!d) return <Text c="dimmed">Loading…</Text>

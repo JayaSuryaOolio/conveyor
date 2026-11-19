@@ -1,5 +1,6 @@
 import {useEffect, useRef, useState} from 'react'
-import {Box, Button, Code, Group, SegmentedControl, Stack, Switch, Text, TextInput, Title} from '@mantine/core'
+import {Box, Code, Group, SegmentedControl, Stack, Switch, Text, TextInput, Title} from '@mantine/core'
+import {Button} from './ui'
 import {IconCopy, IconSearch} from '@tabler/icons-react'
 import {AppLog} from '../wailsjs/go/ui/App'
 
@@ -60,7 +61,7 @@ export function Logs() {
                     <SegmentedControl value={source} onChange={setSource} data={SOURCES.map(({value, label}) => ({value, label}))}/>
                     <TextInput placeholder="Filter" leftSection={<IconSearch size={16}/>} value={q} onChange={e => setQ(e.target.value)}/>
                     <Switch label="Follow" checked={follow} onChange={e => setFollow(e.currentTarget.checked)}/>
-                    <Button variant="default" leftSection={<IconCopy size={16}/>} onClick={() => navigator.clipboard.writeText(shown.join('\n'))}>Copy</Button>
+                    <Button variant="secondary" icon={<IconCopy size={16}/>} onClick={() => navigator.clipboard.writeText(shown.join('\n'))}>Copy</Button>
                 </Group>
             </Group>
             <Text size="xs" c="dimmed">~/.conveyor/{file}. From a terminal: <Code>tail -f ~/.conveyor/{file}</Code></Text>
