@@ -172,7 +172,12 @@ func ReviewCheck(ctx context.Context, svc *core.Service, key string, step int) (
 		body.WriteString(text)
 	}
 	if err := errors.Join(errs...); err != nil {
-		return "", err // watermark untouched, the next trigger retries
+		// Watermark untouched; retry the same step so an outage does not end the backoff chain.
+		store.Audit("review.check.error", "task_id", t.ID, "step", step, "err", err.Error())
+		if serr := ScheduleCheck(svc.DB, t, backoff[min(step, len(backoff)-1)], step); serr != nil {
+			err = errors.Join(err, serr)
+		}
+		return "", err
 	}
 	switch {
 	case body.Len() > 0:
@@ -257,32 +262,47 @@ func checkPR(ctx context.Context, db *sql.DB, taskID, repoID int64, dir, url str
 		was[i], mark[i] = *p, max(*p, 0)
 	}
 	var sb strings.Builder
-	keep := func(kind int, id int64, text string) bool {
-		mark[kind] = max(mark[kind], id)
-		return was[kind] >= 0 && id > was[kind] && strings.TrimSpace(text) != "" && !strings.HasPrefix(strings.TrimSpace(text), agentPrefix)
-	}
-	add := func(head, body string) {
-		// ponytail: items past totalCap are dropped but the watermark still advances; raise totalCap if that bites.
-		if body = clean(body); body != "" && !isNoise(body) && sb.Len() < totalCap {
-			fmt.Fprintf(&sb, "> %s\n%s\n\n", head, body)
+	var blocked [3]bool
+	var sent, ignored, deferred int
+	// handle reports one item. Ignorable ones (agent reply, empty, noise, resolved) advance the
+	// watermark; one dropped for lack of room (totalCap) holds it back, with every later item of
+	// its type, so the next check reports it.
+	handle := func(kind int, id int64, head, body string, resolvedThread bool) {
+		if was[kind] < 0 || id <= was[kind] { // baselining, or already seen
+			if !blocked[kind] {
+				mark[kind] = max(mark[kind], id)
+			}
+			return
+		}
+		text := strings.TrimSpace(body)
+		cleaned := clean(body)
+		switch {
+		case text == "" || strings.HasPrefix(text, agentPrefix) || resolvedThread || cleaned == "" || isNoise(cleaned):
+			ignored++
+		case sb.Len() >= totalCap:
+			blocked[kind] = true
+			deferred++
+			return
+		default:
+			fmt.Fprintf(&sb, "> %s\n%s\n\n", head, cleaned)
+			sent++
+		}
+		if !blocked[kind] {
+			mark[kind] = max(mark[kind], id)
 		}
 	}
 	for _, r := range reviews {
 		st.Review = r.State
-		if keep(0, r.ID, r.Body) {
-			add(fmt.Sprintf("review (%s) by %s", r.State, r.User.Login), r.Body)
-		}
+		handle(0, r.ID, fmt.Sprintf("review (%s) by %s", r.State, r.User.Login), r.Body, false)
 	}
 	for _, c := range comments {
-		if keep(1, c.ID, c.Body) && !resolved[c.ID] {
-			add(fmt.Sprintf("%s:%d (%s)", c.Path, c.Line, c.User.Login), c.Body)
-		}
+		handle(1, c.ID, fmt.Sprintf("%s:%d (%s)", c.Path, c.Line, c.User.Login), c.Body, resolved[c.ID])
 	}
 	for _, c := range convo {
-		if keep(2, c.ID, c.Body) {
-			add(fmt.Sprintf("comment (%s)", c.User.Login), c.Body)
-		}
+		handle(2, c.ID, fmt.Sprintf("comment (%s)", c.User.Login), c.Body, false)
 	}
+	store.Audit("review.check.pr", "task_id", taskID, "pr", url, "sent", sent, "ignored", ignored, "deferred", deferred,
+		"reviews", len(reviews), "inline", len(comments), "comments", len(convo), "marks", fmt.Sprint(mark))
 	for i, p := range seen {
 		*p = mark[i]
 	}
