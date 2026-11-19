@@ -40,6 +40,7 @@ export default function App() {
     const back = () => { if (window.history.state?.idx > 0) navigate(-1) }
     const [showNew, setShowNew] = useState(false)
     const [showFocus, setShowFocus] = useState(false)
+    const [newKey, setNewKey] = useState(0) // bumped after each close: NewTask remounts fresh (drafts persist in localStorage) while hidden
     const [q, setQ] = useState('')
     const search = useRef<HTMLInputElement>(null)
     const [dispatcher, setDispatcher] = useState('')
@@ -135,8 +136,8 @@ export default function App() {
                 {view.name === 'logs' && <Logs/>}
                 {view.name === 'settings' && <Settings/>}
             </AppShell.Main>
-            <Modal opened={showFocus} onClose={() => setShowFocus(false)} size="min(800px, 96vw)" title="Focus"><Focus nav={nav} onClose={() => setShowFocus(false)}/></Modal>
-            <Modal opened={showNew} onClose={() => setShowNew(false)} size="clamp(28rem, 60vw, 64rem)" title="New task"><NewTask nav={nav} close={() => setShowNew(false)}/></Modal>
+            <Modal opened={showFocus} onClose={() => setShowFocus(false)} size="min(800px, 96vw)" title="Focus" keepMounted><Focus nav={nav} onClose={() => setShowFocus(false)}/></Modal>
+            <Modal opened={showNew} onClose={() => setShowNew(false)} size="clamp(28rem, 60vw, 64rem)" title="New task" keepMounted onExitTransitionEnd={() => setNewKey(k => k + 1)}><NewTask key={newKey} nav={nav} close={() => setShowNew(false)}/></Modal>
             <CommandPalette nav={nav} onFocus={() => setTimeout(() => setShowFocus(true), 300)} /* ponytail: open after the palette's close transition so Mantine records the real opener (not the palette's input) for return-focus; refactor: Spotlight onSpotlightClose callback *//>
             <Toasts/>
         </AppShell>
