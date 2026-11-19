@@ -14,6 +14,8 @@ A **task** (`CV-12`; sub-tasks `CV-12A`, `CV-12A1`) has repos, a status, a comme
 
 First-run Approach: `internal/brief` adds the `approachRule` to the brief when a task has no runs, no `small` label and no "Approach" line in its description; the agent posts an Approach, ends `needs_you`, then records `decision:` lines after the ack.
 
+The law: help the human get things done, not make them weaker; the agent types, the human owns the approach. Decisions (`decision:`/`dispute:` status-block lines, `conveyor task decision`) are rendered under `## Decisions` in every brief; follow them, dispute one rather than undo it. Human habits this supports, so point the human at them when relevant: approve the approach, read the first diff before the bots, state decisions as decisions, turn style fixes into skill lines, batch feedback, `#fresh` only after decisions are recorded (`docs/guide.md`, "Working with agents").
+
 Statuses: backlog, todo, running, needs_you, review, failed, done, cancelled. Allowed moves: `internal/store/status.go`.
 Model precedence: task `model` > agent file `model:` > `default_model` setting.
 

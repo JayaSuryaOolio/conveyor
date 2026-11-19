@@ -129,6 +129,21 @@ When the dispatcher launches a task that already has runs, it chooses between:
 
 To choose yourself, start a comment with `#fresh` or `#resume` (CLI, app or Slack; the latest pending one wins). `#fresh` always starts a new session; `#resume` resumes regardless of `resume_threshold` and those rules, as long as the last auto run finished with a known session.
 
+## Working with agents: you own the approach
+
+The rule Conveyor is built around: **help the human get things done, not make them weaker. The agent types; the human owns the approach.** Standards in the codebase and skills don't replace your call on which module, which existing API and what names. Tasks that skipped that call took about 8 PR rounds instead of one short plan (`docs/research/cv-117b-117i-study.md`).
+
+**Decisions.** A run's status block can carry `decision: what — why` lines. Each is stored on the task as `D<n>` and listed under `## Decisions` in every later `BRIEF.md`, so it survives `#fresh`. Manage them with `conveyor task decision KEY list | add "what — why" | rm D<n> | dispute D<n> "reason" | undispute D<n>`, or from the task page. An agent that thinks a decision is wrong writes `dispute: D<n> | reason` instead of quietly undoing it.
+
+Habits that keep you in touch with the code:
+
+- **Approve the approach.** Spend about 5 minutes on the first-run Approach (see "Approach step" above): which module, which existing API, what names. Approving it is the one thing only you can do; your ack becomes Decisions.
+- **Read the first diff yourself, before the bots.** Bot rounds polish whatever shape exists. One look at round 1 catches the wrong module, a bool flag or a lookup on every call.
+- **State decisions as decisions.** Write "Decision: X because Y" (or `task decision add`), and mark a question as a question so it isn't read as an order.
+- **Turn style corrections into skill lines.** A correction fixes one PR; ask the agent to add it to the repo skill and the next task follows it.
+- **Batch feedback.** One comment with every point, not one per run: each comment is a run, and each run re-derives context.
+- **Use `#fresh` only after decisions are recorded.** A fresh session knows only what `BRIEF.md` holds.
+
 ## Interactive sessions and terminals
 
 The app has embedded terminals on the task page: a shell in the worktree, or one of the actions below. Output survives switching away (a 256 KB replay buffer), and terminals are closed when the app quits. From the CLI, `conveyor task open KEY` opens an external terminal instead, through the `terminal_template` setting.
