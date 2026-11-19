@@ -1,5 +1,6 @@
 import {useState} from 'react'
-import {ActionIcon, Button, Checkbox, Code, Group, Modal, MultiSelect, PasswordInput, ScrollArea, SegmentedControl, Select, SelectProps, SimpleGrid, Stack, Table, TagsInput, Tabs, Text, TextInput, Textarea, Title, Tooltip} from '@mantine/core'
+import {ActionIcon, Button, Checkbox, Code, Group, MultiSelect, PasswordInput, ScrollArea, SegmentedControl, Select, SelectProps, SimpleGrid, Stack, Table, TagsInput, Tabs, Text, TextInput, Textarea, Title, Tooltip} from '@mantine/core'
+import {Modal} from './ui'
 import {IconAdjustments} from '@tabler/icons-react'
 import {AddLabel, AddRepo, CreateTask, ExportState, GetPromptDefaults, GetTask, GetSettings, ImportState, ListAgents, ListCLIAgents, ListLabels, ListModels, ListRepos, PreviewBrief, Requirements, ShellPATHError, SetRepoSetupScript, SetSetting, SetTaskAgent, SetTaskModel, SetTaskRunner} from '../wailsjs/go/ui/App'
 import {core, store} from '../wailsjs/go/models'

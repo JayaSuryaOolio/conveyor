@@ -1,5 +1,6 @@
 import {lazy, Ref, Suspense, useEffect, useRef, useState} from 'react'
-import {ActionIcon, Anchor, Badge, Box, Breadcrumbs, Button, CloseButton, Code, CopyButton, Divider, Group, Kbd, Modal, Paper, Popover, Stack, Text, TextInput, Timeline, Title, Tooltip} from '@mantine/core'
+import {ActionIcon, Anchor, Badge, Box, Breadcrumbs, Button, CloseButton, Code, CopyButton, Divider, Group, Kbd, Paper, Popover, Stack, Text, TextInput, Timeline, Title, Tooltip} from '@mantine/core'
+import {Modal} from './ui'
 import {useLocalStorage} from '@mantine/hooks'
 import {IconAbc, IconSitemap, IconArrowDown, IconArrowUp, IconClock, IconFlame, IconHash, IconPencil, IconSearch, IconTerminal, IconX, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconMessage, IconPlayerPlay} from '@tabler/icons-react'
 import {Actions, GetTask, QueueStatus, RunLog, SendQueuedNow, SetTaskDescription, Stop, TakeQueuedComment, TermStart} from '../wailsjs/go/ui/App'
@@ -184,7 +185,7 @@ export function Focus({nav, onClose}: {nav: Nav; onClose: () => void}) {
 /** The task page in a modal ("" = closed), so agent/model/skills edit in place; navigating away from it closes the modal. */
 export function TaskPreview({k, onClose, nav}: {k: string; onClose: () => void; nav: Nav}) {
     return (
-        <Modal opened={!!k} onClose={onClose} size="min(1200px, 96vw)" padding="sm" title={k}>
+        <Modal opened={!!k} onClose={onClose} size="min(1200px, 96vw)" compact title={k}>
             {k && <TaskPage k={k} height="calc(100vh - 140px)" nav={nav}/>}
         </Modal>
     )

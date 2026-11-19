@@ -1,10 +1,11 @@
 import {useContext, useEffect, useState} from 'react'
-import {ActionIcon, Badge, Box, Button, Card as MCard, Group, Indicator, Menu, Modal, Notification, Paper, Popover, RingProgress, Select, Stack, Text, Tooltip} from '@mantine/core'
+import {ActionIcon, Badge, Box, Button, Group, Indicator, Menu, Notification, Paper, Popover, RingProgress, Select, Stack, Text, Tooltip} from '@mantine/core'
+import {ClickableCard, Modal} from './ui'
 import {IconAppWindow, IconCheck, IconChevronLeft, IconChevronRight, IconDots, IconMessageSearch, IconPencil, IconSitemap, IconX} from '@tabler/icons-react'
 import {AddComment, ConnectorServiceRunning, CheckReviews, MergedPR, Move, PlacedActions, RunConnectorAction, ShowError, SendQueuedNow, StopConnectorService, TakeQueuedComment} from '../wailsjs/go/ui/App'
 import {store, ui} from '../wailsjs/go/models'
 import {Markdown, MarkdownEditor, TaskKey} from './markdown'
-import {ALL_STATUSES, STATUS_COLOR, STATUS_LABEL, ago, clickable, fmtK, fmtTime, prNumbers, useData, useDraft} from './util'
+import {ALL_STATUSES, STATUS_COLOR, STATUS_LABEL, ago, fmtK, fmtTime, prNumbers, useData, useDraft} from './util'
 
 /** A screen to show; board views may carry a label or repo filter to apply (deep link); epic views a task key for the open modal. */
 export type View = {name: string; key?: string; label?: string; repo?: string; task?: string}
@@ -157,7 +158,7 @@ function StatusMenu({k, status}: {k: string; status: string}) {
 /** showPR (a search is active) adds the card's PR numbers beside the key, so a PR-number hit is explained without crowding idle cards. */
 export function Card({c, nav, onLabel, showPR}: {c: ui.TaskCard; nav: Nav; onLabel: (l: string) => void; showPR?: boolean}) {
     return (
-        <MCard withBorder padding="sm" radius="md" style={{cursor: 'pointer'}} {...clickable(() => nav({name: 'task', key: c.key}))}>
+        <ClickableCard bordered onActivate={() => nav({name: 'task', key: c.key})}>
             <Group justify="space-between" wrap="nowrap" gap="xs">
                 <Text size="xs" fw={600} c="dimmed">{c.key}{c.parent && <Text span size="xs" fw={400}> ↑ {c.parent}</Text>}{showPR && c.prUrls.length > 0 && <Text span size="xs" fw={400} c="violet"> {prNumbers(c.prUrls).join(' ')}</Text>}</Text>
                 <Group gap={4} wrap="nowrap">
@@ -175,7 +176,7 @@ export function Card({c, nav, onLabel, showPR}: {c: ui.TaskCard; nav: Nav; onLab
             </Group>}
             {c.lastSummary && <Box mt="xs" mah={40} style={{overflow: 'hidden'}}><Markdown c="dimmed">{c.lastSummary}</Markdown></Box>}
             {c.repos.length > 0 && <Box mt="xs"><PlacedButtons place="board_card" k={c.key} size="compact-xs"/></Box>}
-        </MCard>
+        </ClickableCard>
     )
 }
 

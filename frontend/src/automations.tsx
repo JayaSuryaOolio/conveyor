@@ -1,5 +1,6 @@
 import {useEffect, useState} from 'react'
-import {ActionIcon, Button, Chip, Code, CopyButton, Group, Modal, MultiSelect, Popover, SegmentedControl, Select, Stack, Switch, Table, Text, TextInput, Textarea, Title, Tooltip} from '@mantine/core'
+import {ActionIcon, Button, Chip, Code, CopyButton, Group, MultiSelect, Popover, SegmentedControl, Select, Stack, Switch, Table, Text, TextInput, Textarea, Title, Tooltip} from '@mantine/core'
+import {Modal} from './ui'
 import {IconCheck, IconCopy, IconCalendarTime, IconPencil, IconPlus, IconTrash} from '@tabler/icons-react'
 import {AddAutomation, Confirm, DeleteAutomation, DescribeSchedule, ListAutomations, ListRepos, RunAutomation, SetAutomationEnabled, UpdateAutomation} from '../wailsjs/go/ui/App'
 import {store, ui} from '../wailsjs/go/models'
