@@ -1,6 +1,6 @@
 import {useContext, useEffect, useState} from 'react'
-import {ActionIcon, Badge, Box, Group, Indicator, Menu, Notification, Paper, Popover, RingProgress, Select, Stack, Text, Tooltip} from '@mantine/core'
-import {Button, ButtonSize, ClickableCard, Modal} from './ui'
+import {ActionIcon, Badge, Box, Indicator, Menu, Notification, Paper, Popover, RingProgress, Select, Text, Tooltip} from '@mantine/core'
+import {Button, ButtonSize, ClickableCard, Group, Modal, Stack} from './ui'
 import {IconAppWindow, IconCheck, IconChevronLeft, IconChevronRight, IconDots, IconMessageSearch, IconPencil, IconSitemap, IconX} from '@tabler/icons-react'
 import {AddComment, ConnectorServiceRunning, CheckReviews, MergedPR, Move, PlacedActions, RunConnectorAction, ShowError, SendQueuedNow, StopConnectorService, TakeQueuedComment} from '../wailsjs/go/ui/App'
 import {store, ui} from '../wailsjs/go/models'
@@ -26,7 +26,7 @@ export function Toasts() {
         return () => { pushToast = () => {} }
     }, [])
     return (
-        <Stack pos="fixed" bottom={16} right={16} gap="xs" maw={480} style={{zIndex: 1000}}>
+        <Stack gap="xs" style={{position: 'fixed', bottom: 16, right: 16, maxWidth: 480, zIndex: 1000}}>
             {list.map(x => (
                 <Notification key={x.id} withBorder color={x.sticky ? 'red' : undefined} withCloseButton={!x.sticky} onClose={() => setList(l => l.filter(y => y.id !== x.id))}>
                     <Text size="sm" ff="monospace" style={{whiteSpace: 'pre-wrap', wordBreak: 'break-word'}}>{x.m}</Text>
@@ -55,7 +55,7 @@ export function PlacedButtons({place, k = '', size = 'xs'}: {place: string; k?: 
         <Group gap={4} onClick={e => e.stopPropagation()}>
             <Modal opened={!!ask} onClose={() => setAsk(undefined)} title={ask?.label}>
                 <Text size="sm" mb="sm">{ask?.msg}</Text>
-                <Group justify="flex-end">
+                <Group justify="end">
                     <Button variant="secondary" onClick={() => setAsk(undefined)}>Cancel</Button>
                     <Button data-autofocus onClick={() => { ask?.go(); setAsk(undefined) }}>Continue</Button>
                 </Group>
@@ -117,7 +117,7 @@ function useMove(k: string) {
     const modal = (
         <Modal opened={!!pending} onClose={() => setPending(undefined)} title={`Move ${k} to ${STATUS_LABEL[pending?.to ?? '']}?`}>
             <Text size="sm" mb="sm">{k} has {pending?.n} running run(s). Moving it ends them; the agent stops now.</Text>
-            <Group justify="flex-end">
+            <Group justify="end">
                 <Button variant="secondary" onClick={() => setPending(undefined)}>Cancel</Button>
                 <Button data-autofocus tone="danger" onClick={confirm}>Stop and move</Button>
             </Group>
@@ -159,9 +159,9 @@ function StatusMenu({k, status}: {k: string; status: string}) {
 export function Card({c, nav, onLabel, showPR}: {c: ui.TaskCard; nav: Nav; onLabel: (l: string) => void; showPR?: boolean}) {
     return (
         <ClickableCard bordered onActivate={() => nav({name: 'task', key: c.key})}>
-            <Group justify="space-between" wrap="nowrap" gap="xs">
+            <Group justify="between" wrap={false} gap="xs">
                 <Text size="xs" fw={600} c="dimmed">{c.key}{c.parent && <Text span size="xs" fw={400}> ↑ {c.parent}</Text>}{showPR && c.prUrls.length > 0 && <Text span size="xs" fw={400} c="violet"> {prNumbers(c.prUrls).join(' ')}</Text>}</Text>
-                <Group gap={4} wrap="nowrap">
+                <Group gap={4} wrap={false}>
                     {c.ctxPeak > 0 && <Badge variant="outline" color="gray" size="xs" title="context peak">{fmtK(c.ctxPeak)}</Badge>}
                     {c.openPR && <Tooltip label="Check PR now (reviews, CI, conflicts)"><ActionIcon variant="subtle" color="gray" size="sm" aria-label="Check PR" onClick={e => { e.stopPropagation(); CheckReviews(c.key).then(() => toast('Checking the PR for reviews, CI and conflicts…', false, 3000), errMsg) }}><IconMessageSearch size={16}/></ActionIcon></Tooltip>}
                     <Tooltip label="Epic view"><ActionIcon variant="subtle" color="gray" size="sm" aria-label="Epic view" onClick={e => { e.stopPropagation(); nav({name: 'epic', key: c.key}) }}><IconSitemap size={16}/></ActionIcon></Tooltip>
@@ -169,7 +169,7 @@ export function Card({c, nav, onLabel, showPR}: {c: ui.TaskCard; nav: Nav; onLab
                 </Group>
             </Group>
             <Text size="sm" fw={500} mt={2} lineClamp={2} title={c.title}>{c.title}</Text>
-            {(c.repos.length > 0 || c.labels.length > 0) && <Group gap={4} mt="xs">
+            {(c.repos.length > 0 || c.labels.length > 0) && <Group gap={4} style={{marginTop: 'var(--mantine-spacing-xs)'}}>
                 {c.repos.map(r => <Badge key={r} variant="light" size="xs">{r}</Badge>)}
                 {c.labels.map(l => <Badge key={'l:' + l} component="button" variant="outline" color="gray" size="xs" title={'Filter by ' + l}
                                           style={{textTransform: 'none', cursor: 'pointer'}} onClick={e => { e.stopPropagation(); onLabel(l) }}>{l}</Badge>)}
@@ -213,7 +213,7 @@ export function CommentBox({k, placeholder = 'Comment…', onDone, restored}: {k
 function Edits({edits, i, setI}: {edits: store.CommentEdit[]; i: number | null; setI: (i: number | null) => void}) {
     const at = i ?? edits.length
     return (
-        <Group gap={2} ml="auto" wrap="nowrap">
+        <Group gap={2} wrap={false} style={{marginLeft: 'auto'}}>
             <ActionIcon variant="subtle" color="gray" size="xs" aria-label="Older version" disabled={at === 0} onClick={() => setI(at - 1)}><IconChevronLeft size={12}/></ActionIcon>
             {i === null
                 ? <Text size="xs" c="dimmed">Current</Text>
@@ -255,7 +255,7 @@ function QueuedBadge({m, queue, onSendNow}: {m: store.Comment; queue?: ui.QueueS
                 <Stack gap={4}>
                     <Text size="xs" fw={600}>Queued · {label}</Text>
                     {queue?.items.length ? queue.items.map(i => (
-                        <Group key={i.key} gap={6} wrap="nowrap">
+                        <Group key={i.key} gap={6} wrap={false}>
                             <Badge size="xs" variant="light" color={i.running ? 'green' : i.held ? 'orange' : 'gray'} style={{flex: 'none'}}>{i.running ? 'running' : 'queued'}</Badge>
                             <Text size="xs" truncate title={i.held || undefined}><b>{i.key}</b> {i.title}</Text>
                         </Group>
@@ -275,7 +275,7 @@ export function Message({m, onEdit, onSendNow, queue}: {m: store.Comment; onEdit
     const old = ver === null ? undefined : m.edits?.[ver]
     return (
         <Paper withBorder p="sm" radius="md" style={old ? {borderStyle: 'dashed'} : undefined} bg={m.author === 'human' ? 'var(--mantine-color-default-hover)' : undefined}>
-            <Group gap="xs" mb={4}>
+            <Group gap="xs" style={{marginBottom: 4}}>
                 <Text size="xs" fw={600}>{m.author}{m.source ? ` (via ${m.source})` : ''}</Text>
                 <Time iso={m.created_at}/>
                 {onEdit && <QueuedBadge m={m} queue={queue} onSendNow={onSendNow && (() => setAsking(true))}/>}
@@ -286,7 +286,7 @@ export function Message({m, onEdit, onSendNow, queue}: {m: store.Comment; onEdit
             <Markdown>{old ? old.body : m.body}</Markdown>
             <Modal opened={asking} onClose={() => setAsking(false)} title="Send now?">
                 <Text size="sm" mb="sm">Skip the wait and start the agent with this message now.</Text>
-                <Group justify="flex-end">
+                <Group justify="end">
                     <Button variant="secondary" onClick={() => setAsking(false)}>Cancel</Button>
                     <Button data-autofocus onClick={() => { setAsking(false); onSendNow?.() }}>Send now</Button>
                 </Group>
