@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -234,5 +235,56 @@ func TestCleanStripsBotBoilerplate(t *testing.T) {
 func TestIsNoise(t *testing.T) {
 	if !isNoise("### ⚠️ No Changeset found\n\nLatest commit") || !isNoise("## Draft PR not reviewed") || isNoise("real finding") {
 		t.Fatal("isNoise")
+	}
+}
+
+// Feedback dropped for lack of room keeps the watermark behind it, so the next check reports it.
+func TestReviewCheckDeferredItemNotLost(t *testing.T) {
+	noThreads := `{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[]}}}}}`
+	big := strings.Repeat("x", itemCap-10)
+	var cs []string
+	for i := 1; i <= 7; i++ { // 7 x ~1.5KB overflows totalCap (8000)
+		cs = append(cs, `{"id":`+strconv.Itoa(i)+`,"body":"`+big+`","path":"a.go","line":1,"user":{"login":"bob"}}`)
+	}
+	dir := fakeAPI(t, `[]`, `[`+strings.Join(cs, ",")+`]`, noThreads)
+	svc, tk := reviewTask(t)
+	ctx := context.Background()
+	st := store.PRReview{TaskID: tk.ID, RepoID: tk.Repos[0].RepoID, SeenReviewID: 0, SeenInlineID: 0, SeenCommentID: 0}
+	if err := store.SavePRReview(svc.DB, st); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ReviewCheck(ctx, svc, tk.Key, 0); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := store.GetPRReview(svc.DB, tk.ID, tk.Repos[0].RepoID)
+	if got.SeenInlineID >= 7 || got.SeenInlineID == 0 {
+		t.Fatalf("watermark should stop before the dropped items: %+v", got)
+	}
+	// The next check reports the rest.
+	os.WriteFile(filepath.Join(dir, "comments.json"), []byte(`[`+strings.Join(cs, ",")+`]`), 0o644)
+	if _, err := ReviewCheck(ctx, svc, tk.Key, 0); err != nil {
+		t.Fatal(err)
+	}
+	got, _ = store.GetPRReview(svc.DB, tk.ID, tk.Repos[0].RepoID)
+	if got.SeenInlineID != 7 {
+		t.Fatalf("deferred items never reported: %+v", got)
+	}
+}
+
+// A gh failure reschedules the same step instead of ending the backoff chain.
+func TestReviewCheckReschedulesAfterError(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "gh"), []byte("#!/bin/sh\necho 'error connecting to api.github.com' >&2\nexit 1\n"), 0o755)
+	t.Setenv("PATH", dir+":"+os.Getenv("PATH"))
+	svc, tk := reviewTask(t)
+	if _, err := ReviewCheck(context.Background(), svc, tk.Key, 1); err == nil {
+		t.Fatal("want error")
+	}
+	a, err := store.GetAutomation(svc.DB, "track-pr:"+tk.Key)
+	if err != nil {
+		t.Fatalf("not rescheduled: %v", err)
+	}
+	if !strings.Contains(a.ActionArg, `"--step","1"`) {
+		t.Errorf("arg %s", a.ActionArg)
 	}
 }
