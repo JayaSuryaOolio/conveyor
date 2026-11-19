@@ -80,7 +80,7 @@ spawn: [todo] title of a follow-up task | its description
 
 Each `spawn:` line becomes a backlog sub-task (or a todo one the dispatcher starts, when the title starts with `[todo]`) with the parent's repos and the text after `|` as its description. A line without a description creates nothing and records a `spawn_failed` event, so no sub-task starts without context; `conveyor task new --parent` likewise requires `--desc`.
 
-Without a block the agent is treated as asking you a question. `BRIEF.md` explains this protocol to the agent, along with the task, repos, latest runs and your comments. The `brief_extra_rules` setting adds your own rules to it.
+Without a block the agent is treated as asking you a question. `BRIEF.md` explains this protocol to the agent, along with the task, repos, latest runs and your comments. The `brief_extra_rules` setting adds your own rules to it. Its sections come in a fixed order and each is size-capped (about 24 KB in all, roughly 6k tokens); anything clipped stays reachable through the `conveyor` command the brief names. See `docs/research/brief-template.md`.
 
 **Approach step.** On a task's first run, unless it has the `small` label or its description has a line starting "Approach", the brief tells the agent to post a short Approach (files and layer, functions and types it will reuse with paths, new names, open decisions) and end `needs_you` without changing code. Once you ack, the agent records the approach as `decision:` lines and builds. Label small items `small` to skip it (`needsApproach` in `internal/brief`).
 

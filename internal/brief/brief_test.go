@@ -276,3 +276,54 @@ func TestApproachRule(t *testing.T) {
 		t.Error("only the first run posts an Approach")
 	}
 }
+
+// TestTemplateCaps checks the template (AC7): sections in a fixed order, each variable one capped,
+// so a task with huge fields still renders a brief well under the budget.
+func TestTemplateCaps(t *testing.T) {
+	db, err := store.Open(filepath.Join(t.TempDir(), "c.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	r, _ := store.AddRepo(db, store.Repo{Name: "api", Path: "/src/api", DefaultBranch: "main"})
+	huge := strings.Repeat("z", 50000)
+	tk, err := store.CreateTask(db, store.Task{Title: "T", Description: "start " + huge, Status: store.StatusTodo}, []store.TaskRepo{{RepoID: r.ID, IsPrimary: true, Branch: "b"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	store.AddDecision(db, tk.ID, store.AuthorAgent, "keep it")
+	for i := 0; i < 5; i++ {
+		run, _ := store.CreateRun(db, store.Run{TaskID: tk.ID, Kind: "auto", Mode: "fresh", Status: "launching"})
+		run.Summary, run.State, run.Next, run.Criteria = &huge, &huge, &huge, &huge
+		store.UpdateRun(db, run)
+	}
+	for i := 0; i < 40; i++ {
+		store.AddComment(db, store.Comment{TaskID: tk.ID, Author: store.AuthorHuman, Body: huge})
+	}
+	for i := 0; i < 80; i++ {
+		store.CreateTask(db, store.Task{Title: huge[:300], Status: store.StatusTodo, ParentID: &tk.ID}, []store.TaskRepo{{RepoID: r.ID, IsPrimary: true, Branch: fmt.Sprint("c", i)}})
+	}
+	tk, _ = store.GetTask(db, tk.ID)
+	got, err := Build(db, tk)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("worst-case brief %d bytes", len(got))
+	if len(got) > maxBriefBytes {
+		t.Fatalf("brief %d bytes, budget %d", len(got), maxBriefBytes)
+	}
+	if !strings.Contains(got, "start zzz") || !strings.Contains(got, "conveyor task show "+tk.Key) {
+		t.Fatal("clipped description must keep its start and point at the full text")
+	}
+	if !strings.Contains(got, "more: `conveyor task graph "+tk.Key) {
+		t.Fatal("clipped relations must point at the graph")
+	}
+	at := -1
+	for _, h := range []string{"## Repos", "## Decisions", "## Description", "## Acceptance criteria", "## Latest run", "## Recent runs", "## Human comments", "## Relations", "## Status block", "## Rules", "## Older history"} {
+		i := strings.Index(got, "\n"+h+"\n")
+		if i <= at {
+			t.Fatalf("%s missing or out of order", h)
+		}
+		at = i
+	}
+}
