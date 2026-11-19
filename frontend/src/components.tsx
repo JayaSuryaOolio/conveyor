@@ -1,6 +1,6 @@
 import {useEffect, useState} from 'react'
-import {ActionIcon, Badge, Box, Button, Card as MCard, Group, Indicator, Menu, Modal, Notification, Paper, Popover, ScrollArea, Select, Stack, Text, Tooltip} from '@mantine/core'
-import {IconAppWindow, IconCheck, IconDots, IconMessageSearch, IconPencil, IconSitemap, IconX} from '@tabler/icons-react'
+import {ActionIcon, Badge, Box, Button, Card as MCard, Group, Indicator, Menu, Modal, Notification, Paper, Select, Stack, Text, Tooltip} from '@mantine/core'
+import {IconAppWindow, IconCheck, IconChevronLeft, IconChevronRight, IconDots, IconMessageSearch, IconPencil, IconSitemap, IconX} from '@tabler/icons-react'
 import {AddComment, ConnectorServiceRunning, CheckReviews, MergedPR, Move, PlacedActions, RunConnectorAction, ShowError, SendQueuedNow, StopConnectorService, TakeQueuedComment} from '../wailsjs/go/ui/App'
 import {store, ui} from '../wailsjs/go/models'
 import {Markdown, MarkdownEditor} from './markdown'
@@ -208,26 +208,17 @@ export function CommentBox({k, placeholder = 'Comment…', onDone, restored}: {k
     </>
 }
 
-/** The "edited" corner badge of a comment the run updated (a question, then its replies); opens the replaced versions. */
-function Edits({edits}: {edits: store.CommentEdit[]}) {
+/** Pager over a comment's replaced versions: `i` is an index into `edits` (oldest first), null is the current body. */
+function Edits({edits, i, setI}: {edits: store.CommentEdit[]; i: number | null; setI: (i: number | null) => void}) {
+    const at = i ?? edits.length
     return (
-        <Popover width={480} position="bottom-end" withinPortal shadow="md">
-            <Popover.Target>
-                <Badge size="xs" variant="light" color="gray" ml="auto" style={{cursor: 'pointer'}} component="button">edited {edits.length}×</Badge>
-            </Popover.Target>
-            <Popover.Dropdown>
-                <ScrollArea.Autosize mah={400}>
-                    <Stack gap="sm">
-                        {[...edits].reverse().map((e, i) => (
-                            <Box key={i}>
-                                <Text size="xs" c="dimmed">Replaced <Time iso={e.at}/></Text>
-                                <Markdown>{e.body}</Markdown>
-                            </Box>
-                        ))}
-                    </Stack>
-                </ScrollArea.Autosize>
-            </Popover.Dropdown>
-        </Popover>
+        <Group gap={2} ml="auto" wrap="nowrap">
+            <ActionIcon variant="subtle" color="gray" size="xs" aria-label="Older version" disabled={at === 0} onClick={() => setI(at - 1)}><IconChevronLeft size={12}/></ActionIcon>
+            {i === null
+                ? <Text size="xs" c="dimmed">Current</Text>
+                : <Tooltip label="Back to current"><Badge size="xs" variant="light" color="gray" style={{cursor: 'pointer'}} component="button" type="button" onClick={() => setI(null)}>Edit {i + 1}/{edits.length}</Badge></Tooltip>}
+            <ActionIcon variant="subtle" color="gray" size="xs" aria-label="Newer version" disabled={i === null} onClick={() => setI(i! + 1 >= edits.length ? null : i! + 1)}><IconChevronRight size={12}/></ActionIcon>
+        </Group>
     )
 }
 
@@ -235,8 +226,10 @@ function Edits({edits}: {edits: store.CommentEdit[]}) {
 // onSendNow: refactor idea: Message owns modal state; if more confirm dialogs appear, adopt @mantine/modals' openConfirmModal.
 export function Message({m, onEdit, onSendNow}: {m: store.Comment; onEdit?: () => void; onSendNow?: () => void}) {
     const [asking, setAsking] = useState(false)
+    const [ver, setVer] = useState<number | null>(null) // not persisted: null shows the current body
+    const old = ver === null ? undefined : m.edits?.[ver]
     return (
-        <Paper withBorder p="sm" radius="md" bg={m.author === 'human' ? 'var(--mantine-color-default-hover)' : undefined}>
+        <Paper withBorder p="sm" radius="md" style={old ? {borderStyle: 'dashed'} : undefined} bg={m.author === 'human' ? 'var(--mantine-color-default-hover)' : undefined}>
             <Group gap="xs" mb={4}>
                 <Text size="xs" fw={600}>{m.author}{m.source ? ` (via ${m.source})` : ''}</Text>
                 <Time iso={m.created_at}/>
@@ -244,9 +237,10 @@ export function Message({m, onEdit, onSendNow}: {m: store.Comment; onEdit?: () =
                     ? <Tooltip label="Click to send now"><Badge size="xs" variant="light" color="gray" style={{cursor: 'pointer'}} component="button" type="button" onClick={() => setAsking(true)}>queued</Badge></Tooltip>
                     : <Tooltip label="Sent to the agent when the next run starts"><Badge size="xs" variant="light" color="gray">queued</Badge></Tooltip>)}
                 {onEdit && <Tooltip label="Move back to the editor"><ActionIcon variant="subtle" color="gray" size="xs" aria-label="Edit queued message" onClick={onEdit}><IconPencil size={12}/></ActionIcon></Tooltip>}
-                {!!m.edits?.length && <Edits edits={m.edits}/>}
+                {!!m.edits?.length && <Edits edits={m.edits} i={ver} setI={setVer}/>}
             </Group>
-            <Markdown>{m.body}</Markdown>
+            {old && <Text size="xs" c="dimmed">Replaced <Time iso={old.at}/></Text>}
+            <Markdown>{old ? old.body : m.body}</Markdown>
             <Modal opened={asking} onClose={() => setAsking(false)} title="Send now?">
                 <Text size="sm" mb="sm">Skip the wait and start the agent with this message now.</Text>
                 <Group justify="flex-end">
