@@ -69,6 +69,8 @@ criteria:
 - [x] AC1 - evidence
 - [ ] AC2 - why not
 learning: only a repo-wide trap (not specific to one task or feature) that cost you >10 min and is not in CLAUDE.md/SKILL.md/LEARNINGS.md. Name the file or command. Feature-level facts go in that feature's SKILL.md or a code comment, not here. Omit the line otherwise. (repeatable line)
+decision: what you chose — why; record one whenever you pick between options or the human states one (repeatable line; omit when none)
+dispute: D<n> | one-line reason, when you think decision D<n> is a mistake; undispute: D<n> once resolved (repeatable lines)
 spawn: [todo] child task title | description with everything its agent needs (repeatable line; omit it entirely when there is nothing to spawn, never write a placeholder like "none"; [todo] is optional: the child starts once unblocked, else it waits in backlog)
 </conveyor>
 ```

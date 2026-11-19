@@ -296,6 +296,7 @@ func ProcessStop(db *sql.DB, task store.Task, run store.Run, lastAssistantMessag
 			return err
 		}
 	}
+	core.ApplyDecisionLines(db, task.ID, block.Decisions, block.Disputes, block.Undisputes)
 	for _, s := range block.Spawn {
 		if err := store.RecordEvent(db, task.ID, "spawn", s); err != nil {
 			return err

@@ -2,6 +2,7 @@ package brief
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -167,5 +168,75 @@ func TestAgyRulesAndContext(t *testing.T) {
 	}
 	if !strings.Contains(got, "The repo's AGENTS.md, skills, commands and agents are the authority") {
 		t.Errorf("brief should mention AGENTS.md for agy runner:\n%s", got)
+	}
+}
+
+func TestDecisionsSection(t *testing.T) {
+	db, err := store.Open(filepath.Join(t.TempDir(), "c.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	r, _ := store.AddRepo(db, store.Repo{Name: "api", Path: "/src/api", DefaultBranch: "main"})
+	tk, err := store.CreateTask(db, store.Task{Title: "T", Description: "desc", Status: store.StatusTodo}, []store.TaskRepo{{RepoID: r.ID, IsPrimary: true, Branch: "b"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, _ := Build(db, tk)
+	if strings.Contains(got, "## Decisions") {
+		t.Fatal("no decisions, no section")
+	}
+	a, _ := store.AddDecision(db, tk.ID, store.AuthorAgent, "use sqlite — already a dependency")
+	store.AddDecision(db, tk.ID, store.AuthorHuman, "no new table per kind — keep it small")
+	store.SetDispute(db, tk.ID, a, store.AuthorHuman, "we use a flat file here")
+	got, _ = Build(db, tk)
+	want := "## Decisions\n\n- D1 (agent): use sqlite — already a dependency\n  pitfall (human): we use a flat file here\n- D2 (human): no new table per kind — keep it small\n"
+	if !strings.Contains(got, want) || strings.Index(got, "## Decisions") > strings.Index(got, "## Description") {
+		t.Fatalf("decisions block:\n%s", got)
+	}
+	store.ClearDispute(db, tk.ID, a)
+	if got, _ = Build(db, tk); strings.Contains(got, "pitfall") {
+		t.Fatal("unmarked dispute still rendered")
+	}
+}
+
+func TestDecisionsCap(t *testing.T) {
+	db, err := store.Open(filepath.Join(t.TempDir(), "c.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	r, _ := store.AddRepo(db, store.Repo{Name: "api", Path: "/src/api", DefaultBranch: "main"})
+	tk, err := store.CreateTask(db, store.Task{Title: "T", Status: store.StatusTodo}, []store.TaskRepo{{RepoID: r.ID, IsPrimary: true, Branch: "b"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	long := strings.Repeat("x", 2000)
+	id, _ := store.AddDecision(db, tk.ID, store.AuthorAgent, "long "+long)
+	store.SetDispute(db, tk.ID, id, store.AuthorHuman, long)
+	for i := 0; i < 200; i++ {
+		store.AddDecision(db, tk.ID, store.AuthorAgent, fmt.Sprintf("choice %d — because %s", i, strings.Repeat("y", 100)))
+	}
+	got, _ := Build(db, tk)
+	start := strings.Index(got, "## Decisions")
+	end := strings.Index(got, "## Description")
+	sec := got[start:end]
+	if len(sec) > maxDecisionBytes+300 {
+		t.Fatalf("section %d bytes, cap %d", len(sec), maxDecisionBytes)
+	}
+	for _, l := range strings.Split(sec, "\n") {
+		if len([]rune(l)) > maxDecisionLine+40 {
+			t.Fatalf("line not capped (%d): %.80s", len(l), l)
+		}
+	}
+	// The newest decision survives; the oldest are summarised, not silently dropped.
+	if !strings.Contains(sec, "choice 199") || !strings.Contains(sec, "older decisions omitted") || strings.Contains(sec, "choice 0 ") {
+		t.Fatalf("cap kept the wrong ones:\n%s", sec)
+	}
+}
+
+func TestStatusBlockHelpMentionsDecisions(t *testing.T) {
+	if !strings.Contains(statusBlock, "decision: ") || !strings.Contains(statusBlock, "dispute: ") {
+		t.Fatal("status block help must teach decision/dispute lines")
 	}
 }

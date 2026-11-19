@@ -6,6 +6,7 @@ import {Actions, GetTask, QueueStatus, RunLog, SendQueuedNow, SetTaskDescription
 import {core, store, ui} from '../wailsjs/go/models'
 import {Card, CommentBox, Message, Nav, StatusBadge, Time, View, errMsg} from './components'
 import {Markdown, MarkdownEditor, TaskKey} from './markdown'
+import {Decisions} from './decisions'
 import {Relations} from './relations'
 import {TaskSidebar} from './workspace'
 import {fmtDuration, fmtK, listTasks, prNumbers, useData} from './util'
@@ -341,6 +342,7 @@ export function TaskPage({k, nav, height = 'calc(100vh - 2 * var(--mantine-spaci
                 <ScrollBox floating={floatingAnswer}>
                     <Stack>
                         <WatchedTitle onGone={setTitleGone}>{t.title}</WatchedTitle>
+                        <Decisions k={t.key}/>
                         <Description t={t} reload={reload}/>
                         <Relations k={t.key} status={t.status} rel={d.relations} nav={nav} reload={reload}/>
                         {latest?.criteria && <><Title order={5}>Acceptance criteria</Title><Criteria text={latest.criteria}/></>}

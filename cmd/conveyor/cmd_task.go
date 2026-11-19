@@ -17,10 +17,10 @@ import (
 )
 
 func init() {
-	register("task", runTask, "manage tasks (new|list|show|comment|move|set|repo|link|unlink|parent|sessions|stop|cancel|done|sync|brief|log|attach|open|label|graph)")
+	register("task", runTask, "manage tasks (new|list|show|comment|move|set|repo|link|unlink|decision|parent|sessions|stop|cancel|done|sync|brief|log|attach|open|label|graph)")
 }
 
-const taskUsage = "usage: conveyor task new|list|show|comment|move|set|link|unlink|parent|sessions|stop|cancel|done|sync|brief|log|attach|open|label|graph ..."
+const taskUsage = "usage: conveyor task new|list|show|comment|move|set|link|unlink|decision|parent|sessions|stop|cancel|done|sync|brief|log|attach|open|label|graph ..."
 
 func runTask(home string, args []string) error {
 	if len(args) == 0 {
@@ -560,4 +560,51 @@ func taskGraph(s *core.Service, args []string) error {
 		fmt.Fprintf(out, "%s %s %s\n", l.From, l.Kind, l.To)
 	}
 	return nil
+}
+
+func taskDecision(s *core.Service, args []string) error {
+	const usage = "usage: conveyor task decision KEY list | add \"what — why\" | rm D<n> | dispute D<n> \"reason\" | undispute D<n>"
+	if len(args) < 2 {
+		return fmt.Errorf("%s", usage)
+	}
+	key, op, rest := args[0], args[1], args[2:]
+	id := func() (int64, error) {
+		if len(rest) == 0 {
+			return 0, fmt.Errorf("%s", usage)
+		}
+		return core.ParseDecisionID(rest[0])
+	}
+	switch op {
+	case "list":
+		ds, err := s.Decisions(key)
+		for _, d := range ds {
+			fmt.Fprintf(out, "D%d (%s): %s\n", d.ID, d.Author, d.Body)
+			if d.DisputedBy != "" {
+				fmt.Fprintf(out, "  pitfall (%s): %s\n", d.DisputedBy, d.Dispute)
+			}
+		}
+		return err
+	case "add":
+		if len(rest) != 1 {
+			return fmt.Errorf("%s", usage)
+		}
+		return s.AddDecision(key, rest[0])
+	case "rm":
+		n, err := id()
+		if err != nil {
+			return err
+		}
+		return s.RemoveDecision(key, n)
+	case "dispute", "undispute":
+		n, err := id()
+		if err != nil || op == "dispute" && len(rest) != 2 || op == "undispute" && len(rest) != 1 {
+			return fmt.Errorf("%s", usage)
+		}
+		reason := ""
+		if op == "dispute" {
+			reason = rest[1]
+		}
+		return s.DisputeDecision(key, n, reason)
+	}
+	return fmt.Errorf("%s", usage)
 }
