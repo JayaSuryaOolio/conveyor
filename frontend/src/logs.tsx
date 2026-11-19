@@ -1,6 +1,6 @@
 import {useEffect, useRef, useState} from 'react'
-import {Box, Code, Group, SegmentedControl, Stack, Switch, Text, TextInput, Title} from '@mantine/core'
-import {Button} from './ui'
+import {Box, Code, SegmentedControl, Switch, Text, TextInput, Title} from '@mantine/core'
+import {Button, Group, Stack} from './ui'
 import {IconCopy, IconSearch} from '@tabler/icons-react'
 import {AppLog} from '../wailsjs/go/ui/App'
 
@@ -54,8 +54,8 @@ export function Logs() {
     }
 
     return (
-        <Stack h="calc(100vh - 2 * var(--mantine-spacing-md))" gap="xs">
-            <Group justify="space-between">
+        <Stack gap="xs" style={{height: 'calc(100vh - 2 * var(--mantine-spacing-md))'}}>
+            <Group justify="between">
                 <Title order={3}>Logs</Title>
                 <Group>
                     <SegmentedControl value={source} onChange={setSource} data={SOURCES.map(({value, label}) => ({value, label}))}/>
