@@ -4,8 +4,8 @@
  * Rule: never pass a Mantine prop type or Mantine-only prop (withBorder, radius, p, w, shadow, withCloseButton, ...) through a wrapper; add a neutral prop and map it here.
  * Migrating other widgets (Button, Text, Stack, ...) follows the same pattern, one wrapper at a time.
  */
-import {Button as MButton, Code, Modal as MModal, Paper} from '@mantine/core'
-import type {CSSProperties, HTMLAttributes, ImgHTMLAttributes, MouseEvent, ReactNode} from 'react'
+import {Button as MButton, Code, Group as MGroup, Modal as MModal, Paper, Stack as MStack} from '@mantine/core'
+import type {CSSProperties, ElementType, HTMLAttributes, ImgHTMLAttributes, MouseEvent, ReactNode} from 'react'
 import {clickable} from './util'
 
 type Size = 'sm' | 'md' | 'lg' | 'auto' | (string & {}) // 'sm'|'md'|'lg' are our tokens; anything else is a CSS width
@@ -77,3 +77,29 @@ const BTN_TONE = {danger: 'red', success: 'green', muted: 'gray'} as const
 
 export const Button = ({variant = 'primary', tone, size, compact, icon, trailing, ...p}: ButtonProps) =>
     <MButton variant={BTN_VARIANT[variant]} color={tone && BTN_TONE[tone]} size={compact ? `compact-${size ?? 'md'}` : size} leftSection={icon} rightSection={trailing} {...p}/>
+
+export type Gap = number | 'xs' | 'sm' | 'md' | 'lg' | 'xl' // number = px
+type Flow = {
+    gap?: Gap
+    align?: 'start' | 'center' | 'end' | 'stretch'
+    justify?: 'start' | 'center' | 'end' | 'between'
+    as?: ElementType
+    id?: string
+    title?: string
+    role?: string
+    className?: string
+    style?: CSSProperties
+    children?: ReactNode
+    onClick?: (e: MouseEvent<HTMLElement>) => void
+    onMouseEnter?: (e: MouseEvent<HTMLElement>) => void
+    onMouseDown?: (e: MouseEvent<HTMLElement>) => void
+    'aria-label'?: string
+}
+const FLEX = {start: 'flex-start', end: 'flex-end', between: 'space-between', center: 'center', stretch: 'stretch'} as const
+const flow = ({align, justify, as, ...p}: Flow) => ({align: align && FLEX[align], justify: justify && FLEX[justify], component: as, ...p})
+
+/** Vertical flex column. Spacing/size beyond these props goes in `style`. */
+export const Stack = (p: Flow) => <MStack {...flow(p)}/>
+/** Horizontal flex row; wraps by default, `wrap={false}` keeps one line, `grow` stretches children equally. */
+export const Group = ({wrap = true, grow, ...p}: Flow & {wrap?: boolean; grow?: boolean}) =>
+    <MGroup wrap={wrap ? 'wrap' : 'nowrap'} grow={grow} {...flow(p)}/>
