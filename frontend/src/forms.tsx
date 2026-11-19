@@ -8,6 +8,7 @@ import {Markdown, MarkdownEditor} from './markdown'
 import {listTasks, useData, useDraft} from './util'
 import {ThemePicker} from './themes'
 
+/** Body of the New task modal; App owns the <Modal> (opened flag) so Mantine's focus trap and return-focus work. Unmounts on close, so state resets. */
 export function NewTask({nav, close}: {nav: Nav; close: () => void}) {
     const {data: repos} = useData(ListRepos, [])
     const {data: tasks} = useData(listTasks, [])
@@ -41,7 +42,6 @@ export function NewTask({nav, close}: {nav: Nav; close: () => void}) {
         }, errMsg)
     }
     return (
-        <Modal opened onClose={close} title="New task" size="clamp(28rem, 60vw, 64rem)">
             <Stack gap="sm">
                 <TextInput data-autofocus placeholder="Title" value={title} onChange={e => setTitle(e.target.value)}/>
                 <MarkdownEditor minRows={4} placeholder="Description" value={desc} onChange={setDesc} repos={sel}/>
@@ -70,7 +70,6 @@ export function NewTask({nav, close}: {nav: Nav; close: () => void}) {
                     <Button onClick={submit} disabled={!title.trim() || sel.length === 0}>Create</Button>
                 </Group>
             </Stack>
-        </Modal>
     )
 }
 

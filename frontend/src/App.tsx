@@ -1,6 +1,6 @@
 import {useEffect, useMemo, useRef, useState} from 'react'
 import {useLocation, useNavigate} from 'react-router'
-import {ActionIcon, AppShell, Badge, Box, Button, Group, Kbd, NavLink, Stack, Text, Title, Tooltip} from '@mantine/core'
+import {ActionIcon, AppShell, Badge, Box, Button, Group, Kbd, Modal, NavLink, Stack, Text, Title, Tooltip} from '@mantine/core'
 import {useLocalStorage} from '@mantine/hooks'
 import {IconApps, IconBolt, IconArrowLeft, IconBook2, IconClock, IconLayoutKanban, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconLogs, IconPlus, IconRobot, IconSettings, IconSitemap} from '@tabler/icons-react'
 import {AppVersion, DispatcherState, Learnings, ShellPATHError} from '../wailsjs/go/ui/App'
@@ -40,6 +40,7 @@ export default function App() {
     const back = () => { if (window.history.state?.idx > 0) navigate(-1) }
     const [showNew, setShowNew] = useState(false)
     const [showFocus, setShowFocus] = useState(false)
+    const [newKey, setNewKey] = useState(0) // bumped after each close: NewTask remounts fresh (drafts persist in localStorage) while hidden
     const [q, setQ] = useState('')
     const search = useRef<HTMLInputElement>(null)
     const [dispatcher, setDispatcher] = useState('')
@@ -109,7 +110,7 @@ export default function App() {
                     <Stack gap={2} mt="xs">
                         {NAV.map(({name, key, label, icon: Icon, filter}) => (
                             <Tooltip key={label} label={label} position="right" disabled={!mini}>
-                                <NavLink label={mini ? undefined : label} active={view.name === name && (view.label ?? undefined) === filter} leftSection={<Icon size={18}/>} aria-label={label}
+                                <NavLink component="button" label={mini ? undefined : label} active={view.name === name && (view.label ?? undefined) === filter} leftSection={<Icon size={18}/>} aria-label={label}
                                          rightSection={mini ? undefined : name === 'learnings' && proposed > 0 ? <Badge size="sm" circle>{proposed}</Badge> : key ? <Kbd size="xs" title={`g then ${key}`}>g {key}</Kbd> : undefined}
                                          onClick={() => setView(filter ? {name, label: filter} : {name})}/>
                             </Tooltip>
@@ -135,9 +136,9 @@ export default function App() {
                 {view.name === 'logs' && <Logs/>}
                 {view.name === 'settings' && <Settings/>}
             </AppShell.Main>
-            {showFocus && <Focus nav={nav} onClose={() => setShowFocus(false)}/>}
-            {showNew && <NewTask nav={nav} close={() => setShowNew(false)}/>}
-            <CommandPalette nav={nav} onFocus={() => setShowFocus(true)}/>
+            <Modal opened={showFocus} onClose={() => setShowFocus(false)} size="min(800px, 96vw)" title="Focus" keepMounted><Focus nav={nav} onClose={() => setShowFocus(false)}/></Modal>
+            <Modal opened={showNew} onClose={() => setShowNew(false)} size="clamp(28rem, 60vw, 64rem)" title="New task" keepMounted onExitTransitionEnd={() => setNewKey(k => k + 1)}><NewTask key={newKey} nav={nav} close={() => setShowNew(false)}/></Modal>
+            <CommandPalette nav={nav} onFocus={() => setTimeout(() => setShowFocus(true), 300)} /* ponytail: open after the palette's close transition so Mantine records the real opener (not the palette's input) for return-focus; refactor: Spotlight onSpotlightClose callback *//>
             <Toasts/>
         </AppShell>
         </NavContext.Provider>

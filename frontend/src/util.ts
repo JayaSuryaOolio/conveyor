@@ -1,4 +1,4 @@
-import {useCallback, useEffect, useRef, useState} from 'react'
+import {useCallback, useEffect, useRef, useState, type KeyboardEvent} from 'react'
 import {EventsOn} from '../wailsjs/runtime/runtime'
 import {ListTasks} from '../wailsjs/go/ui/App'
 
@@ -99,3 +99,13 @@ export function ago(iso: string): string {
 }
 
 export const fmtTime = (iso: string) => new Date(iso).toLocaleString()
+
+/**
+ * Props that make a non-button container keyboard-operable: focusable, Enter/Space activate it. The keys only count when the container itself has focus,
+ * so buttons inside it keep their own. Refactor: a card holding buttons should be one real link (title <Anchor> stretched over the card) instead of role=button.
+ */
+export const clickable = (go: () => void) => ({
+    role: 'button', tabIndex: 0, onClick: go,
+    onKeyDown: (e: KeyboardEvent) => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); go() } },
+})
+

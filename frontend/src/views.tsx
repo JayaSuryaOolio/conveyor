@@ -9,7 +9,7 @@ import {Markdown, MarkdownEditor, TaskKey} from './markdown'
 import {Decisions} from './decisions'
 import {Relations} from './relations'
 import {TaskSidebar} from './workspace'
-import {fmtDuration, fmtK, listTasks, prNumbers, useData} from './util'
+import {clickable, fmtDuration, fmtK, listTasks, prNumbers, useData} from './util'
 
 const TermDock = lazy(() => import('./terminals'))
 
@@ -70,7 +70,7 @@ export function Board({nav, q, setQ, search, link}: {nav: Nav; q: string; setQ: 
     const cols = [...COLUMNS]
     if (cards.some(c => c.status === 'failed')) cols.splice(5, 0, ['failed', 'Failed'])
     return (<Stack gap="sm">
-        <Paper withBorder radius="md" px="sm" py={6}>
+        <Paper withBorder radius="md" px="sm" py={6} className="find-box">
             <Group gap="sm" wrap="wrap">
                 <TextInput ref={search} variant="unstyled" size="sm" placeholder="Find a task…" w={200} leftSection={<IconSearch size={16}/>}
                            rightSection={q ? <CloseButton size="sm" aria-label="Clear search" onClick={() => setQ('')}/> : <Kbd size="xs">/</Kbd>}
@@ -127,7 +127,7 @@ export function Board({nav, q, setQ, search, link}: {nav: Nav; q: string; setQ: 
                 if (ARCHIVE.includes(s)) list = list.filter(c => Date.now() - Date.parse(c.updatedAt) < WEEK)
                 if (shut(s)) return (
                     <Paper key={s} bg="var(--mantine-color-default-hover)" radius="md" mih={120} title={'Show ' + label}
-                           style={{cursor: 'pointer', writingMode: 'vertical-rl', padding: '12px 0', display: 'flex', alignItems: 'center', gap: 6}} onClick={() => toggle(s)}>
+                           style={{cursor: 'pointer', writingMode: 'vertical-rl', padding: '12px 0', display: 'flex', alignItems: 'center', gap: 6}} {...clickable(() => toggle(s))}>
                         <Text size="sm" fw={600}>{label}</Text>
                         <Text size="xs" c="dimmed">{list.length}</Text>
                     </Paper>
@@ -135,7 +135,7 @@ export function Board({nav, q, setQ, search, link}: {nav: Nav; q: string; setQ: 
                 return (
                     <Paper key={s} bg="var(--mantine-color-default-hover)" p="xs" radius="md" mih={120}>
                         <Group gap="xs" mb="xs" px={4} style={ARCHIVE.includes(s) ? {cursor: 'pointer'} : undefined}
-                               title={ARCHIVE.includes(s) ? 'Collapse' : undefined} onClick={ARCHIVE.includes(s) ? () => toggle(s) : undefined}>
+                               title={ARCHIVE.includes(s) ? 'Collapse' : undefined} {...(ARCHIVE.includes(s) ? clickable(() => toggle(s)) : {})}>
                             <Text size="sm" fw={600}>{label}</Text>
                             <Text size="xs" c="dimmed">{list.length}</Text>
                         </Group>
@@ -147,7 +147,7 @@ export function Board({nav, q, setQ, search, link}: {nav: Nav; q: string; setQ: 
     </Stack>)
 }
 
-/** Focus popup: what is waiting on you, each card showing only the last message. Preview opens the task page in a nested modal. */
+/** Body of the Focus popup (App owns the <Modal>, see NewTask): what is waiting on you, each card showing only the last message. Preview opens the task page in a nested modal. */
 export function Focus({nav, onClose}: {nav: Nav; onClose: () => void}) {
     const {data, error} = useData(listTasks, [])
     const [peek, setPeek] = useState('')
@@ -156,7 +156,6 @@ export function Focus({nav, onClose}: {nav: Nav; onClose: () => void}) {
         .filter(c => FOCUS_ORDER.includes(c.status))
         .sort((a, b) => waiting(a) - waiting(b) || lastAt(b) - lastAt(a) || a.priority - b.priority)
     return <>
-        <Modal opened onClose={onClose} size="min(800px, 96vw)" title="Focus">
             {error && <Text c="red">{error}</Text>}
             {!error && rows.length === 0 && <Text c="dimmed">Nothing needs you.</Text>}
             <Stack>
@@ -178,7 +177,6 @@ export function Focus({nav, onClose}: {nav: Nav; onClose: () => void}) {
                     </Paper>
                 ))}
             </Stack>
-        </Modal>
         <TaskPreview k={peek} onClose={() => setPeek('')} nav={go}/>
     </>
 }
@@ -353,7 +351,7 @@ export function TaskPage({k, nav, height = 'calc(100vh - 2 * var(--mantine-spaci
                                                title={`Run ${runNo.get(it.run.id)} · ${it.run.mode}`}>
                                     <Text size="xs" c="dimmed">
                                         {it.run.session_id && (sid => <><CopyButton value={sid}>{({copied, copy}) => (
-                                            <Tooltip label={copied ? 'Copied' : `Click to copy ${sid}`}><Code style={{cursor: 'pointer'}} onClick={copy}>{sid.slice(0, 8)}</Code></Tooltip>
+                                            <Tooltip label={copied ? 'Copied' : `Click to copy ${sid}`}><Code style={{cursor: 'pointer'}} {...clickable(copy)}>{sid.slice(0, 8)}</Code></Tooltip>
                                         )}</CopyButton> · </>)(it.run.session_id)}{it.run.api_calls} calls · {fmtK(it.run.ctx_peak)} peak · {fmtDuration(it.run.started_at, it.run.ended_at)} · <Time iso={it.run.started_at}/>
                                     </Text>
                                     <SessionLog run={it.run} onStop={it.run.kind !== 'interactive' ? stop : undefined}/>
