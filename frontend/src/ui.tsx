@@ -18,6 +18,8 @@ export type ModalProps = {
     compact?: boolean // tighter body padding
     centered?: boolean
     closeButton?: boolean // default true
+    keepMounted?: boolean // keep the body in the DOM while closed
+    onExitTransitionEnd?: () => void // after the close animation
     children?: ReactNode
 }
 
