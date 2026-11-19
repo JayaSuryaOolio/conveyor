@@ -319,8 +319,13 @@ func TestStopRun(t *testing.T) {
 	s.DB.Exec(`UPDATE tasks SET status=? WHERE id=?`, store.StatusRunning, tk.ID)
 	// No bg id, so no `claude` call.
 	r, _ := store.CreateRun(s.DB, store.Run{TaskID: tk.ID, Kind: "auto", Mode: "fresh", Status: "launching"})
+	rv, _ := store.AddComment(s.DB, store.Comment{TaskID: tk.ID, Author: store.AuthorSystem, Body: "PR review"})
+	store.ConsumeComments(s.DB, []int64{rv.ID}, r.ID)
 	if err := s.Stop(tk.Key); err != nil {
 		t.Fatal(err)
+	}
+	if q, _ := store.UnconsumedComments(s.DB, tk.ID); len(q) == 0 || q[0].ID != rv.ID {
+		t.Fatalf("stopped run's review not re-delivered: %v", q)
 	}
 	got, _ := store.GetTask(s.DB, tk.ID)
 	run, _ := store.GetRun(s.DB, r.ID)
