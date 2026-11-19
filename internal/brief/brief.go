@@ -13,13 +13,23 @@ import (
 	"github.com/JayaSuryaOolio/conveyor/internal/workspace"
 )
 
-const maxComments = 20
-
-// Decisions are read on every run and the effective context is ~60k tokens, so the block is capped:
-// a line per decision, a line per dispute, each clipped, and the oldest dropped (with a count) past the total.
+// The brief is a template: fixed sections in a fixed order, each variable one size-capped, because it is
+// read on every run and the effective context is about 60k tokens (docs/research/brief-template.md).
+// Order: header (key, labels, epic, kind, skills), Repos, Decisions, Description, [Continues],
+// Acceptance criteria, [Other repos' context], Latest run, Recent runs, Human comments, Relations,
+// split help, Status block, Rules, Older history. Whatever a cap drops stays reachable through a named command.
 const (
-	maxDecisionLine  = 240
-	maxDecisionBytes = 4000
+	maxBriefBytes    = 24000 // whole brief, about 6k tokens; the sum of the caps below plus fixed text
+	maxDecisionLine  = 240   // one decision or pitfall line
+	maxDecisionBytes = 4000  // Decisions: oldest dropped past this, with a count
+	maxDescription   = 6000  // Description, runes
+	maxParentDesc    = 2000  // a follow-up's parent description, runes
+	maxCriteria      = 1500  // Acceptance criteria, runes
+	maxRunLine       = 300   // Latest run state/next, one run summary
+	maxComments      = 20    // human comments carried
+	maxCommentLine   = 200   // first line of each
+	maxRelations     = 30    // relation lines
+	maxRelationLine  = 160
 )
 
 const statusBlock = `## Status block
@@ -223,13 +233,16 @@ func Build(db *sql.DB, task store.Task) (string, error) {
 	if desc == "" {
 		desc = "(none)"
 	}
+	if c := clip(desc, maxDescription); c != desc {
+		desc = c + fmt.Sprintf("\n\n(clipped; full text: `conveyor task show %s`)", task.Key)
+	}
 	fmt.Fprintf(&b, "\n## Description\n\n%s\n", desc)
 	if task.Source == "followup" && task.ParentID != nil {
 		if err := parentContext(&b, db, *task.ParentID); err != nil {
 			return "", err
 		}
 	}
-	fmt.Fprintf(&b, "\n## Acceptance criteria\n\n%s\n", criteria(runs, "see description"))
+	fmt.Fprintf(&b, "\n## Acceptance criteria\n\n%s\n", clip(criteria(runs, "see description"), maxCriteria))
 	runnerTitle, doc := "Claude Code", "CLAUDE.md"
 	if authorityRunner(db, task) == "agy" {
 		runnerTitle, doc = "Antigravity", "AGENTS.md"
@@ -242,15 +255,25 @@ func Build(db *sql.DB, task store.Task) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	fmt.Fprintf(&b, "\n## Relations\n\n")
+	var rels []string
 	if rel.Parent != nil {
-		fmt.Fprintf(&b, "- parent: %s %s (%s)\n", rel.Parent.Key, rel.Parent.Title, rel.Parent.Status)
+		rels = append(rels, fmt.Sprintf("- parent: %s %s (%s)", rel.Parent.Key, rel.Parent.Title, rel.Parent.Status))
 	}
 	for _, c := range rel.Children {
-		fmt.Fprintf(&b, "- sub-task: %s %s (%s)\n", c.Key, c.Title, c.Status)
+		rels = append(rels, fmt.Sprintf("- sub-task: %s %s (%s)", c.Key, c.Title, c.Status))
 	}
 	for _, l := range rel.Links {
-		fmt.Fprintf(&b, "- %s: %s %s (%s)\n", l.Label, l.Task.Key, l.Task.Title, l.Task.Status)
+		rels = append(rels, fmt.Sprintf("- %s: %s %s (%s)", l.Label, l.Task.Key, l.Task.Title, l.Task.Status))
+	}
+	for i := range rels {
+		rels[i] = clip(rels[i], maxRelationLine)
+	}
+	if n := len(rels) - maxRelations; n > 0 {
+		rels = append(rels[:maxRelations], fmt.Sprintf("- (%d more: `conveyor task graph %s`)", n, task.Key))
+	}
+	fmt.Fprintf(&b, "\n## Relations\n\n")
+	if len(rels) > 0 {
+		b.WriteString(strings.Join(rels, "\n") + "\n")
 	}
 	b.WriteString(relationsHelp)
 	if x := connectors.Injected(db, true, func(i connectors.ManifestInject) string { return i.Brief }); x != "" {
@@ -356,12 +379,12 @@ func criteria(runs []store.Run, def string) string {
 func history(b *strings.Builder, h string, runs []store.Run, comments []store.Comment) {
 	if len(runs) > 0 {
 		last := runs[len(runs)-1]
-		fmt.Fprintf(b, "\n%s Latest run\n\nState: %s\nNext: %s\n", h, oneLine(deref(last.State)), oneLine(deref(last.Next)))
+		fmt.Fprintf(b, "\n%s Latest run\n\nState: %s\nNext: %s\n", h, clip(oneLine(deref(last.State)), maxRunLine), clip(oneLine(deref(last.Next)), maxRunLine))
 	}
 	var sums []string
 	for _, r := range runs {
 		if s := oneLine(deref(r.Summary)); s != "" {
-			sums = append(sums, fmt.Sprintf("- run %d: %s", r.ID, s))
+			sums = append(sums, clip(fmt.Sprintf("- run %d: %s", r.ID, s), maxRunLine))
 		}
 	}
 	if len(sums) > 3 {
@@ -373,7 +396,7 @@ func history(b *strings.Builder, h string, runs []store.Run, comments []store.Co
 	var human []string
 	for _, c := range comments {
 		if c.Author == store.AuthorHuman {
-			human = append(human, "- "+firstLine(c.Body))
+			human = append(human, clip("- "+firstLine(c.Body), maxCommentLine))
 		}
 	}
 	if len(human) > maxComments {
@@ -407,7 +430,7 @@ func parentContext(b *strings.Builder, db *sql.DB, parentID int64) error {
 	}
 	fmt.Fprintf(b, "\n## Continues %s: %s\n\nThis task is a follow-up of %s, whose PR is merged (%s). Start from the default branch; the parent's work is already in it. Its context:\n",
 		p.Key, p.Title, p.Key, strings.Join(prs, ", "))
-	fmt.Fprintf(b, "\n### Its description\n\n%s\n\n### Its acceptance criteria\n\n%s\n", strings.TrimSpace(p.Description), criteria(runs, "(none recorded)"))
+	fmt.Fprintf(b, "\n### Its description\n\n%s\n\n### Its acceptance criteria\n\n%s\n", clip(strings.TrimSpace(p.Description), maxParentDesc), clip(criteria(runs, "(none recorded)"), maxCriteria))
 	history(b, "###", runs, comments)
 	return nil
 }
