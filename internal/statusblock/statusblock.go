@@ -18,6 +18,8 @@ type Block struct {
 	Summary, State, Next string
 	Criteria             []Criterion
 	Learnings, Spawn     []string
+	// Decisions are "what — why" lines; Disputes are "D<n> | reason"; Undisputes are "D<n>".
+	Decisions, Disputes, Undisputes []string
 }
 
 var (
@@ -61,6 +63,11 @@ func parseBody(body string) (Block, bool) {
 			case "learning":
 				if !emptyLearning(v) {
 					b.Learnings = append(b.Learnings, v)
+				}
+			case "decision", "dispute", "undispute":
+				if !emptyLearning(v) {
+					p := map[string]*[]string{"decision": &b.Decisions, "dispute": &b.Disputes, "undispute": &b.Undisputes}[key]
+					*p = append(*p, v)
 				}
 			case "spawn":
 				if !emptySpawn(v) {

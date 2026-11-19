@@ -15,6 +15,13 @@ import (
 
 const maxComments = 20
 
+// Decisions are read on every run and the effective context is ~60k tokens, so the block is capped:
+// a line per decision, a line per dispute, each clipped, and the oldest dropped (with a count) past the total.
+const (
+	maxDecisionLine  = 240
+	maxDecisionBytes = 4000
+)
+
 const statusBlock = `## Status block
 
 End every final reply with this block. Omit it to ask the human a question instead.
@@ -30,6 +37,8 @@ criteria:
 - [x] AC1 - evidence
 - [ ] AC2 - why not
 learning: only a repo-wide trap (not specific to one task or feature) that cost you >10 min and is not in CLAUDE.md/SKILL.md/LEARNINGS.md. Name the file or command. Feature-level facts go in that feature's SKILL.md or a code comment, not here. Omit the line otherwise. (repeatable line)
+decision: what you chose — why; record one whenever you pick between options or the human states one (repeatable line; omit when none)
+dispute: D<n> | one-line reason, when you think decision D<n> is a mistake; undispute: D<n> once resolved (repeatable lines)
 spawn: [todo] child task title | description with everything its agent needs (repeatable line; omit it entirely when there is nothing to spawn, never write a placeholder like "none"; [todo] is optional: the child starts once unblocked, else it waits in backlog)
 </conveyor>
 ` + "```" + `
@@ -189,6 +198,9 @@ func Build(db *sql.DB, task store.Task) (string, error) {
 		}
 		fmt.Fprintf(&b, "- %s: %s (branch `%s`, PR: %s)\n", r.RepoName, deref(r.WorktreePath), r.Branch, pr)
 	}
+	if err := decisions(&b, db, task); err != nil {
+		return "", err
+	}
 	desc := strings.TrimSpace(task.Description)
 	if desc == "" {
 		desc = "(none)"
@@ -228,6 +240,40 @@ func Build(db *sql.DB, task store.Task) (string, error) {
 	}
 	fmt.Fprintf(&b, "\n%s\n## Rules\n\n%s\n## Older history\n\nFull thread: `conveyor task show %s --thread --json`\n", statusBlock, rulesForTask(db, task, true), task.Key)
 	return b.String(), nil
+}
+
+func clip(s string, n int) string {
+	if r := []rune(s); len(r) > n {
+		return string(r[:n-1]) + "…"
+	}
+	return s
+}
+
+// decisions writes the Decisions section: durable choices, disputed ones followed by a pitfall line.
+func decisions(b *strings.Builder, db *sql.DB, task store.Task) error {
+	ds, err := store.ListDecisions(db, task.ID)
+	if err != nil || len(ds) == 0 {
+		return err
+	}
+	var blocks []string
+	for _, d := range ds {
+		s := clip(fmt.Sprintf("- D%d (%s): %s", d.ID, d.Author, d.Body), maxDecisionLine) + "\n"
+		if d.DisputedBy != "" {
+			s += clip(fmt.Sprintf("  pitfall (%s): %s", d.DisputedBy, d.Dispute), maxDecisionLine) + "\n"
+		}
+		blocks = append(blocks, s)
+	}
+	size, from := 0, len(blocks)
+	for from > 0 && size+len(blocks[from-1]) <= maxDecisionBytes {
+		from--
+		size += len(blocks[from])
+	}
+	b.WriteString("\n## Decisions\n\n")
+	if from > 0 {
+		fmt.Fprintf(b, "(%d older decisions omitted: `conveyor task decision %s list`)\n", from, task.Key)
+	}
+	b.WriteString(strings.Join(blocks[from:], ""))
+	return nil
 }
 
 // kindRules is the one-line rule per epic_kind (docs/epic-builder.md §2.1).

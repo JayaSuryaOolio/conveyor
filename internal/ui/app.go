@@ -398,6 +398,20 @@ func (a *App) GetTask(key string) (TaskDetail, error) {
 	return TaskDetail{Task: t, Comments: cs, Runs: rs, Relations: rel, Creator: by}, nil
 }
 
+// Decisions lists a task's decisions.
+func (a *App) Decisions(key string) ([]store.Decision, error) { return a.svc.Decisions(key) }
+
+// AddDecision records a human decision on a task.
+func (a *App) AddDecision(key, body string) error { return a.svc.AddDecision(key, body) }
+
+// RemoveDecision strikes a decision.
+func (a *App) RemoveDecision(key string, id int64) error { return a.svc.RemoveDecision(key, id) }
+
+// DisputeDecision marks a decision disputed with a reason; an empty reason unmarks it.
+func (a *App) DisputeDecision(key string, id int64, reason string) error {
+	return a.svc.DisputeDecision(key, id, reason)
+}
+
 // Link records "from <kind> to" (blocks, relates).
 func (a *App) Link(from, kind, to string) error { return a.svc.Link(from, kind, to) }
 
