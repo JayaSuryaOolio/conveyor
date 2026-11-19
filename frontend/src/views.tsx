@@ -185,7 +185,7 @@ export function Focus({nav, onClose}: {nav: Nav; onClose: () => void}) {
 /** The task page in a modal ("" = closed), so agent/model/skills edit in place; navigating away from it closes the modal. */
 export function TaskPreview({k, onClose, nav}: {k: string; onClose: () => void; nav: Nav}) {
     return (
-        <Modal opened={!!k} onClose={onClose} size="min(1200px, 96vw)" padding="sm" title={k}>
+        <Modal opened={!!k} onClose={onClose} size="min(1200px, 96vw)" compact title={k}>
             {k && <TaskPage k={k} height="calc(100vh - 140px)" nav={nav}/>}
         </Modal>
     )

@@ -1,15 +1,38 @@
-/** Shared wrappers over Mantine: focus, ring and a11y defaults live here, call sites import from './ui' instead of '@mantine/core' for these. */
-import {Modal as MModal, ModalProps, Paper, PaperProps, Card, CardProps} from '@mantine/core'
-import {ElementType, ReactNode} from 'react'
+/**
+ * The only module (with theme setup in main.tsx/App.tsx) that knows these widgets come from Mantine.
+ * Call sites use the library-neutral props below, so swapping the component library means rewriting this file, not every screen.
+ * Rule: never pass a Mantine prop type or Mantine-only prop (withBorder, radius, p, w, shadow, withCloseButton, ...) through a wrapper; add a neutral prop and map it here.
+ * Migrating other widgets (Button, Text, Stack, ...) follows the same pattern, one wrapper at a time.
+ */
+import {Modal as MModal, Paper} from '@mantine/core'
+import type {HTMLAttributes, ReactNode} from 'react'
 import {clickable} from './util'
 
-/** Modal with an accessible close button; focus trap and return-focus are Mantine's defaults (the Modal must stay mounted with `opened` toggling, so the opener is recorded). */
-export const Modal = (p: ModalProps) => <MModal closeButtonProps={{'aria-label': 'Close'}} {...p}/>
+type Size = 'sm' | 'md' | 'lg' | 'auto' | (string & {}) // 'sm'|'md'|'lg' are our tokens; anything else is a CSS width
 
-type Click = {onActivate: () => void}
-/** Keyboard-operable card (Enter/Space activate, focus ring from style.css). */
-export const ClickableCard = ({onActivate, style, ...p}: CardProps & Click & {children?: ReactNode}) =>
-    <Card style={{cursor: 'pointer', ...style}} {...clickable(onActivate)} {...(p as object)}/>
-/** Same for Paper rows. `component` is not forwarded so role=button stays on a div. */
-export const ClickablePaper = ({onActivate, style, ...p}: PaperProps & Click & {children?: ReactNode; [k: string]: unknown}) =>
-    <Paper style={{cursor: 'pointer', ...style}} {...clickable(onActivate)} {...(p as object)}/>
+export type ModalProps = {
+    opened: boolean
+    onClose: () => void
+    title?: ReactNode
+    size?: Size
+    compact?: boolean // tighter body padding
+    centered?: boolean
+    closeButton?: boolean // default true
+    children?: ReactNode
+}
+
+/** Dialog. Keep it mounted with `opened` toggled (not conditionally rendered) so focus trap and return-focus see the opener. */
+export const Modal = ({closeButton = true, compact, ...p}: ModalProps) =>
+    <MModal withCloseButton={closeButton} padding={compact ? 'sm' : undefined} closeButtonProps={{'aria-label': 'Close'}} {...p}/>
+
+export type ClickableCardProps = Omit<HTMLAttributes<HTMLDivElement>, 'onClick'> & {
+    onActivate: () => void // click, Enter or Space
+    bordered?: boolean
+    raised?: boolean // drop shadow
+    padding?: 'xs' | 'sm'
+    width?: number | string
+}
+
+/** Keyboard-operable card or row (role=button, focus ring from style.css). Buttons inside keep their own keys. */
+export const ClickableCard = ({onActivate, bordered, raised, padding = 'sm', width, style, ...p}: ClickableCardProps) =>
+    <Paper withBorder={bordered} shadow={raised ? 'sm' : undefined} radius="md" p={padding} w={width} style={{cursor: 'pointer', ...style}} {...clickable(onActivate)} {...p}/>

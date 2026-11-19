@@ -24,7 +24,7 @@ function Img({src, alt}: {src?: string; alt?: string}) {
     return (
         <>
             <img src={url} alt={alt} style={{maxWidth: '100%', cursor: 'zoom-in'}} {...clickable(() => setOpen(true))}/>
-            <Modal opened={open} onClose={() => setOpen(false)} size="auto" centered withCloseButton={false}>
+            <Modal opened={open} onClose={() => setOpen(false)} size="auto" centered closeButton={false}>
                 <img src={url} alt={alt} style={{maxWidth: '100%', display: 'block'}}/>
             </Modal>
         </>
