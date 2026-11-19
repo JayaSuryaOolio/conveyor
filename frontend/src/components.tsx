@@ -1,6 +1,6 @@
 import {useContext, useEffect, useState} from 'react'
-import {ActionIcon, Badge, Box, Indicator, Menu, Notification, Paper, Popover, RingProgress, Select, Text, Tooltip} from '@mantine/core'
-import {Button, ButtonSize, ClickableCard, Group, Modal, Stack} from './ui'
+import {ActionIcon, Badge, Box, Indicator, Menu, Notification, Paper, Popover, RingProgress, Select, Tooltip} from '@mantine/core'
+import {Button, ButtonSize, ClickableCard, Group, Modal, Stack, Text} from './ui'
 import {IconAppWindow, IconCheck, IconChevronLeft, IconChevronRight, IconDots, IconMessageSearch, IconPencil, IconSitemap, IconX} from '@tabler/icons-react'
 import {AddComment, ConnectorServiceRunning, CheckReviews, MergedPR, Move, PlacedActions, RunConnectorAction, ShowError, SendQueuedNow, StopConnectorService, TakeQueuedComment} from '../wailsjs/go/ui/App'
 import {store, ui} from '../wailsjs/go/models'
@@ -29,7 +29,7 @@ export function Toasts() {
         <Stack gap="xs" style={{position: 'fixed', bottom: 16, right: 16, maxWidth: 480, zIndex: 1000}}>
             {list.map(x => (
                 <Notification key={x.id} withBorder color={x.sticky ? 'red' : undefined} withCloseButton={!x.sticky} onClose={() => setList(l => l.filter(y => y.id !== x.id))}>
-                    <Text size="sm" ff="monospace" style={{whiteSpace: 'pre-wrap', wordBreak: 'break-word'}}>{x.m}</Text>
+                    <Text size="sm" mono style={{whiteSpace: 'pre-wrap', wordBreak: 'break-word'}}>{x.m}</Text>
                 </Notification>
             ))}
         </Stack>
@@ -54,7 +54,7 @@ export function PlacedButtons({place, k = '', size = 'xs'}: {place: string; k?: 
     return (
         <Group gap={4} onClick={e => e.stopPropagation()}>
             <Modal opened={!!ask} onClose={() => setAsk(undefined)} title={ask?.label}>
-                <Text size="sm" mb="sm">{ask?.msg}</Text>
+                <Text size="sm" style={{marginBottom: 12}}>{ask?.msg}</Text>
                 <Group justify="end">
                     <Button variant="secondary" onClick={() => setAsk(undefined)}>Cancel</Button>
                     <Button data-autofocus onClick={() => { ask?.go(); setAsk(undefined) }}>Continue</Button>
@@ -102,7 +102,7 @@ export const AppIcon = ({name, icons, size = 18}: {name: string; icons?: Record<
 
 /** Relative time with the absolute one on hover. */
 export const Time = ({iso}: {iso: string}) => (
-    <Tooltip label={fmtTime(iso)}><Text span size="xs" c="dimmed">{ago(iso)}</Text></Tooltip>
+    <Tooltip label={fmtTime(iso)}><Text span size="xs" tone="muted">{ago(iso)}</Text></Tooltip>
 )
 
 export const StatusBadge = ({status}: {status: string}) => (
@@ -116,7 +116,7 @@ function useMove(k: string) {
     const confirm = () => { Move(k, pending!.to, true).catch(errMsg); setPending(undefined) }
     const modal = (
         <Modal opened={!!pending} onClose={() => setPending(undefined)} title={`Move ${k} to ${STATUS_LABEL[pending?.to ?? '']}?`}>
-            <Text size="sm" mb="sm">{k} has {pending?.n} running run(s). Moving it ends them; the agent stops now.</Text>
+            <Text size="sm" style={{marginBottom: 12}}>{k} has {pending?.n} running run(s). Moving it ends them; the agent stops now.</Text>
             <Group justify="end">
                 <Button variant="secondary" onClick={() => setPending(undefined)}>Cancel</Button>
                 <Button data-autofocus tone="danger" onClick={confirm}>Stop and move</Button>
@@ -160,7 +160,7 @@ export function Card({c, nav, onLabel, showPR}: {c: ui.TaskCard; nav: Nav; onLab
     return (
         <ClickableCard bordered onActivate={() => nav({name: 'task', key: c.key})}>
             <Group justify="between" wrap={false} gap="xs">
-                <Text size="xs" fw={600} c="dimmed">{c.key}{c.parent && <Text span size="xs" fw={400}> ↑ {c.parent}</Text>}{showPR && c.prUrls.length > 0 && <Text span size="xs" fw={400} c="violet"> {prNumbers(c.prUrls).join(' ')}</Text>}</Text>
+                <Text size="xs" weight={600} tone="muted">{c.key}{c.parent && <Text span size="xs" weight={400}> ↑ {c.parent}</Text>}{showPR && c.prUrls.length > 0 && <Text span size="xs" weight={400} tone="accent"> {prNumbers(c.prUrls).join(' ')}</Text>}</Text>
                 <Group gap={4} wrap={false}>
                     {c.ctxPeak > 0 && <Badge variant="outline" color="gray" size="xs" title="context peak">{fmtK(c.ctxPeak)}</Badge>}
                     {c.openPR && <Tooltip label="Check PR now (reviews, CI, conflicts)"><ActionIcon variant="subtle" color="gray" size="sm" aria-label="Check PR" onClick={e => { e.stopPropagation(); CheckReviews(c.key).then(() => toast('Checking the PR for reviews, CI and conflicts…', false, 3000), errMsg) }}><IconMessageSearch size={16}/></ActionIcon></Tooltip>}
@@ -168,7 +168,7 @@ export function Card({c, nav, onLabel, showPR}: {c: ui.TaskCard; nav: Nav; onLab
                     <StatusMenu k={c.key} status={c.status}/>
                 </Group>
             </Group>
-            <Text size="sm" fw={500} mt={2} lineClamp={2} title={c.title}>{c.title}</Text>
+            <Text size="sm" weight={500} clamp={2} title={c.title} style={{marginTop: 2}}>{c.title}</Text>
             {(c.repos.length > 0 || c.labels.length > 0) && <Group gap={4} style={{marginTop: 'var(--mantine-spacing-xs)'}}>
                 {c.repos.map(r => <Badge key={r} variant="light" size="xs">{r}</Badge>)}
                 {c.labels.map(l => <Badge key={'l:' + l} component="button" variant="outline" color="gray" size="xs" title={'Filter by ' + l}
@@ -216,7 +216,7 @@ function Edits({edits, i, setI}: {edits: store.CommentEdit[]; i: number | null; 
         <Group gap={2} wrap={false} style={{marginLeft: 'auto'}}>
             <ActionIcon variant="subtle" color="gray" size="xs" aria-label="Older version" disabled={at === 0} onClick={() => setI(at - 1)}><IconChevronLeft size={12}/></ActionIcon>
             {i === null
-                ? <Text size="xs" c="dimmed">Current</Text>
+                ? <Text size="xs" tone="muted">Current</Text>
                 : <Tooltip label="Back to current"><Badge size="xs" variant="light" color="gray" style={{cursor: 'pointer'}} component="button" type="button" onClick={() => setI(null)}>Edit {i + 1}/{edits.length}</Badge></Tooltip>}
             <ActionIcon variant="subtle" color="gray" size="xs" aria-label="Newer version" disabled={i === null} onClick={() => setI(i! + 1 >= edits.length ? null : i! + 1)}><IconChevronRight size={12}/></ActionIcon>
         </Group>
@@ -253,13 +253,13 @@ function QueuedBadge({m, queue, onSendNow}: {m: store.Comment; queue?: ui.QueueS
             </Popover.Target>
             <Popover.Dropdown>
                 <Stack gap={4}>
-                    <Text size="xs" fw={600}>Queued · {label}</Text>
+                    <Text size="xs" weight={600}>Queued · {label}</Text>
                     {queue?.items.length ? queue.items.map(i => (
                         <Group key={i.key} gap={6} wrap={false}>
                             <Badge size="xs" variant="light" color={i.running ? 'green' : i.held ? 'orange' : 'gray'} style={{flex: 'none'}}>{i.running ? 'running' : 'queued'}</Badge>
                             <Text size="xs" truncate title={i.held || undefined}><b>{i.key}</b> {i.title}</Text>
                         </Group>
-                    )) : <Text size="xs" c="dimmed">Nothing else in the queue</Text>}
+                    )) : <Text size="xs" tone="muted">Nothing else in the queue</Text>}
                     {onSendNow && <Button style={{marginTop: 4}} size="xs" compact variant="soft" onClick={onSendNow}>Send now</Button>}
                 </Stack>
             </Popover.Dropdown>
@@ -276,16 +276,16 @@ export function Message({m, onEdit, onSendNow, queue}: {m: store.Comment; onEdit
     return (
         <Paper withBorder p="sm" radius="md" style={old ? {borderStyle: 'dashed'} : undefined} bg={m.author === 'human' ? 'var(--mantine-color-default-hover)' : undefined}>
             <Group gap="xs" style={{marginBottom: 4}}>
-                <Text size="xs" fw={600}>{m.author}{m.source ? ` (via ${m.source})` : ''}</Text>
+                <Text size="xs" weight={600}>{m.author}{m.source ? ` (via ${m.source})` : ''}</Text>
                 <Time iso={m.created_at}/>
                 {onEdit && <QueuedBadge m={m} queue={queue} onSendNow={onSendNow && (() => setAsking(true))}/>}
                 {onEdit && <Tooltip label="Move back to the editor"><ActionIcon variant="subtle" color="gray" size="xs" aria-label="Edit queued message" onClick={onEdit}><IconPencil size={12}/></ActionIcon></Tooltip>}
                 {!!m.edits?.length && <Edits edits={m.edits} i={ver} setI={setVer}/>}
             </Group>
-            {old && <Text size="xs" c="dimmed">Replaced <Time iso={old.at}/></Text>}
+            {old && <Text size="xs" tone="muted">Replaced <Time iso={old.at}/></Text>}
             <Markdown>{old ? old.body : m.body}</Markdown>
             <Modal opened={asking} onClose={() => setAsking(false)} title="Send now?">
-                <Text size="sm" mb="sm">Skip the wait and start the agent with this message now.</Text>
+                <Text size="sm" style={{marginBottom: 12}}>Skip the wait and start the agent with this message now.</Text>
                 <Group justify="end">
                     <Button variant="secondary" onClick={() => setAsking(false)}>Cancel</Button>
                     <Button data-autofocus onClick={() => { setAsking(false); onSendNow?.() }}>Send now</Button>

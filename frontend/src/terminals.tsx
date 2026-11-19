@@ -1,6 +1,6 @@
 import {useEffect, useRef, useState} from 'react'
-import {ActionIcon, Text, Tooltip, UnstyledButton} from '@mantine/core'
-import {Group, Stack} from './ui'
+import {ActionIcon, Tooltip, UnstyledButton} from '@mantine/core'
+import {Group, Stack, Text} from './ui'
 import {IconArrowsMaximize, IconArrowsMinimize, IconChevronDown, IconChevronUp, IconX} from '@tabler/icons-react'
 import {FitAddon} from '@xterm/addon-fit'
 import {Terminal} from '@xterm/xterm'
@@ -115,11 +115,11 @@ export default function TermDock({k, added}: {k: string; added?: ui.TermInfo}) {
             {open && !max && <div onMouseDown={drag} style={{position: 'absolute', top: -3, left: 0, right: 0, height: 6, cursor: 'ns-resize', zIndex: 1}}/>}
             <Group gap={4} wrap={false} justify="between" style={{paddingInline: 'var(--mantine-spacing-xs)', height: HEADER, flex: 'none'}}>
                 <Group gap={2} wrap={false} style={{overflowX: 'auto'}}>
-                    {tabs.length === 0 && <Text size="xs" c="dimmed">Terminals</Text>}
+                    {tabs.length === 0 && <Text size="xs" tone="muted">Terminals</Text>}
                     {tabs.map(t => (
                         <Group key={t.id} gap={2} wrap={false} style={{paddingInline: 6, borderRadius: 4, background: t.id === active && open ? 'var(--mantine-color-default-hover)' : undefined}}>
                             <UnstyledButton onClick={() => { setActive(t.id); setOpen(true) }}>
-                                <Text size="xs" fw={t.id === active ? 600 : 400} style={{whiteSpace: 'nowrap'}}>{t.title}</Text>
+                                <Text size="xs" weight={t.id === active ? 600 : 400} style={{whiteSpace: 'nowrap'}}>{t.title}</Text>
                             </UnstyledButton>
                             <ActionIcon variant="subtle" color="gray" size="xs" aria-label="Close terminal" onClick={() => close(t.id)}><IconX size={12}/></ActionIcon>
                         </Group>

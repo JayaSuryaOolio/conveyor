@@ -1,6 +1,6 @@
 import {useState} from 'react'
-import {Text, TextInput, Title} from '@mantine/core'
-import {Button, Group, Stack} from './ui'
+import {TextInput, Title} from '@mantine/core'
+import {Button, Group, Stack, Text} from './ui'
 import {AcceptLearning, ApplyLearnings, EditLearning, Learnings as ListLearnings, RejectLearning, RejectLearningCategory, RejectSimilarLearnings} from '../wailsjs/go/ui/App'
 import {ui} from '../wailsjs/go/models'
 import {Nav, errMsg} from './components'
@@ -13,13 +13,13 @@ export function LearningsPage({nav}: {nav: Nav}) {
     return (
         <Stack style={{maxWidth: 1000}}>
             <Title order={3}>Learnings</Title>
-            {error && <Text c="red">{error}</Text>}
+            {error && <Text tone="danger">{error}</Text>}
             <Group gap="xs">
                 {['placeholder', 'personal-env'].map(c => (
                     <Button key={c} size="xs" variant="secondary" tone="danger" onClick={() => RejectLearningCategory(c).then(reload, errMsg)}>Reject all {c}</Button>
                 ))}
             </Group>
-            {data?.length === 0 && <Text c="dimmed">Nothing proposed.</Text>}
+            {data?.length === 0 && <Text tone="muted">Nothing proposed.</Text>}
             {Object.keys(groups).sort().map(repo => (
                 <Stack key={repo} gap="xs">
                     <Group justify="between">
@@ -41,7 +41,7 @@ function LearningItem({l, reload}: {l: ui.LearningRow; reload: () => void}) {
     const done = () => reload()
     return (
         <Group wrap={false} gap="xs">
-            <Text size="xs" c="dimmed" miw={32} title="Learning ID, as in `conveyor learning reject ID`">#{l.id}</Text>
+            <Text size="xs" tone="muted" title="Learning ID, as in `conveyor learning reject ID`" style={{minWidth: 32}}>#{l.id}</Text>
             <TextInput style={{flex: 1}} value={body} onChange={e => setBody(e.target.value)}/>
             <Button variant="secondary" disabled={body === l.body} onClick={() => EditLearning(l.id, body).then(done, errMsg)}>Save</Button>
             <TextInput w={140} title="local = Conveyor's LEARNINGS.md for this repo, loaded into its tasks; a repo file (CLAUDE.md) = PR via Apply" value={target} onChange={e => setTarget(e.target.value)}/>

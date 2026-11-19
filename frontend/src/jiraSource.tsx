@@ -1,6 +1,6 @@
 import {useEffect, useState} from 'react'
-import {Alert, Badge, Collapse, NumberInput, Paper, Text, TextInput, Textarea} from '@mantine/core'
-import {Button, Group, Stack} from './ui'
+import {Alert, Badge, Collapse, NumberInput, Paper, TextInput, Textarea} from '@mantine/core'
+import {Button, Group, Stack, Text} from './ui'
 import {JiraSourceClear, JiraSourceGet, JiraSourceSet, JiraSourceSyncNow} from '../wailsjs/go/ui/App'
 import {store} from '../wailsjs/go/models'
 import {errMsg} from './components'
@@ -19,9 +19,9 @@ export function JiraSource({epic}: {epic: string}) {
     return <Paper withBorder radius="md" px="sm" py={6}>
         <Group justify="between">
             <Group gap="xs">
-                <Text size="sm" fw={600}>Jira source</Text>
-                {src ? <Badge variant="light">{src.jira_key}{src.done ? ' · done' : ''}</Badge> : <Text size="sm" c="dimmed">none</Text>}
-                {src && <Text size="xs" c="dimmed">{src.last_sync ? `synced ${new Date(src.last_sync).toLocaleString()}` : 'never synced'}</Text>}
+                <Text size="sm" weight={600}>Jira source</Text>
+                {src ? <Badge variant="light">{src.jira_key}{src.done ? ' · done' : ''}</Badge> : <Text size="sm" tone="muted">none</Text>}
+                {src && <Text size="xs" tone="muted">{src.last_sync ? `synced ${new Date(src.last_sync).toLocaleString()}` : 'never synced'}</Text>}
             </Group>
             <Group gap="xs">
                 {src && <Button size="sm" compact loading={busy} onClick={sync}>Sync now</Button>}

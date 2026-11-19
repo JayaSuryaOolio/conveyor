@@ -4,7 +4,7 @@
  * Rule: never pass a Mantine prop type or Mantine-only prop (withBorder, radius, p, w, shadow, withCloseButton, ...) through a wrapper; add a neutral prop and map it here.
  * Migrating other widgets (Button, Text, Stack, ...) follows the same pattern, one wrapper at a time.
  */
-import {Button as MButton, Code, Group as MGroup, Modal as MModal, Paper, Stack as MStack} from '@mantine/core'
+import {Button as MButton, Code, Group as MGroup, Modal as MModal, Paper, Stack as MStack, Text as MText} from '@mantine/core'
 import type {CSSProperties, ElementType, HTMLAttributes, ImgHTMLAttributes, MouseEvent, ReactNode} from 'react'
 import {clickable} from './util'
 
@@ -103,3 +103,25 @@ export const Stack = (p: Flow) => <MStack {...flow(p)}/>
 /** Horizontal flex row; wraps by default, `wrap={false}` keeps one line, `grow` stretches children equally. */
 export const Group = ({wrap = true, grow, ...p}: Flow & {wrap?: boolean; grow?: boolean}) =>
     <MGroup wrap={wrap ? 'wrap' : 'nowrap'} grow={grow} {...flow(p)}/>
+
+export type TextTone = 'muted' | 'danger' | 'warning' | 'accent' | 'info' | 'live' | 'neutral'
+export type TextProps = {
+    size?: 'md' | 'sm' | 'xs'
+    tone?: TextTone
+    weight?: 400 | 500 | 600 | 700
+    mono?: boolean
+    upper?: boolean
+    span?: boolean
+    clamp?: number
+    truncate?: boolean | 'start' | 'end'
+    as?: 'button'
+    type?: 'button' | 'submit'
+    title?: string
+    style?: CSSProperties
+    onClick?: (e: MouseEvent<HTMLElement>) => void
+    children?: ReactNode
+}
+const TEXT_TONE = {muted: 'dimmed', danger: 'red', warning: 'orange', accent: 'violet', info: 'blue', live: 'cyan', neutral: 'gray'} as const
+
+export const Text = ({tone, weight, mono, upper, clamp, as, ...p}: TextProps) =>
+    <MText c={tone && TEXT_TONE[tone]} fw={weight} ff={mono ? 'monospace' : undefined} tt={upper ? 'uppercase' : undefined} lineClamp={clamp} component={as as 'button' | undefined} {...p}/>

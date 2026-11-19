@@ -1,6 +1,6 @@
 import {useState} from 'react'
-import {ActionIcon, Text, TextInput, Title, Tooltip} from '@mantine/core'
-import {Group, Stack} from './ui'
+import {ActionIcon, TextInput, Title, Tooltip} from '@mantine/core'
+import {Group, Stack, Text} from './ui'
 import {IconAlertTriangle, IconCheck, IconPlus, IconTrash} from '@tabler/icons-react'
 import {AddDecision, Decisions as ListDecisions, DisputeDecision, RemoveDecision} from '../wailsjs/go/ui/App'
 import {errMsg} from './components'
@@ -28,7 +28,7 @@ export function Decisions({k}: {k: string}) {
                         </Tooltip>
                         <ActionIcon size="sm" variant="subtle" color="gray" aria-label="Strike decision" onClick={() => done(RemoveDecision(k, d.id))}><IconTrash size={14}/></ActionIcon>
                     </Group>
-                    {d.disputed_by && <Text size="xs" c="orange" ml="md">pitfall ({d.disputed_by}): {d.dispute}</Text>}
+                    {d.disputed_by && <Text size="xs" tone="warning" style={{marginLeft: 16}}>pitfall ({d.disputed_by}): {d.dispute}</Text>}
                 </Stack>
             ))}
             <Group gap={4} wrap={false}>

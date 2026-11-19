@@ -1,6 +1,6 @@
 import {createContext, useContext, useEffect, useMemo, useRef, useState} from 'react'
-import {ActionIcon, Alert, Anchor, Badge, Box, Indicator, Menu, Paper, ScrollArea, SegmentedControl, SimpleGrid, Table, Text, Textarea, TextInput, Tooltip} from '@mantine/core'
-import {Button, Clickable, ClickableCard, Group, Modal, Stack} from './ui'
+import {ActionIcon, Alert, Anchor, Badge, Box, Indicator, Menu, Paper, ScrollArea, SegmentedControl, SimpleGrid, Table, Textarea, TextInput, Tooltip} from '@mantine/core'
+import {Button, Clickable, ClickableCard, Group, Modal, Stack, Text} from './ui'
 import {useLocalStorage} from '@mantine/hooks'
 import {IconCode, IconExternalLink, IconGitPullRequest, IconMessageQuestion, IconPlayerPlay, IconPlayerStop, IconPlus, IconTerminal2} from '@tabler/icons-react'
 import {Background, Controls, Handle, MarkerType, Position, ReactFlow, useEdgesState, useNodesState, type Connection, type Edge, type Node, type NodeProps} from '@xyflow/react'
@@ -64,9 +64,9 @@ function TaskNode({data}: NodeProps<Node<CardData>>) {
     const stop = (e: React.MouseEvent) => e.stopPropagation()
     const details = [
         n.kind && <Badge key="kind" size="xs" color={KIND_COLOR[n.kind] ?? 'gray'} variant="filled">{n.kind}</Badge>,
-        n.agent && <Text key="agent" size="xs" c="dimmed">{n.agent}</Text>,
-        n.model && <Text key="model" size="xs" c="dimmed">{n.model}</Text>,
-        skills.length > 0 && <Tooltip key="skills" label={skills.join(', ')}><Text size="xs" c="dimmed">{skills.length} skill{skills.length === 1 ? '' : 's'}</Text></Tooltip>,
+        n.agent && <Text key="agent" size="xs" tone="muted">{n.agent}</Text>,
+        n.model && <Text key="model" size="xs" tone="muted">{n.model}</Text>,
+        skills.length > 0 && <Tooltip key="skills" label={skills.join(', ')}><Text size="xs" tone="muted">{skills.length} skill{skills.length === 1 ? '' : 's'}</Text></Tooltip>,
         ...n.repos.map(r => <Badge key={r} size="xs" variant="light">{r}</Badge>),
         n.worktrees.length > 0 && <Tooltip key="wt" label={'worktree: ' + n.worktrees.join(', ')}><Badge size="xs" variant="outline" color="gray">worktree</Badge></Tooltip>,
     ].filter(Boolean)
@@ -80,7 +80,7 @@ function TaskNode({data}: NodeProps<Node<CardData>>) {
             <Stack gap={6}>
                 <Group justify="between" wrap={false} gap="xs">
                     <Group gap={6} wrap={false}>
-                        <Text size="xs" fw={600} c="dimmed">{n.key}</Text>
+                        <Text size="xs" weight={600} tone="muted">{n.key}</Text>
                         <Indicator disabled={!running} processing color="cyan" size={8} offset={-2}><StatusBadge status={n.status}/></Indicator>
                     </Group>
                     <Group gap={2} wrap={false} className={nd} onClick={stop}>
@@ -99,7 +99,7 @@ function TaskNode({data}: NodeProps<Node<CardData>>) {
                         </>}
                     </Group>
                 </Group>
-                <Text size="sm" fw={500} lineClamp={2}>{n.title}</Text>
+                <Text size="sm" weight={500} clamp={2}>{n.title}</Text>
                 <Group gap={6} wrap>
                     {details}
                     {prs.filter(p => p.pr_url).map(p => <PrChip key={p.repo} p={p}/>)}
@@ -146,7 +146,7 @@ function Header({g, nav, root}: {g: core.Graph; nav: Nav; root: core.GraphNode})
             <Group justify="between" wrap>
                 <Group gap="sm">
                     <Anchor component="button" fw={600} onClick={() => nav({name: 'task', key: root.key})}>{root.key}</Anchor>
-                    <Text size="sm" truncate maw={320}>{root.title}</Text>
+                    <Text size="sm" truncate style={{maxWidth: 320}}>{root.title}</Text>
                     {epic && <Group gap={4}>{STAGES.map((s, i) => {
                         const at = STAGES.indexOf(g.stage)
                         return <Badge key={s} size="sm" variant={i === at ? 'filled' : 'light'} color={i === at ? 'blue' : i < at ? 'green' : 'gray'}>{i + 1}. {s}</Badge>
@@ -199,10 +199,10 @@ function TaskRow({n, note}: {n: core.GraphNode; note?: string}) {
     return (
         <Clickable style={{display: 'flex', alignItems: 'center', gap: 6, padding: '2px 6px', borderRadius: 4, borderLeft: `3px solid ${c6(KIND_COLOR[n.kind] ?? 'gray')}`}}
                className="epic-row" onActivate={() => open(n.key)} onFocus={() => hover(n.key)} onBlur={() => hover('')} onMouseEnter={() => hover(n.key)} onMouseLeave={() => hover('')}>
-            <Text size="xs" fw={600} c="dimmed" style={{flexShrink: 0}}>{n.key}</Text>
+            <Text size="xs" weight={600} tone="muted" style={{flexShrink: 0}}>{n.key}</Text>
             <StatusBadge status={n.status}/>
             <Text size="xs" truncate style={{flex: 1}}>{n.title}</Text>
-            {note && <Text size="xs" c="dimmed" style={{flexShrink: 0}}>{note}</Text>}
+            {note && <Text size="xs" tone="muted" style={{flexShrink: 0}}>{note}</Text>}
         </Clickable>
     )
 }
@@ -211,22 +211,23 @@ function Legend() {
     const swatch = (color: string, label: string, dashed = false) => (
         <Group key={label} gap={4} wrap={false}>
             <Box w={18} h={0} style={{borderTop: `2px ${dashed ? 'dashed' : 'solid'} ${c6(color)}`}}/>
-            <Text size="xs" c="dimmed">{label}</Text>
+            <Text size="xs" tone="muted">{label}</Text>
         </Group>
     )
     return (
         <Group gap="md" wrap>
-            {Object.entries(KIND_COLOR).map(([k, c]) => <Group key={k} gap={4} wrap={false}><Box w={10} h={10} bg={c6(c)} style={{borderRadius: 2}}/><Text size="xs" c="dimmed">{k}</Text></Group>)}
-            <Text size="xs" c="dimmed">·</Text>
+            {Object.entries(KIND_COLOR).map(([k, c]) => <Group key={k} gap={4} wrap={false}><Box w={10} h={10} bg={c6(c)} style={{borderRadius: 2}}/><Text size="xs" tone="muted">{k}</Text></Group>)}
+            <Text size="xs" tone="muted">·</Text>
             {swatch('orange', 'blocks (waiting)')}{swatch('cyan', 'blocker running')}{swatch('green', 'unblocked')}{swatch('gray', 'relates', true)}
         </Group>
     )
 }
 
+const BOX_TONE = {orange: 'warning', cyan: 'live', blue: 'info', gray: 'neutral'} as const
 /** The boxes under the graph: what needs a human, what is moving, what can start, what is held back and by whom. */
 function InfoBoxes({g}: {g: core.Graph}) {
     const live = leavesOf(g).filter(n => !FINISHED.has(n.status))
-    const boxes: [string, string, {n: core.GraphNode; note?: string}[]][] = [
+    const boxes: [string, keyof typeof BOX_TONE, {n: core.GraphNode; note?: string}[]][] = [
         ['Wants you', 'orange', live.filter(n => n.status === 'needs_you').map(n => ({n}))],
         ['Running', 'cyan', live.filter(n => n.status === 'running').map(n => ({n}))],
         ['Ready to run', 'blue', live.filter(n => READY.has(n.status) && openBlockers(g, n.key).length === 0).map(n => ({n}))],
@@ -236,9 +237,9 @@ function InfoBoxes({g}: {g: core.Graph}) {
         <SimpleGrid cols={{base: 2, md: 4}} spacing="xs">
             {boxes.map(([title, color, rows]) => (
                 <Paper key={title} withBorder radius="md" p="xs" style={{background: `color-mix(in srgb, ${c6(color)} 10%, transparent)`}}>
-                    <Group justify="between" style={{marginBottom: 4}}><Text size="xs" fw={700} tt="uppercase" c={color}>{title}</Text><Text size="xs" c="dimmed">{rows.length}</Text></Group>
+                    <Group justify="between" style={{marginBottom: 4}}><Text size="xs" weight={700} upper tone={BOX_TONE[color]}>{title}</Text><Text size="xs" tone="muted">{rows.length}</Text></Group>
                     <ScrollArea.Autosize mah={120}>
-                        {rows.length ? <Stack gap={1}>{rows.map(r => <TaskRow key={r.n.key} {...r}/>)}</Stack> : <Text size="xs" c="dimmed">None</Text>}
+                        {rows.length ? <Stack gap={1}>{rows.map(r => <TaskRow key={r.n.key} {...r}/>)}</Stack> : <Text size="xs" tone="muted">None</Text>}
                     </ScrollArea.Autosize>
                 </Paper>
             ))}
@@ -261,14 +262,14 @@ function Waves({g}: {g: core.Graph}) {
                     return (
                         <Paper key={i} withBorder radius="md" p="xs" style={{borderLeft: `4px solid ${c6(color)}`}}>
                             <Group justify="between" style={{marginBottom: 4}}>
-                                <Text size="sm" fw={700}>Wave {i + 1}{i === 0 ? ' · no blockers' : ` · after wave ${i}`}</Text>
+                                <Text size="sm" weight={700}>Wave {i + 1}{i === 0 ? ' · no blockers' : ` · after wave ${i}`}</Text>
                                 <Badge size="sm" variant="light" color={color}>{done}/{ns.length} done</Badge>
                             </Group>
                             {ns.map(n => <TaskRow key={n.key} n={n} note={openBlockers(g, n.key).length ? '← ' + openBlockers(g, n.key).join(', ') : undefined}/>)}
                         </Paper>
                     )
                 })}
-                {waves.length === 0 && <Text c="dimmed" size="sm">No tasks yet.</Text>}
+                {waves.length === 0 && <Text tone="muted" size="sm">No tasks yet.</Text>}
             </Stack>
         </ScrollArea>
     )
@@ -277,7 +278,7 @@ function Waves({g}: {g: core.Graph}) {
 function PRTable({g}: {g: core.Graph}) {
     const {open} = useContext(Ctx)
     const rows = g.prs.filter(p => p.pr_url)
-    if (!rows.length) return <Text c="dimmed" size="sm">No PRs yet{g.stage ? '' : ' (PR rows are tracked for epics only)'}.</Text>
+    if (!rows.length) return <Text tone="muted" size="sm">No PRs yet{g.stage ? '' : ' (PR rows are tracked for epics only)'}.</Text>
     const tone = (s?: string) => !s ? 'gray' : /approved|success|pass/i.test(s) ? 'green' : /changes|fail|error/i.test(s) ? 'red' : 'yellow'
     return (
         <ScrollArea style={{flex: 1}}>
@@ -290,7 +291,7 @@ function PRTable({g}: {g: core.Graph}) {
                         <Table.Td><Anchor size="sm" onClick={() => BrowserOpenURL(p.pr_url!)}>{p.pr_url!.replace(/^.*\/pull\//, '#')}</Anchor></Table.Td>
                         <Table.Td><Badge size="sm" variant="light" color={tone(p.review)}>{p.review || '—'}</Badge></Table.Td>
                         <Table.Td><Badge size="sm" variant="light" color={tone(p.checks)}>{p.checks || '—'}</Badge></Table.Td>
-                        <Table.Td><Text size="sm" c={p.unresolved ? 'orange' : 'dimmed'}>{p.unresolved}</Text></Table.Td>
+                        <Table.Td><Text size="sm" tone={p.unresolved ? 'warning' : 'muted'}>{p.unresolved}</Text></Table.Td>
                     </Table.Tr>
                 ))}</Table.Tbody>
             </Table>
@@ -357,8 +358,8 @@ export function EpicView({k, task = '', nav}: {k: string; task?: string; nav: Na
     const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
     useEffect(() => setEdges(derived), [derived, setEdges])
 
-    if (error) return <Text c="red">{error}</Text>
-    if (!g) return <Text c="dimmed">Loading…</Text>
+    if (error) return <Text tone="danger">{error}</Text>
+    if (!g) return <Text tone="muted">Loading…</Text>
     const root = g.nodes.find(n => n.key === g.root)!
     const ctx: Ctx = {nav, addSub: setAdding, open: setTask, lit, hover: setHovered}
     const connect = (c: Connection) => c.source && c.target && c.source !== c.target && Link(c.source, 'blocks', c.target).catch(errMsg)
@@ -370,7 +371,7 @@ export function EpicView({k, task = '', nav}: {k: string; task?: string; nav: Na
                 <Group justify="between" wrap={false}>
                     <SegmentedControl size="xs" value={view} onChange={setView} data={[
                         {value: 'graph', label: 'Graph'}, {value: 'waves', label: 'Waves'}, {value: 'prs', label: `PRs (${g.prs.filter(p => p.pr_url).length})`}]}/>
-                    <Text size="xs" c="dimmed" truncate>{VIEW_HINT[view]}</Text>
+                    <Text size="xs" tone="muted" truncate>{VIEW_HINT[view]}</Text>
                 </Group>
                 {view === 'graph' && <>
                     <Box style={{flex: 1, minHeight: 0, border: '1px solid var(--mantine-color-default-border)', borderRadius: 8}}>

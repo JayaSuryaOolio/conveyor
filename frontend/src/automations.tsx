@@ -1,6 +1,6 @@
 import {useEffect, useState} from 'react'
-import {ActionIcon, Chip, Code, CopyButton, MultiSelect, Popover, SegmentedControl, Select, Switch, Table, Text, TextInput, Textarea, Title, Tooltip} from '@mantine/core'
-import {Button, Group, Modal, Stack} from './ui'
+import {ActionIcon, Chip, Code, CopyButton, MultiSelect, Popover, SegmentedControl, Select, Switch, Table, TextInput, Textarea, Title, Tooltip} from '@mantine/core'
+import {Button, Group, Modal, Stack, Text} from './ui'
 import {IconCheck, IconCopy, IconCalendarTime, IconPencil, IconPlus, IconTrash} from '@tabler/icons-react'
 import {AddAutomation, Confirm, DeleteAutomation, DescribeSchedule, ListAutomations, ListRepos, RunAutomation, SetAutomationEnabled, UpdateAutomation} from '../wailsjs/go/ui/App'
 import {store, ui} from '../wailsjs/go/models'
@@ -72,7 +72,7 @@ function AutomationForm({initial, edit, onClose}: {initial: Form; edit: boolean;
                 {PRESETS.map(([l, x]) => <Chip key={x} size="xs" checked={f.schedule === x} onChange={() => set({schedule: x})}>{l}</Chip>)}
             </Group>
             {info?.valid && (
-                <Text size="sm" c="dimmed">{info.description}. Next: {info.next.join(' · ')}</Text>
+                <Text size="sm" tone="muted">{info.description}. Next: {info.next.join(' · ')}</Text>
             )}
             <Textarea label="Precheck (optional)" description="Shell command. Exit 0 runs the action, non-zero skips it. Its stdout replaces {output} in the action text."
                       styles={{input: {fontFamily: 'monospace'}}} autosize minRows={1} maxRows={6} value={f.precheck} onChange={e => set({precheck: e.target.value})}/>
@@ -93,7 +93,7 @@ function AutomationForm({initial, edit, onClose}: {initial: Form; edit: boolean;
             </>}
             {f.kind === 'cli' && <TextInput label="Conveyor args" description="Run as `conveyor ARGS`, e.g. task new --repo a" ff="monospace" value={f.args} onChange={e => set({args: e.target.value})}/>}
             <div>
-                <Group justify="between"><Text size="sm" fw={500}>Equivalent CLI command</Text>
+                <Group justify="between"><Text size="sm" weight={500}>Equivalent CLI command</Text>
                     <CopyButton value={cmd}>{({copied, copy}) => (
                         <Tooltip label={copied ? 'Copied' : 'Copy'}><ActionIcon variant="subtle" color={copied ? 'teal' : 'gray'} onClick={copy} aria-label="Copy command">{copied ? <IconCheck size={16}/> : <IconCopy size={16}/>}</ActionIcon></Tooltip>
                     )}</CopyButton>
@@ -137,12 +137,12 @@ function NextRuns({schedule, name, lastRunAt, lastResult}: {schedule: string; na
             </Popover.Target>
             <Popover.Dropdown>
                 {past.length > 0 && <>
-                    <Text size="xs" c="dimmed" mb={4}>Completed runs</Text>
-                    {past.map(r => <Group key={r.at} gap={6} wrap={false}><Time iso={r.at}/><Text size="xs" c="dimmed" lineClamp={1}>{r.result}</Text></Group>)}
-                    <Text size="xs" c="dimmed" mt="xs" mb={4}>Next runs</Text>
+                    <Text size="xs" tone="muted" style={{marginBottom: 4}}>Completed runs</Text>
+                    {past.map(r => <Group key={r.at} gap={6} wrap={false}><Time iso={r.at}/><Text size="xs" tone="muted" clamp={1}>{r.result}</Text></Group>)}
+                    <Text size="xs" tone="muted" style={{marginTop: 10, marginBottom: 4}}>Next runs</Text>
                 </>}
-                {past.length === 0 && <Text size="xs" c="dimmed" mb={4}>Next runs</Text>}
-                {info?.valid ? info.next.map(t => <Text key={t} size="sm">{t}</Text>) : <Text size="sm" c="red">{info?.error}</Text>}
+                {past.length === 0 && <Text size="xs" tone="muted" style={{marginBottom: 4}}>Next runs</Text>}
+                {info?.valid ? info.next.map(t => <Text key={t} size="sm">{t}</Text>) : <Text size="sm" tone="danger">{info?.error}</Text>}
             </Popover.Dropdown>
         </Popover>
     )
@@ -168,8 +168,8 @@ export function Automations() {
                 <Title order={3}>Automations</Title>
                 <Button icon={<IconPlus size={16}/>} onClick={() => setForm({initial: EMPTY, edit: false})}>New automation</Button>
             </Group>
-            {error && <Text c="red">{error}</Text>}
-            {data && data.length === 0 && <Text c="dimmed">None yet. Create one, or use <Code>conveyor automation add --template pr-sweep</Code>.</Text>}
+            {error && <Text tone="danger">{error}</Text>}
+            {data && data.length === 0 && <Text tone="muted">None yet. Create one, or use <Code>conveyor automation add --template pr-sweep</Code>.</Text>}
             {data && data.length > 0 && (
                 <Table.ScrollContainer minWidth={700}>
                     <Table verticalSpacing="xs">
@@ -179,10 +179,10 @@ export function Automations() {
                                 <Table.Tr key={a.name}>
                                     <Table.Td><Switch checked={a.enabled} onChange={e => SetAutomationEnabled(a.name, e.currentTarget.checked).then(reload, errMsg)}/></Table.Td>
                                     <Table.Td fw={600}>{a.name}</Table.Td>
-                                    <Table.Td>{a.schedule ? <Group gap={4} wrap={false}><Code>{a.schedule}</Code><NextRuns schedule={a.schedule} name={a.name} lastRunAt={a.last_run_at} lastResult={a.last_result}/></Group> : a.run_at ? <Group gap={4} wrap={false}><Text size="sm" c="dimmed">once</Text><Time iso={a.run_at}/></Group> : null}</Table.Td>
+                                    <Table.Td>{a.schedule ? <Group gap={4} wrap={false}><Code>{a.schedule}</Code><NextRuns schedule={a.schedule} name={a.name} lastRunAt={a.last_run_at} lastResult={a.last_result}/></Group> : a.run_at ? <Group gap={4} wrap={false}><Text size="sm" tone="muted">once</Text><Time iso={a.run_at}/></Group> : null}</Table.Td>
                                     <Table.Td>{a.action_kind}</Table.Td>
                                     <Table.Td>{a.last_run_at ? <Time iso={a.last_run_at}/> : ''}</Table.Td>
-                                    <Table.Td><Text size="sm" lineClamp={1}>{a.last_result ?? ''}</Text></Table.Td>
+                                    <Table.Td><Text size="sm" clamp={1}>{a.last_result ?? ''}</Text></Table.Td>
                                     <Table.Td>
                                         <Group gap="xs" wrap={false}>
                                             <RunButton name={a.name} onDone={reload}/>
