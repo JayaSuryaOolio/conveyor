@@ -1,5 +1,6 @@
 import {ReactNode, createContext, useContext, useState} from 'react'
-import {Box, Combobox, Group, InputBase, MantineColorsTuple, MantineProvider, MantineThemeOverride, Text, mergeThemeOverrides, useCombobox} from '@mantine/core'
+import {Box, Combobox, InputBase, MantineColorsTuple, MantineProvider, MantineThemeOverride, Text, mergeThemeOverrides, useCombobox} from '@mantine/core'
+import {Group, Stack} from './ui'
 
 type Theme = {id: string; label: string; scheme: 'light' | 'dark'; theme: MantineThemeOverride}
 
