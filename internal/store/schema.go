@@ -231,6 +231,9 @@ func Migrate(db *sql.DB) error {
 	if err := migrateAddPRReported(db); err != nil {
 		return err
 	}
+	if err := migrateSplitPRWatermark(db); err != nil {
+		return err
+	}
 	if err := migrateAddTaskCreatedBy(db); err != nil {
 		return err
 	}
@@ -476,6 +479,34 @@ func migrateAddPRReported(db *sql.DB) error {
 		}
 	}
 	return nil
+}
+
+// migrateSplitPRWatermark adds per-type review watermarks (CV-195). The old single watermark was a
+// max over all id ranges, so it is kept for issue comments only; rows that had one get -1 for
+// reviews and inline comments, which the next check baselines instead of resending handled feedback.
+func migrateSplitPRWatermark(db *sql.DB) error {
+	var n int
+	if err := db.QueryRow(`SELECT count(*) FROM pragma_table_info('pr_reviews') WHERE name='seen_review_id'`).Scan(&n); err != nil {
+		return fmt.Errorf("check pr_reviews.seen_review_id: %w", err)
+	}
+	if n > 0 {
+		return nil
+	}
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	for _, q := range []string{
+		`ALTER TABLE pr_reviews ADD COLUMN seen_review_id INTEGER NOT NULL DEFAULT 0`,
+		`ALTER TABLE pr_reviews ADD COLUMN seen_inline_id INTEGER NOT NULL DEFAULT 0`,
+		`UPDATE pr_reviews SET seen_review_id=-1, seen_inline_id=-1 WHERE seen_comment_id > 0`,
+	} {
+		if _, err := tx.Exec(q); err != nil {
+			return fmt.Errorf("split pr_reviews watermark: %w", err)
+		}
+	}
+	return tx.Commit()
 }
 
 // migrateRenameApps renames the pre-rebrand apps table to connectors (CV-161). It runs before
