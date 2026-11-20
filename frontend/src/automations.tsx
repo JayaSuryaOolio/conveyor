@@ -1,7 +1,7 @@
 import {useEffect, useState} from 'react'
-import {ActionIcon, Chip, Code, CopyButton, MultiSelect, Popover, SegmentedControl, Select, Switch, Table, TextInput, Textarea, Title, Tooltip} from '@mantine/core'
+import {ActionIcon, Chip, Code, CopyButton, MultiSelect, Popover, SegmentedControl, Select, Switch, Table, TextInput, Textarea, Title, Tooltip, UnstyledButton} from '@mantine/core'
 import {Button, Group, Modal, Stack, Text} from './ui'
-import {IconCheck, IconCopy, IconCalendarTime, IconPencil, IconPlus, IconTrash} from '@tabler/icons-react'
+import {IconCheck, IconClock, IconCopy, IconPencil, IconPlus, IconTrash} from '@tabler/icons-react'
 import {AddAutomation, Confirm, DeleteAutomation, DescribeSchedule, ListAutomations, ListRepos, RunAutomation, SetAutomationEnabled, UpdateAutomation} from '../wailsjs/go/ui/App'
 import {store, ui} from '../wailsjs/go/models'
 import {Time, errMsg} from './components'
@@ -131,9 +131,10 @@ function NextRuns({schedule, name, lastRunAt, lastResult}: {schedule: string; na
     const [info, setInfo] = useState<ui.ScheduleInfo>()
     const past = usePastRuns(name, lastRunAt, lastResult)
     return (
-        <Popover width={300} withArrow position="bottom">
+        <Popover width={300} withArrow position="bottom" onOpen={() => DescribeSchedule(schedule).then(setInfo, errMsg)}>
             <Popover.Target>
-                <ActionIcon variant="subtle" color="gray" aria-label="Next runs" onClick={() => DescribeSchedule(schedule).then(setInfo, errMsg)}><IconCalendarTime size={16}/></ActionIcon>
+                {/* Native button: click, Enter and Space all toggle; ClickableCode's onClick would be overridden by the one Popover.Target injects. */}
+                <UnstyledButton aria-label={`Next runs of ${schedule}`}><Code style={{cursor: 'pointer'}}>{schedule}</Code></UnstyledButton>
             </Popover.Target>
             <Popover.Dropdown>
                 {past.length > 0 && <>
@@ -179,7 +180,8 @@ export function Automations() {
                                 <Table.Tr key={a.name}>
                                     <Table.Td><Switch checked={a.enabled} onChange={e => SetAutomationEnabled(a.name, e.currentTarget.checked).then(reload, errMsg)}/></Table.Td>
                                     <Table.Td fw={600}>{a.name}</Table.Td>
-                                    <Table.Td>{a.schedule ? <Group gap={4} wrap={false}><Code>{a.schedule}</Code><NextRuns schedule={a.schedule} name={a.name} lastRunAt={a.last_run_at} lastResult={a.last_result}/></Group> : a.run_at ? <Group gap={4} wrap={false}><Text size="sm" tone="muted">once</Text><Time iso={a.run_at}/></Group> : null}</Table.Td>
+                                    {/* Refactor: fold this cell and NextRuns into one ScheduleCell. */}
+                                    <Table.Td>{a.schedule ? <NextRuns schedule={a.schedule} name={a.name} lastRunAt={a.last_run_at} lastResult={a.last_result}/> : a.run_at ? <Group gap={4} wrap={false}><IconClock size={14} color="var(--mantine-color-dimmed)" aria-label="Runs once"/><Time iso={a.run_at}/></Group> : null}</Table.Td>
                                     <Table.Td>{a.action_kind}</Table.Td>
                                     <Table.Td>{a.last_run_at ? <Time iso={a.last_run_at}/> : ''}</Table.Td>
                                     <Table.Td><Text size="sm" clamp={1}>{a.last_result ?? ''}</Text></Table.Td>
