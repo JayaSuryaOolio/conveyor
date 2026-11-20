@@ -996,3 +996,45 @@ func TestReapStaleListedSession(t *testing.T) {
 		}
 	}
 }
+
+// A comment starts its run at created_at+debounce from the wake timer, long before the next tick.
+func TestCommentLaunchesWithoutWaitingForTick(t *testing.T) {
+	e := setup(t)
+	e.d.Now = nil // real clock: Run's timers do not follow e.now
+	store.SetSetting(e.db, "comment_debounce_secs", "2")
+	store.SetSetting(e.db, "dispatch_tick_secs", "15")
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan struct{})
+	go func() { e.d.Run(ctx); close(done) }()
+	defer func() { cancel(); <-done }()
+	for i := 0; store.GetMeta(e.db, "dispatch_last_tick_at") == ""; i++ { // the first tick is over
+		if i > 100 {
+			t.Fatal("no first tick")
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	tk := e.task(t, "t", 0)
+	start := time.Now()
+	if _, err := store.AddComment(e.db, store.Comment{TaskID: tk.ID, Author: store.AuthorHuman, Body: "hi"}); err != nil {
+		t.Fatal(err)
+	}
+	for e.get(t, tk.ID).Status != store.StatusRunning {
+		if time.Since(start) > 3*time.Second { // debounce 2s + 1s
+			t.Fatal("comment did not launch within debounce + 1s")
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+}
+
+func TestTickWritesHeartbeat(t *testing.T) {
+	e := setup(t)
+	store.SetSetting(e.db, "dispatch_tick_secs", "99") // clamped to 15
+	e.tick(t)
+	last, every, ok := store.Heartbeat(e.db)
+	if !ok || every != 15*time.Second || e.now.Sub(last) > time.Second {
+		t.Fatalf("heartbeat = %v %v %v", last, every, ok)
+	}
+	if store.HeartbeatStale(e.db, e.now.Add(44*time.Second)) || !store.HeartbeatStale(e.db, e.now.Add(46*time.Second)) {
+		t.Error("stale should start after 3 intervals")
+	}
+}
