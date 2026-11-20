@@ -391,3 +391,15 @@ func TestMigrateSplitsPRWatermark(t *testing.T) {
 		}
 	}
 }
+
+func TestTickSecsClampedOnWriteAndRead(t *testing.T) {
+	db := openTest(t)
+	for in, want := range map[string]int{"0": 1, "7": 7, "99": 15, "x": 5} {
+		if err := SetSetting(db, "dispatch_tick_secs", in); err != nil {
+			t.Fatal(err)
+		}
+		if got := TickSecs(db); got != want {
+			t.Errorf("%q: got %d want %d", in, got, want)
+		}
+	}
+}

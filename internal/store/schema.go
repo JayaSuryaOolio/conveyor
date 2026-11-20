@@ -200,6 +200,9 @@ CREATE INDEX IF NOT EXISTS idx_decisions_task ON decisions(task_id);
 
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 
+-- meta holds daemon-written state (the dispatcher heartbeat), kept apart from user settings.
+CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+
 CREATE TABLE IF NOT EXISTS connectors (
   id INTEGER PRIMARY KEY,
   name TEXT NOT NULL UNIQUE,

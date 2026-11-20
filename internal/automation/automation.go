@@ -54,6 +54,28 @@ func Due(a store.Automation, now time.Time) bool {
 	return !sched.Next(last).After(now)
 }
 
+// NextDue is the earliest time any enabled automation becomes due, or the zero time when none will.
+func NextDue(list []store.Automation) time.Time {
+	var next time.Time
+	for _, a := range list {
+		var at time.Time
+		if a.RunAt != nil {
+			at, _ = time.Parse(time.RFC3339, *a.RunAt)
+		} else if a.LastRunAt != nil {
+			sched, err := cron.ParseStandard(a.Schedule)
+			last, err2 := time.Parse(time.RFC3339, *a.LastRunAt)
+			if err != nil || err2 != nil {
+				continue
+			}
+			at = sched.Next(last)
+		}
+		if a.Enabled && !at.IsZero() && (next.IsZero() || at.Before(next)) {
+			next = at
+		}
+	}
+	return next
+}
+
 // ValidSchedule checks a cron expression.
 func ValidSchedule(s string) error {
 	if _, err := cron.ParseStandard(s); err != nil {

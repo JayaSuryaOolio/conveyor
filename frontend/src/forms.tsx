@@ -184,6 +184,7 @@ const TABS: {name: string; fields: Field[]}[] = [
         {k: "max_parallel", label: "Max parallel runs", desc: "How many tasks run at once."},
         {k: "resume_threshold", label: "Resume threshold (tokens)", desc: "A hot session resumes while its context peak is below this; above it a fresh session starts."},
         {k: "comment_debounce_secs", label: "Comment debounce (s)", desc: "Wait this long after a comment before starting a run, so you can batch comments."},
+        {k: "dispatch_tick_secs", label: "Dispatch poll (s)", desc: "Safety-net poll for changes made from the CLI or another window (1-15). Changes in the app itself start runs without waiting for it."},
         {k: "max_consecutive_failures", label: "Max consecutive failures", desc: "After this many failed runs in a row the task is marked failed."},
     ]},
     {name: "External terminal", fields: [

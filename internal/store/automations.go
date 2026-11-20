@@ -27,6 +27,7 @@ func CreateAutomation(db *sql.DB, a Automation) (Automation, error) {
 		return Automation{}, fmt.Errorf("create automation %q: %w", a.Name, err)
 	}
 	a.ID, _ = res.LastInsertId()
+	Wake(time.Time{}) // the dispatcher re-arms its next-due timer
 	return a, nil
 }
 
@@ -67,6 +68,7 @@ func UpdateAutomation(db *sql.DB, a Automation) error {
 	if n, _ := res.RowsAffected(); n == 0 {
 		return fmt.Errorf("automation %q: %w", a.Name, sql.ErrNoRows)
 	}
+	Wake(time.Time{})
 	return nil
 }
 

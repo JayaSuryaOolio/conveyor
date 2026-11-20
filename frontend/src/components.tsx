@@ -234,20 +234,27 @@ function QueuedBadge({m, queue, onSendNow}: {m: store.Comment; queue?: ui.QueueS
     const self = queue?.items.find(i => i.key === k)
     const held = self?.running ? 'The agent is running; sent when its next run starts' : self?.held
     const wait = (queue?.debounce_secs ?? 0) * 1000
-    const done = m.send_now || (wait > 0 ? now - new Date(m.created_at).getTime() >= wait : true)
+    // launchTodo debounces on the newest pending comment, and a launch from another process waits for the next tick.
+    const from = new Date(self?.pending || m.created_at).getTime()
+    const last = queue?.last_tick_at ? new Date(queue.last_tick_at).getTime() : NaN
+    const every = (queue?.tick_secs ?? 0) * 1000
+    const stale = isNaN(last) ? !!queue?.stale : every > 0 && now - last > 3 * every
+    const due = from + wait
+    const target = !stale && every > 0 && !isNaN(last) ? last + Math.max(0, Math.ceil((due - last) / every)) * every : due
+    const done = m.send_now || now >= target
     useEffect(() => {
-        if (done || held) return
+        if (done || held || stale) return
         const t = setInterval(() => setNow(Date.now()), 500)
         return () => clearInterval(t)
-    }, [done, held])
-    const frac = m.send_now || !wait ? 1 : Math.min(1, Math.max(0, (now - new Date(m.created_at).getTime()) / wait))
-    const label = held ?? (done ? 'Starting shortly' : 'Sent to the agent when the debounce ends')
+    }, [done, held, stale])
+    const frac = m.send_now || target <= from ? 1 : Math.min(1, Math.max(0, (now - from) / (target - from)))
+    const label = held ?? (stale ? 'Dispatcher not running' : done ? 'Starting shortly' : 'Sent to the agent at the first dispatch tick after the debounce')
     return (
         <Popover width={300} position="bottom-start" withArrow shadow="md">
             <Popover.Target>
                 <Tooltip label={label}>
-                    <ActionIcon variant="subtle" color={held ? 'orange' : 'gray'} size="sm" aria-label="Queued: show queue">
-                        <RingProgress size={20} thickness={3} roundCaps sections={[{value: frac * 100, color: held ? 'orange' : 'blue'}]} rootColor="var(--mantine-color-default-border)"/>
+                    <ActionIcon variant="subtle" color={held || stale ? 'orange' : 'gray'} size="sm" aria-label="Queued: show queue">
+                        <RingProgress size={20} thickness={3} roundCaps sections={[{value: frac * 100, color: held || stale ? 'orange' : 'blue'}]} rootColor="var(--mantine-color-default-border)"/>
                     </ActionIcon>
                 </Tooltip>
             </Popover.Target>

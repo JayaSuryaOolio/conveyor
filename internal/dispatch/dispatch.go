@@ -9,9 +9,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"slices"
+	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -31,10 +32,8 @@ import (
 )
 
 const (
-	tickEvery  = 2 * time.Second
 	reapGrace  = 30 * time.Second
 	prPollEach = 60 * time.Second
-	autoEach   = 30 * time.Second
 )
 
 // Dispatcher launches and supervises auto runs. Run it from one process at a time (see Lock).
@@ -44,9 +43,31 @@ type Dispatcher struct {
 	Log *log.Logger      // defaults to log.Default()
 
 	lastPoll time.Time
-	lastAuto time.Time
 	lastHook time.Time
 	autoBusy atomic.Bool // an automation pass is in flight (prechecks can take a minute)
+
+	wakeOnce sync.Once
+	wakeCh   chan struct{} // buffered 1: a pending wake coalesces with any later ones
+	autoMu   sync.Mutex
+	autoAt   *time.Timer // fires Wake at the next automation due time
+}
+
+func (d *Dispatcher) wakeC() chan struct{} {
+	d.wakeOnce.Do(func() { d.wakeCh = make(chan struct{}, 1) })
+	return d.wakeCh
+}
+
+// Wake asks Run for a launch pass at at; a zero or past time means now. Timers outlive a
+// superseded need harmlessly: an early pass finds nothing to do.
+func (d *Dispatcher) Wake(at time.Time) {
+	if wait := time.Until(at); !at.IsZero() && wait > 0 {
+		time.AfterFunc(wait, func() { d.Wake(time.Time{}) })
+		return
+	}
+	select {
+	case d.wakeC() <- struct{}{}:
+	default:
+	}
 }
 
 func (d *Dispatcher) now() time.Time {
@@ -75,27 +96,50 @@ func (d *Dispatcher) intSetting(key string) int {
 // pollJira runs the Jira source poller; a var so tests can see the dispatcher start it.
 var pollJira = func(ctx context.Context, svc *core.Service) { (&jira.Poller{}).Run(ctx, svc) }
 
-// Run ticks every 2s until ctx is done. It also starts the chat bridge and the Jira poller,
-// so they run once, under the dispatcher lock, in the app and in `conveyor daemon` alike.
+// Run starts the chat bridge and the Jira poller, so they run once, under the dispatcher lock, in the
+// app and in `conveyor daemon` alike. Then it ticks every dispatch_tick_secs (the safety net for writes
+// from other processes, and the poll for reap, PRs and the webhook), and between ticks runs a launch
+// pass whenever something wakes it (see store.Wake).
 func (d *Dispatcher) Run(ctx context.Context) error {
 	go chat.Run(ctx, d.Svc, d.logf, map[string]chat.Factory{"slack": slack.New})
 	go pollJira(ctx, d.Svc)
-	t := time.NewTicker(tickEvery)
-	defer t.Stop()
+	store.SetWake(d.Wake)
+	defer store.SetWake(nil)
+	wake := d.wakeC()
 	for {
 		if err := d.Tick(ctx); err != nil && ctx.Err() == nil {
 			d.logf("tick: %v", err)
 		}
-		select {
-		case <-ctx.Done():
-			return nil
-		case <-t.C:
+		t := time.NewTimer(time.Duration(store.TickSecs(d.Svc.DB)) * time.Second)
+	wait:
+		for {
+			select {
+			case <-ctx.Done():
+				t.Stop()
+				return nil
+			case <-t.C:
+				break wait
+			case <-wake:
+				d.react(ctx)
+			}
 		}
 	}
 }
 
-// Tick does one pass: reap, PR poll, launch.
+// react is the event-driven part of a tick: epic wake-ups, due automations and launches.
+func (d *Dispatcher) react(ctx context.Context) {
+	d.tickAutomations(ctx)
+	d.wakeEpics()
+	if err := d.launchTodo(ctx); err != nil && ctx.Err() == nil {
+		d.logf("launch: %v", err)
+	}
+}
+
+// Tick does one pass: heartbeat, reap, PR poll, then the launch pass.
 func (d *Dispatcher) Tick(ctx context.Context) error {
+	if err := store.RecordTick(d.Svc.DB, d.now(), store.TickSecs(d.Svc.DB)); err != nil {
+		d.logf("heartbeat: %v", err)
+	}
 	if err := d.reap(ctx); err != nil {
 		d.logf("reap: %v", err)
 	}
@@ -124,17 +168,30 @@ func (d *Dispatcher) wakeEpics() {
 	}
 }
 
-// tickAutomations runs due automations every autoEach, off the main loop so a slow precheck never stalls launches.
+// tickAutomations runs due automations off the main loop so a slow precheck never stalls launches,
+// then sleeps until the next one is due (autoAt) instead of re-checking on a clock.
 func (d *Dispatcher) tickAutomations(ctx context.Context) {
-	if !d.lastAuto.IsZero() && d.now().Sub(d.lastAuto) < autoEach || !d.autoBusy.CompareAndSwap(false, true) {
+	if !d.autoBusy.CompareAndSwap(false, true) {
 		return
 	}
-	d.lastAuto = d.now()
 	now := d.now()
 	go func() {
 		defer d.autoBusy.Store(false)
 		if err := automation.Tick(ctx, d.Svc, now); err != nil {
 			d.logf("automations: %v", err)
+		}
+		list, err := store.ListAutomations(d.Svc.DB)
+		if err != nil || ctx.Err() != nil {
+			return
+		}
+		d.autoMu.Lock()
+		defer d.autoMu.Unlock()
+		if d.autoAt != nil {
+			d.autoAt.Stop()
+			d.autoAt = nil
+		}
+		if next := automation.NextDue(list); !next.IsZero() {
+			d.autoAt = time.AfterFunc(max(time.Until(next), 0), func() { d.Wake(time.Time{}) })
 		}
 	}()
 }

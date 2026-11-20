@@ -519,6 +519,9 @@ func (a *App) SendQueuedNow(key string) error {
 // QueueStatus feeds the queued-message badge and its popover.
 type QueueStatus struct {
 	DebounceSecs int         `json:"debounce_secs"`
+	LastTickAt   string      `json:"last_tick_at"` // dispatcher heartbeat (RFC3339); the next tick is this + tick_secs
+	TickSecs     int         `json:"tick_secs"`
+	Stale        bool        `json:"stale"` // no tick for over 3 intervals: the dispatcher is not running
 	Items        []QueueItem `json:"items"`
 }
 
@@ -528,6 +531,7 @@ type QueueItem struct {
 	Title   string `json:"title"`
 	Running bool   `json:"running"`
 	Held    string `json:"held"` // why a queued task cannot launch yet; "" when only the debounce is left
+	Pending string `json:"pending"` // created_at of the newest unsent human/system comment, the one launchTodo debounces on; "" when none
 }
 
 // QueueStatus mirrors the checks of dispatch.launchTodo (refactor idea: extract them there as one
@@ -546,7 +550,18 @@ func (a *App) QueueStatus() (QueueStatus, error) {
 	if err != nil {
 		debounce, _ = strconv.Atoi(store.Defaults["comment_debounce_secs"])
 	}
-	out := QueueStatus{DebounceSecs: debounce, Items: []QueueItem{}}
+	out := QueueStatus{DebounceSecs: debounce, TickSecs: store.TickSecs(a.svc.DB), Items: []QueueItem{}}
+	if last, _, ok := store.Heartbeat(a.svc.DB); ok {
+		out.LastTickAt = last.UTC().Format(time.RFC3339Nano)
+	}
+	out.Stale = store.HeartbeatStale(a.svc.DB, time.Now())
+	pending := func(id int64) string {
+		cs, _ := store.UnconsumedComments(a.svc.DB, id)
+		if len(cs) == 0 {
+			return ""
+		}
+		return cs[len(cs)-1].CreatedAt
+	}
 	busy, auto := map[int64]bool{}, 0
 	for _, r := range runs {
 		busy[r.TaskID] = true
@@ -557,7 +572,7 @@ func (a *App) QueueStatus() (QueueStatus, error) {
 		if err != nil {
 			return QueueStatus{}, err
 		}
-		out.Items = append(out.Items, QueueItem{Key: t.Key, Title: t.Title, Running: true})
+		out.Items = append(out.Items, QueueItem{Key: t.Key, Title: t.Title, Running: true, Pending: pending(t.ID)})
 	}
 	todo, err := store.ListTasks(a.svc.DB, store.StatusTodo)
 	if err != nil {
@@ -581,7 +596,7 @@ func (a *App) QueueStatus() (QueueStatus, error) {
 				held = "waiting for its sub-tasks"
 			}
 		}
-		out.Items = append(out.Items, QueueItem{Key: t.Key, Title: t.Title, Held: held})
+		out.Items = append(out.Items, QueueItem{Key: t.Key, Title: t.Title, Held: held, Pending: pending(t.ID)})
 	}
 	return out, nil
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 )
 
 const taskCols = `id, key, title, description, status, priority, model, agent, runner, source, external_key,
@@ -207,6 +208,7 @@ func UpdateTaskStatus(db *sql.DB, id int64, to Status, actor Actor) (Task, error
 		return Task{}, err
 	}
 	notifyTask(id)
+	Wake(time.Time{}) // todo, blocker closed, run ended, child settled
 	return GetTask(db, id)
 }
 

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"runtime"
+	"strconv"
 	"strings"
 )
 
@@ -33,6 +34,7 @@ var Defaults = map[string]string{
 	"max_parallel":             "3",
 	"resume_threshold":         "60000",
 	"comment_debounce_secs":    "20",
+	"dispatch_tick_secs":       "5", // poll safety net for writes from other processes; clamped 1-15
 	"max_consecutive_failures": "3",
 	"default_model":            "",
 	"default_runner":           "claude", // "claude" or "agy"
@@ -74,6 +76,9 @@ func SetSetting(db *sql.DB, key, value string) error {
 		if !okPrefix {
 			return fmt.Errorf("%s must start with %s", key, strings.Join(pre, " or "))
 		}
+	}
+	if key == "dispatch_tick_secs" {
+		value = strconv.Itoa(ClampTickSecs(value))
 	}
 	_, err := db.Exec(`INSERT INTO settings (key, value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value`, key, value)
 	if err != nil {
