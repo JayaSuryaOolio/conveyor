@@ -23,12 +23,14 @@ func main() {
 		return
 	}
 	var ctx context.Context // set in OnStartup, read by menu callbacks
+	// Mac options must be set, or Wails disables the zoom/fullscreen button. TabFocusesLinks makes Tab reach buttons and checkboxes
+	// even when macOS "Keyboard navigation" is off; without it WebKit only tabs between text fields and lists (CV-202).
 	err = wails.Run(&options.App{
 		Title:            "Conveyor",
 		Width:            1280,
 		Height:           820,
 		AssetServer:      &assetserver.Options{Assets: assets, Handler: core.AttachmentHandler(home)},
-		Mac:              &mac.Options{}, // without it Wails disables the zoom/fullscreen button
+		Mac:              &mac.Options{Preferences: &mac.Preferences{TabFocusesLinks: mac.Enabled}},
 		BackgroundColour: &options.RGBA{R: 27, G: 38, B: 54, A: 1},
 		Menu:             appMenu(func() context.Context { return ctx }),
 		OnStartup:        func(c context.Context) { ctx = c; app.Startup(c) },
