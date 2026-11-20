@@ -17,7 +17,7 @@ This guide covers day-to-day use. For setup see the [README](../README.md); for 
 
 ## The board and the task page
 
-The sidebar has Board, Focus, Learnings, Automations, Connectors, Agents, Logs and Settings (repos are a Settings tab). Board, Focus, Agents and Logs have the shortcuts `b`, `f`, `a` and `l`.
+The sidebar has Board, Focus, Learnings, Automations, Connectors, Agents, Logs and Settings (repos are a Settings tab). Board, Focus, Automations, Agents and Logs have the shortcuts `b`, `f`, `u`, `a` and `l`.
 
 The board has a column per status: Backlog, Todo, Running, Needs you, Review, Failed (only shown when something has failed), Done and Cancelled. Done and Cancelled are collapsed and show the last 7 days. A bar above the board searches key and title (`/` focuses it, Esc clears), sorts every column by priority, last update, key or title (click the active sort again to reverse it), and filters by repo: click repo pills to show only those repos, combine several, Clear resets. Sort and repo picks are remembered; filtering is all in the UI. Focus is a single list of what wants your attention, in this order: needs_you, review, failed, running, todo.
 
