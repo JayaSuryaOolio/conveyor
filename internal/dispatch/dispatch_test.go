@@ -564,7 +564,7 @@ func TestPRMergeRemovesSessions(t *testing.T) {
 	if _, err := store.CreateRun(e.db, store.Run{TaskID: tk.ID, Kind: "auto", Mode: "fresh", Status: "finished", BgID: &bg}); err != nil {
 		t.Fatal(err)
 	}
-	e.d.pollPRs(t.Context())
+	e.d.syncPRs(t.Context())
 	if got := e.get(t, tk.ID); got.Status != store.StatusDone {
 		t.Fatalf("status %s", got.Status)
 	}
