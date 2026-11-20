@@ -1,6 +1,6 @@
 import {useEffect, useRef, useState} from 'react'
-import {Box, Code, SegmentedControl, Switch, Text, TextInput, Title} from '@mantine/core'
-import {Button, Group, Stack} from './ui'
+import {Box, Code, SegmentedControl, Switch, TextInput, Title} from '@mantine/core'
+import {Button, Group, Stack, Text} from './ui'
 import {IconCopy, IconSearch} from '@tabler/icons-react'
 import {AppLog} from '../wailsjs/go/ui/App'
 
@@ -64,10 +64,10 @@ export function Logs() {
                     <Button variant="secondary" icon={<IconCopy size={16}/>} onClick={() => navigator.clipboard.writeText(shown.join('\n'))}>Copy</Button>
                 </Group>
             </Group>
-            <Text size="xs" c="dimmed">~/.conveyor/{file}. From a terminal: <Code>tail -f ~/.conveyor/{file}</Code></Text>
+            <Text size="xs" tone="muted">~/.conveyor/{file}. From a terminal: <Code>tail -f ~/.conveyor/{file}</Code></Text>
             <Box ref={box} onScroll={onScroll} flex={1} mih={0} p="xs" bd="1px solid var(--mantine-color-default-border)"
                  style={{overflow: 'auto', fontFamily: 'var(--mantine-font-family-monospace)', fontSize: 12, borderRadius: 4}}>
-                {loaded && !lines.length && <Text size="sm" c="dimmed">Nothing logged to {file} yet.</Text>}
+                {loaded && !lines.length && <Text size="sm" tone="muted">Nothing logged to {file} yet.</Text>}
                 {shown.map((l, i) => {
                     const lo = l.toLowerCase()
                     const path = l.includes('PATH=')

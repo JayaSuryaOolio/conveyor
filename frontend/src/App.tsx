@@ -1,7 +1,7 @@
 import {useEffect, useMemo, useRef, useState} from 'react'
 import {useLocation, useNavigate} from 'react-router'
-import {ActionIcon, AppShell, Badge, Box, Kbd, NavLink, Text, Title, Tooltip} from '@mantine/core'
-import {Button, Group, Modal, Stack} from './ui'
+import {ActionIcon, AppShell, Badge, Box, Kbd, NavLink, Title, Tooltip} from '@mantine/core'
+import {Button, Group, Modal, Stack, Text} from './ui'
 import {useLocalStorage} from '@mantine/hooks'
 import {IconApps, IconBolt, IconArrowLeft, IconBook2, IconClock, IconLayoutKanban, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconLogs, IconPlus, IconRobot, IconSettings, IconSitemap} from '@tabler/icons-react'
 import {AppVersion, DispatcherState, Learnings, ShellPATHError} from '../wailsjs/go/ui/App'
@@ -122,7 +122,7 @@ export default function App() {
                         <Tooltip label={dispatcher === 'dispatching' ? 'Dispatcher running in this app' : 'UI only: another process dispatches'} position="right">
                             <Box w={8} h={8} style={{borderRadius: '50%', background: `var(--mantine-color-${dispatcher === 'dispatching' ? 'green' : 'gray'}-6)`}}/>
                         </Tooltip>
-                        {!mini && version && <Text size="xs" c="dimmed">{version}</Text>}
+                        {!mini && version && <Text size="xs" tone="muted">{version}</Text>}
                     </Group>
                 </Stack>
             </AppShell.Navbar>

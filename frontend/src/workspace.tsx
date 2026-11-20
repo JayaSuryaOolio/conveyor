@@ -1,6 +1,6 @@
 import {useState} from 'react'
-import {ActionIcon, Anchor, Badge, Code, Divider, Menu, Paper, TagsInput, Text, TextInput, Title, Tooltip} from '@mantine/core'
-import {Button, ClickableCode, Group, Modal, Stack} from './ui'
+import {ActionIcon, Anchor, Badge, Code, Divider, Menu, Paper, TagsInput, TextInput, Title, Tooltip} from '@mantine/core'
+import {Button, ClickableCode, Group, Modal, Stack, Text} from './ui'
 import {useClipboard} from '@mantine/hooks'
 import {IconCopy, IconMessageSearch, IconPencil, IconPlus, IconStar, IconX, IconTerminal, IconTerminal2} from '@tabler/icons-react'
 import {Actions, AddLabel, AddTaskRepo, CheckReviews, EnsureWorkspace, ListLabels, ListRepos, RemoveLabel, RemoveTaskRepo, RunAction, Sessions, SetTaskRepo, TermStart} from '../wailsjs/go/ui/App'
@@ -86,7 +86,7 @@ function RepoFields({k, r, reload, canRemove, children}: {k: string; r: store.Ta
             <Stack gap="xs">
                 <Group gap={6} justify="between" wrap={false}>
                     <Group gap={6}>
-                        <Text size="sm" fw={600}>{r.repo_name}</Text>
+                        <Text size="sm" weight={600}>{r.repo_name}</Text>
                         {r.is_primary && <Badge size="xs" variant="light" leftSection={<IconStar size={10}/>}>primary</Badge>}
                     </Group>
                     {canRemove && !r.pr_url && (
@@ -97,18 +97,18 @@ function RepoFields({k, r, reload, canRemove, children}: {k: string; r: store.Ta
                     )}
                 </Group>
                 <div>
-                    <Text size="xs" c="dimmed">Branch</Text>
+                    <Text size="xs" tone="muted">Branch</Text>
                     {r.worktree_path
                         ? <Mono text={r.branch}/>
                         : <TextInput size="xs" value={branch} onChange={e => setBranch(e.target.value)} onKeyDown={onKey}/>}
                 </div>
                 <div>
-                    <Text size="xs" c="dimmed">Worktree</Text>
-                    {r.worktree_path ? <Mono text={r.worktree_path}/> : <Text size="xs" c="dimmed">not created yet</Text>}
+                    <Text size="xs" tone="muted">Worktree</Text>
+                    {r.worktree_path ? <Mono text={r.worktree_path}/> : <Text size="xs" tone="muted">not created yet</Text>}
                 </div>
                 <div>
                     <Group gap={6} style={{marginBottom: 2}}>
-                        <Text size="xs" c="dimmed">PR</Text>
+                        <Text size="xs" tone="muted">PR</Text>
                         {r.pr_url && r.pr_state && <Badge size="xs" variant="light" color={PR_COLOR[r.pr_state.toLowerCase()] ?? 'gray'}>{r.pr_state}</Badge>}
                         {r.pr_url && <Anchor size="xs" href={r.pr_url} onClick={e => { e.preventDefault(); BrowserOpenURL(r.pr_url!) }}>Open PR</Anchor>}
                         {r.pr_state === 'OPEN' && (
@@ -175,22 +175,22 @@ export function TaskSidebar({t, by, runs, reload, onTerm}: {t: store.Task; by: s
     return (
         <Stack gap="sm" as="aside" style={{minWidth: 0}}>
             <Group justify="between" wrap={false}>
-                <Group gap={4}><Text size="sm" fw={600}>Agent</Text><TaskSettings k={k} model={t.model ?? ''} runner={t.runner ?? ''} reload={reload}/></Group>
+                <Group gap={4}><Text size="sm" weight={600}>Agent</Text><TaskSettings k={k} model={t.model ?? ''} runner={t.runner ?? ''} reload={reload}/></Group>
                 <TaskAgent k={k} repos={repos.map(r => r.repo_name)} agent={t.agent ?? ''}/>
             </Group>
             <Group justify="between">
-                <Text size="sm" fw={600}>Status</Text>
+                <Text size="sm" weight={600}>Status</Text>
                 <StatusSelect k={k} status={t.status}/>
             </Group>
-            <Group justify="between"><Text size="xs" c="dimmed">Created</Text><Group gap={4} wrap={false}><Text size="xs">{by} ·</Text><Time iso={t.created_at}/></Group></Group>
-            <Group justify="between"><Text size="xs" c="dimmed">Updated</Text><Time iso={t.updated_at}/></Group>
+            <Group justify="between"><Text size="xs" tone="muted">Created</Text><Group gap={4} wrap={false}><Text size="xs">{by} ·</Text><Time iso={t.created_at}/></Group></Group>
+            <Group justify="between"><Text size="xs" tone="muted">Updated</Text><Time iso={t.updated_at}/></Group>
             <Labels k={k} labels={t.labels ?? []} reload={reload}/>
             <Divider/>
             <Group justify="between">
                 <Title order={6}>Repos</Title>
                 <AddRepo k={k} have={repos.map(r => r.repo_name)} reload={reload}/>
             </Group>
-            {actionsError && <Text size="xs" c="red">Failed to load actions: {actionsError}</Text>}
+            {actionsError && <Text size="xs" tone="danger">Failed to load actions: {actionsError}</Text>}
             {repos.map(r => (
                 <RepoFields key={r.repo_id + '|' + r.branch + '|' + (r.pr_url ?? '')} k={k} r={r} reload={reload} canRemove={repos.length > 1}/>
             ))}
@@ -201,8 +201,8 @@ export function TaskSidebar({t, by, runs, reload, onTerm}: {t: store.Task; by: s
             {taskActions.map(a => <ActionRow key={a.kind + a.repo} k={k} a={a} onTerm={onTerm}/>)}
             <Divider/>
             <Title order={6}>Sessions</Title>
-            {sessionsError && <Text size="xs" c="red">Failed to load sessions: {sessionsError}</Text>}
-            {runs.length + (sessions?.length ?? 0) === 0 && <Text size="xs" c="dimmed">None yet.</Text>}
+            {sessionsError && <Text size="xs" tone="danger">Failed to load sessions: {sessionsError}</Text>}
+            {runs.length + (sessions?.length ?? 0) === 0 && <Text size="xs" tone="muted">None yet.</Text>}
             {runs.map((r, i) => (
                 <Group key={r.id} justify="between" wrap={false} gap="xs">
                     <Anchor size="xs" c="dimmed" component="button" ta="left" title={r.session_id ? `Session ${r.session_id}` : 'Show in thread'}
@@ -215,7 +215,7 @@ export function TaskSidebar({t, by, runs, reload, onTerm}: {t: store.Task; by: s
             {sessions?.map(s => (
                 <Stack key={s.id} gap={2}>
                     <ActionRow k={k} a={s.action} kind={'resume:' + s.id} onTerm={onTerm}/>
-                    <Text size="xs" c="dimmed" lineClamp={1} title={`Session ${s.id}\n${s.prompt}`}>{s.prompt || s.id}</Text>
+                    <Text size="xs" tone="muted" clamp={1} title={`Session ${s.id}\n${s.prompt}`}>{s.prompt || s.id}</Text>
                 </Stack>
             ))}
         </Stack>

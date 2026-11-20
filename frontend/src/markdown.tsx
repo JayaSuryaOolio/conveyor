@@ -1,6 +1,6 @@
 import {createContext, lazy, Suspense, useRef, useState} from 'react'
-import {ActionIcon, Box, Popover, SegmentedControl, Text, Textarea, Tooltip, Typography} from '@mantine/core'
-import {Button, Group, Stack} from './ui'
+import {ActionIcon, Box, Popover, SegmentedControl, Textarea, Tooltip, Typography} from '@mantine/core'
+import {Button, Group, Stack, Text} from './ui'
 import {IconBold, IconCode, IconItalic, IconLink, IconList, IconListCheck} from '@tabler/icons-react'
 import {Complete, SaveAttachment, ShowError} from '../wailsjs/go/ui/App'
 import {core} from '../wailsjs/go/models'
@@ -202,17 +202,17 @@ export function MarkdownEditor({value, onChange, onSubmit, submitLabel = 'Send',
                     <Popover.Dropdown p={4}>
                         {items.map((i, n) => (
                             <Group key={i.insert} gap="xs" wrap={false} onMouseEnter={() => setHi(n)} onMouseDown={e => { e.preventDefault(); pick(i) }} style={{paddingInline: 'var(--mantine-spacing-xs)', paddingBlock: 2, background: n === hi ? 'var(--mantine-color-default-hover)' : undefined, cursor: 'pointer', borderRadius: 4}}>
-                                <Text size="sm" ff="monospace" c={trig?.kind === '/' ? 'violet' : 'blue'} truncate={trig?.kind === '@' ? 'start' : 'end'} style={{flex: 'none', maxWidth: '100%'}}><span dir="ltr">{i.label}</span></Text>
-                                {i.hint && <Text size="xs" c="dimmed" truncate>{i.hint}</Text>}
+                                <Text size="sm" mono tone={trig?.kind === '/' ? 'accent' : 'info'} truncate={trig?.kind === '@' ? 'start' : 'end'} style={{flex: 'none', maxWidth: '100%'}}><span dir="ltr">{i.label}</span></Text>
+                                {i.hint && <Text size="xs" tone="muted" truncate>{i.hint}</Text>}
                             </Group>
                         ))}
                     </Popover.Dropdown>
                 </Popover>
                 : <Stack style={{minHeight: minRows * 24, padding: 'var(--mantine-spacing-sm)'}}>
-                    {value.trim() ? <Markdown>{value}</Markdown> : <Text size="sm" c="dimmed">Nothing to preview</Text>}
+                    {value.trim() ? <Markdown>{value}</Markdown> : <Text size="sm" tone="muted">Nothing to preview</Text>}
                 </Stack>}
             <Group justify="between" wrap={false} style={{paddingInline: 'var(--mantine-spacing-xs)', paddingBlock: 6, borderTop: '1px solid var(--mantine-color-default-border)'}}>
-                <Text size="xs" c="dimmed">{pending ? 'Uploading…' : <>Markdown supported · @ files · / commands ·{keyPrefix && ` ${keyPrefix} tasks ·`} paste or drop images{onSubmit && ' · ⌘↵ to send'}</>}</Text>
+                <Text size="xs" tone="muted">{pending ? 'Uploading…' : <>Markdown supported · @ files · / commands ·{keyPrefix && ` ${keyPrefix} tasks ·`} paste or drop images{onSubmit && ' · ⌘↵ to send'}</>}</Text>
                 {onSubmit && <Button size="sm" compact onClick={submit} loading={submitting} disabled={!canSubmit || pending > 0}>{submitLabel}</Button>}
             </Group>
         </Box>

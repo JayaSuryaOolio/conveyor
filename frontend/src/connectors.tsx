@@ -1,6 +1,6 @@
 import {useEffect, useRef, useState} from 'react'
-import {ActionIcon, Badge, Checkbox, Code, FileButton, MultiSelect, NumberInput, Pagination, Paper, Select, Switch, Table, Tabs, Text, TextInput, Textarea, Title} from '@mantine/core'
-import {Button, Group, Modal, Stack} from './ui'
+import {ActionIcon, Badge, Checkbox, Code, FileButton, MultiSelect, NumberInput, Pagination, Paper, Select, Switch, Table, Tabs, TextInput, Textarea, Title} from '@mantine/core'
+import {Button, Group, Modal, Stack, Text} from './ui'
 import {IconDownload, IconPlus, IconPuzzle, IconSettings, IconTrash, IconUpload} from '@tabler/icons-react'
 import {AddConnector, ConnectorSettings, SaveConnectorSettings, ExampleConnectors, InstallExample, GetSettings, SetSetting, ConnectorIcons, ConnectorPresets, Confirm, SetConnectorDisabled, DeleteConnector, ExportConnector, InstallManifest, InstallPreset, ListConnectors, SlackLinks, ManifestSchema, Plugin, ValidateManifest} from '../wailsjs/go/ui/App'
 import {runner, store} from '../wailsjs/go/models'
@@ -66,7 +66,7 @@ function ManifestForm({onClose}: {onClose: (saved: boolean) => void}) {
     }
     return (
         <Stack gap="sm">
-            <Text size="sm" c="dimmed">
+            <Text size="sm" tone="muted">
                 A manifest (version {schema?.version?.[0]}) declares actions and where they appear, and can ship <Code>agents</Code> and <Code>automations</Code>.
                 Click a placeholder to insert it at the cursor; scripts get its value shell-quoted.
             </Text>
@@ -108,16 +108,16 @@ function SettingsForm({app, onClose}: {app: string; onClose: () => void}) {
     useEffect(() => { if (data) setVals(v => Object.keys(v).length ? v : Object.fromEntries(data.map(s => [s.key, s.value]))) }, [data])
     return (
         <Stack gap="md">
-            {error && <Text c="red" size="sm">{error}</Text>}
+            {error && <Text tone="danger" size="sm">{error}</Text>}
             {data?.map(s => {
                 const v = vals[s.key] ?? s.value, set = (x: string) => setVals({...vals, [s.key]: x})
                 return (
                     <div key={s.key}>
-                        <Text size="sm" fw={600} ff="monospace">{s.key}</Text>
+                        <Text size="sm" weight={600} mono>{s.key}</Text>
                         {s.type === 'boolean'
                             ? <Switch mt={4} label={s.description} checked={v === 'true'} onChange={e => set(String(e.currentTarget.checked))}/>
                             : <>
-                                {s.description && <Text size="xs" c="dimmed" mb={4}>{s.description}</Text>}
+                                {s.description && <Text size="xs" tone="muted" style={{marginBottom: 4}}>{s.description}</Text>}
                                 {s.type === 'number' ? <NumberInput value={v} onChange={x => set(String(x))}/>
                                     : s.type === 'enum' ? <Select data={s.options ?? []} value={v} onChange={x => x && set(x)} allowDeselect={false}/>
                                     : <TextInput value={v} onChange={e => set(e.target.value)}/>}
@@ -144,10 +144,10 @@ function PluginRow({st, act}: {st: runner.PluginStatus, act: (tool: string, a: s
     return (
         <Group justify="between">
             <Group gap="xs">
-                <Text size="sm" fw={500}>{st.tool}</Text>
+                <Text size="sm" weight={500}>{st.tool}</Text>
                 <Badge variant="light" color={pluginColor[st.status] ?? 'gray'}>{st.status}</Badge>
                 {st.path && <Code>{st.path}</Code>}
-                {st.note && <Text size="xs" c="dimmed">{st.note}</Text>}
+                {st.note && <Text size="xs" tone="muted">{st.note}</Text>}
             </Group>
             {supported && <Group gap="xs">
                 {st.status !== 'installed' && <Button size="xs" onClick={() => act(st.tool, 'install')}>{st.status === 'outdated' ? 'Update' : 'Install'}</Button>}
@@ -165,13 +165,13 @@ function ConveyorPlugin() {
             <Stack gap="xs">
                 <Title order={5}>Conveyor plugin</Title>
                 {data?.map(st => <PluginRow key={st.tool} st={st} act={act}/>)}
-                <Text size="sm" c="dimmed">
+                <Text size="sm" tone="muted">
                     Sessions Conveyor starts always report back. The plugin adds the same hooks (prompt, stop, notification) and the
                     {' '}<Code>conveyor</Code> and <Code>epic</Code> skills for sessions you start yourself, so a <Code>claude</Code> run in a task
                     worktree, from an app or any terminal, shows up on the task as an interactive run. Sessions outside Conveyor workspaces are ignored.
                     Installing also removes the older hooks from <Code>~/.claude/settings.json</Code>. Same as <Code>conveyor plugin install</Code>.
                 </Text>
-                {error && <Text c="red" size="sm">{error}</Text>}
+                {error && <Text tone="danger" size="sm">{error}</Text>}
             </Stack>
         </Paper>
     )
@@ -197,9 +197,9 @@ function ConnectorList() {
                     <Button icon={<IconPlus size={16}/>} onClick={() => setAdding(true)}>New connector</Button>
                 </Group>
             </Group>
-            <Text size="sm" c="dimmed">Connectors a task worktree can be opened in, from the icons under each repo on the task page or <Code>conveyor app open NAME KEY</Code>.</Text>
-            {error && <Text c="red">{error}</Text>}
-            {data && data.length === 0 && <Text c="dimmed">None yet. Add one below or create your own.</Text>}
+            <Text size="sm" tone="muted">Connectors a task worktree can be opened in, from the icons under each repo on the task page or <Code>conveyor app open NAME KEY</Code>.</Text>
+            {error && <Text tone="danger">{error}</Text>}
+            {data && data.length === 0 && <Text tone="muted">None yet. Add one below or create your own.</Text>}
             {data && data.length > 0 && (
                 <Table verticalSpacing="xs">
                     <Table.Thead><Table.Tr><Table.Th>Name</Table.Th><Table.Th>Actions</Table.Th><Table.Th/></Table.Tr></Table.Thead>
@@ -232,7 +232,7 @@ function ConnectorList() {
             </>}
             {offered.length > 0 && <>
                 <Title order={5}>Templates</Title>
-                <Text size="xs" c="dimmed">Bundled examples, not detected on this Mac. Install one to use it or as a starting point.</Text>
+                <Text size="xs" tone="muted">Bundled examples, not detected on this Mac. Install one to use it or as a starting point.</Text>
                 <Group gap="xs">
                     {offered.map(e => (
                         <Button key={e.file} size="xs" variant="soft" icon={<IconPlus size={14}/>} title={e.description}
@@ -274,8 +274,8 @@ function SlackLinksTable() {
     if (!data?.total) return null
     return (
         <Stack gap="xs">
-            <Text size="sm" fw={500}>Threads</Text>
-            <Text size="xs" c="dimmed">Which task each Slack thread replies to. Part of Conveyor's state, so Export state includes them.</Text>
+            <Text size="sm" weight={500}>Threads</Text>
+            <Text size="xs" tone="muted">Which task each Slack thread replies to. Part of Conveyor's state, so Export state includes them.</Text>
             <Table verticalSpacing={4}>
                 <Table.Thead><Table.Tr><Table.Th>Task</Table.Th><Table.Th>Channel</Table.Th><Table.Th>Thread</Table.Th><Table.Th>Notifies</Table.Th></Table.Tr></Table.Thead>
                 <Table.Tbody>
@@ -297,7 +297,7 @@ function Integrations() {
     const set = (k: string, v: string) => SetSetting(k, v).then(reload, errMsg)
     return (
         <Stack>
-            {error && <Text c="red">{error}</Text>}
+            {error && <Text tone="danger">{error}</Text>}
             {data && (
                 <Paper withBorder p="md" radius="md">
                     <Stack gap="sm">
@@ -309,7 +309,7 @@ function Integrations() {
                             </Group>
                             <Switch label="Send and listen" checked={data.chat_enabled === 'on'} onChange={e => set('chat_enabled', e.currentTarget.checked ? 'on' : 'off')}/>
                         </Group>
-                        <Text size="sm" c="dimmed">
+                        <Text size="sm" tone="muted">
                             Answer needs_you questions, get PR links and run <Code>/conveyor list|comment|move</Code> from the Slack mobile app.
                             Create the Slack app as described in <Code>docs/slack.md</Code>. Changes apply without a restart.
                         </Text>

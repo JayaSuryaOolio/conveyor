@@ -1,6 +1,6 @@
 import {useCallback, useEffect, useState} from 'react'
-import {ActionIcon, Badge, Text, Tooltip} from '@mantine/core'
-import {Group, Stack} from './ui'
+import {ActionIcon, Badge, Tooltip} from '@mantine/core'
+import {Group, Stack, Text} from './ui'
 import {Spotlight, spotlight} from '@mantine/spotlight'
 import '@mantine/spotlight/styles.css'
 import {IconBolt, IconFilter, IconLayoutKanban, IconRefresh, IconRobot, IconSearch, IconSettings} from '@tabler/icons-react'
@@ -70,7 +70,7 @@ export function CommandPalette({nav, onFocus}: {nav: Nav; onFocus: () => void}) 
                             <Spotlight.Action key={i.id} onClick={i.go}>
                                 <Group wrap={false} style={{width: '100%'}}>
                                     <Icon size={18}/>
-                                    <Text flex={1} miw={0} truncate>{i.label}</Text>
+                                    <Text truncate style={{flex: 1, minWidth: 0}}>{i.label}</Text>
                                     {i.pr && <Badge variant="light" color="violet" style={{textTransform: 'none', flexShrink: 0}}>{i.pr}</Badge>}
                                     {i.hint && <Badge variant="light" color="gray" style={{flexShrink: 0}}>{i.hint}</Badge>}
                                 </Group>
