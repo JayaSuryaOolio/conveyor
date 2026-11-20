@@ -45,6 +45,7 @@ type Dispatcher struct {
 	lastPoll time.Time
 	lastHook time.Time
 	autoBusy atomic.Bool // an automation pass is in flight (prechecks can take a minute)
+	prBusy   atomic.Bool // a PR poll is in flight (one gh call per task, serial)
 
 	wakeOnce sync.Once
 	wakeCh   chan struct{} // buffered 1: a pending wake coalesces with any later ones
@@ -457,10 +458,18 @@ func (d *Dispatcher) reapInteractive(r store.Run, alive bool) error {
 
 // pollPRs is the fallback for the Stop hook's per-task refresh (hook.Handle) and covers PRs merged elsewhere.
 func (d *Dispatcher) pollPRs(ctx context.Context) {
-	if !d.lastPoll.IsZero() && d.now().Sub(d.lastPoll) < prPollEach {
+	if !d.lastPoll.IsZero() && d.now().Sub(d.lastPoll) < prPollEach || !d.prBusy.CompareAndSwap(false, true) {
 		return
 	}
 	d.lastPoll = d.now()
+	go func() {
+		defer d.prBusy.Store(false)
+		d.syncPRs(ctx)
+	}()
+}
+
+// syncPRs runs off the tick: its gh calls take seconds per task and must not delay launchTodo.
+func (d *Dispatcher) syncPRs(ctx context.Context) {
 	tasks, err := store.ListTasks(d.Svc.DB, store.StatusRunning, store.StatusNeedsYou, store.StatusReview)
 	if err != nil {
 		d.logf("pr poll: %v", err)
