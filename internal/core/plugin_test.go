@@ -38,12 +38,12 @@ func TestPlugin(t *testing.T) {
 	status("status", "outdated", "not installed")
 
 	status("install", "installed", "installed")
-	for _, f := range []string{".claude-plugin/plugin.json", "hooks/hooks.json", "skills/epic/SKILL.md", "skills/epic/planners/wayfinder.md", "skills/conveyor/SKILL.md", "skills/conveyor-drift/SKILL.md"} {
+	for _, f := range []string{".claude-plugin/plugin.json", "hooks/hooks.json", "skills/epic/SKILL.md", "skills/epic/planners/wayfinder.md", "skills/conveyor/SKILL.md", "skills/conveyor-drift/SKILL.md", "skills/write-migration/SKILL.md"} {
 		if _, err := os.Stat(filepath.Join(claudePlugin, f)); err != nil {
 			t.Fatal(err)
 		}
 	}
-	for _, f := range []string{"plugin.json", "hooks.json", "skills/epic/SKILL.md", "skills/conveyor/SKILL.md", "skills/conveyor-drift/SKILL.md", "agents/epic-builder.md"} {
+	for _, f := range []string{"plugin.json", "hooks.json", "skills/epic/SKILL.md", "skills/conveyor/SKILL.md", "skills/conveyor-drift/SKILL.md", "skills/write-migration/SKILL.md", "agents/epic-builder.md"} {
 		if _, err := os.Stat(filepath.Join(agyPlugin, f)); err != nil {
 			t.Fatal(err)
 		}
