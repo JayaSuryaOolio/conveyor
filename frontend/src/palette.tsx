@@ -1,5 +1,6 @@
 import {useCallback, useEffect, useState} from 'react'
-import {ActionIcon, Badge, Group, Text, Tooltip} from '@mantine/core'
+import {ActionIcon, Badge, Tooltip} from '@mantine/core'
+import {Group, Stack, Text} from './ui'
 import {Spotlight, spotlight} from '@mantine/spotlight'
 import '@mantine/spotlight/styles.css'
 import {IconBolt, IconFilter, IconLayoutKanban, IconRefresh, IconRobot, IconSearch, IconSettings} from '@tabler/icons-react'
@@ -7,7 +8,7 @@ import {Nav} from './components'
 import {SETTING_LABELS} from './forms'
 import {load, Raw} from './paletteCache'
 
-type Item = {id: string; label: string; hint: string; go: () => void}
+type Item = {id: string; label: string; hint: string; pr?: string; go: () => void}
 
 const PER_GROUP = 20
 
@@ -45,7 +46,8 @@ export function CommandPalette({nav, onFocus}: {nav: Nav; onFocus: () => void}) 
     const r = raw ?? {tasks: [], agents: [], labels: [], repos: []}
     const groups: {title: string; icon: typeof IconSearch; items: Item[]}[] = [
         {title: 'Go to', icon: IconBolt, items: pick([0], () => 'focus waiting on you', () => ({id: 'focus', label: 'Focus', hint: 'waiting on you', go: onFocus}))},
-        {title: 'Tasks', icon: IconLayoutKanban, items: pick(r.tasks, t => `${t.key} ${t.title}`, t => ({id: 't' + t.key, label: `${t.key} ${t.title}`, hint: t.status, go: () => nav({name: 'task', key: t.key})}))},
+        // PR numbers get their own badge next to the status, not the label: a long title would clip them off the end.
+        {title: 'Tasks', icon: IconLayoutKanban, items: pick(r.tasks, t => `${t.key} ${t.title} ${t.prs.join(' ')}`, t => ({id: 't' + t.key, label: `${t.key} ${t.title}`, hint: t.status, pr: words.length ? t.prs.join(' ') : '', go: () => nav({name: 'task', key: t.key})}))},
         {title: 'Filters', icon: IconFilter, items: [
             ...pick(r.labels, l => 'label ' + l, l => ({id: 'l' + l, label: l, hint: 'label', go: () => nav({name: 'board', label: l})})),
             ...pick(r.repos, x => 'repo ' + x, x => ({id: 'r' + x, label: x, hint: 'repo', go: () => nav({name: 'board', repo: x})})),
@@ -66,10 +68,11 @@ export function CommandPalette({nav, onFocus}: {nav: Nav; onFocus: () => void}) 
                     <Spotlight.ActionsGroup key={title} label={title}>
                         {items.map(i => (
                             <Spotlight.Action key={i.id} onClick={i.go}>
-                                <Group wrap="nowrap" w="100%">
+                                <Group wrap={false} style={{width: '100%'}}>
                                     <Icon size={18}/>
-                                    <Text flex={1} truncate>{i.label}</Text>
-                                    {i.hint && <Badge variant="light" color="gray">{i.hint}</Badge>}
+                                    <Text truncate style={{flex: 1, minWidth: 0}}>{i.label}</Text>
+                                    {i.pr && <Badge variant="light" color="violet" style={{textTransform: 'none', flexShrink: 0}}>{i.pr}</Badge>}
+                                    {i.hint && <Badge variant="light" color="gray" style={{flexShrink: 0}}>{i.hint}</Badge>}
                                 </Group>
                             </Spotlight.Action>
                         ))}

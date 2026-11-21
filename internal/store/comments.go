@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strconv"
+	"time"
 )
 
 const commentCols = `id, task_id, author, body, source, run_id, consumed_by_run_id, created_at, edits, send_now`
@@ -40,6 +42,10 @@ func AddComment(db *sql.DB, c Comment) (Comment, error) {
 		return Comment{}, fmt.Errorf("add comment: %w", err)
 	}
 	c.ID, _ = res.LastInsertId()
+	if c.Author == AuthorHuman || c.Author == AuthorSystem { // launchTodo waits out the debounce, then takes it
+		secs, _ := strconv.Atoi(getSetting(db, "comment_debounce_secs"))
+		Wake(parseRFC(c.CreatedAt).Add(time.Duration(secs) * time.Second))
+	}
 	return c, nil
 }
 
@@ -86,7 +92,11 @@ func SendQueuedNow(db *sql.DB, taskID int64) (int64, error) {
 	if err != nil {
 		return 0, fmt.Errorf("send now: %w", err)
 	}
-	return res.RowsAffected()
+	n, err := res.RowsAffected()
+	if n > 0 {
+		Wake(time.Time{})
+	}
+	return n, err
 }
 
 // ConsumeComments marks comments as received by a run.
@@ -130,6 +140,15 @@ func TakeQueuedComment(db *sql.DB, taskID, id int64) (body string, ok bool, err 
 	}
 	n, _ := res.RowsAffected()
 	return body, n == 1, nil
+}
+
+// DeleteQueuedBySource deletes the task's comments from source that no run has received yet.
+func DeleteQueuedBySource(db *sql.DB, taskID int64, source string) (int64, error) {
+	res, err := db.Exec(`DELETE FROM comments WHERE task_id=? AND source=? AND consumed_by_run_id IS NULL`, taskID, source)
+	if err != nil {
+		return 0, fmt.Errorf("delete queued comments: %w", err)
+	}
+	return res.RowsAffected()
 }
 
 // ReleaseIfNothingQueued undoes a comment's requeue after the comment was taken back: a todo task

@@ -1,10 +1,11 @@
-import {useEffect, useState} from 'react'
-import {ActionIcon, Badge, Box, Button, Card as MCard, Group, Indicator, Menu, Modal, Notification, Paper, Popover, ScrollArea, Select, Stack, Text, Tooltip} from '@mantine/core'
-import {IconAppWindow, IconCheck, IconDots, IconMessageSearch, IconPencil, IconSitemap, IconX} from '@tabler/icons-react'
+import {useContext, useEffect, useState} from 'react'
+import {ActionIcon, Badge, Box, Indicator, Menu, Notification, Paper, Popover, RingProgress, Select, Tooltip} from '@mantine/core'
+import {Button, ButtonSize, ClickableCard, Group, Modal, Stack, Text} from './ui'
+import {IconAppWindow, IconCheck, IconChevronLeft, IconChevronRight, IconDots, IconMessageSearch, IconPencil, IconSitemap, IconX} from '@tabler/icons-react'
 import {AddComment, ConnectorServiceRunning, CheckReviews, MergedPR, Move, PlacedActions, RunConnectorAction, ShowError, SendQueuedNow, StopConnectorService, TakeQueuedComment} from '../wailsjs/go/ui/App'
 import {store, ui} from '../wailsjs/go/models'
-import {Markdown, MarkdownEditor} from './markdown'
-import {ALL_STATUSES, STATUS_COLOR, STATUS_LABEL, ago, fmtK, fmtTime, useData, useDraft} from './util'
+import {Markdown, MarkdownEditor, TaskKey} from './markdown'
+import {ALL_STATUSES, STATUS_COLOR, STATUS_LABEL, ago, fmtK, fmtTime, prNumbers, useData, useDraft} from './util'
 
 /** A screen to show; board views may carry a label or repo filter to apply (deep link); epic views a task key for the open modal. */
 export type View = {name: string; key?: string; label?: string; repo?: string; task?: string}
@@ -25,10 +26,10 @@ export function Toasts() {
         return () => { pushToast = () => {} }
     }, [])
     return (
-        <Stack pos="fixed" bottom={16} right={16} gap="xs" maw={480} style={{zIndex: 1000}}>
+        <Stack gap="xs" style={{position: 'fixed', bottom: 16, right: 16, maxWidth: 480, zIndex: 1000}}>
             {list.map(x => (
                 <Notification key={x.id} withBorder color={x.sticky ? 'red' : undefined} withCloseButton={!x.sticky} onClose={() => setList(l => l.filter(y => y.id !== x.id))}>
-                    <Text size="sm" ff="monospace" style={{whiteSpace: 'pre-wrap', wordBreak: 'break-word'}}>{x.m}</Text>
+                    <Text size="sm" mono style={{whiteSpace: 'pre-wrap', wordBreak: 'break-word'}}>{x.m}</Text>
                 </Notification>
             ))}
         </Stack>
@@ -53,9 +54,9 @@ export function PlacedButtons({place, k = '', size = 'xs'}: {place: string; k?: 
     return (
         <Group gap={4} onClick={e => e.stopPropagation()}>
             <Modal opened={!!ask} onClose={() => setAsk(undefined)} title={ask?.label}>
-                <Text size="sm" mb="sm">{ask?.msg}</Text>
-                <Group justify="flex-end">
-                    <Button variant="default" onClick={() => setAsk(undefined)}>Cancel</Button>
+                <Text size="sm" style={{marginBottom: 12}}>{ask?.msg}</Text>
+                <Group justify="end">
+                    <Button variant="secondary" onClick={() => setAsk(undefined)}>Cancel</Button>
                     <Button data-autofocus onClick={() => { ask?.go(); setAsk(undefined) }}>Continue</Button>
                 </Group>
             </Modal>
@@ -64,7 +65,7 @@ export function PlacedButtons({place, k = '', size = 'xs'}: {place: string; k?: 
                 ? <ServiceButton key={a.connector + a.id} a={a} place={place} k={k} size={size} guard={guard}/>
                 : a.icon
                     ? <Tooltip key={a.connector + a.id} label={a.label}><ActionIcon size={iconSize(size)} variant="default" aria-label={a.label} loading={busy === a.connector + a.id} onClick={() => run(a)}><ActionImg src={a.icon}/></ActionIcon></Tooltip>
-                    : <Button key={a.connector + a.id} size={size} variant="default" loading={busy === a.connector + a.id} title={a.connector} onClick={() => run(a)}>{a.label}</Button>)}
+                    : <Button key={a.connector + a.id} size={size.replace('compact-', '') as ButtonSize} compact={size.startsWith('compact')} variant="secondary" loading={busy === a.connector + a.id} title={a.connector} onClick={() => run(a)}>{a.label}</Button>)}
         </Group>
     )
 }
@@ -89,7 +90,7 @@ function ServiceButton({a, place, k, size, guard}: {a: {connector: string; id: s
             <Indicator disabled={!running} color="green" size={8} processing>
                 {a.icon
                     ? <ActionIcon size={iconSize(size)} variant="default" aria-label={a.label} onClick={click}>{flash ?? <ActionImg src={a.icon}/>}</ActionIcon>
-                    : <Button size={size} variant="default" title={a.connector} onClick={click} leftSection={flash}>{a.label}</Button>}
+                    : <Button size={size.replace('compact-', '') as ButtonSize} compact={size.startsWith('compact')} variant="secondary" title={a.connector} onClick={click} icon={flash}>{a.label}</Button>}
             </Indicator>
         </Tooltip>
     )
@@ -101,7 +102,7 @@ export const AppIcon = ({name, icons, size = 18}: {name: string; icons?: Record<
 
 /** Relative time with the absolute one on hover. */
 export const Time = ({iso}: {iso: string}) => (
-    <Tooltip label={fmtTime(iso)}><Text span size="xs" c="dimmed">{ago(iso)}</Text></Tooltip>
+    <Tooltip label={fmtTime(iso)}><Text span size="xs" tone="muted">{ago(iso)}</Text></Tooltip>
 )
 
 export const StatusBadge = ({status}: {status: string}) => (
@@ -115,10 +116,10 @@ function useMove(k: string) {
     const confirm = () => { Move(k, pending!.to, true).catch(errMsg); setPending(undefined) }
     const modal = (
         <Modal opened={!!pending} onClose={() => setPending(undefined)} title={`Move ${k} to ${STATUS_LABEL[pending?.to ?? '']}?`}>
-            <Text size="sm" mb="sm">{k} has {pending?.n} running run(s). Moving it ends them; the agent stops now.</Text>
-            <Group justify="flex-end">
-                <Button variant="default" onClick={() => setPending(undefined)}>Cancel</Button>
-                <Button data-autofocus color="red" onClick={confirm}>Stop and move</Button>
+            <Text size="sm" style={{marginBottom: 12}}>{k} has {pending?.n} running run(s). Moving it ends them; the agent stops now.</Text>
+            <Group justify="end">
+                <Button variant="secondary" onClick={() => setPending(undefined)}>Cancel</Button>
+                <Button data-autofocus tone="danger" onClick={confirm}>Stop and move</Button>
             </Group>
         </Modal>
     )
@@ -154,27 +155,28 @@ function StatusMenu({k, status}: {k: string; status: string}) {
 }
 
 /** `onLabel` adds a clicked label to the board's filters. */
-export function Card({c, nav, onLabel}: {c: ui.TaskCard; nav: Nav; onLabel: (l: string) => void}) {
+/** showPR (a search is active) adds the card's PR numbers beside the key, so a PR-number hit is explained without crowding idle cards. */
+export function Card({c, nav, onLabel, showPR}: {c: ui.TaskCard; nav: Nav; onLabel: (l: string) => void; showPR?: boolean}) {
     return (
-        <MCard withBorder padding="sm" radius="md" style={{cursor: 'pointer'}} onClick={() => nav({name: 'task', key: c.key})}>
-            <Group justify="space-between" wrap="nowrap" gap="xs">
-                <Text size="xs" fw={600} c="dimmed">{c.key}{c.parent && <Text span size="xs" fw={400}> ↑ {c.parent}</Text>}</Text>
-                <Group gap={4} wrap="nowrap">
+        <ClickableCard bordered onActivate={() => nav({name: 'task', key: c.key})}>
+            <Group justify="between" wrap={false} gap="xs">
+                <Text size="xs" weight={600} tone="muted">{c.key}{c.parent && <Text span size="xs" weight={400}> ↑ {c.parent}</Text>}{showPR && c.prUrls.length > 0 && <Text span size="xs" weight={400} tone="accent"> {prNumbers(c.prUrls).join(' ')}</Text>}</Text>
+                <Group gap={4} wrap={false}>
                     {c.ctxPeak > 0 && <Badge variant="outline" color="gray" size="xs" title="context peak">{fmtK(c.ctxPeak)}</Badge>}
                     {c.openPR && <Tooltip label="Check PR now (reviews, CI, conflicts)"><ActionIcon variant="subtle" color="gray" size="sm" aria-label="Check PR" onClick={e => { e.stopPropagation(); CheckReviews(c.key).then(() => toast('Checking the PR for reviews, CI and conflicts…', false, 3000), errMsg) }}><IconMessageSearch size={16}/></ActionIcon></Tooltip>}
                     <Tooltip label="Epic view"><ActionIcon variant="subtle" color="gray" size="sm" aria-label="Epic view" onClick={e => { e.stopPropagation(); nav({name: 'epic', key: c.key}) }}><IconSitemap size={16}/></ActionIcon></Tooltip>
                     <StatusMenu k={c.key} status={c.status}/>
                 </Group>
             </Group>
-            <Text size="sm" fw={500} mt={2}>{c.title}</Text>
-            {(c.repos.length > 0 || c.labels.length > 0) && <Group gap={4} mt="xs">
+            <Text size="sm" weight={500} clamp={2} title={c.title} style={{marginTop: 2}}>{c.title}</Text>
+            {(c.repos.length > 0 || c.labels.length > 0) && <Group gap={4} style={{marginTop: 'var(--mantine-spacing-xs)'}}>
                 {c.repos.map(r => <Badge key={r} variant="light" size="xs">{r}</Badge>)}
                 {c.labels.map(l => <Badge key={'l:' + l} component="button" variant="outline" color="gray" size="xs" title={'Filter by ' + l}
                                           style={{textTransform: 'none', cursor: 'pointer'}} onClick={e => { e.stopPropagation(); onLabel(l) }}>{l}</Badge>)}
             </Group>}
             {c.lastSummary && <Box mt="xs" mah={40} style={{overflow: 'hidden'}}><Markdown c="dimmed">{c.lastSummary}</Markdown></Box>}
             {c.repos.length > 0 && <Box mt="xs"><PlacedButtons place="board_card" k={c.key} size="compact-xs"/></Box>}
-        </MCard>
+        </ClickableCard>
     )
 }
 
@@ -200,31 +202,73 @@ export function CommentBox({k, placeholder = 'Comment…', onDone, restored}: {k
             <Stack gap="sm">
                 <Text size="sm">{merged} is merged, so {k} can't take more changes on its branch: a task keeps one branch and one PR per repo. What is this comment for?</Text>
                 <Button data-autofocus onClick={() => post('')}>More work: start a follow-up sub-task</Button>
-                <Button variant="default" onClick={() => post('ask')}>A question: answer it, no code changes</Button>
-                <Button variant="subtle" color="gray" onClick={() => post('note')}>Just a note: nothing runs</Button>
+                <Button variant="secondary" onClick={() => post('ask')}>A question: answer it, no code changes</Button>
+                <Button variant="ghost" tone="muted" onClick={() => post('note')}>Just a note: nothing runs</Button>
             </Stack>
         </Modal>
     </>
 }
 
-/** The "edited" corner badge of a comment the run updated (a question, then its replies); opens the replaced versions. */
-function Edits({edits}: {edits: store.CommentEdit[]}) {
+/** Pager over a comment's replaced versions: `i` is an index into `edits` (oldest first), null is the current body. */
+function Edits({edits, i, setI}: {edits: store.CommentEdit[]; i: number | null; setI: (i: number | null) => void}) {
+    const at = i ?? edits.length
     return (
-        <Popover width={480} position="bottom-end" withinPortal shadow="md">
+        <Group gap={2} wrap={false} style={{marginLeft: 'auto'}}>
+            <ActionIcon variant="subtle" color="gray" size="xs" aria-label="Older version" disabled={at === 0} onClick={() => setI(at - 1)}><IconChevronLeft size={12}/></ActionIcon>
+            {i === null
+                ? <Text size="xs" tone="muted">Current</Text>
+                : <Tooltip label="Back to current"><Badge size="xs" variant="light" color="gray" style={{cursor: 'pointer'}} component="button" type="button" onClick={() => setI(null)}>Edit {i + 1}/{edits.length}</Badge></Tooltip>}
+            <ActionIcon variant="subtle" color="gray" size="xs" aria-label="Newer version" disabled={i === null} onClick={() => setI(i! + 1 >= edits.length ? null : i! + 1)}><IconChevronRight size={12}/></ActionIcon>
+        </Group>
+    )
+}
+
+/**
+ * Ring that fills over the dispatcher's comment debounce, so a queued message shows whether it will be taken up.
+ * It stays frozen (orange) while the task is held: agent still running, max_parallel full, blockers.
+ * Click lists running and queued tasks. Refactor idea: if more views need the queue, lift `queue` into a context.
+ */
+function QueuedBadge({m, queue, onSendNow}: {m: store.Comment; queue?: ui.QueueStatus; onSendNow?: () => void}) {
+    const k = useContext(TaskKey)
+    const [now, setNow] = useState(Date.now())
+    const self = queue?.items.find(i => i.key === k)
+    const held = self?.running ? 'The agent is running; sent when its next run starts' : self?.held
+    const wait = (queue?.debounce_secs ?? 0) * 1000
+    // launchTodo debounces on the newest pending comment, and a launch from another process waits for the next tick.
+    const from = new Date(self?.pending || m.created_at).getTime()
+    const last = queue?.last_tick_at ? new Date(queue.last_tick_at).getTime() : NaN
+    const every = (queue?.tick_secs ?? 0) * 1000
+    const stale = isNaN(last) ? !!queue?.stale : every > 0 && now - last > 3 * every
+    const due = from + wait
+    const target = !stale && every > 0 && !isNaN(last) ? last + Math.max(0, Math.ceil((due - last) / every)) * every : due
+    const done = m.send_now || now >= target
+    useEffect(() => {
+        if (done || held || stale) return
+        const t = setInterval(() => setNow(Date.now()), 500)
+        return () => clearInterval(t)
+    }, [done, held, stale])
+    const frac = m.send_now || target <= from ? 1 : Math.min(1, Math.max(0, (now - from) / (target - from)))
+    const label = held ?? (stale ? 'Dispatcher not running' : done ? 'Starting shortly' : 'Sent to the agent at the first dispatch tick after the debounce')
+    return (
+        <Popover width={300} position="bottom-start" withArrow shadow="md">
             <Popover.Target>
-                <Badge size="xs" variant="light" color="gray" ml="auto" style={{cursor: 'pointer'}} component="button">edited {edits.length}×</Badge>
+                <Tooltip label={label}>
+                    <ActionIcon variant="subtle" color={held || stale ? 'orange' : 'gray'} size="sm" aria-label="Queued: show queue">
+                        <RingProgress size={20} thickness={3} roundCaps sections={[{value: frac * 100, color: held || stale ? 'orange' : 'blue'}]} rootColor="var(--mantine-color-default-border)"/>
+                    </ActionIcon>
+                </Tooltip>
             </Popover.Target>
             <Popover.Dropdown>
-                <ScrollArea.Autosize mah={400}>
-                    <Stack gap="sm">
-                        {[...edits].reverse().map((e, i) => (
-                            <Box key={i}>
-                                <Text size="xs" c="dimmed">Replaced <Time iso={e.at}/></Text>
-                                <Markdown>{e.body}</Markdown>
-                            </Box>
-                        ))}
-                    </Stack>
-                </ScrollArea.Autosize>
+                <Stack gap={4}>
+                    <Text size="xs" weight={600}>Queued · {label}</Text>
+                    {queue?.items.length ? queue.items.map(i => (
+                        <Group key={i.key} gap={6} wrap={false}>
+                            <Badge size="xs" variant="light" color={i.running ? 'green' : i.held ? 'orange' : 'gray'} style={{flex: 'none'}}>{i.running ? 'running' : 'queued'}</Badge>
+                            <Text size="xs" truncate title={i.held || undefined}><b>{i.key}</b> {i.title}</Text>
+                        </Group>
+                    )) : <Text size="xs" tone="muted">Nothing else in the queue</Text>}
+                    {onSendNow && <Button style={{marginTop: 4}} size="xs" compact variant="soft" onClick={onSendNow}>Send now</Button>}
+                </Stack>
             </Popover.Dropdown>
         </Popover>
     )
@@ -232,24 +276,25 @@ function Edits({edits}: {edits: store.CommentEdit[]}) {
 
 /** One comment in the thread. */
 // onSendNow: refactor idea: Message owns modal state; if more confirm dialogs appear, adopt @mantine/modals' openConfirmModal.
-export function Message({m, onEdit, onSendNow}: {m: store.Comment; onEdit?: () => void; onSendNow?: () => void}) {
+export function Message({m, onEdit, onSendNow, queue}: {m: store.Comment; onEdit?: () => void; onSendNow?: () => void; queue?: ui.QueueStatus}) {
     const [asking, setAsking] = useState(false)
+    const [ver, setVer] = useState<number | null>(null) // not persisted: null shows the current body
+    const old = ver === null ? undefined : m.edits?.[ver]
     return (
-        <Paper withBorder p="sm" radius="md" bg={m.author === 'human' ? 'var(--mantine-color-default-hover)' : undefined}>
-            <Group gap="xs" mb={4}>
-                <Text size="xs" fw={600}>{m.author}{m.source ? ` (via ${m.source})` : ''}</Text>
+        <Paper withBorder p="sm" radius="md" style={old ? {borderStyle: 'dashed'} : undefined} bg={m.author === 'human' ? 'var(--mantine-color-default-hover)' : undefined}>
+            <Group gap="xs" style={{marginBottom: 4}}>
+                <Text size="xs" weight={600}>{m.author}{m.source ? ` (via ${m.source})` : ''}</Text>
                 <Time iso={m.created_at}/>
-                {onEdit && (onSendNow
-                    ? <Tooltip label="Click to send now"><Badge size="xs" variant="light" color="gray" style={{cursor: 'pointer'}} component="button" type="button" onClick={() => setAsking(true)}>queued</Badge></Tooltip>
-                    : <Tooltip label="Sent to the agent when the next run starts"><Badge size="xs" variant="light" color="gray">queued</Badge></Tooltip>)}
+                {onEdit && <QueuedBadge m={m} queue={queue} onSendNow={onSendNow && (() => setAsking(true))}/>}
                 {onEdit && <Tooltip label="Move back to the editor"><ActionIcon variant="subtle" color="gray" size="xs" aria-label="Edit queued message" onClick={onEdit}><IconPencil size={12}/></ActionIcon></Tooltip>}
-                {!!m.edits?.length && <Edits edits={m.edits}/>}
+                {!!m.edits?.length && <Edits edits={m.edits} i={ver} setI={setVer}/>}
             </Group>
-            <Markdown>{m.body}</Markdown>
+            {old && <Text size="xs" tone="muted">Replaced <Time iso={old.at}/></Text>}
+            <Markdown>{old ? old.body : m.body}</Markdown>
             <Modal opened={asking} onClose={() => setAsking(false)} title="Send now?">
-                <Text size="sm" mb="sm">Skip the wait and start the agent with this message now.</Text>
-                <Group justify="flex-end">
-                    <Button variant="default" onClick={() => setAsking(false)}>Cancel</Button>
+                <Text size="sm" style={{marginBottom: 12}}>Skip the wait and start the agent with this message now.</Text>
+                <Group justify="end">
+                    <Button variant="secondary" onClick={() => setAsking(false)}>Cancel</Button>
                     <Button data-autofocus onClick={() => { setAsking(false); onSendNow?.() }}>Send now</Button>
                 </Group>
             </Modal>

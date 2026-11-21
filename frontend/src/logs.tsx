@@ -1,5 +1,6 @@
 import {useEffect, useRef, useState} from 'react'
-import {Box, Button, Code, Group, SegmentedControl, Stack, Switch, Text, TextInput, Title} from '@mantine/core'
+import {Box, Code, SegmentedControl, Switch, TextInput, Title} from '@mantine/core'
+import {Button, Group, Stack, Text} from './ui'
 import {IconCopy, IconSearch} from '@tabler/icons-react'
 import {AppLog} from '../wailsjs/go/ui/App'
 
@@ -53,20 +54,20 @@ export function Logs() {
     }
 
     return (
-        <Stack h="calc(100vh - 2 * var(--mantine-spacing-md))" gap="xs">
-            <Group justify="space-between">
+        <Stack gap="xs" style={{height: 'calc(100vh - 2 * var(--mantine-spacing-md))'}}>
+            <Group justify="between">
                 <Title order={3}>Logs</Title>
                 <Group>
                     <SegmentedControl value={source} onChange={setSource} data={SOURCES.map(({value, label}) => ({value, label}))}/>
                     <TextInput placeholder="Filter" leftSection={<IconSearch size={16}/>} value={q} onChange={e => setQ(e.target.value)}/>
                     <Switch label="Follow" checked={follow} onChange={e => setFollow(e.currentTarget.checked)}/>
-                    <Button variant="default" leftSection={<IconCopy size={16}/>} onClick={() => navigator.clipboard.writeText(shown.join('\n'))}>Copy</Button>
+                    <Button variant="secondary" icon={<IconCopy size={16}/>} onClick={() => navigator.clipboard.writeText(shown.join('\n'))}>Copy</Button>
                 </Group>
             </Group>
-            <Text size="xs" c="dimmed">~/.conveyor/{file}. From a terminal: <Code>tail -f ~/.conveyor/{file}</Code></Text>
+            <Text size="xs" tone="muted">~/.conveyor/{file}. From a terminal: <Code>tail -f ~/.conveyor/{file}</Code></Text>
             <Box ref={box} onScroll={onScroll} flex={1} mih={0} p="xs" bd="1px solid var(--mantine-color-default-border)"
                  style={{overflow: 'auto', fontFamily: 'var(--mantine-font-family-monospace)', fontSize: 12, borderRadius: 4}}>
-                {loaded && !lines.length && <Text size="sm" c="dimmed">Nothing logged to {file} yet.</Text>}
+                {loaded && !lines.length && <Text size="sm" tone="muted">Nothing logged to {file} yet.</Text>}
                 {shown.map((l, i) => {
                     const lo = l.toLowerCase()
                     const path = l.includes('PATH=')

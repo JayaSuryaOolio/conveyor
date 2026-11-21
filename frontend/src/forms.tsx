@@ -1,12 +1,15 @@
 import {useState} from 'react'
-import {ActionIcon, Button, Checkbox, Code, Group, Modal, MultiSelect, PasswordInput, ScrollArea, SegmentedControl, Select, SelectProps, SimpleGrid, Stack, Table, TagsInput, Tabs, Text, TextInput, Textarea, Title, Tooltip} from '@mantine/core'
+import {ActionIcon, Checkbox, Code, MultiSelect, PasswordInput, ScrollArea, SegmentedControl, Select, SelectProps, SimpleGrid, Table, TagsInput, Tabs, TextInput, Textarea, Title, Tooltip} from '@mantine/core'
+import {Button, Group, Modal, Stack, Text} from './ui'
 import {IconAdjustments} from '@tabler/icons-react'
 import {AddLabel, AddRepo, CreateTask, ExportState, GetPromptDefaults, GetTask, GetSettings, ImportState, ListAgents, ListCLIAgents, ListLabels, ListModels, ListRepos, PreviewBrief, Requirements, ShellPATHError, SetRepoSetupScript, SetSetting, SetTaskAgent, SetTaskModel, SetTaskRunner} from '../wailsjs/go/ui/App'
 import {core, store} from '../wailsjs/go/models'
 import {Nav, errMsg} from './components'
 import {Markdown, MarkdownEditor} from './markdown'
 import {listTasks, useData, useDraft} from './util'
+import {ThemePicker} from './themes'
 
+/** Body of the New task modal; App owns the <Modal> (opened flag) so Mantine's focus trap and return-focus work. Unmounts on close, so state resets. */
 export function NewTask({nav, close}: {nav: Nav; close: () => void}) {
     const {data: repos} = useData(ListRepos, [])
     const {data: tasks} = useData(listTasks, [])
@@ -40,7 +43,6 @@ export function NewTask({nav, close}: {nav: Nav; close: () => void}) {
         }, errMsg)
     }
     return (
-        <Modal opened onClose={close} title="New task" size="clamp(28rem, 60vw, 64rem)">
             <Stack gap="sm">
                 <TextInput data-autofocus placeholder="Title" value={title} onChange={e => setTitle(e.target.value)}/>
                 <MarkdownEditor minRows={4} placeholder="Description" value={desc} onChange={setDesc} repos={sel}/>
@@ -53,7 +55,7 @@ export function NewTask({nav, close}: {nav: Nav; close: () => void}) {
                     {sel.length > 1 && <Select label="Primary repo" allowDeselect={false} data={sel} value={prim} onChange={v => setPrimary(v ?? '')}/>}
                     <TagsInput label="Labels" placeholder="Add label…" data={allLabels ?? []} value={labels} onChange={setLabels} splitChars={[',']}/>
                 </SimpleGrid>
-                <Text size="sm" fw={500} mt="xs">Agents</Text>
+                <Text size="sm" weight={500} style={{marginTop: 10}}>Agents</Text>
                 <SimpleGrid type="container" cols={{base: 1, '36em': 3}} spacing="sm">
                     <ModelSelect label="Model" runner={runner} value={model} onChange={setModel}/>
                     <AgentSelect label="Agent" repos={sel} value={agent} onChange={setAgent}/>
@@ -64,12 +66,11 @@ export function NewTask({nav, close}: {nav: Nav; close: () => void}) {
                     <Checkbox label="Epic" checked={epic} onChange={e => setEpic(e.currentTarget.checked)}/>
                     {epic && <TextInput label="Epic name" placeholder="default: the lower-cased task key" value={epicName} onChange={e => setEpicName(e.target.value)}/>}
                 </SimpleGrid>
-                <Group justify="flex-end">
-                    <Button variant="default" onClick={() => { setTitle(''); setDesc(''); close() }}>Cancel</Button>
+                <Group justify="end">
+                    <Button variant="secondary" onClick={() => { setTitle(''); setDesc(''); close() }}>Cancel</Button>
                     <Button onClick={submit} disabled={!title.trim() || sel.length === 0}>Create</Button>
                 </Group>
             </Stack>
-        </Modal>
     )
 }
 
@@ -131,9 +132,9 @@ export function TaskSettings({k, model, runner, reload}: {k: string; model: stri
         <Modal opened={open} onClose={() => setOpen(false)} title={`${k} settings`} size="sm">
             <Stack gap="sm">
                 <ModelSelect label="Model" runner={runner} value={model} onChange={m => SetTaskModel(k, m).then(reload, errMsg)}/>
-                <Text size="xs" c="dimmed">Used from the next run. Default: the agent's model, else the default_model setting.</Text>
+                <Text size="xs" tone="muted">Used from the next run. Default: the agent's model, else the default_model setting.</Text>
                 <RunnerSelect label="Runner" value={runner ?? ''} onChange={r => SetTaskRunner(k, r).then(reload, errMsg)}/>
-                <Text size="xs" c="dimmed">Used from the next run. Default: the default_runner setting.</Text>
+                <Text size="xs" tone="muted">Used from the next run. Default: the default_runner setting.</Text>
             </Stack>
         </Modal>
     </>
@@ -145,10 +146,10 @@ function Repos() {
     const [name, setName] = useState('')
     return (
         <Stack>
-            <Text size="xs" c="dimmed">Each repo's setup script runs with bash in every new worktree before the agent starts (stdin closed, 10 min limit), e.g. to build a nix-direnv dev shell. A failure fails the launch and the script reruns on the next one. Log: workspaces/&lt;KEY&gt;/setup-&lt;repo&gt;.log.</Text>
-            {error && <Text c="red">{error}</Text>}
+            <Text size="xs" tone="muted">Each repo's setup script runs with bash in every new worktree before the agent starts (stdin closed, 10 min limit), e.g. to build a nix-direnv dev shell. A failure fails the launch and the script reruns on the next one. Log: workspaces/&lt;KEY&gt;/setup-&lt;repo&gt;.log.</Text>
+            {error && <Text tone="danger">{error}</Text>}
             {data?.map(r => <RepoRow key={r.id} r={r} reload={reload}/>)}
-            <Group align="flex-start" wrap="nowrap">
+            <Group align="start" wrap={false}>
                 <TextInput style={{flex: 2}} placeholder="/path/to/clone" value={path} onChange={e => setPath(e.target.value)}/>
                 <TextInput style={{flex: 1}} placeholder="name (optional)" value={name} onChange={e => setName(e.target.value)}/>
                 <Button onClick={() => AddRepo(path, name).then(() => { setPath(''); setName(''); reload() }, errMsg)}>Add</Button>
@@ -160,10 +161,10 @@ function Repos() {
 function RepoRow({r, reload}: {r: store.Repo; reload: () => void}) {
     const [val, setVal] = useState(r.setup_script)
     return (
-        <Group wrap="nowrap" align="flex-end">
+        <Group wrap={false} align="end">
             <Textarea style={{flex: 1}} autosize minRows={2} maxRows={10} value={val} onChange={e => setVal(e.target.value)}
                       styles={{input: {fontFamily: 'var(--mantine-font-family-monospace)'}}}
-                      label={<>{r.name} <Text span c="dimmed" size="xs">{r.default_branch} · {r.path}</Text></>}
+                      label={<>{r.name} <Text span tone="muted" size="xs">{r.default_branch} · {r.path}</Text></>}
                       placeholder="direnv allow . && direnv exec . true"/>
             <Button disabled={val === r.setup_script} onClick={() => SetRepoSetupScript(r.name, val).then(reload, errMsg)}>Save</Button>
         </Group>
@@ -183,6 +184,7 @@ const TABS: {name: string; fields: Field[]}[] = [
         {k: "max_parallel", label: "Max parallel runs", desc: "How many tasks run at once."},
         {k: "resume_threshold", label: "Resume threshold (tokens)", desc: "A hot session resumes while its context peak is below this; above it a fresh session starts."},
         {k: "comment_debounce_secs", label: "Comment debounce (s)", desc: "Wait this long after a comment before starting a run, so you can batch comments."},
+        {k: "dispatch_tick_secs", label: "Dispatch poll (s)", desc: "Safety-net poll for changes made from the CLI or another window (1-15). Changes in the app itself start runs without waiting for it."},
         {k: "max_consecutive_failures", label: "Max consecutive failures", desc: "After this many failed runs in a row the task is marked failed."},
     ]},
     {name: "External terminal", fields: [
@@ -205,12 +207,12 @@ export function Settings() {
     const known = new Set(TABS.flatMap(t => t.fields.map(f => f.k)))
     const extra = Object.keys(data ?? {}).filter(k => !known.has(k)).sort().map((k): Field => ({k, label: k, desc: ""}))
     return (
-        <Stack maw={800}>
+        <Stack style={{maxWidth: 800}}>
             <Title order={3}>Settings</Title>
-            {error && <Text c="red">{error}</Text>}
+            {error && <Text tone="danger">{error}</Text>}
             {data && (
                 <Tabs defaultValue="General" keepMounted={false}>
-                    <Tabs.List mb="md">{TABS.map(t => <Tabs.Tab key={t.name} value={t.name}>{t.name}</Tabs.Tab>)}<Tabs.Tab value="Repos">Repos</Tabs.Tab><Tabs.Tab value="Requirements">Requirements</Tabs.Tab></Tabs.List>
+                    <Tabs.List mb="md">{TABS.map(t => <Tabs.Tab key={t.name} value={t.name}>{t.name}</Tabs.Tab>)}<Tabs.Tab value="UI">UI</Tabs.Tab><Tabs.Tab value="Repos">Repos</Tabs.Tab><Tabs.Tab value="Requirements">Requirements</Tabs.Tab></Tabs.List>
                     {TABS.map(t => (
                         <Tabs.Panel key={t.name} value={t.name}>
                             <Stack>
@@ -220,6 +222,7 @@ export function Settings() {
                             </Stack>
                         </Tabs.Panel>
                     ))}
+                    <Tabs.Panel value="UI"><ThemePicker/></Tabs.Panel>
                     <Tabs.Panel value="Repos"><Repos/></Tabs.Panel>
                     <Tabs.Panel value="Requirements"><RequirementsList/></Tabs.Panel>
                 </Tabs>
@@ -234,7 +237,7 @@ function RequirementsList() {
     const {data: pathErr} = useData(ShellPATHError, [])
     return (
         <Stack gap="xs">
-            <Text size="xs" c="dimmed">{pathErr ? `Login-shell PATH not loaded (${pathErr}); only the app's own PATH is searched.` : "Searched on the app's PATH, including your login shell's."}</Text>
+            <Text size="xs" tone="muted">{pathErr ? `Login-shell PATH not loaded (${pathErr}); only the app's own PATH is searched.` : "Searched on the app's PATH, including your login shell's."}</Text>
             <Table>
                 <Table.Tbody>
                     {reqs?.map(r => (
@@ -255,11 +258,11 @@ function StateButtons({reload}: {reload: () => void}) {
     const [msg, setMsg] = useState<string[]>([])
     return (
         <Stack gap={4}>
-            <Text size="sm" fw={500}>State</Text>
-            <Text size="xs" c="dimmed">Move settings, connectors, automations and user agents to another install. Repos are not exported: automations get placeholders and import disabled. Import only adds what is missing.</Text>
+            <Text size="sm" weight={500}>State</Text>
+            <Text size="xs" tone="muted">Move settings, connectors, automations and user agents to another install. Repos are not exported: automations get placeholders and import disabled. Import only adds what is missing.</Text>
             <Group>
-                <Button variant="default" onClick={() => ExportState().then(p => setMsg(p ? [`Exported to ${p}`] : []), errMsg)}>Export state</Button>
-                <Button variant="default" onClick={() => ImportState().then(l => { setMsg(l ?? []); reload() }, errMsg)}>Import state</Button>
+                <Button variant="secondary" onClick={() => ExportState().then(p => setMsg(p ? [`Exported to ${p}`] : []), errMsg)}>Export state</Button>
+                <Button variant="secondary" onClick={() => ImportState().then(l => { setMsg(l ?? []); reload() }, errMsg)}>Import state</Button>
             </Group>
             {msg.map((l, i) => <Text key={i} size="sm">{l}</Text>)}
         </Stack>
@@ -270,9 +273,9 @@ export function SettingRow({f, v, ph, reload}: {f: Field; v: string; ph?: string
     const [val, setVal] = useState(v)
     const props = {style: {flex: 1}, label: f.label, description: f.desc, placeholder: ph}
     return (
-        <Group wrap="nowrap" align="flex-end">
+        <Group wrap={false} align="end">
             {f.kind === "md" ? <Stack gap={4} style={{flex: 1}}>
-                <Text size="sm" fw={500}>{f.label}</Text><Text size="xs" c="dimmed">{f.desc}</Text>
+                <Text size="sm" weight={500}>{f.label}</Text><Text size="xs" tone="muted">{f.desc}</Text>
                 <MarkdownEditor minRows={4} value={val} onChange={setVal}/>
             </Stack>
                 : f.kind === "model" ? <ModelSelect {...props} value={val} onChange={setVal}/>
@@ -293,22 +296,22 @@ function PromptsInfo({settings, protocol}: {settings: Record<string, string>; pr
     const sig = JSON.stringify(settings) // refetch when any setting is saved
     const {data: pv, error} = useData(() => key ? PreviewBrief(key) : Promise.resolve(undefined), [key, sig])
     return (
-        <Stack mt="md">
+        <Stack style={{marginTop: 'var(--mantine-spacing-md)'}}>
             <Title order={5}>Built-in protocol and rules</Title>
-            <Text size="xs" c="dimmed">Always in the brief. Read-only; add to the rules with Extra rules above.</Text>
+            <Text size="xs" tone="muted">Always in the brief. Read-only; add to the rules with Extra rules above.</Text>
             <ScrollArea.Autosize mah={360}><Code block>{protocol}</Code></ScrollArea.Autosize>
             <Title order={5}>Preview</Title>
-            <Text size="xs" c="dimmed">The brief and first prompt for a task as they would be sent now. Nothing is written.</Text>
+            <Text size="xs" tone="muted">The brief and first prompt for a task as they would be sent now. Nothing is written.</Text>
             <Group>
                 <Select style={{flex: 1}} placeholder="Pick a task" value={key} onChange={setKey}
                         data={(tasks ?? []).filter(t => t.status !== 'done' && t.status !== 'cancelled').sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).map(t => ({value: t.key, label: `${t.key}  ${t.title}`}))}/>
                 <SegmentedControl value={raw} onChange={setRaw} data={[{value: "rendered", label: "Rendered"}, {value: "raw", label: "Raw"}]}/>
             </Group>
-            {error && <Text c="red">{error}</Text>}
+            {error && <Text tone="danger">{error}</Text>}
             {pv && <>
-                <Text size="sm" fw={600}>BRIEF.md</Text>
+                <Text size="sm" weight={600}>BRIEF.md</Text>
                 {raw === "raw" ? <Code block>{pv.brief}</Code> : <Markdown>{pv.brief}</Markdown>}
-                <Text size="sm" fw={600}>Fresh prompt</Text>
+                <Text size="sm" weight={600}>Fresh prompt</Text>
                 <Code block>{pv.prompt}</Code>
             </>}
         </Stack>

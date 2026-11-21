@@ -1,5 +1,6 @@
 import {useState} from 'react'
-import {ActionIcon, Anchor, Badge, Button, Code, Divider, Group, Menu, Modal, Paper, Stack, TagsInput, Text, TextInput, Title, Tooltip} from '@mantine/core'
+import {ActionIcon, Anchor, Badge, Code, Divider, Menu, Paper, TagsInput, TextInput, Title, Tooltip} from '@mantine/core'
+import {Button, ClickableCode, Group, Modal, Stack, Text} from './ui'
 import {useClipboard} from '@mantine/hooks'
 import {IconCopy, IconMessageSearch, IconPencil, IconPlus, IconStar, IconX, IconTerminal, IconTerminal2} from '@tabler/icons-react'
 import {Actions, AddLabel, AddTaskRepo, CheckReviews, EnsureWorkspace, ListLabels, ListRepos, RemoveLabel, RemoveTaskRepo, RunAction, Sessions, SetTaskRepo, TermStart} from '../wailsjs/go/ui/App'
@@ -14,8 +15,8 @@ function Confirm({msg, ok, close}: {msg: string | null; ok: () => void; close: (
     return (
         <Modal opened={!!msg} onClose={close} title="Please confirm" size="sm" centered>
             <Text size="sm">{msg}</Text>
-            <Group justify="flex-end" mt="md">
-                <Button variant="default" onClick={close}>Cancel</Button>
+            <Group justify="end" style={{marginTop: 'var(--mantine-spacing-md)'}}>
+                <Button variant="secondary" onClick={close}>Cancel</Button>
                 <Button onClick={() => { close(); ok() }}>Confirm</Button>
             </Group>
         </Modal>
@@ -29,7 +30,7 @@ const cdCmd = (a: core.Action) => 'cd ' + sq(a.cwd) + (a.cmd ? ' && ' + a.cmd : 
 /** One full-width row: label left, copy / external terminal / internal terminal icons right. */
 function ActionRow({k, a, kind, onTerm}: {k: string; a: core.Action; kind?: string; onTerm: (t: ui.TermInfo) => void}) {
     return (
-        <Group justify="space-between" wrap="nowrap" gap="xs">
+        <Group justify="between" wrap={false} gap="xs">
             <Text size="sm" style={{wordBreak: 'break-word'}}>{a.label}</Text>
             <ActionIcons k={k} a={a} kind={kind} onTerm={onTerm}/>
         </Group>
@@ -40,7 +41,7 @@ function ActionRow({k, a, kind, onTerm}: {k: string; a: core.Action; kind?: stri
 function ActionIcons({k, a, kind, onTerm}: {k: string; a: core.Action; kind?: string; onTerm: (t: ui.TermInfo) => void}) {
     return (
         <>
-            <Group gap={2} wrap="nowrap">
+            <Group gap={2} wrap={false}>
                 <Tooltip label="Copy command">
                     <ActionIcon variant="default" size="sm" aria-label="Copy command" onClick={() => copy(cdCmd(a))}><IconCopy size={14}/></ActionIcon>
                 </Tooltip>
@@ -63,7 +64,7 @@ function Mono({text}: {text: string}) {
     const cb = useClipboard({timeout: 1200})
     return (
         <Tooltip label="Copied" opened={cb.copied} position="top-start">
-            <Code style={{display: 'block', cursor: 'pointer', whiteSpace: 'pre-wrap', wordBreak: 'break-all'}} title="Click to copy" onClick={() => cb.copy(text)}>{text}</Code>
+            <ClickableCode block style={{whiteSpace: 'pre-wrap', wordBreak: 'break-all'}} title="Click to copy" onActivate={() => cb.copy(text)}>{text}</ClickableCode>
         </Tooltip>
     )
 }
@@ -83,9 +84,9 @@ function RepoFields({k, r, reload, canRemove, children}: {k: string; r: store.Ta
             <Confirm msg={rm ? `Remove ${r.repo_name} from ${k}?` : null} close={() => setRm(false)}
                      ok={() => RemoveTaskRepo(k, r.repo_name).then(reload).catch(errMsg)}/>
             <Stack gap="xs">
-                <Group gap={6} justify="space-between" wrap="nowrap">
+                <Group gap={6} justify="between" wrap={false}>
                     <Group gap={6}>
-                        <Text size="sm" fw={600}>{r.repo_name}</Text>
+                        <Text size="sm" weight={600}>{r.repo_name}</Text>
                         {r.is_primary && <Badge size="xs" variant="light" leftSection={<IconStar size={10}/>}>primary</Badge>}
                     </Group>
                     {canRemove && !r.pr_url && (
@@ -96,18 +97,18 @@ function RepoFields({k, r, reload, canRemove, children}: {k: string; r: store.Ta
                     )}
                 </Group>
                 <div>
-                    <Text size="xs" c="dimmed">Branch</Text>
+                    <Text size="xs" tone="muted">Branch</Text>
                     {r.worktree_path
                         ? <Mono text={r.branch}/>
                         : <TextInput size="xs" value={branch} onChange={e => setBranch(e.target.value)} onKeyDown={onKey}/>}
                 </div>
                 <div>
-                    <Text size="xs" c="dimmed">Worktree</Text>
-                    {r.worktree_path ? <Mono text={r.worktree_path}/> : <Text size="xs" c="dimmed">not created yet</Text>}
+                    <Text size="xs" tone="muted">Worktree</Text>
+                    {r.worktree_path ? <Mono text={r.worktree_path}/> : <Text size="xs" tone="muted">not created yet</Text>}
                 </div>
                 <div>
-                    <Group gap={6} mb={2}>
-                        <Text size="xs" c="dimmed">PR</Text>
+                    <Group gap={6} style={{marginBottom: 2}}>
+                        <Text size="xs" tone="muted">PR</Text>
                         {r.pr_url && r.pr_state && <Badge size="xs" variant="light" color={PR_COLOR[r.pr_state.toLowerCase()] ?? 'gray'}>{r.pr_state}</Badge>}
                         {r.pr_url && <Anchor size="xs" href={r.pr_url} onClick={e => { e.preventDefault(); BrowserOpenURL(r.pr_url!) }}>Open PR</Anchor>}
                         {r.pr_state === 'OPEN' && (
@@ -123,7 +124,7 @@ function RepoFields({k, r, reload, canRemove, children}: {k: string; r: store.Ta
                         ? <TextInput size="xs" value={pr} placeholder="https://github.com/…/pull/1" onChange={e => setPr(e.target.value)} onKeyDown={onKey}/>
                         : <Mono text={r.pr_url}/>}
                 </div>
-                {dirty && <Button size="compact-sm" onClick={save}>Save</Button>}
+                {dirty && <Button size="sm" compact onClick={save}>Save</Button>}
                 {children}
             </Stack>
         </Paper>
@@ -172,24 +173,24 @@ export function TaskSidebar({t, by, runs, reload, onTerm}: {t: store.Task; by: s
     const resume = new Map((actions ?? []).filter(a => /^(resume|attach):/.test(a.kind)).map(a => [a.kind.split(':')[1], a]))
     const hasWorktree = repos.some(r => r.worktree_path)
     return (
-        <Stack gap="sm" component="aside" miw={0}>
-            <Group justify="space-between" wrap="nowrap">
-                <Group gap={4}><Text size="sm" fw={600}>Agent</Text><TaskSettings k={k} model={t.model ?? ''} runner={t.runner ?? ''} reload={reload}/></Group>
+        <Stack gap="sm" as="aside" style={{minWidth: 0}}>
+            <Group justify="between" wrap={false}>
+                <Group gap={4}><Text size="sm" weight={600}>Agent</Text><TaskSettings k={k} model={t.model ?? ''} runner={t.runner ?? ''} reload={reload}/></Group>
                 <TaskAgent k={k} repos={repos.map(r => r.repo_name)} agent={t.agent ?? ''}/>
             </Group>
-            <Group justify="space-between">
-                <Text size="sm" fw={600}>Status</Text>
+            <Group justify="between">
+                <Text size="sm" weight={600}>Status</Text>
                 <StatusSelect k={k} status={t.status}/>
             </Group>
-            <Group justify="space-between"><Text size="xs" c="dimmed">Created</Text><Group gap={4} wrap="nowrap"><Text size="xs">{by} ·</Text><Time iso={t.created_at}/></Group></Group>
-            <Group justify="space-between"><Text size="xs" c="dimmed">Updated</Text><Time iso={t.updated_at}/></Group>
+            <Group justify="between"><Text size="xs" tone="muted">Created</Text><Group gap={4} wrap={false}><Text size="xs">{by} ·</Text><Time iso={t.created_at}/></Group></Group>
+            <Group justify="between"><Text size="xs" tone="muted">Updated</Text><Time iso={t.updated_at}/></Group>
             <Labels k={k} labels={t.labels ?? []} reload={reload}/>
             <Divider/>
-            <Group justify="space-between">
+            <Group justify="between">
                 <Title order={6}>Repos</Title>
                 <AddRepo k={k} have={repos.map(r => r.repo_name)} reload={reload}/>
             </Group>
-            {actionsError && <Text size="xs" c="red">Failed to load actions: {actionsError}</Text>}
+            {actionsError && <Text size="xs" tone="danger">Failed to load actions: {actionsError}</Text>}
             {repos.map(r => (
                 <RepoFields key={r.repo_id + '|' + r.branch + '|' + (r.pr_url ?? '')} k={k} r={r} reload={reload} canRemove={repos.length > 1}/>
             ))}
@@ -200,10 +201,10 @@ export function TaskSidebar({t, by, runs, reload, onTerm}: {t: store.Task; by: s
             {taskActions.map(a => <ActionRow key={a.kind + a.repo} k={k} a={a} onTerm={onTerm}/>)}
             <Divider/>
             <Title order={6}>Sessions</Title>
-            {sessionsError && <Text size="xs" c="red">Failed to load sessions: {sessionsError}</Text>}
-            {runs.length + (sessions?.length ?? 0) === 0 && <Text size="xs" c="dimmed">None yet.</Text>}
+            {sessionsError && <Text size="xs" tone="danger">Failed to load sessions: {sessionsError}</Text>}
+            {runs.length + (sessions?.length ?? 0) === 0 && <Text size="xs" tone="muted">None yet.</Text>}
             {runs.map((r, i) => (
-                <Group key={r.id} justify="space-between" wrap="nowrap" gap="xs">
+                <Group key={r.id} justify="between" wrap={false} gap="xs">
                     <Anchor size="xs" c="dimmed" component="button" ta="left" title={r.session_id ? `Session ${r.session_id}` : 'Show in thread'}
                             onClick={() => document.getElementById('run-' + r.id)?.scrollIntoView({behavior: 'smooth', block: 'start'})}>
                         #{i + 1} {r.kind} · {r.status}{r.block_status ? ' · ' + r.block_status : ''}
@@ -214,7 +215,7 @@ export function TaskSidebar({t, by, runs, reload, onTerm}: {t: store.Task; by: s
             {sessions?.map(s => (
                 <Stack key={s.id} gap={2}>
                     <ActionRow k={k} a={s.action} kind={'resume:' + s.id} onTerm={onTerm}/>
-                    <Text size="xs" c="dimmed" lineClamp={1} title={`Session ${s.id}\n${s.prompt}`}>{s.prompt || s.id}</Text>
+                    <Text size="xs" tone="muted" clamp={1} title={`Session ${s.id}\n${s.prompt}`}>{s.prompt || s.id}</Text>
                 </Stack>
             ))}
         </Stack>

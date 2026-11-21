@@ -19,6 +19,7 @@ import (
 
 const (
 	rescanEvery = time.Minute
+	maxRetry    = time.Hour
 )
 
 // ErrNoWebhookExt means `gh webhook` is not installed.
@@ -119,6 +120,51 @@ func openPRRepos(db *sql.DB) []string {
 	return out
 }
 
+// dropStaleForwards deletes the repo's `gh webhook forward` hooks (name "cli", GitHub's forwarder
+// URL): GitHub allows one per repo and no forward of ours is running when this is called, so any
+// left by a crashed run or another machine would fail the next forward with 422. Best effort.
+func dropStaleForwards(ctx context.Context, repo string) {
+	out, err := run(ctx, "", "list hooks", "api", "repos/"+repo+"/hooks", "--jq",
+		`.[] | select(.name=="cli" and (.config.url|test("webhook-forwarder"))) | .id`)
+	if err != nil {
+		return
+	}
+	for _, id := range strings.Fields(string(out)) {
+		if _, err := run(ctx, "", "delete hook", "api", "-X", "DELETE", "repos/"+repo+"/hooks/"+id); err != nil {
+			log.Printf("review webhook: %s: %v", repo, err)
+			continue
+		}
+		log.Printf("review webhook: removed stale forward hook %s on %s", id, repo)
+	}
+}
+
+// firstLine is the first non-empty line of out: gh prints its usage text after an error.
+func firstLine(out []byte) string {
+	l, _, _ := strings.Cut(strings.TrimSpace(string(out)), "\n")
+	return l
+}
+
+// notifyForwardFailed records on the timeline of every open task with a PR in repo that
+// review webhooks cannot reach it, so a missing review nudge is explained.
+func notifyForwardFailed(db *sql.DB, repo, reason string) {
+	tasks, _ := openTasks(db)
+	for _, t := range tasks {
+		for _, tr := range t.Repos {
+			if o, r, _, err := parsePR(deref(tr.PRURL)); err == nil && o+"/"+r == repo {
+				_ = store.RecordEvent(db, t.ID, "connector", "review webhooks cannot forward "+repo+" ("+reason+"); reviews there are found by polling only")
+				break
+			}
+		}
+	}
+}
+
+func deref(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
 // RunWebhook serves the handler on a random loopback port and keeps one `gh webhook forward`
 // per repo with an open PR until ctx ends. A failed forward (GitHub allows one per repo) is
 // logged and retried on the next scan; the backoff checks still run. events are fixed until it restarts.
@@ -143,22 +189,33 @@ func RunWebhook(ctx context.Context, db *sql.DB, events []string) error {
 	url := "http://" + ln.Addr().String()
 	log.Printf("review webhook: listening on %s", url)
 
+	type result struct {
+		repo string
+		err  string // first line of the output when the forward failed fast, else ""
+	}
 	running := map[string]bool{}
-	done := make(chan string)
+	fails := map[string]int{}         // consecutive fast failures per repo
+	retryAt := map[string]time.Time{} // no restart before this
+	done := make(chan result)
 	scan := func() {
 		for _, repo := range openPRRepos(db) {
-			if running[repo] {
+			if running[repo] || time.Now().Before(retryAt[repo]) {
 				continue
 			}
 			running[repo] = true
 			log.Printf("review webhook: forwarding %s", repo)
 			cmd := exec.CommandContext(ctx, bin, "webhook", "forward", "--repo", repo, "--events="+strings.Join(events, ","), "--url", url)
 			go func() {
+				start := time.Now()
 				out, err := cmd.CombinedOutput()
+				r := result{repo: repo}
 				if ctx.Err() == nil {
-					log.Printf("review webhook: forward %s stopped: %v: %s", repo, err, out)
+					log.Printf("review webhook: forward %s stopped: %v: %s", repo, err, firstLine(out))
+					if time.Since(start) < rescanEvery {
+						r.err = firstLine(out)
+					}
 				}
-				done <- repo
+				done <- r
 			}()
 		}
 	}
@@ -169,8 +226,19 @@ func RunWebhook(ctx context.Context, db *sql.DB, events []string) error {
 		select {
 		case <-ctx.Done():
 			return nil
-		case repo := <-done:
-			delete(running, repo)
+		case r := <-done:
+			delete(running, r.repo)
+			if r.err == "" {
+				delete(fails, r.repo)
+				continue
+			}
+			// A repo we cannot hook (e.g. no admin rights: 404) is retried with a growing delay;
+			// its tasks' timelines say so once, and the backoff review checks still cover it.
+			fails[r.repo]++
+			retryAt[r.repo] = time.Now().Add(min(rescanEvery<<fails[r.repo], maxRetry))
+			if fails[r.repo] == 1 {
+				notifyForwardFailed(db, r.repo, r.err)
+			}
 		case <-tick.C:
 			scan()
 		}

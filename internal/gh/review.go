@@ -28,6 +28,18 @@ const (
 
 var htmlComment = regexp.MustCompile(`(?s)<!--.*?-->`)
 
+// noise marks automated notices that carry no finding (changeset-bot, CodeRabbit skipping a draft).
+var noise = []string{"No Changeset found", "Changeset detected", "Draft PR not reviewed", "Review skipped", "Rate limit exceeded"}
+
+func isNoise(s string) bool {
+	for _, n := range noise {
+		if strings.Contains(s, n) {
+			return true
+		}
+	}
+	return false
+}
+
 // clean strips review-bot boilerplate: HTML comments, everything from the first <details>
 // (agent-prompt copies, tool logs), checkbox and rule lines; then caps the length.
 func clean(s string) string {
@@ -57,7 +69,7 @@ var backoff = []time.Duration{30 * time.Minute, 2 * time.Hour, 8 * time.Hour}
 func ScheduleCheck(db *sql.DB, t store.Task, delay time.Duration, step int) error {
 	arg, _ := json.Marshal(map[string]any{"args": []string{"epic", "review-check", t.Key, "--step", strconv.Itoa(step)}})
 	return store.ScheduleOnce(db, store.Automation{
-		Name: "review-check:" + t.Key, ActionKind: "cli", ActionArg: string(arg), TaskID: &t.ID,
+		Name: "track-pr:" + t.Key, ActionKind: "cli", ActionArg: string(arg), TaskID: &t.ID,
 	}, time.Now().Add(delay))
 }
 
@@ -160,7 +172,12 @@ func ReviewCheck(ctx context.Context, svc *core.Service, key string, step int) (
 		body.WriteString(text)
 	}
 	if err := errors.Join(errs...); err != nil {
-		return "", err // watermark untouched, the next trigger retries
+		// Watermark untouched; retry the same step so an outage does not end the backoff chain.
+		store.Audit("review.check.error", "task_id", t.ID, "step", step, "err", err.Error())
+		if serr := ScheduleCheck(svc.DB, t, backoff[min(step, len(backoff)-1)], step); serr != nil {
+			err = errors.Join(err, serr)
+		}
+		return "", err
 	}
 	switch {
 	case body.Len() > 0:
@@ -184,7 +201,7 @@ func checkPR(ctx context.Context, db *sql.DB, taskID, repoID int64, dir, url str
 	base := fmt.Sprintf("repos/%s/%s/pulls/%d", owner, repo, n)
 	// ponytail: first 100 only; add pagination if a PR outgrows it.
 	var reviews []review
-	var comments []comment
+	var comments, convo []comment // inline diff comments; PR conversation comments
 	var pr struct {
 		MergeableState string `json:"mergeable_state"`
 		Head           struct{ SHA string }
@@ -212,6 +229,7 @@ func checkPR(ctx context.Context, db *sql.DB, taskID, repoID int64, dir, url str
 	}{
 		{&reviews, []string{base + "/reviews?per_page=100"}},
 		{&comments, []string{base + "/comments?per_page=100"}},
+		{&convo, []string{fmt.Sprintf("repos/%s/%s/issues/%d/comments?per_page=100", owner, repo, n)}},
 		{&pr, []string{base}},
 		{&threads, []string{"graphql", "-f", "query=" + threadsQuery, "-F", "o=" + owner, "-F", "r=" + repo, "-F", "n=" + strconv.Itoa(n)}},
 	} {
@@ -235,31 +253,60 @@ func checkPR(ctx context.Context, db *sql.DB, taskID, repoID int64, dir, url str
 	if err != nil {
 		return "", err
 	}
-	// ponytail: one watermark over review and comment ids; split them if GitHub ids stop being roughly monotonic.
-	mark := st.SeenCommentID
-	var sb strings.Builder
-	keep := func(id int64, text string) bool {
-		mark = max(mark, id)
-		return id > st.SeenCommentID && strings.TrimSpace(text) != "" && !strings.HasPrefix(strings.TrimSpace(text), agentPrefix)
+	// GitHub numbers reviews, inline comments and issue comments in separate ranges (issue comment
+	// ids run far higher), so each type keeps its own watermark. -1 means not yet baselined (a row
+	// from before the split): that check records the current max of the type without reporting it.
+	seen := [3]*int64{&st.SeenReviewID, &st.SeenInlineID, &st.SeenCommentID}
+	var was, mark [3]int64
+	for i, p := range seen {
+		was[i], mark[i] = *p, max(*p, 0)
 	}
-	add := func(head, body string) {
-		// ponytail: items past totalCap are dropped but the watermark still advances; raise totalCap if that bites.
-		if body = clean(body); body != "" && sb.Len() < totalCap {
-			fmt.Fprintf(&sb, "> %s\n%s\n\n", head, body)
+	var sb strings.Builder
+	var blocked [3]bool
+	var sent, ignored, deferred int
+	// handle reports one item. Ignorable ones (agent reply, empty, noise, resolved) advance the
+	// watermark; one dropped for lack of room (totalCap) holds it back, with every later item of
+	// its type, so the next check reports it.
+	handle := func(kind int, id int64, head, body string, resolvedThread bool) {
+		if was[kind] < 0 || id <= was[kind] { // baselining, or already seen
+			if !blocked[kind] {
+				mark[kind] = max(mark[kind], id)
+			}
+			return
+		}
+		text := strings.TrimSpace(body)
+		cleaned := clean(body)
+		switch {
+		case text == "" || strings.HasPrefix(text, agentPrefix) || resolvedThread || cleaned == "" || isNoise(cleaned):
+			ignored++
+		case sb.Len() >= totalCap:
+			blocked[kind] = true
+			deferred++
+			return
+		default:
+			fmt.Fprintf(&sb, "> %s\n%s\n\n", head, cleaned)
+			sent++
+		}
+		if !blocked[kind] {
+			mark[kind] = max(mark[kind], id)
 		}
 	}
 	for _, r := range reviews {
 		st.Review = r.State
-		if keep(r.ID, r.Body) {
-			add(fmt.Sprintf("review (%s) by %s", r.State, r.User.Login), r.Body)
-		}
+		handle(0, r.ID, fmt.Sprintf("review (%s) by %s", r.State, r.User.Login), r.Body, false)
 	}
 	for _, c := range comments {
-		if keep(c.ID, c.Body) && !resolved[c.ID] {
-			add(fmt.Sprintf("%s:%d (%s)", c.Path, c.Line, c.User.Login), c.Body)
-		}
+		handle(1, c.ID, fmt.Sprintf("%s:%d (%s)", c.Path, c.Line, c.User.Login), c.Body, resolved[c.ID])
 	}
-	st.SeenCommentID, st.Unresolved = mark, unresolved
+	for _, c := range convo {
+		handle(2, c.ID, fmt.Sprintf("comment (%s)", c.User.Login), c.Body, false)
+	}
+	store.Audit("review.check.pr", "task_id", taskID, "pr", url, "sent", sent, "ignored", ignored, "deferred", deferred,
+		"reviews", len(reviews), "inline", len(comments), "comments", len(convo), "marks", fmt.Sprint(mark))
+	for i, p := range seen {
+		*p = mark[i]
+	}
+	st.Unresolved = unresolved
 	// CI failures and merge conflicts: sent once per distinct state, so a repeat check stays quiet.
 	state, ci := ciState(pr.MergeableState, runs.CheckRuns, pr.Head.SHA)
 	if state != st.Reported && state != "" {

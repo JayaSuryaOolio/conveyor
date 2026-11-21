@@ -1,5 +1,6 @@
 import {createContext, useContext, useEffect, useMemo, useRef, useState} from 'react'
-import {ActionIcon, Alert, Anchor, Badge, Box, Button, Group, Indicator, Menu, Modal, Paper, ScrollArea, SegmentedControl, SimpleGrid, Stack, Table, Text, Textarea, TextInput, Tooltip} from '@mantine/core'
+import {ActionIcon, Alert, Anchor, Badge, Box, Indicator, Menu, Paper, ScrollArea, SegmentedControl, SimpleGrid, Table, Textarea, TextInput, Tooltip} from '@mantine/core'
+import {Button, Clickable, ClickableCard, Group, Modal, Stack, Text} from './ui'
 import {useLocalStorage} from '@mantine/hooks'
 import {IconCode, IconExternalLink, IconGitPullRequest, IconMessageQuestion, IconPlayerPlay, IconPlayerStop, IconPlus, IconTerminal2} from '@tabler/icons-react'
 import {Background, Controls, Handle, MarkerType, Position, ReactFlow, useEdgesState, useNodesState, type Connection, type Edge, type Node, type NodeProps} from '@xyflow/react'
@@ -63,26 +64,26 @@ function TaskNode({data}: NodeProps<Node<CardData>>) {
     const stop = (e: React.MouseEvent) => e.stopPropagation()
     const details = [
         n.kind && <Badge key="kind" size="xs" color={KIND_COLOR[n.kind] ?? 'gray'} variant="filled">{n.kind}</Badge>,
-        n.agent && <Text key="agent" size="xs" c="dimmed">{n.agent}</Text>,
-        n.model && <Text key="model" size="xs" c="dimmed">{n.model}</Text>,
-        skills.length > 0 && <Tooltip key="skills" label={skills.join(', ')}><Text size="xs" c="dimmed">{skills.length} skill{skills.length === 1 ? '' : 's'}</Text></Tooltip>,
+        n.agent && <Text key="agent" size="xs" tone="muted">{n.agent}</Text>,
+        n.model && <Text key="model" size="xs" tone="muted">{n.model}</Text>,
+        skills.length > 0 && <Tooltip key="skills" label={skills.join(', ')}><Text size="xs" tone="muted">{skills.length} skill{skills.length === 1 ? '' : 's'}</Text></Tooltip>,
         ...n.repos.map(r => <Badge key={r} size="xs" variant="light">{r}</Badge>),
         n.worktrees.length > 0 && <Tooltip key="wt" label={'worktree: ' + n.worktrees.join(', ')}><Badge size="xs" variant="outline" color="gray">worktree</Badge></Tooltip>,
     ].filter(Boolean)
     return (
-        <Paper withBorder radius="md" p="xs" w={CARD.w} shadow="sm" onClick={() => open(n.key)} onMouseEnter={() => hover(n.key)} onMouseLeave={() => hover('')}
+        <ClickableCard bordered raised padding="xs" width={CARD.w} onActivate={() => open(n.key)} onMouseEnter={() => hover(n.key)} onMouseLeave={() => hover('')}
                style={{cursor: 'pointer', borderLeft: `4px solid ${c6(KIND_COLOR[n.kind] ?? 'gray')}`,
                        opacity: lit && !lit.has(n.key) ? 0.3 : 1, transition: 'opacity 120ms',
                        outline: lit?.has(n.key) ? `1px solid ${c6('blue')}` : undefined}}>
             <Handle type="target" position={Position.Left}/>
             <Handle type="source" position={Position.Right}/>
             <Stack gap={6}>
-                <Group justify="space-between" wrap="nowrap" gap="xs">
-                    <Group gap={6} wrap="nowrap">
-                        <Text size="xs" fw={600} c="dimmed">{n.key}</Text>
+                <Group justify="between" wrap={false} gap="xs">
+                    <Group gap={6} wrap={false}>
+                        <Text size="xs" weight={600} tone="muted">{n.key}</Text>
                         <Indicator disabled={!running} processing color="cyan" size={8} offset={-2}><StatusBadge status={n.status}/></Indicator>
                     </Group>
-                    <Group gap={2} wrap="nowrap" className={nd} onClick={stop}>
+                    <Group gap={2} wrap={false} className={nd} onClick={stop}>
                         <Tooltip label="Open task page"><ActionIcon size="sm" variant="subtle" aria-label="Open task" onClick={() => nav({name: 'task', key: n.key})}><IconExternalLink size={14}/></ActionIcon></Tooltip>
                         {running
                             ? <Tooltip label="Stop the run"><ActionIcon size="sm" variant="subtle" color="red" aria-label="Stop" onClick={() => Stop(n.key).catch(errMsg)}><IconPlayerStop size={14}/></ActionIcon></Tooltip>
@@ -98,13 +99,13 @@ function TaskNode({data}: NodeProps<Node<CardData>>) {
                         </>}
                     </Group>
                 </Group>
-                <Text size="sm" fw={500} lineClamp={2}>{n.title}</Text>
-                <Group gap={6} wrap="wrap">
+                <Text size="sm" weight={500} clamp={2}>{n.title}</Text>
+                <Group gap={6} wrap>
                     {details}
                     {prs.filter(p => p.pr_url).map(p => <PrChip key={p.repo} p={p}/>)}
                 </Group>
             </Stack>
-        </Paper>
+        </ClickableCard>
     )
 }
 
@@ -115,8 +116,8 @@ function GroupNode({data}: NodeProps<Node<{n: core.GraphNode}>>) {
         <Box w="100%" h="100%" style={{border: '1px dashed var(--mantine-color-default-border)', borderRadius: 12, background: 'var(--mantine-color-default-hover)'}}>
             <Handle type="target" position={Position.Left}/>
             <Handle type="source" position={Position.Right}/>
-            <Group px="sm" py={8} justify="space-between" wrap="nowrap">
-                <Group gap={6} wrap="nowrap" style={{minWidth: 0}}>
+            <Group justify="between" wrap={false} style={{paddingInline: 'var(--mantine-spacing-sm)', paddingBlock: 8}}>
+                <Group gap={6} wrap={false} style={{minWidth: 0}}>
                     <Anchor component="button" size="xs" fw={600} onClick={() => nav({name: 'task', key: n.key})}>{n.key}</Anchor>
                     <Text size="xs" truncate>{n.title}</Text>
                     <StatusBadge status={n.status}/>
@@ -142,10 +143,10 @@ function Header({g, nav, root}: {g: core.Graph; nav: Nav; root: core.GraphNode})
     const noHooks = !(apps ?? []).some(a => a.manifest.includes('"autostart"'))
     return <Stack gap="xs">
         <Paper withBorder radius="md" px="sm" py={6}>
-            <Group justify="space-between" wrap="wrap">
+            <Group justify="between" wrap>
                 <Group gap="sm">
                     <Anchor component="button" fw={600} onClick={() => nav({name: 'task', key: root.key})}>{root.key}</Anchor>
-                    <Text size="sm" truncate maw={320}>{root.title}</Text>
+                    <Text size="sm" truncate style={{maxWidth: 320}}>{root.title}</Text>
                     {epic && <Group gap={4}>{STAGES.map((s, i) => {
                         const at = STAGES.indexOf(g.stage)
                         return <Badge key={s} size="sm" variant={i === at ? 'filled' : 'light'} color={i === at ? 'blue' : i < at ? 'green' : 'gray'}>{i + 1}. {s}</Badge>
@@ -154,8 +155,8 @@ function Header({g, nav, root}: {g: core.Graph; nav: Nav; root: core.GraphNode})
                 <Group gap="sm">
                     <Text size="sm">{live.filter(n => n.status === 'done').length}/{live.length} done</Text>
                     <Badge color={wants ? 'orange' : 'gray'} variant={wants ? 'filled' : 'light'}>{wants} want{wants === 1 ? 's' : ''} you</Badge>
-                    {g.gate && <Button size="compact-sm" color="green" onClick={() => EpicApprove(g.root).catch(errMsg)}>Approve plan</Button>}
-                    {epic && <Button size="compact-sm" variant="default" onClick={() => setRestart(true)}>Restart</Button>}
+                    {g.gate && <Button size="sm" compact tone="success" onClick={() => EpicApprove(g.root).catch(errMsg)}>Approve plan</Button>}
+                    {epic && <Button size="sm" compact variant="secondary" onClick={() => setRestart(true)}>Restart</Button>}
                 </Group>
             </Group>
         </Paper>
@@ -164,7 +165,7 @@ function Header({g, nav, root}: {g: core.Graph; nav: Nav; root: core.GraphNode})
             <Alert variant="light" withCloseButton onClose={() => setSeen(true)} title="Review comments arrive by backoff polling">
                 <Group gap="sm">
                     <Text size="sm">Add the review-webhooks connector to get them as they are posted.</Text>
-                    <Button size="compact-xs" onClick={() => InstallExample('review-webhooks').then(reloadApps, errMsg)}>Add review webhooks</Button>
+                    <Button size="xs" compact onClick={() => InstallExample('review-webhooks').then(reloadApps, errMsg)}>Add review webhooks</Button>
                 </Group>
             </Alert>
         )}
@@ -172,9 +173,9 @@ function Header({g, nav, root}: {g: core.Graph; nav: Nav; root: core.GraphNode})
             <Stack gap="sm">
                 <Text size="sm">Abandons the current flow, cancels its open sub-tasks and starts a new flow at spec.</Text>
                 <Textarea data-autofocus label="Reason" required autosize minRows={2} value={reason} onChange={e => setReason(e.currentTarget.value)}/>
-                <Group justify="flex-end">
-                    <Button variant="default" onClick={() => setRestart(false)}>Cancel</Button>
-                    <Button color="red" disabled={!reason.trim()} onClick={() => EpicRestart(g.root, reason).then(() => { setRestart(false); setReason('') }, errMsg)}>Restart</Button>
+                <Group justify="end">
+                    <Button variant="secondary" onClick={() => setRestart(false)}>Cancel</Button>
+                    <Button tone="danger" disabled={!reason.trim()} onClick={() => EpicRestart(g.root, reason).then(() => { setRestart(false); setReason('') }, errMsg)}>Restart</Button>
                 </Group>
             </Stack>
         </Modal>
@@ -196,36 +197,37 @@ const openBlockers = (g: core.Graph, key: string) => g.links
 function TaskRow({n, note}: {n: core.GraphNode; note?: string}) {
     const {open, hover} = useContext(Ctx)
     return (
-        <Group gap={6} wrap="nowrap" px={6} py={2} style={{cursor: 'pointer', borderRadius: 4, borderLeft: `3px solid ${c6(KIND_COLOR[n.kind] ?? 'gray')}`}}
-               className="epic-row" onClick={() => open(n.key)} onMouseEnter={() => hover(n.key)} onMouseLeave={() => hover('')}>
-            <Text size="xs" fw={600} c="dimmed" style={{flexShrink: 0}}>{n.key}</Text>
+        <Clickable style={{display: 'flex', alignItems: 'center', gap: 6, padding: '2px 6px', borderRadius: 4, borderLeft: `3px solid ${c6(KIND_COLOR[n.kind] ?? 'gray')}`}}
+               className="epic-row" onActivate={() => open(n.key)} onFocus={() => hover(n.key)} onBlur={() => hover('')} onMouseEnter={() => hover(n.key)} onMouseLeave={() => hover('')}>
+            <Text size="xs" weight={600} tone="muted" style={{flexShrink: 0}}>{n.key}</Text>
             <StatusBadge status={n.status}/>
             <Text size="xs" truncate style={{flex: 1}}>{n.title}</Text>
-            {note && <Text size="xs" c="dimmed" style={{flexShrink: 0}}>{note}</Text>}
-        </Group>
+            {note && <Text size="xs" tone="muted" style={{flexShrink: 0}}>{note}</Text>}
+        </Clickable>
     )
 }
 
 function Legend() {
     const swatch = (color: string, label: string, dashed = false) => (
-        <Group key={label} gap={4} wrap="nowrap">
+        <Group key={label} gap={4} wrap={false}>
             <Box w={18} h={0} style={{borderTop: `2px ${dashed ? 'dashed' : 'solid'} ${c6(color)}`}}/>
-            <Text size="xs" c="dimmed">{label}</Text>
+            <Text size="xs" tone="muted">{label}</Text>
         </Group>
     )
     return (
-        <Group gap="md" wrap="wrap">
-            {Object.entries(KIND_COLOR).map(([k, c]) => <Group key={k} gap={4} wrap="nowrap"><Box w={10} h={10} bg={c6(c)} style={{borderRadius: 2}}/><Text size="xs" c="dimmed">{k}</Text></Group>)}
-            <Text size="xs" c="dimmed">·</Text>
+        <Group gap="md" wrap>
+            {Object.entries(KIND_COLOR).map(([k, c]) => <Group key={k} gap={4} wrap={false}><Box w={10} h={10} bg={c6(c)} style={{borderRadius: 2}}/><Text size="xs" tone="muted">{k}</Text></Group>)}
+            <Text size="xs" tone="muted">·</Text>
             {swatch('orange', 'blocks (waiting)')}{swatch('cyan', 'blocker running')}{swatch('green', 'unblocked')}{swatch('gray', 'relates', true)}
         </Group>
     )
 }
 
+const BOX_TONE = {orange: 'warning', cyan: 'live', blue: 'info', gray: 'neutral'} as const
 /** The boxes under the graph: what needs a human, what is moving, what can start, what is held back and by whom. */
 function InfoBoxes({g}: {g: core.Graph}) {
     const live = leavesOf(g).filter(n => !FINISHED.has(n.status))
-    const boxes: [string, string, {n: core.GraphNode; note?: string}[]][] = [
+    const boxes: [string, keyof typeof BOX_TONE, {n: core.GraphNode; note?: string}[]][] = [
         ['Wants you', 'orange', live.filter(n => n.status === 'needs_you').map(n => ({n}))],
         ['Running', 'cyan', live.filter(n => n.status === 'running').map(n => ({n}))],
         ['Ready to run', 'blue', live.filter(n => READY.has(n.status) && openBlockers(g, n.key).length === 0).map(n => ({n}))],
@@ -234,10 +236,10 @@ function InfoBoxes({g}: {g: core.Graph}) {
     return (
         <SimpleGrid cols={{base: 2, md: 4}} spacing="xs">
             {boxes.map(([title, color, rows]) => (
-                <Paper key={title} withBorder radius="md" p="xs" style={{borderTop: `3px solid ${c6(color)}`}}>
-                    <Group justify="space-between" mb={4}><Text size="xs" fw={700} tt="uppercase" c={color}>{title}</Text><Text size="xs" c="dimmed">{rows.length}</Text></Group>
+                <Paper key={title} withBorder radius="md" p="xs" style={{background: `color-mix(in srgb, ${c6(color)} 10%, transparent)`}}>
+                    <Group justify="between" style={{marginBottom: 4}}><Text size="xs" weight={700} upper tone={BOX_TONE[color]}>{title}</Text><Text size="xs" tone="muted">{rows.length}</Text></Group>
                     <ScrollArea.Autosize mah={120}>
-                        {rows.length ? rows.map(r => <TaskRow key={r.n.key} {...r}/>) : <Text size="xs" c="dimmed">None</Text>}
+                        {rows.length ? <Stack gap={1}>{rows.map(r => <TaskRow key={r.n.key} {...r}/>)}</Stack> : <Text size="xs" tone="muted">None</Text>}
                     </ScrollArea.Autosize>
                 </Paper>
             ))}
@@ -259,15 +261,15 @@ function Waves({g}: {g: core.Graph}) {
                     const color = done === ns.length ? 'green' : ns.some(n => n.status !== 'backlog' && n.status !== 'todo') ? 'cyan' : 'gray'
                     return (
                         <Paper key={i} withBorder radius="md" p="xs" style={{borderLeft: `4px solid ${c6(color)}`}}>
-                            <Group justify="space-between" mb={4}>
-                                <Text size="sm" fw={700}>Wave {i + 1}{i === 0 ? ' · no blockers' : ` · after wave ${i}`}</Text>
+                            <Group justify="between" style={{marginBottom: 4}}>
+                                <Text size="sm" weight={700}>Wave {i + 1}{i === 0 ? ' · no blockers' : ` · after wave ${i}`}</Text>
                                 <Badge size="sm" variant="light" color={color}>{done}/{ns.length} done</Badge>
                             </Group>
                             {ns.map(n => <TaskRow key={n.key} n={n} note={openBlockers(g, n.key).length ? '← ' + openBlockers(g, n.key).join(', ') : undefined}/>)}
                         </Paper>
                     )
                 })}
-                {waves.length === 0 && <Text c="dimmed" size="sm">No tasks yet.</Text>}
+                {waves.length === 0 && <Text tone="muted" size="sm">No tasks yet.</Text>}
             </Stack>
         </ScrollArea>
     )
@@ -276,7 +278,7 @@ function Waves({g}: {g: core.Graph}) {
 function PRTable({g}: {g: core.Graph}) {
     const {open} = useContext(Ctx)
     const rows = g.prs.filter(p => p.pr_url)
-    if (!rows.length) return <Text c="dimmed" size="sm">No PRs yet{g.stage ? '' : ' (PR rows are tracked for epics only)'}.</Text>
+    if (!rows.length) return <Text tone="muted" size="sm">No PRs yet{g.stage ? '' : ' (PR rows are tracked for epics only)'}.</Text>
     const tone = (s?: string) => !s ? 'gray' : /approved|success|pass/i.test(s) ? 'green' : /changes|fail|error/i.test(s) ? 'red' : 'yellow'
     return (
         <ScrollArea style={{flex: 1}}>
@@ -289,7 +291,7 @@ function PRTable({g}: {g: core.Graph}) {
                         <Table.Td><Anchor size="sm" onClick={() => BrowserOpenURL(p.pr_url!)}>{p.pr_url!.replace(/^.*\/pull\//, '#')}</Anchor></Table.Td>
                         <Table.Td><Badge size="sm" variant="light" color={tone(p.review)}>{p.review || '—'}</Badge></Table.Td>
                         <Table.Td><Badge size="sm" variant="light" color={tone(p.checks)}>{p.checks || '—'}</Badge></Table.Td>
-                        <Table.Td><Text size="sm" c={p.unresolved ? 'orange' : 'dimmed'}>{p.unresolved}</Text></Table.Td>
+                        <Table.Td><Text size="sm" tone={p.unresolved ? 'warning' : 'muted'}>{p.unresolved}</Text></Table.Td>
                     </Table.Tr>
                 ))}</Table.Tbody>
             </Table>
@@ -356,20 +358,20 @@ export function EpicView({k, task = '', nav}: {k: string; task?: string; nav: Na
     const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
     useEffect(() => setEdges(derived), [derived, setEdges])
 
-    if (error) return <Text c="red">{error}</Text>
-    if (!g) return <Text c="dimmed">Loading…</Text>
+    if (error) return <Text tone="danger">{error}</Text>
+    if (!g) return <Text tone="muted">Loading…</Text>
     const root = g.nodes.find(n => n.key === g.root)!
     const ctx: Ctx = {nav, addSub: setAdding, open: setTask, lit, hover: setHovered}
     const connect = (c: Connection) => c.source && c.target && c.source !== c.target && Link(c.source, 'blocks', c.target).catch(errMsg)
     const create = () => CreateTask(core.NewTaskInput.createFrom({Title: title, ParentKey: adding})).then(() => { setAdding(''); setTitle('') }, errMsg)
     return (
         <Ctx.Provider value={ctx}>
-            <Stack gap="sm" h="calc(100vh - 2 * var(--mantine-spacing-md))">
+            <Stack gap="sm" style={{height: 'calc(100vh - 2 * var(--mantine-spacing-md))'}}>
                 <Header g={g} nav={nav} root={root}/>
-                <Group justify="space-between" wrap="nowrap">
+                <Group justify="between" wrap={false}>
                     <SegmentedControl size="xs" value={view} onChange={setView} data={[
                         {value: 'graph', label: 'Graph'}, {value: 'waves', label: 'Waves'}, {value: 'prs', label: `PRs (${g.prs.filter(p => p.pr_url).length})`}]}/>
-                    <Text size="xs" c="dimmed" truncate>{VIEW_HINT[view]}</Text>
+                    <Text size="xs" tone="muted" truncate>{VIEW_HINT[view]}</Text>
                 </Group>
                 {view === 'graph' && <>
                     <Box style={{flex: 1, minHeight: 0, border: '1px solid var(--mantine-color-default-border)', borderRadius: 8}}>
@@ -391,7 +393,7 @@ export function EpicView({k, task = '', nav}: {k: string; task?: string; nav: Na
                     <form onSubmit={e => { e.preventDefault(); if (title.trim()) create() }}>
                         <Stack gap="sm">
                             <TextInput data-autofocus label="Title" value={title} onChange={e => setTitle(e.currentTarget.value)}/>
-                            <Group justify="flex-end"><Button type="submit" disabled={!title.trim()}>Create</Button></Group>
+                            <Group justify="end"><Button type="submit" disabled={!title.trim()}>Create</Button></Group>
                         </Stack>
                     </form>
                 </Modal>

@@ -86,9 +86,13 @@ func run(ctx context.Context, dir string, env []string, args ...string) (string,
 	return out, nil
 }
 
+// keepCwd makes Claude reset the Bash tool's cwd after every command, so an agent's `cd` cannot move the
+// session out of its workspace (hooks key the run off that cwd, and a stray one left a run unfinished).
+const keepCwd = "CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR=1"
+
 // Launch runs `claude --bg ...` and returns the background id.
 func Launch(ctx context.Context, s LaunchSpec) (string, error) {
-	out, err := run(ctx, s.Cwd, []string{"CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD=1"}, s.Args()...)
+	out, err := run(ctx, s.Cwd, []string{"CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD=1", keepCwd}, s.Args()...)
 	if err != nil {
 		return "", err
 	}
@@ -108,7 +112,7 @@ func Resume(ctx context.Context, cwd, bgID, sessionID, settingsPath, prompt stri
 	if len(addDirs) > 0 { // after the prompt: the flag is variadic
 		args = append(append(args, "--add-dir"), addDirs...)
 	}
-	out, err := run(ctx, cwd, nil, args...)
+	out, err := run(ctx, cwd, []string{keepCwd}, args...)
 	if err != nil {
 		return "", err
 	}

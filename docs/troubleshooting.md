@@ -76,6 +76,19 @@ Run it when the session is idle if you can; a live session's own Stop only touch
 
 **Prevented since CV-58.** The hook adopts the launching resume run and the reaper follows the bg agent's session id; see [session-identity.md](session-identity.md#prevention-since-cv-58). The recipe stays for runs stuck from before.
 
+## Todo tasks wait with a free-looking board
+
+Seen on CV-190. `max_parallel` counts every active auto run, and a run stayed active because its session was still listed by `claude agents --json --all` (`"state": "done"`, or still alive after the task was cancelled), so the reaper never saw it vanish. The dispatcher log says `max_parallel N reached` when todo tasks wait.
+
+**Confirm**
+
+```sh
+conveyor task show KEY --runs     # active run on a cancelled / needs_you / done task
+grep "max_parallel" ~/.conveyor/conveyor.log
+```
+
+**Fix.** Automatic since CV-190: the reaper fails an active run whose task is cancelled or done (and stops its session), or whose session is done/stopped while the task is not running. Before that, fail the run by hand in the DB.
+
 ## A task has a second PR that Conveyor doesn't track
 
 Also seen on CV-9. After PR #90 merged, a comment reopened the task, and the agent opened #92 from a new branch (`cv/CV-9-readme-tone`). Conveyor follows one branch per repo (`cv/<KEY>-<slug>`), so it never saw #92 and the task won't finish when #92 merges.

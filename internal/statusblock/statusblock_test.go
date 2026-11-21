@@ -71,3 +71,10 @@ func TestSpawnPlaceholderSkipped(t *testing.T) {
 		t.Fatalf("%v %+v", ok, b.Spawn)
 	}
 }
+
+func TestDecisionLines(t *testing.T) {
+	b, _, ok := Parse("<conveyor>\nstatus: done\ndecision: use X — it is simple\ndecision: none\ndecision: use Y — why\ndispute: D3 | it breaks Z\nundispute: D4\n</conveyor>")
+	if !ok || len(b.Decisions) != 2 || b.Decisions[0] != "use X — it is simple" || len(b.Disputes) != 1 || b.Disputes[0] != "D3 | it breaks Z" || len(b.Undisputes) != 1 || b.Undisputes[0] != "D4" {
+		t.Fatalf("%v %+v", ok, b)
+	}
+}

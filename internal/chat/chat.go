@@ -19,7 +19,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/JayaSuryaOolio/conveyor/internal/connectors"
 	"github.com/JayaSuryaOolio/conveyor/internal/core"
+	"github.com/JayaSuryaOolio/conveyor/internal/gh"
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 )
 
@@ -301,7 +303,8 @@ const Help = `*Conveyor commands* (send as a DM, or /conveyor …)
 • new [REPO] your comment — new backlog task from your comment and the message you forwarded to me just before (images included)
 • KEY your comment — comment on a task (e.g. CV-12 use the v2 API)
 • show KEY (or just KEY) — status, repos, PRs and the last agent message
-• move KEY todo|done|cancelled — change status
+• move KEY todo|done|cancelled — change status (also KEY move done)
+• KEY run conveyor:check-pr — run an action on a task: built-in conveyor:check-pr, or APP:ACTION of an installed app (e.g. CV-12 run graft:open; APP alone runs its first action); "run list" shows them
 • help — this guide
 Replying in a task's thread (or to my "created" reply) comments on it; "move done" or "show" typed there acts on that task.`
 
@@ -326,6 +329,10 @@ func threadCmd(key, text string) string {
 		return "show " + key
 	case verb == "show" && len(f) == 2 && keyArg.MatchString(f[1]):
 		return "show " + f[1]
+	case verb == "run" && len(f) == 2:
+		return "run " + key + " " + f[1]
+	case verb == "run" && len(f) == 3 && keyArg.MatchString(f[1]):
+		return "run " + f[1] + " " + f[2]
 	case verb == "move" && len(f) == 2 && moveTo[strings.ToLower(f[1])]:
 		return "move " + key + " " + strings.ToLower(f[1])
 	case verb == "move" && len(f) == 3 && strings.EqualFold(f[1], "to") && moveTo[strings.ToLower(f[2])]:
@@ -367,7 +374,16 @@ func (b *bridge) command(text string) string {
 	if len(f) == 4 && f[0] == "move" && strings.EqualFold(f[2], "to") { // "move KEY to done"
 		f = []string{f[0], f[1], f[3]}
 	}
+	if len(f) == 3 && keyArg.MatchString(f[0]) { // "KEY run X" / "KEY move S" read as "run KEY X" / "move KEY S"
+		if v := strings.ToLower(f[1]); v == "run" || v == "move" && moveTo[strings.ToLower(f[2])] {
+			f = []string{v, f[0], f[2]}
+		}
+	}
 	switch {
+	case len(f) == 2 && f[0] == "run" && f[1] == "list":
+		return b.runList()
+	case len(f) == 3 && f[0] == "run":
+		return b.runAction(f[1], f[2])
 	case len(f) > 0 && (f[0] == "help" || f[0] == "?"):
 		return Help
 	case len(f) == 0 || f[0] == "list":
@@ -380,7 +396,13 @@ func (b *bridge) command(text string) string {
 		}
 		var s []string
 		for _, t := range ts {
-			s = append(s, fmt.Sprintf("%s %s — %s", t.Key, t.Title, t.Status))
+			line := fmt.Sprintf("%s %s — %s", t.Key, t.Title, t.Status)
+			for _, r := range t.Repos {
+				if r.PRURL != nil {
+					line += " <" + *r.PRURL + "|#" + prNumber(*r.PRURL) + ">" // short link text
+				}
+			}
+			s = append(s, line)
 		}
 		return strings.Join(s, "\n")
 	case f[0] == "show" && len(f) == 2:
@@ -400,4 +422,73 @@ func (b *bridge) command(text string) string {
 		return b.comment(f[0], strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(text), f[0])))
 	}
 	return Help
+}
+
+// prNumber is the trailing number of a PR URL (".../pull/123" -> "123").
+func prNumber(u string) string { return u[strings.LastIndex(u, "/")+1:] }
+
+// builtinActions are the inbuilt "conveyor:NAME" actions, run like an app's.
+var builtinActions = map[string]func(b *bridge, t store.Task) (string, error){
+	"check-pr": func(b *bridge, t store.Task) (string, error) {
+		return "PR check scheduled for " + t.Key, gh.ScheduleCheck(b.svc.DB, t, 0, 0)
+	},
+}
+
+// appSlug is how chat names an app: its manifest id (else its name as a slug).
+func appSlug(a store.Connector) (connectors.Manifest, string) {
+	m, err := connectors.ParseManifest(a.Manifest)
+	if err != nil {
+		return m, ""
+	}
+	return m, m.ConnectorID()
+}
+
+// runList lists what "run" accepts: built-ins and every enabled app's actions as APP:ACTION.
+func (b *bridge) runList() string {
+	s := []string{"conveyor:check-pr"}
+	apps, _ := store.ListConnectors(b.svc.DB)
+	for _, a := range apps {
+		if m, slug := appSlug(a); slug != "" && !a.Disabled {
+			for _, x := range m.Actions {
+				s = append(s, slug+":"+x.ID)
+			}
+		}
+	}
+	return "Actions for `KEY run …`:\n• " + strings.Join(s, "\n• ")
+}
+
+// runAction runs "conveyor:NAME" or "APP:ACTION" (APP alone = the app's first action) on a task.
+func (b *bridge) runAction(key, spec string) string {
+	t, err := store.GetTaskByKey(b.svc.DB, key)
+	if err != nil {
+		return "warning: " + err.Error()
+	}
+	slug, act, _ := strings.Cut(strings.ToLower(spec), ":")
+	if slug == "conveyor" {
+		fn := builtinActions[act]
+		if fn == nil {
+			return "warning: no built-in " + spec + "; try `run list`"
+		}
+		out, err := fn(b, t)
+		if err != nil {
+			return "warning: " + err.Error()
+		}
+		return out
+	}
+	apps, _ := store.ListConnectors(b.svc.DB)
+	for _, a := range apps {
+		m, s := appSlug(a)
+		if s != slug || a.Disabled {
+			continue
+		}
+		if act == "" && len(m.Actions) > 0 {
+			act = m.Actions[0].ID
+		}
+		out, err := b.svc.RunConnectorAction(a.Name, act, "", t.Key)
+		if err != nil {
+			return "warning: " + err.Error()
+		}
+		return cmp.Or(out, fmt.Sprintf("ran %s:%s on %s", slug, act, t.Key))
+	}
+	return "warning: no app " + slug + "; try `run list`"
 }

@@ -3,6 +3,7 @@ package store
 import (
 	"database/sql"
 	"fmt"
+	"time"
 )
 
 const runCols = `id, task_id, kind, mode, bg_id, session_id, status, prompt, block_status,
@@ -70,6 +71,9 @@ func UpdateRun(db *sql.DB, r Run) error {
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
 		return fmt.Errorf("run %d: %w", r.ID, sql.ErrNoRows)
+	}
+	if r.EndedAt != nil {
+		Wake(time.Time{}) // a slot freed
 	}
 	return nil
 }

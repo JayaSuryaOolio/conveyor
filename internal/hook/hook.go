@@ -69,10 +69,20 @@ func Handle(db *sql.DB, home, event string, raw []byte) (string, error) {
 	if key == "" && p.TaskKey != "" {
 		key = p.TaskKey
 	}
+	var task store.Task
+	var err error
+	if key == "" && p.SessionID != "" {
+		// A bg session can report a stray cwd (seen: /private/tmp on a resume); its session id still names the run.
+		if r, rerr := store.RunBySession(db, p.SessionID); rerr == nil {
+			task, err = store.GetTask(db, r.TaskID)
+			key = task.Key
+		}
+	} else if key != "" {
+		task, err = store.GetTaskByKey(db, key)
+	}
 	if key == "" {
 		return "", nil // not one of ours
 	}
-	task, err := store.GetTaskByKey(db, key)
 	if err != nil {
 		return "", fmt.Errorf("hook %s: %w", event, err)
 	}
@@ -286,6 +296,7 @@ func ProcessStop(db *sql.DB, task store.Task, run store.Run, lastAssistantMessag
 			return err
 		}
 	}
+	core.ApplyDecisionLines(db, task.ID, block.Decisions, block.Disputes, block.Undisputes)
 	for _, s := range block.Spawn {
 		if err := store.RecordEvent(db, task.ID, "spawn", s); err != nil {
 			return err

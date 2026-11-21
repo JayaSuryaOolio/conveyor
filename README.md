@@ -114,3 +114,4 @@ Integrations (terminal templates, external connectors, global hooks, automations
 
 - A wrapped UI component layer so Mantine can be swapped in one place.
 - A remote backend: dispatcher, DB and workspaces on a server, driven over an API.
+- Release check and source sync: once a task's PR is merged, work out what "released" means for that repo (e.g. the squash-merged commit appears in the merged `chore: version & release packages` PR), verify it (the `release-manager` skill may already do this, otherwise a script run by a skill), then move the task's source (Jira card, Slack thread, parent Conveyor task) to the matching status. Needed for the epic flow, and possibly for closing standalone tasks too.

@@ -305,3 +305,19 @@ func TestRunOneLogsFailure(t *testing.T) {
 		}
 	}
 }
+
+func TestNextDue(t *testing.T) {
+	last := "2026-01-01T00:00:00Z"
+	at := "2026-01-01T00:05:00Z"
+	list := []store.Automation{
+		{Enabled: true, Schedule: "0 * * * *", LastRunAt: &last},
+		{Enabled: true, RunAt: &at},
+		{Enabled: false, Schedule: "* * * * *", LastRunAt: &last},
+	}
+	if got := NextDue(list); !got.Equal(time.Date(2026, 1, 1, 0, 5, 0, 0, time.UTC)) {
+		t.Errorf("got %v", got)
+	}
+	if !NextDue(nil).IsZero() {
+		t.Error("none should be zero")
+	}
+}

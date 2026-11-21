@@ -159,3 +159,21 @@ func TestCreator(t *testing.T) {
 		}
 	}
 }
+
+func TestQueueStatusHoldsWhenSlotsFull(t *testing.T) {
+	a, _ := newApp(t)
+	store.SetSetting(a.svc.DB, "max_parallel", "1")
+	run, _ := a.CreateTask(core.NewTaskInput{Title: "Runs", Repos: []string{"a"}, Start: true})
+	wait, _ := a.CreateTask(core.NewTaskInput{Title: "Waits", Repos: []string{"a"}, Start: true})
+	tk, _ := store.GetTaskByKey(a.svc.DB, run)
+	store.CreateRun(a.svc.DB, store.Run{TaskID: tk.ID, Kind: "auto", Mode: "fresh", Status: "running"})
+	q, err := a.QueueStatus()
+	if err != nil || q.DebounceSecs != 20 {
+		t.Fatalf("%+v %v", q, err)
+	}
+	for _, i := range q.Items {
+		if i.Key == run && !i.Running || i.Key == wait && i.Held == "" {
+			t.Fatalf("item %+v", i)
+		}
+	}
+}

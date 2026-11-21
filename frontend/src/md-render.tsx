@@ -1,5 +1,6 @@
 import {useContext, useEffect, useMemo, useState} from 'react'
-import {Menu, Modal, Tooltip} from '@mantine/core'
+import {Menu, Tooltip} from '@mantine/core'
+import {Clickable, Modal} from './ui'
 import Md from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import {FileOpeners, Home, OpenFile, ShowError} from '../wailsjs/go/ui/App'
@@ -21,8 +22,8 @@ function Img({src, alt}: {src?: string; alt?: string}) {
     const url = src && home && src.startsWith(home + '/') ? '/attachments' + src : src
     return (
         <>
-            <img src={url} alt={alt} style={{maxWidth: '100%', cursor: 'zoom-in'}} onClick={() => setOpen(true)}/>
-            <Modal opened={open} onClose={() => setOpen(false)} size="auto" centered withCloseButton={false}>
+            <Clickable as="img" src={url} alt={alt} style={{maxWidth: '100%', cursor: 'zoom-in'}} onActivate={() => setOpen(true)}/>
+            <Modal opened={open} onClose={() => setOpen(false)} size="auto" centered closeButton={false}>
                 <img src={url} alt={alt} style={{maxWidth: '100%', display: 'block'}}/>
             </Modal>
         </>

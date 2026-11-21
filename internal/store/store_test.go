@@ -306,7 +306,7 @@ func TestDoneOrCancelledDeletesTaskAutomations(t *testing.T) {
 		tk := mkTask(t, db, StatusReview)
 		other := mkTask(t, db, StatusReview)
 		for _, x := range []Task{tk, other} {
-			if err := ScheduleOnce(db, Automation{Name: "review-check:" + x.Key, ActionKind: "cli", ActionArg: "{}", TaskID: &x.ID}, time.Now()); err != nil {
+			if err := ScheduleOnce(db, Automation{Name: "track-pr:" + x.Key, ActionKind: "cli", ActionArg: "{}", TaskID: &x.ID}, time.Now()); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -314,7 +314,7 @@ func TestDoneOrCancelledDeletesTaskAutomations(t *testing.T) {
 			t.Fatal(err)
 		}
 		as, _ := ListAutomations(db)
-		if len(as) != 1 || as[0].Name != "review-check:"+other.Key {
+		if len(as) != 1 || as[0].Name != "track-pr:"+other.Key {
 			t.Fatalf("%s: %+v", tc.to, as)
 		}
 	}
@@ -365,5 +365,41 @@ func TestRemoveTaskRepoHandsOverPrimaryAtomically(t *testing.T) {
 	}
 	if got, _ := GetTask(db, tk.ID); len(got.Repos) != 2 || got.Repos[0].RepoName != "b" || !got.Repos[0].IsPrimary || got.Repos[1].IsPrimary {
 		t.Fatalf("want b primary: %+v", got.Repos)
+	}
+}
+
+// CV-195: rows with the old single watermark keep it for issue comments and get -1 (baseline
+// on next check) for reviews and inline comments; rows that never saw anything stay at 0.
+func TestMigrateSplitsPRWatermark(t *testing.T) {
+	db := openTest(t)
+	if _, err := db.Exec(`DROP TABLE pr_reviews; CREATE TABLE pr_reviews (task_id INTEGER NOT NULL, repo_id INTEGER NOT NULL,
+  head_sha TEXT NOT NULL DEFAULT '', seen_comment_id INTEGER NOT NULL DEFAULT 0, unresolved INTEGER NOT NULL DEFAULT 0,
+  review TEXT NOT NULL DEFAULT '', reported TEXT NOT NULL DEFAULT '', PRIMARY KEY (task_id, repo_id));
+ INSERT INTO pr_reviews (task_id, repo_id, seen_comment_id) VALUES (1, 1, 6954124677), (2, 1, 0)`); err != nil {
+		t.Fatal(err)
+	}
+	if err := Migrate(db); err != nil {
+		t.Fatal(err)
+	}
+	if err := Migrate(db); err != nil { // idempotent
+		t.Fatal(err)
+	}
+	for _, c := range []struct{ task, review, inline, convo int64 }{{1, -1, -1, 6954124677}, {2, 0, 0, 0}} {
+		p, err := GetPRReview(db, c.task, 1)
+		if err != nil || p.SeenReviewID != c.review || p.SeenInlineID != c.inline || p.SeenCommentID != c.convo {
+			t.Errorf("task %d: %+v %v", c.task, p, err)
+		}
+	}
+}
+
+func TestTickSecsClampedOnWriteAndRead(t *testing.T) {
+	db := openTest(t)
+	for in, want := range map[string]int{"0": 1, "7": 7, "99": 15, "x": 5} {
+		if err := SetSetting(db, "dispatch_tick_secs", in); err != nil {
+			t.Fatal(err)
+		}
+		if got := TickSecs(db); got != want {
+			t.Errorf("%q: got %d want %d", in, got, want)
+		}
 	}
 }

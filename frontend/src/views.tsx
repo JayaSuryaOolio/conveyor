@@ -1,14 +1,16 @@
 import {lazy, Ref, Suspense, useEffect, useRef, useState} from 'react'
-import {ActionIcon, Anchor, Badge, Box, Breadcrumbs, Button, CloseButton, Code, CopyButton, Divider, Group, Kbd, Modal, Paper, Popover, Stack, Text, TextInput, Timeline, Title, Tooltip} from '@mantine/core'
+import {ActionIcon, Anchor, Badge, Box, Breadcrumbs, CloseButton, Code, CopyButton, Divider, Kbd, Paper, Popover, TextInput, Timeline, Title, Tooltip} from '@mantine/core'
+import {Button, Clickable, ClickableCode, Group, Modal, Stack, Text} from './ui'
 import {useLocalStorage} from '@mantine/hooks'
 import {IconAbc, IconSitemap, IconArrowDown, IconArrowUp, IconClock, IconFlame, IconHash, IconPencil, IconSearch, IconTerminal, IconX, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconMessage, IconPlayerPlay} from '@tabler/icons-react'
-import {Actions, GetTask, RunLog, SendQueuedNow, SetTaskDescription, Stop, TakeQueuedComment, TermStart} from '../wailsjs/go/ui/App'
+import {Actions, GetTask, QueueStatus, RunLog, SendQueuedNow, SetTaskDescription, Stop, TakeQueuedComment, TermStart} from '../wailsjs/go/ui/App'
 import {core, store, ui} from '../wailsjs/go/models'
 import {Card, CommentBox, Message, Nav, StatusBadge, Time, View, errMsg} from './components'
 import {Markdown, MarkdownEditor, TaskKey} from './markdown'
+import {Decisions} from './decisions'
 import {Relations} from './relations'
 import {TaskSidebar} from './workspace'
-import {fmtDuration, fmtK, listTasks, useData} from './util'
+import {fmtDuration, fmtK, listTasks, prNumbers, useData} from './util'
 
 const TermDock = lazy(() => import('./terminals'))
 
@@ -45,7 +47,7 @@ export function Board({nav, q, setQ, search, link}: {nav: Nav; q: string; setQ: 
         if (!link.label && !link.repo) return
         setQ(''); setDeep({labels: link.label ? [link.label] : [], repos: link.repo ? [link.repo] : []})
     }, [link]) // a new view object per palette pick, so re-picking the same label re-applies it
-    if (error) return <Text c="red">{error}</Text>
+    if (error) return <Text tone="danger">{error}</Text>
     const shut = (s: string) => ARCHIVE.includes(s) && !open.includes(s)
     const toggle = (s: string) => setOpen(o => o.includes(s) ? o.filter(x => x !== s) : [...o, s])
     const all = data ?? []
@@ -63,26 +65,26 @@ export function Board({nav, q, setQ, search, link}: {nav: Nav; q: string; setQ: 
     const needle = q.toLowerCase()
     // Array.sort is stable, so ties keep the server order (priority desc, created asc).
     const cards = all
-        .filter(c => (!needle || (c.key + ' ' + c.title).toLowerCase().includes(needle)) && (!sel.length || c.repos.some(r => sel.includes(r))) && (!selL.length || c.labels.some(l => selL.includes(l))))
+        .filter(c => (!needle || (c.key + ' ' + c.title + ' ' + prNumbers(c.prUrls).join(' ')).toLowerCase().includes(needle)) && (!sel.length || c.repos.some(r => sel.includes(r))) && (!selL.length || c.labels.some(l => selL.includes(l))))
         .sort((a, b) => sort.desc ? s.cmp(b, a) : s.cmp(a, b))
     const filtered = !!needle || sel.length > 0 || selL.length > 0
     const cols = [...COLUMNS]
     if (cards.some(c => c.status === 'failed')) cols.splice(5, 0, ['failed', 'Failed'])
     return (<Stack gap="sm">
-        <Paper withBorder radius="md" px="sm" py={6}>
-            <Group gap="sm" wrap="wrap">
+        <Paper withBorder radius="md" px="sm" py={6} className="find-box">
+            <Group gap="sm" wrap>
                 <TextInput ref={search} variant="unstyled" size="sm" placeholder="Find a task…" w={200} leftSection={<IconSearch size={16}/>}
                            rightSection={q ? <CloseButton size="sm" aria-label="Clear search" onClick={() => setQ('')}/> : <Kbd size="xs">/</Kbd>}
                            value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => e.key === 'Escape' && (setQ(''), e.currentTarget.blur())}/>
                 <Divider orientation="vertical"/>
-                <Group gap={2} wrap="nowrap" role="group" aria-label="Sort">
+                <Group gap={2} wrap={false} role="group" aria-label="Sort">
                     {SORTS.map(({by, label, icon: Icon, desc}) => {
                         const on = by === s.by
                         const Arrow = sort.desc ? IconArrowDown : IconArrowUp
                         return (
                             <Tooltip key={by} label={on ? 'Click to reverse' : 'Sort by ' + label.toLowerCase()}>
-                                <Button size="compact-sm" variant={on ? 'light' : 'subtle'} color={on ? undefined : 'gray'} aria-pressed={on}
-                                        leftSection={<Icon size={14}/>} rightSection={on ? <Arrow size={12}/> : undefined}
+                                <Button size="sm" compact variant={on ? 'soft' : 'ghost'} tone={on ? undefined : 'muted'} aria-pressed={on}
+                                        icon={<Icon size={14}/>} trailing={on ? <Arrow size={12}/> : undefined}
                                         onClick={() => setSort(on ? {by, desc: !sort.desc} : {by, desc})}>{label}</Button>
                             </Tooltip>
                         )
@@ -90,7 +92,7 @@ export function Board({nav, q, setQ, search, link}: {nav: Nav; q: string; setQ: 
                 </Group>
                 {repos.length > 1 && <>
                     <Divider orientation="vertical"/>
-                    <Group gap={6} wrap="wrap" role="group" aria-label="Repos" style={{flex: 1}}>
+                    <Group gap={6} wrap role="group" aria-label="Repos" style={{flex: 1}}>
                         {repos.map(r => {
                             const on = sel.includes(r)
                             return (
@@ -105,7 +107,7 @@ export function Board({nav, q, setQ, search, link}: {nav: Nav; q: string; setQ: 
                 </>}
                 {selL.length > 0 && <>
                     <Divider orientation="vertical"/>
-                    <Group gap={6} wrap="wrap" role="group" aria-label="Labels">
+                    <Group gap={6} wrap role="group" aria-label="Labels">
                         {selL.map(l => (
                             <Badge key={l} component="button" size="lg" radius="md" color="gray" variant="filled" aria-pressed
                                    title={'Hide ' + l + ' filter'} rightSection={<IconX size={12}/>}
@@ -113,10 +115,10 @@ export function Board({nav, q, setQ, search, link}: {nav: Nav; q: string; setQ: 
                         ))}
                     </Group>
                 </>}
-                {filtered && <Group gap={6} wrap="nowrap" ml="auto">
+                {filtered && <Group gap={6} wrap={false} style={{marginLeft: 'auto'}}>
                     <Badge size="lg" radius="md" color="yellow" variant="light" style={{textTransform: 'none'}}>Filtered: {[...selL, ...sel, ...(needle ? ['"' + q + '"'] : [])].join(', ')}</Badge>
-                    <Text size="xs" c="dimmed">{cards.length} of {all.length}</Text>
-                    <Button size="compact-xs" variant="subtle" color="gray" leftSection={<IconX size={12}/>} onClick={() => { setQ(''); setPicked([]); setPickedLabels([]) }}>Clear</Button>
+                    <Text size="xs" tone="muted">{cards.length} of {all.length}</Text>
+                    <Button size="xs" compact variant="ghost" tone="muted" icon={<IconX size={12}/>} onClick={() => { setQ(''); setPicked([]); setPickedLabels([]) }}>Clear</Button>
                 </Group>}
             </Group>
         </Paper>
@@ -125,20 +127,20 @@ export function Board({nav, q, setQ, search, link}: {nav: Nav; q: string; setQ: 
                 let list = cards.filter(c => c.status === s)
                 if (ARCHIVE.includes(s)) list = list.filter(c => Date.now() - Date.parse(c.updatedAt) < WEEK)
                 if (shut(s)) return (
-                    <Paper key={s} bg="var(--mantine-color-default-hover)" radius="md" mih={120} title={'Show ' + label}
-                           style={{cursor: 'pointer', writingMode: 'vertical-rl', padding: '12px 0', display: 'flex', alignItems: 'center', gap: 6}} onClick={() => toggle(s)}>
-                        <Text size="sm" fw={600}>{label}</Text>
-                        <Text size="xs" c="dimmed">{list.length}</Text>
-                    </Paper>
+                    <Clickable key={s} title={'Show ' + label}
+                           style={{background: 'var(--mantine-color-default-hover)', borderRadius: 'var(--mantine-radius-md)', minHeight: 120, writingMode: 'vertical-rl', padding: '12px 0', display: 'flex', alignItems: 'center', gap: 6}} onActivate={() => toggle(s)}>
+                        <Text size="sm" weight={600}>{label}</Text>
+                        <Text size="xs" tone="muted">{list.length}</Text>
+                    </Clickable>
                 )
                 return (
                     <Paper key={s} bg="var(--mantine-color-default-hover)" p="xs" radius="md" mih={120}>
-                        <Group gap="xs" mb="xs" px={4} style={ARCHIVE.includes(s) ? {cursor: 'pointer'} : undefined}
-                               title={ARCHIVE.includes(s) ? 'Collapse' : undefined} onClick={ARCHIVE.includes(s) ? () => toggle(s) : undefined}>
-                            <Text size="sm" fw={600}>{label}</Text>
-                            <Text size="xs" c="dimmed">{list.length}</Text>
-                        </Group>
-                        <Stack gap="xs">{list.map(c => <Card key={c.key} c={c} nav={nav} onLabel={l => !selL.includes(l) && setPickedLabels([...selL, l])}/>)}</Stack>
+                        <Clickable style={{display: 'flex', alignItems: 'center', gap: 'var(--mantine-spacing-xs)', marginBottom: 'var(--mantine-spacing-xs)', padding: '0 4px'}}
+                               title={ARCHIVE.includes(s) ? 'Collapse' : undefined} onActivate={ARCHIVE.includes(s) ? () => toggle(s) : undefined}>
+                            <Text size="sm" weight={600}>{label}</Text>
+                            <Text size="xs" tone="muted">{list.length}</Text>
+                        </Clickable>
+                        <Stack gap="xs">{list.map(c => <Card key={c.key} c={c} nav={nav} showPR={!!needle} onLabel={l => !selL.includes(l) && setPickedLabels([...selL, l])}/>)}</Stack>
                     </Paper>
                 )
             })}
@@ -146,7 +148,7 @@ export function Board({nav, q, setQ, search, link}: {nav: Nav; q: string; setQ: 
     </Stack>)
 }
 
-/** Focus popup: what is waiting on you, each card showing only the last message. Preview opens the task page in a nested modal. */
+/** Body of the Focus popup (App owns the <Modal>, see NewTask): what is waiting on you, each card showing only the last message. Preview opens the task page in a nested modal. */
 export function Focus({nav, onClose}: {nav: Nav; onClose: () => void}) {
     const {data, error} = useData(listTasks, [])
     const [peek, setPeek] = useState('')
@@ -155,29 +157,27 @@ export function Focus({nav, onClose}: {nav: Nav; onClose: () => void}) {
         .filter(c => FOCUS_ORDER.includes(c.status))
         .sort((a, b) => waiting(a) - waiting(b) || lastAt(b) - lastAt(a) || a.priority - b.priority)
     return <>
-        <Modal opened onClose={onClose} size="min(800px, 96vw)" title="Focus">
-            {error && <Text c="red">{error}</Text>}
-            {!error && rows.length === 0 && <Text c="dimmed">Nothing needs you.</Text>}
+            {error && <Text tone="danger">{error}</Text>}
+            {!error && rows.length === 0 && <Text tone="muted">Nothing needs you.</Text>}
             <Stack>
                 {rows.map(c => (
                     <Paper key={c.key} withBorder p="md" radius="md">
                         <Stack gap="xs">
-                            <Group wrap="nowrap">
+                            <Group wrap={false}>
                                 <StatusBadge status={c.status}/>
-                                <Text size="sm" fw={600}>{c.key}</Text>
-                                <Text size="sm" style={{flex: 1}} lineClamp={1}>{c.title}</Text>
-                                <Text size="xs" c="dimmed">{c.lastMsgBy ? c.lastMsgBy + ' · ' : ''}<Time iso={c.lastMsgAt || c.updatedAt}/></Text>
+                                <Text size="sm" weight={600}>{c.key}</Text>
+                                <Text size="sm" clamp={1} style={{flex: 1}}>{c.title}</Text>
+                                <Text size="xs" tone="muted">{c.lastMsgBy ? c.lastMsgBy + ' · ' : ''}<Time iso={c.lastMsgAt || c.updatedAt}/></Text>
                             </Group>
                             {c.lastSummary && <Box mah={80} style={{overflow: 'hidden'}}><Markdown c="dimmed">{c.lastSummary}</Markdown></Box>}
                             <Group gap="xs">
-                                <Button variant="default" size="compact-xs" onClick={() => setPeek(c.key)}>Preview</Button>
-                                <Button variant="default" size="compact-xs" onClick={() => go({name: 'task', key: c.key})}>Open task</Button>
+                                <Button variant="secondary" size="xs" compact onClick={() => setPeek(c.key)}>Preview</Button>
+                                <Button variant="secondary" size="xs" compact onClick={() => go({name: 'task', key: c.key})}>Open task</Button>
                             </Group>
                         </Stack>
                     </Paper>
                 ))}
             </Stack>
-        </Modal>
         <TaskPreview k={peek} onClose={() => setPeek('')} nav={go}/>
     </>
 }
@@ -185,7 +185,7 @@ export function Focus({nav, onClose}: {nav: Nav; onClose: () => void}) {
 /** The task page in a modal ("" = closed), so agent/model/skills edit in place; navigating away from it closes the modal. */
 export function TaskPreview({k, onClose, nav}: {k: string; onClose: () => void; nav: Nav}) {
     return (
-        <Modal opened={!!k} onClose={onClose} size="min(1200px, 96vw)" padding="sm" title={k}>
+        <Modal opened={!!k} onClose={onClose} size="min(1200px, 96vw)" compact title={k}>
             {k && <TaskPage k={k} height="calc(100vh - 140px)" nav={nav}/>}
         </Modal>
     )
@@ -224,9 +224,9 @@ function SessionLog({run, onStop}: {run: store.Run; onStop?: () => void}) {
     useEffect(() => { box.current?.scrollTo({top: box.current.scrollHeight}) }, [entries])
     const lastTool = [...entries].reverse().find(e => e.kind === 'tool')
     return (
-        <Stack gap={6} mt="xs">
+        <Stack gap={6} style={{marginTop: 'var(--mantine-spacing-xs)'}}>
             {active ? (
-                <Group gap="xs" wrap="nowrap">
+                <Group gap="xs" wrap={false}>
                     <span className="pulse"/>
                     {/* Fixed parts never shrink/wrap; only the last-tool text below takes the remaining space and truncates. */}
                     <Text size="sm" style={{flexShrink: 0, whiteSpace: 'nowrap'}}>Working · {secs(Math.max(0, Math.round((now - Date.parse(run.started_at)) / 1000)))}</Text>
@@ -234,24 +234,24 @@ function SessionLog({run, onStop}: {run: store.Run; onStop?: () => void}) {
                         <Popover withArrow shadow="md" position="bottom-start">
                             <Popover.Target><Anchor component="button" size="sm" underline="hover" style={{flexShrink: 0, whiteSpace: 'nowrap'}}>Stop run</Anchor></Popover.Target>
                             <Popover.Dropdown>
-                                <Text size="sm" mb="xs">End this session? The agent stops now.</Text>
-                                <Button size="compact-xs" color="red" onClick={onStop}>Stop run</Button>
+                                <Text size="sm" style={{marginBottom: 10}}>End this session? The agent stops now.</Text>
+                                <Button size="xs" compact tone="danger" onClick={onStop}>Stop run</Button>
                             </Popover.Dropdown>
                         </Popover>
                     )}
-                    {lastTool && <Text size="xs" c="dimmed" truncate style={{flex: 1, minWidth: 0}}>· {lastTool.text}</Text>}
+                    {lastTool && <Text size="xs" tone="muted" truncate style={{flex: 1, minWidth: 0}}>· {lastTool.text}</Text>}
                 </Group>
             ) : (
-                <Button variant="subtle" size="compact-xs" w="fit-content" onClick={() => setOpen(!open)}>{open ? 'Hide session' : 'Show session'}</Button>
+                <Button style={{width: "fit-content"}} variant="ghost" size="xs" compact onClick={() => setOpen(!open)}>{open ? 'Hide session' : 'Show session'}</Button>
             )}
-            {err && <Text size="xs" c="dimmed">{err}</Text>}
+            {err && <Text size="xs" tone="muted">{err}</Text>}
             {show && entries.length > 0 && (
                 <Paper withBorder p="xs" radius="md" mah={320} style={{overflowY: 'auto'}} ref={box}>
                     {entries.map((e, i) => (
                         e.kind === 'tool'
                             ? <Code key={i} block bg="transparent" c="dimmed" style={{whiteSpace: 'pre-wrap', wordBreak: 'break-word'}}>{e.text}</Code>
                             : e.kind === 'user'
-                                ? <Text key={i} size="sm" fw={600} style={{whiteSpace: 'pre-wrap', wordBreak: 'break-word'}}>{e.text}</Text>
+                                ? <Text key={i} size="sm" weight={600} style={{whiteSpace: 'pre-wrap', wordBreak: 'break-word'}}>{e.text}</Text>
                                 : <Markdown key={i}>{e.text}</Markdown>
                     ))}
                 </Paper>
@@ -272,7 +272,7 @@ function Description({t, reload}: {t: store.Task; reload: () => void}) {
         return (
             <Stack gap={4}>
                 <MarkdownEditor minRows={4} value={draft} onChange={setDraft} onSubmit={save} submitLabel="Save" submitting={busy} attachKey={t.key}/>
-                <Button variant="default" size="compact-sm" style={{alignSelf: 'flex-start'}} onClick={() => setDraft(null)}>Cancel</Button>
+                <Button variant="secondary" size="sm" compact style={{alignSelf: 'flex-start'}} onClick={() => setDraft(null)}>Cancel</Button>
             </Stack>
         )
     }
@@ -294,6 +294,7 @@ export function TaskPage({k, nav, height = 'calc(100vh - 2 * var(--mantine-spaci
     const [titleGone, setTitleGone] = useState(false)
     // A question is answered in the session itself: needs_you offers a way into the live session's terminal.
     const needsYou = d?.task.status === 'needs_you'
+    const {data: queue} = useData(() => QueueStatus(), [d?.comments.length, d?.runs.length])
     const {data: actions} = useData(() => needsYou ? Actions(k) : Promise.resolve([]), [k, needsYou, d?.runs.length])
     const runs = d?.runs ?? []
     const latest = runs[runs.length - 1]
@@ -302,12 +303,12 @@ export function TaskPage({k, nav, height = 'calc(100vh - 2 * var(--mantine-spaci
     // Gated on needsYou: `actions` keeps its last value until the refetch lands, so without it the button lingers after the answer.
     const open = () => attach && TermStart(k, attach.kind, attach.repo).then(setAdded).catch(errMsg)
     const termLabel = attach?.kind === 'resume' ? 'Resume in terminal' : 'Answer in terminal'
-    const answer = needsYou && attach && <Button id="answer-inline" size="compact-sm" leftSection={<IconTerminal size={14}/>} onClick={open}>{termLabel}</Button>
+    const answer = needsYou && attach && <Button id="answer-inline" size="sm" compact icon={<IconTerminal size={14}/>} onClick={open}>{termLabel}</Button>
     // Floating twin: opens the terminal too; scrollIntoView 'nearest' is a no-op when the inline button is already visible.
-    const floatingAnswer = needsYou && attach && <Button variant="default" size="compact-sm" leftSection={<IconTerminal size={14}/>}
+    const floatingAnswer = needsYou && attach && <Button variant="secondary" size="sm" compact icon={<IconTerminal size={14}/>}
         onClick={() => { open(); document.getElementById('answer-inline')?.scrollIntoView({behavior: 'smooth', block: 'nearest'}) }}>{termLabel}</Button>
-    if (error) return <Text c="red">{error}</Text>
-    if (!d) return <Text c="dimmed">Loading…</Text>
+    if (error) return <Text tone="danger">{error}</Text>
+    if (!d) return <Text tone="muted">Loading…</Text>
     const t = d.task
     // Takes the queued message out of the thread and drops its text into the editor.
     const edit = (id: number) => TakeQueuedComment(k, id).then(body => setRestored({body}), errMsg).finally(reload)
@@ -323,23 +324,24 @@ export function TaskPage({k, nav, height = 'calc(100vh - 2 * var(--mantine-spaci
         <TaskKey.Provider value={t.key}>
         <Box style={{display: 'flex', flexDirection: 'column', height}}>
         <Box style={{flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: `minmax(0, 1fr) ${side ? '300px' : 'auto'}`, gap: side ? 'var(--mantine-spacing-xl)' : 'var(--mantine-spacing-xs)'}}>
-            <Stack gap="sm" mih={0}>
-                <Group justify="space-between" wrap="nowrap" style={{flex: 'none'}}>
+            <Stack gap="sm" style={{minHeight: 0}}>
+                <Group justify="between" wrap={false} style={{flex: 'none'}}>
                 <Breadcrumbs style={{flex: 'none', flexWrap: 'nowrap'}}>
                     {/* A <button> anchor stays keyboard-focusable; only the underline is dropped. */}
                     <Anchor size="sm" component="button" underline="never" onClick={() => nav({name: 'board'})}>Board</Anchor>
                     <CopyButton value={t.key}>{({copied, copy}) => (
                         <Tooltip label={copied ? 'Copied' : 'Click to copy'}>
-                            <Text size="sm" component="button" type="button" onClick={copy} style={{cursor: 'pointer', background: 'none', border: 0, padding: 0, color: 'inherit', flex: 'none'}}>{t.key}</Text>
+                            <Text size="sm" as="button" type="button" onClick={copy} style={{cursor: 'pointer', background: 'none', border: 0, padding: 0, color: 'inherit', flex: 'none'}}>{t.key}</Text>
                         </Tooltip>
                     )}</CopyButton>
-                    {titleGone && <Text size="sm" c="dimmed" truncate>{t.title}</Text>}
+                    {titleGone && <Text size="sm" tone="muted" truncate>{t.title}</Text>}
                 </Breadcrumbs>
                 <Tooltip label="Epic view (e)"><ActionIcon variant="subtle" color="gray" aria-label="Epic view" onClick={() => nav({name: 'epic', key: t.key})}><IconSitemap size={18}/></ActionIcon></Tooltip>
                 </Group>
                 <ScrollBox floating={floatingAnswer}>
                     <Stack>
                         <WatchedTitle onGone={setTitleGone}>{t.title}</WatchedTitle>
+                        <Decisions k={t.key}/>
                         <Description t={t} reload={reload}/>
                         <Relations k={t.key} status={t.status} rel={d.relations} nav={nav} reload={reload}/>
                         {latest?.criteria && <><Title order={5}>Acceptance criteria</Title><Criteria text={latest.criteria}/></>}
@@ -348,9 +350,9 @@ export function TaskPage({k, nav, height = 'calc(100vh - 2 * var(--mantine-spaci
                             {items.map(it => it.run ? (
                                 <Timeline.Item key={'r' + it.run.id} id={'run-' + it.run.id} bullet={<IconPlayerPlay size={12}/>}
                                                title={`Run ${runNo.get(it.run.id)} · ${it.run.mode}`}>
-                                    <Text size="xs" c="dimmed">
+                                    <Text size="xs" tone="muted">
                                         {it.run.session_id && (sid => <><CopyButton value={sid}>{({copied, copy}) => (
-                                            <Tooltip label={copied ? 'Copied' : `Click to copy ${sid}`}><Code style={{cursor: 'pointer'}} onClick={copy}>{sid.slice(0, 8)}</Code></Tooltip>
+                                            <Tooltip label={copied ? 'Copied' : `Click to copy ${sid}`}><ClickableCode onActivate={copy}>{sid.slice(0, 8)}</ClickableCode></Tooltip>
                                         )}</CopyButton> · </>)(it.run.session_id)}{it.run.api_calls} calls · {fmtK(it.run.ctx_peak)} peak · {fmtDuration(it.run.started_at, it.run.ended_at)} · <Time iso={it.run.started_at}/>
                                     </Text>
                                     <SessionLog run={it.run} onStop={it.run.kind !== 'interactive' ? stop : undefined}/>
@@ -358,7 +360,7 @@ export function TaskPage({k, nav, height = 'calc(100vh - 2 * var(--mantine-spaci
                                 </Timeline.Item>
                             ) : (
                                 <Timeline.Item key={'c' + it.comment!.id} bullet={<IconMessage size={12}/>}>
-                                    <Message m={it.comment!} onEdit={it.comment!.author === 'human' && !it.comment!.consumed_by_run_id ? () => edit(it.comment!.id) : undefined} onSendNow={it.comment!.author === 'human' && !it.comment!.consumed_by_run_id ? sendNow : undefined}/>
+                                    <Message m={it.comment!} onEdit={it.comment!.author === 'human' && !it.comment!.consumed_by_run_id ? () => edit(it.comment!.id) : undefined} onSendNow={it.comment!.author === 'human' && !it.comment!.consumed_by_run_id ? sendNow : undefined} queue={queue}/>
                                 </Timeline.Item>
                             ))}
                         </Timeline>
@@ -367,7 +369,7 @@ export function TaskPage({k, nav, height = 'calc(100vh - 2 * var(--mantine-spaci
                 <Box style={{flex: 'none'}}><CommentBox k={t.key} onDone={reload} restored={restored}/></Box>
             </Stack>
             <Box mih={0} style={{overflowY: 'auto'}}>
-                <Group justify="flex-end" mb={4}>
+                <Group justify="end" style={{marginBottom: 4}}>
                     <ActionIcon variant="subtle" color="gray" aria-label={side ? 'Hide details' : 'Show details'} title={side ? 'Hide details' : 'Show details'} onClick={() => setSide(!side)}>
                         {side ? <IconLayoutSidebarRightCollapse size={18}/> : <IconLayoutSidebarRightExpand size={18}/>}
                     </ActionIcon>
@@ -411,7 +413,7 @@ function ScrollBox({children, floating}: {children: React.ReactNode; floating?: 
     return (
         <Box pos="relative" style={{flex: 1, minHeight: 0}}>
             <Box ref={el} onScroll={update} h="100%" pr="xs" style={{overflowY: 'auto'}}>{children}</Box>
-            <Stack gap={4} pos="absolute" right={16} bottom={8} align="flex-end">
+            <Stack gap={4} align="end" style={{position: 'absolute', right: 16, bottom: 8}}>
                 {floating}
                 {!pos.top && <ActionIcon variant="default" radius="xl" size="lg" aria-label="Scroll to top" onClick={() => go(0)}><IconArrowUp size={16}/></ActionIcon>}
                 {!pos.bottom && <ActionIcon variant="default" radius="xl" size="lg" aria-label="Scroll to bottom" onClick={() => go(el.current!.scrollHeight)}><IconArrowDown size={16}/></ActionIcon>}

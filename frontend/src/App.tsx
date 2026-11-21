@@ -1,6 +1,7 @@
 import {useEffect, useMemo, useRef, useState} from 'react'
 import {useLocation, useNavigate} from 'react-router'
-import {ActionIcon, AppShell, Badge, Box, Button, Group, Kbd, NavLink, Stack, Text, Title, Tooltip} from '@mantine/core'
+import {ActionIcon, AppShell, Badge, Box, Kbd, NavLink, Title, Tooltip} from '@mantine/core'
+import {Button, Group, Modal, Stack, Text} from './ui'
 import {useLocalStorage} from '@mantine/hooks'
 import {IconApps, IconBolt, IconArrowLeft, IconBook2, IconClock, IconLayoutKanban, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconLogs, IconPlus, IconRobot, IconSettings, IconSitemap} from '@tabler/icons-react'
 import {AppVersion, DispatcherState, Learnings, ShellPATHError} from '../wailsjs/go/ui/App'
@@ -23,7 +24,7 @@ const NAV: {name: string; key?: string; label: string; icon: typeof IconBolt; fi
     {name: 'board', key: 'b', label: 'Board', icon: IconLayoutKanban},
     {name: 'board', label: 'Epics', icon: IconSitemap, filter: 'epic'},
     {name: 'learnings', label: 'Learnings', icon: IconBook2},
-    {name: 'automations', label: 'Automations', icon: IconClock},
+    {name: 'automations', key: 'u', label: 'Automations', icon: IconClock},
     {name: 'apps', label: 'Connectors', icon: IconApps},
     {name: 'agents', key: 'a', label: 'Agents', icon: IconRobot},
     {name: 'logs', key: 'l', label: 'Logs', icon: IconLogs},
@@ -40,6 +41,7 @@ export default function App() {
     const back = () => { if (window.history.state?.idx > 0) navigate(-1) }
     const [showNew, setShowNew] = useState(false)
     const [showFocus, setShowFocus] = useState(false)
+    const [newKey, setNewKey] = useState(0) // bumped after each close: NewTask remounts fresh (drafts persist in localStorage) while hidden
     const [q, setQ] = useState('')
     const search = useRef<HTMLInputElement>(null)
     const [dispatcher, setDispatcher] = useState('')
@@ -87,9 +89,9 @@ export default function App() {
         <NavContext.Provider value={nav}>
         <AppShell navbar={{width: mini ? 60 : 220, breakpoint: 0}} padding="md">
             <AppShell.Navbar p="sm">
-                <Stack gap="xs" h="100%">
-                    <Group justify={mini ? 'center' : 'space-between'} wrap="nowrap">
-                        {!mini && <Group gap={4} wrap="nowrap">
+                <Stack gap="xs" style={{height: '100%'}}>
+                    <Group justify={mini ? 'center' : 'between'} wrap={false}>
+                        {!mini && <Group gap={4} wrap={false}>
                             <Tooltip label="Back (⌘[)" position="right">
                                 <ActionIcon variant="subtle" color="gray" aria-label="Back" disabled={!canBack} onClick={back}><IconArrowLeft size={18}/></ActionIcon>
                             </Tooltip>
@@ -104,23 +106,23 @@ export default function App() {
                             <ActionIcon size="lg" mx="auto" aria-label="New task" onClick={() => setShowNew(true)}><IconPlus size={18}/></ActionIcon>
                         </Tooltip>
                     ) : <>
-                        <Button leftSection={<IconPlus size={16}/>} rightSection={<Kbd size="xs">n</Kbd>} onClick={() => setShowNew(true)}>New task</Button>
+                        <Button icon={<IconPlus size={16}/>} trailing={<Kbd size="xs">n</Kbd>} onClick={() => setShowNew(true)}>New task</Button>
                     </>}
-                    <Stack gap={2} mt="xs">
+                    <Stack gap={2} style={{marginTop: 'var(--mantine-spacing-xs)'}}>
                         {NAV.map(({name, key, label, icon: Icon, filter}) => (
                             <Tooltip key={label} label={label} position="right" disabled={!mini}>
-                                <NavLink label={mini ? undefined : label} active={view.name === name && (view.label ?? undefined) === filter} leftSection={<Icon size={18}/>} aria-label={label}
+                                <NavLink component="button" label={mini ? undefined : label} active={view.name === name && (view.label ?? undefined) === filter} leftSection={<Icon size={18}/>} aria-label={label}
                                          rightSection={mini ? undefined : name === 'learnings' && proposed > 0 ? <Badge size="sm" circle>{proposed}</Badge> : key ? <Kbd size="xs" title={`g then ${key}`}>g {key}</Kbd> : undefined}
                                          onClick={() => setView(filter ? {name, label: filter} : {name})}/>
                             </Tooltip>
                         ))}
                     </Stack>
                     <Box mt="auto">{!mini && <PlacedButtons place="global_nav" size="compact-xs"/>}</Box>
-                    <Group gap="xs" justify={mini ? 'center' : 'space-between'} wrap="nowrap">
+                    <Group gap="xs" justify={mini ? 'center' : 'between'} wrap={false}>
                         <Tooltip label={dispatcher === 'dispatching' ? 'Dispatcher running in this app' : 'UI only: another process dispatches'} position="right">
                             <Box w={8} h={8} style={{borderRadius: '50%', background: `var(--mantine-color-${dispatcher === 'dispatching' ? 'green' : 'gray'}-6)`}}/>
                         </Tooltip>
-                        {!mini && version && <Text size="xs" c="dimmed">{version}</Text>}
+                        {!mini && version && <Text size="xs" tone="muted">{version}</Text>}
                     </Group>
                 </Stack>
             </AppShell.Navbar>
@@ -135,9 +137,9 @@ export default function App() {
                 {view.name === 'logs' && <Logs/>}
                 {view.name === 'settings' && <Settings/>}
             </AppShell.Main>
-            {showFocus && <Focus nav={nav} onClose={() => setShowFocus(false)}/>}
-            {showNew && <NewTask nav={nav} close={() => setShowNew(false)}/>}
-            <CommandPalette nav={nav} onFocus={() => setShowFocus(true)}/>
+            <Modal opened={showFocus} onClose={() => setShowFocus(false)} size="min(800px, 96vw)" title="Focus" keepMounted><Focus nav={nav} onClose={() => setShowFocus(false)}/></Modal>
+            <Modal opened={showNew} onClose={() => setShowNew(false)} size="clamp(28rem, 60vw, 64rem)" title="New task" keepMounted onExitTransitionEnd={() => setNewKey(k => k + 1)}><NewTask key={newKey} nav={nav} close={() => setShowNew(false)}/></Modal>
+            <CommandPalette nav={nav} onFocus={() => setTimeout(() => setShowFocus(true), 300)} /* ponytail: open after the palette's close transition so Mantine records the real opener (not the palette's input) for return-focus; refactor: Spotlight onSpotlightClose callback *//>
             <Toasts/>
         </AppShell>
         </NavContext.Provider>

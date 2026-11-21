@@ -1,4 +1,4 @@
-import {useCallback, useEffect, useRef, useState} from 'react'
+import {useCallback, useEffect, useRef, useState, type KeyboardEvent} from 'react'
 import {EventsOn} from '../wailsjs/runtime/runtime'
 import {ListTasks} from '../wailsjs/go/ui/App'
 
@@ -67,6 +67,9 @@ export function useDraft(key: string): [string, (v: string | ((prev: string) => 
     return [val, set]
 }
 
+/** "#123" for each PR url (a task has one PR per repo); the number is the url's last path segment. */
+export const prNumbers = (urls: string[]) => urls.map(u => '#' + u.replace(/^.*\/pull\//, ''))
+
 export const fmtK = (n: number) => (n >= 1000 ? Math.round(n / 1000) + 'K' : String(n))
 
 export function fmtDuration(start: string, end?: string | null): string {
@@ -86,13 +89,23 @@ export const STATUS_COLOR: Record<string, string> = {
     review: 'violet', done: 'green', failed: 'red', cancelled: 'gray',
 }
 
-/** "5m ago" style relative time; pair with fmtTime for the absolute one. */
+/** "5m ago" / "in 5m" style relative time; pair with fmtTime for the absolute one. */
 export function ago(iso: string): string {
-    const s = Math.round((Date.now() - Date.parse(iso)) / 1000)
-    if (!(s >= 60)) return 'just now'
-    if (s < 3600) return Math.floor(s / 60) + 'm ago'
-    if (s < 86400) return Math.floor(s / 3600) + 'h ago'
-    return Math.floor(s / 86400) + 'd ago'
+    const d = Math.round((Date.now() - Date.parse(iso)) / 1000)
+    const s = Math.abs(d)
+    if (s < 60) return 'just now'
+    const n = s < 3600 ? Math.floor(s / 60) + 'm' : s < 86400 ? Math.floor(s / 3600) + 'h' : Math.floor(s / 86400) + 'd'
+    return d < 0 ? 'in ' + n : n + ' ago'
 }
 
 export const fmtTime = (iso: string) => new Date(iso).toLocaleString()
+
+/**
+ * Props that make a non-button container keyboard-operable: focusable, Enter/Space activate it. The keys only count when the container itself has focus,
+ * so buttons inside it keep their own. Refactor: a card holding buttons should be one real link (title <Anchor> stretched over the card) instead of role=button.
+ */
+export const clickable = (go: () => void) => ({
+    role: 'button', tabIndex: 0, onClick: go,
+    onKeyDown: (e: KeyboardEvent) => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); go() } },
+})
+

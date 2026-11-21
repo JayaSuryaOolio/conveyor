@@ -1,5 +1,6 @@
 import {useState} from 'react'
-import {ActionIcon, Anchor, Badge, Group, Select, Stack, Text, Title, Tooltip} from '@mantine/core'
+import {ActionIcon, Anchor, Badge, Select, Title, Tooltip} from '@mantine/core'
+import {Group, Stack, Text} from './ui'
 import {IconChevronDown, IconChevronRight, IconPlus, IconTrash} from '@tabler/icons-react'
 import {AdoptChild, Link, SetParent, Unlink} from '../wailsjs/go/ui/App'
 import {store, ui} from '../wailsjs/go/models'
@@ -36,18 +37,18 @@ function Row({task, nav, kids, onRemove}: {task: store.TaskRef; nav: Nav; kids: 
     const done = subs.filter(s => s.status === 'done').length
     return (
         <Stack gap={2}>
-            <Group gap={6} wrap="nowrap" justify="space-between">
-                <Group gap={6} wrap="nowrap" miw={0}>
+            <Group gap={6} wrap={false} justify="between">
+                <Group gap={6} wrap={false} style={{minWidth: 0}}>
                     {subs.length > 0
                         ? <ActionIcon variant="subtle" color="gray" size="xs" aria-label={open ? 'Collapse sub-tasks' : 'Expand sub-tasks'} aria-expanded={open} onClick={() => setOpen(!open)}>
                             {open ? <IconChevronDown size={14}/> : <IconChevronRight size={14}/>}
                         </ActionIcon>
                         : <span style={{width: 18, flex: 'none'}}/>}
                     <Anchor size="sm" component="button" ta="left" onClick={() => nav({name: 'task', key: task.key})}>{task.key}</Anchor>
-                    <Text size="sm" lineClamp={1} title={task.title}>{task.title}</Text>
-                    {subs.length > 0 && !open && <Text size="xs" c="dimmed" style={{whiteSpace: 'nowrap'}}>({done}/{subs.length} subtasks DONE)</Text>}
+                    <Text size="sm" clamp={1} title={task.title}>{task.title}</Text>
+                    {subs.length > 0 && !open && <Text size="xs" tone="muted" style={{whiteSpace: 'nowrap'}}>({done}/{subs.length} subtasks DONE)</Text>}
                 </Group>
-                <Group gap={4} wrap="nowrap">
+                <Group gap={4} wrap={false}>
                     <StatusBadge status={task.status}/>
                     {onRemove && (
                         <Tooltip label="Remove link">
@@ -56,7 +57,7 @@ function Row({task, nav, kids, onRemove}: {task: store.TaskRef; nav: Nav; kids: 
                     )}
                 </Group>
             </Group>
-            {open && <Stack gap={2} ml="1.25rem">{subs.map(c => <Row key={c.key} task={c} nav={nav} kids={kids}/>)}</Stack>}
+            {open && <Stack gap={2} style={{marginLeft: '1.25rem'}}>{subs.map(c => <Row key={c.key} task={c} nav={nav} kids={kids}/>)}</Stack>}
         </Stack>
     )
 }
@@ -85,31 +86,31 @@ export function Relations({k, status, rel, nav, reload}: {k: string; status: str
     return (
         <Stack gap="xs">
             <Title order={5}>Relations</Title>
-            {status === 'todo' && blockers.length > 0 && <Text size="xs" c="orange">Not launched: blocked by {blockers.map(l => l.task.key).join(', ')}</Text>}
-            {rel.parent && <Stack gap={2}><Text size="xs" c="dimmed">Parent</Text><Row task={rel.parent} nav={nav} kids={kids} onRemove={() => done(SetParent(k, ''))}/></Stack>}
+            {status === 'todo' && blockers.length > 0 && <Text size="xs" tone="warning">Not launched: blocked by {blockers.map(l => l.task.key).join(', ')}</Text>}
+            {rel.parent && <Stack gap={2}><Text size="xs" tone="muted">Parent</Text><Row task={rel.parent} nav={nav} kids={kids} onRemove={() => done(SetParent(k, ''))}/></Stack>}
             {rel.children.length > 0 && (
                 <Stack gap={2}>
-                    <Text size="xs" c="dimmed">Sub-tasks</Text>
+                    <Text size="xs" tone="muted">Sub-tasks</Text>
                     {rel.children.map(c => <Row key={c.key} task={c} nav={nav} kids={kids} onRemove={() => done(SetParent(c.key, ''))}/>)}
                 </Stack>
             )}
             {labels.map(label => (
                 <Stack key={label} gap={2}>
-                    <Text size="xs" c="dimmed">{label}</Text>
+                    <Text size="xs" tone="muted">{label}</Text>
                     {rel.links.filter(l => l.label === label).map(l => (
                         <Row key={l.kind + l.task.key} task={l.task} nav={nav} kids={kids}
                              onRemove={() => done(l.from ? Unlink(k, l.kind, l.task.key) : Unlink(l.task.key, l.kind, k))}/>
                     ))}
                 </Stack>
             ))}
-            <Group gap={4} wrap="nowrap">
+            <Group gap={4} wrap={false}>
                 <Select size="xs" w={130} allowDeselect={false} value={choice} onChange={v => { if (v) { setChoice(v); setOther(null) } }} data={CHOICES.map(c => ({value: c[0], label: c[1]}))}/>
                 <Select size="xs" clearable placeholder="Task" style={{flex: 1}} value={other} onChange={setOther}
                         data={options.map(x => ({value: x.key, label: `${x.key} ${x.title}`, disabled: off.includes(x.key)}))}
                         renderOption={({option}) => (
-                            <Group gap={6} wrap="nowrap" justify="space-between" w="100%">
-                                <Text size="xs" lineClamp={1}>{option.label}</Text>
-                                <Group gap={4} wrap="nowrap">
+                            <Group gap={6} wrap={false} justify="between" style={{width: '100%'}}>
+                                <Text size="xs" clamp={1}>{option.label}</Text>
+                                <Group gap={4} wrap={false}>
                                     {hasParent.has(option.value) && <Badge variant="outline" color="gray" size="xs">has parent</Badge>}
                                     <StatusBadge status={byKey.get(option.value)?.status ?? ''}/>
                                 </Group>

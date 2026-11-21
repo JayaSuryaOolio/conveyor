@@ -14,7 +14,7 @@ Conveyor assumes `bg_id` and `session_id` name the same thing. That holds for a 
 
 ## How hooks find their run
 
-Hooks (`UserPromptSubmit`, `Stop`, `Notification`) carry only the `cwd` and a `session_id`. `internal/hook.resolveRun` maps them to a run in this order:
+Hooks (`UserPromptSubmit`, `Stop`, `Notification`) carry only the `cwd` and a `session_id`. The `cwd` picks the task; when it is outside the workspaces (a resumed bg session once reported `/private/tmp`), the `session_id` of a known run picks it instead. `internal/hook.resolveRun` maps them to a run in this order:
 
 1. The newest run whose `session_id` equals the hook's (resumes are supposed to share an id, so newest wins).
 2. A run still `launching` with no session id: adopt it and record the id.

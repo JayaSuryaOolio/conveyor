@@ -317,6 +317,18 @@ func TestOutsideWorkspacesIgnored(t *testing.T) {
 	}
 }
 
+// A bg resume reported cwd /private/tmp and its Stop was dropped, leaving the run active and the queue stuck.
+func TestStopWithStrayCwdFindsRunBySession(t *testing.T) {
+	e := setup(t, store.StatusRunning)
+	r := e.run(t, "auto", "running", "S1", "p")
+	if err := e.fire(t, "Stop", map[string]any{"cwd": "/private/tmp", "session_id": "S1", "last_assistant_message": doneMsg}); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := store.GetRun(e.db, r.ID); got.Status != "finished" || e.status(t).Status != store.StatusReview {
+		t.Fatalf("%+v %+v", got, e.status(t))
+	}
+}
+
 func TestMalformedJSON(t *testing.T) {
 	e := setup(t, store.StatusRunning)
 	if _, err := Handle(e.db, e.home, "Stop", []byte("{nope")); err == nil {

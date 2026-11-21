@@ -17,7 +17,7 @@ This guide covers day-to-day use. For setup see the [README](../README.md); for 
 
 ## The board and the task page
 
-The sidebar has Board, Focus, Learnings, Automations, Connectors, Agents, Logs and Settings (repos are a Settings tab). Board, Focus, Agents and Logs have the shortcuts `b`, `f`, `a` and `l`.
+The sidebar has Board, Focus, Learnings, Automations, Connectors, Agents, Logs and Settings (repos are a Settings tab). Board, Focus, Automations, Agents and Logs have the shortcuts `b`, `f`, `u`, `a` and `l`.
 
 The board has a column per status: Backlog, Todo, Running, Needs you, Review, Failed (only shown when something has failed), Done and Cancelled. Done and Cancelled are collapsed and show the last 7 days. A bar above the board searches key and title (`/` focuses it, Esc clears), sorts every column by priority, last update, key or title (click the active sort again to reverse it), and filters by repo: click repo pills to show only those repos, combine several, Clear resets. Sort and repo picks are remembered; filtering is all in the UI. Focus is a single list of what wants your attention, in this order: needs_you, review, failed, running, todo.
 
@@ -52,6 +52,7 @@ Every 2 seconds the dispatcher:
 2. Every 60 seconds, checks PRs of tasks in review with `gh` (see below).
 3. Every 30 seconds, runs due automations.
 4. Launches `todo` tasks, highest priority first, up to `max_parallel` (default 3) at once. A task with new comments waits `comment_debounce_secs` (default 20) after the last one, so you can write several comments before it starts.
+   Adding the label `approved` to a task queues a `spec approved` comment the same way; removing the label before a run takes it withdraws the comment (and a task that has run goes back to needs_you). It does not pass an epic's gate: use Approve for that.
 
 To launch, it creates the worktrees, writes `claude-settings.json` and `BRIEF.md`, creates a run, marks the comments as consumed, moves the task to running and starts Claude:
 
@@ -72,14 +73,16 @@ state: branch ..., PR #N, tests: pass|fail|not run
 next: what remains
 criteria:
 - [x] AC1 - evidence
-learning: only if this repo had a trap that cost you >10 min and is not in CLAUDE.md/SKILL.md/LEARNINGS.md. Name the file or command. Omit the line otherwise. (repeatable line)
+learning: only a repo-wide trap (not specific to one task or feature) that cost you >10 min and is not in CLAUDE.md/SKILL.md/LEARNINGS.md. Name the file or command. Feature-level facts go in that feature's SKILL.md or a code comment, not here. Omit the line otherwise. (repeatable line)
 spawn: [todo] title of a follow-up task | its description
 </conveyor>
 ```
 
 Each `spawn:` line becomes a backlog sub-task (or a todo one the dispatcher starts, when the title starts with `[todo]`) with the parent's repos and the text after `|` as its description. A line without a description creates nothing and records a `spawn_failed` event, so no sub-task starts without context; `conveyor task new --parent` likewise requires `--desc`.
 
-Without a block the agent is treated as asking you a question. `BRIEF.md` explains this protocol to the agent, along with the task, repos, latest runs and your comments. The `brief_extra_rules` setting adds your own rules to it.
+Without a block the agent is treated as asking you a question. `BRIEF.md` explains this protocol to the agent, along with the task, repos, latest runs and your comments. The `brief_extra_rules` setting adds your own rules to it. Its sections come in a fixed order and each is size-capped (about 24 KB in all, roughly 6k tokens); anything clipped stays reachable through the `conveyor` command the brief names. See `docs/research/brief-template.md`.
+
+**Approach step.** On a task's first run, unless it has the `small` label or its description has a line starting "Approach", the brief tells the agent to post a short Approach (files and layer, functions and types it will reuse with paths, new names, open decisions) and end `needs_you` without changing code. Once you ack, the agent records the approach as `decision:` lines and builds. Label small items `small` to skip it (`needsApproach` in `internal/brief`).
 
 **Repo context comes first.** The session's working directory is the primary repo's worktree, a normal checkout of that repo, so Claude Code loads its `CLAUDE.md` and `.claude` skills, commands, agents and settings as usual. The brief tells the agent these are the authority on how to work in the repo, over its own defaults and generic user-level skills; only the worktree, PR and status block rules are Conveyor's. The task's other repos are attached with `--add-dir`, which does not load their `CLAUDE.md`, commands or agents, so the brief lists them (paths and one-liners) under "Other repos' context" for the agent to read when it works there. Gitignored files (`CLAUDE.local.md`, `.claude/settings.local.json`) are not in a worktree.
 
@@ -125,6 +128,21 @@ When the dispatcher launches a task that already has runs, it chooses between:
 - **Fresh**: a new session that reads `BRIEF.md`, which carries the summaries of recent runs and your comments. Used otherwise.
 
 To choose yourself, start a comment with `#fresh` or `#resume` (CLI, app or Slack; the latest pending one wins). `#fresh` always starts a new session; `#resume` resumes regardless of `resume_threshold` and those rules, as long as the last auto run finished with a known session.
+
+## Working with agents: you own the approach
+
+The rule Conveyor is built around: **help the human get things done, not make them weaker. The agent types; the human owns the approach.** Standards in the codebase and skills don't replace your call on which module, which existing API and what names. Tasks that skipped that call took about 8 PR rounds instead of one short plan (`docs/research/cv-117b-117i-study.md`).
+
+**Decisions.** A run's status block can carry `decision: what — why` lines. Each is stored on the task as `D<n>` and listed under `## Decisions` in every later `BRIEF.md`, so it survives `#fresh`. Manage them with `conveyor task decision KEY list | add "what — why" | rm D<n> | dispute D<n> "reason" | undispute D<n>`, or from the task page. An agent that thinks a decision is wrong writes `dispute: D<n> | reason` instead of quietly undoing it.
+
+Habits that keep you in touch with the code:
+
+- **Approve the approach.** Spend about 5 minutes on the first-run Approach (see "Approach step" above): which module, which existing API, what names. Approving it is the one thing only you can do; your ack becomes Decisions.
+- **Read the first diff yourself, before the bots.** Bot rounds polish whatever shape exists. One look at round 1 catches the wrong module, a bool flag or a lookup on every call.
+- **State decisions as decisions.** Write "Decision: X because Y" (or `task decision add`), and mark a question as a question so it isn't read as an order.
+- **Turn style corrections into skill lines.** A correction fixes one PR; ask the agent to add it to the repo skill and the next task follows it.
+- **Batch feedback.** One comment with every point, not one per run: each comment is a run, and each run re-derives context.
+- **Use `#fresh` only after decisions are recorded.** A fresh session knows only what `BRIEF.md` holds.
 
 ## Interactive sessions and terminals
 
@@ -182,7 +200,7 @@ Kinds:
 - `comment`: `{task_key | task_status, body}`. With `task_status` it comments on every task in that status, running the precheck once per task with `CONVEYOR_TASK_KEY`, `CONVEYOR_TASK_BRANCH` and `CONVEYOR_TASK_PR` set.
 - `cli`: `{args}`, run as a `conveyor` command.
 
-There is one built-in template, `pr-sweep` (every 15 minutes, comments on tasks in review that have new PR reviews):
+Built-in templates: `pr-sweep` (every 15 minutes, comments on tasks in review that have new PR reviews) and `state-backup`:
 
 ```
 conveyor automation add --template pr-sweep
@@ -232,7 +250,7 @@ An action is a long-running **service** at a place when `services` has an entry 
 
 `conveyor app run APP ACTION [KEY] --place p` runs an action as shown at a place. Manifests carry a `version` (current: 4; absent means 1). Older versions keep working: a version 1 action's single `service` becomes the service at each of its places.
 
-**Connector settings (v3).** A manifest may declare `settings`: `{key, type, default, description, options}` with `type` one of `string`, `boolean`, `number`, `enum` (`options` lists the choices); keys match `[a-z0-9_]+`. The Apps page shows a Settings icon for such apps that opens a modal to edit them; values are stored per app in the DB (`apps.settings`) and scripts read them as `${{ setting.key }}` (shell-quoted; booleans are `true`/`false`). Unsaved settings use the default. Uninstalling or replacing an app drops its values. The bundled Review webhooks app has one boolean per forwarded GitHub event; the listener reads them when it starts, so restart it after a change.
+**Connector settings (v3).** A manifest may declare `settings`: `{key, type, default, description, options}` with `type` one of `string`, `boolean`, `number`, `enum` (`options` lists the choices); keys match `[a-z0-9_]+`. The Apps page shows a Settings icon for such apps that opens a modal to edit them; values are stored per app in the DB (`connectors.settings`) and scripts read them as `${{ setting.key }}` (shell-quoted; booleans are `true`/`false`). Unsaved settings use the default. Uninstalling or replacing an app drops its values. The bundled Review webhooks app has one boolean per forwarded GitHub event; the listener reads them when it starts, so restart it after a change.
 
 Not yet: connector hooks (a connector reacting to task events). Later, Claude itself could be a connector: the agent that works a task would come from a manifest, with other agents (Codex, Gemini CLI, ...) installed as alternative apps instead of being built in.
 
@@ -242,13 +260,14 @@ For tasks in review, every 60 seconds Conveyor runs `gh pr list --head <branch>`
 
 ### Review webhooks (opt-in)
 
-PR review checks run on push and a backoff (30 min, 2 h, 8 h). For instant checks, Conveyor starts the review-webhook listener by itself (under the id of the enabled connector whose action runs `conveyor review-webhook`, found by manifest so a variant with another id shares one instance; `review-webhooks` when none is installed) while an epic task (label `epic` or `epic:<name>`) is unfinished; for non-epic tasks, add the bundled **Review webhooks** example from "Detected on this Mac" on the Apps screen (or `conveyor app install examples/review-webhooks.json`). Once started (by an epic or the app), Conveyor runs `conveyor review-webhook` itself: a listener on `127.0.0.1` (random port, pid in `<home>/apps/<app-id>.pid`, log `logs/app/<app-id>.log`; the id is the manifest `id`, else its name as a slug, and is `${{ app.id }}` in scripts so two versions of an app can run side by side) plus one `gh webhook forward` per repo with an open PR of any unfinished task (needs `gh extension install cli/gh-webhook` and admin on the repo; GitHub allows one forward per repo). A review or review comment schedules that task's check for now. Without an open epic, the app or the extension, tasks keep the timed checks. `--status` exits 0 when running; `--stop` stops it (Conveyor restarts it within a minute while the app is enabled (its service is `"autostart": true`, which the dispatcher honors for any app) or an epic is open; uninstall the app and finish the epic to opt out).
+PR review checks run on push and a backoff (30 min, 2 h, 8 h). For instant checks, Conveyor starts the review-webhook listener by itself (under the id of the enabled connector whose action runs `conveyor review-webhook`, found by manifest so a variant with another id shares one instance; `review-webhooks` when none is installed) while an epic task (label `epic` or `epic:<name>`) is unfinished; for non-epic tasks, add the bundled **Review webhooks** example from "Detected on this Mac" on the Apps screen (or `conveyor app install examples/review-webhooks.json`). Once started (by an epic or the app), Conveyor runs `conveyor review-webhook` itself: a listener on `127.0.0.1` (random port, pid in `<home>/apps/<app-id>.pid`, log `logs/app/<app-id>.log`; the id is the manifest `id`, else its name as a slug, and is `${{ app.id }}` in scripts so two versions of an app can run side by side) plus one `gh webhook forward` per repo with an open PR of any unfinished task (needs `gh extension install cli/gh-webhook` and admin on the repo; GitHub allows one forward per repo, so a leftover hook fails a forward with `422 Hook already exists`, so the listener deletes the repo's old `gh webhook forward` hooks before each forward; needs the `admin:repo_hook` token scope). No tunnel (ngrok etc.) is needed: `gh webhook forward` registers a hook that GitHub relays over a websocket the extension opens outbound, and Conveyor's listener only receives from that local process. A review or review comment schedules that task's check for now. Without an open epic, the app or the extension, tasks keep the timed checks. `--status` exits 0 when running; `--stop` stops it (Conveyor restarts it within a minute while the app is enabled (its service is `"autostart": true`, which the dispatcher honors for any app) or an epic is open; uninstall the app and finish the epic to opt out).
 
 ## Settings
 
-Settings are in the app (Settings page) or `conveyor config list|get|set`.
+Settings are in the app (Settings page) or `conveyor config list|get|set`. Secret settings (keys containing `token`, `secret` or `password`, or ending `_key`) are masked in `config list` (first 4 characters + `****`) and `config get` refuses them; add `--reveal` to print them.
 
-- **General**: `key_prefix` (CV), `default_model`.
+- **General**: `key_prefix` (CV), `user_name`, `default_model`, `default_runner` (`claude`, or `agy` for Antigravity; a task can override it with `--runner`; `conveyor detect [--fix]` shows the installed runners).
+- **Chat** (Slack bridge, see [slack.md](slack.md)): `chat_enabled` (on), `chat_transport` (slack), `chat_statuses` (`needs_you,review,done,failed`) and the `slack_*` tokens and ids.
 - **Dispatch**: `max_parallel` (3), `resume_threshold` (60000), `comment_debounce_secs` (20), `max_consecutive_failures` (3).
 - **External terminal**: `terminal_template`, the command for external terminals (`{cwd}` and `{cmd}` are substituted; default uses macOS Terminal).
 - **Prompts**: `pr_comment_prefix`, `brief_extra_rules`, and `prompt_fresh` / `prompt_resume` to replace the launch prompts (placeholders `{key}`, `{title}`, `{brief}`, `{comments}`). Empty means the built-in prompt. The page also shows the status block protocol the agent is given.
@@ -263,11 +282,12 @@ Global flag: `conveyor [--home dir] <command>`. Running a command with no argume
 conveyor repo add <path> [--name n]       conveyor repo list | rm <name> | setup <name> [script|-]
 
 conveyor task new "<title>" --repo a[,b] [--primary r] [--desc t | --desc-file f]
-                  [--todo] [--model m] [--agent a] [--parent KEY] [--priority n]
+                  [--todo] [--model m] [--agent a] [--runner r] [--parent KEY] [--priority n]
 conveyor task list [--status a,b]         conveyor task show KEY [--thread] [--runs]
 conveyor task comment KEY <text|-> [--ask|--note]   conveyor task move KEY <status> [--stop]
 conveyor task done KEY [--stop]           conveyor task cancel KEY
-conveyor task stop KEY
+conveyor task stop KEY                    conveyor task sessions KEY [--json]
+conveyor task repo KEY add|rm NAME
 conveyor task set KEY [--repo r] [--branch b] [--pr url] [--model m] [--desc d | --desc-file f]
 conveyor task link KEY blocks|relates OTHER    conveyor task unlink KEY kind OTHER
 conveyor task parent KEY PARENT|--none   conveyor task label KEY add|rm NAME | set <prefix>:<value>
@@ -275,6 +295,8 @@ conveyor task graph KEY [--json]          conveyor task new "t" --repo r --epic 
 conveyor epic status KEY [--flow N] [--json]    conveyor epic check KEY [--fix]
 conveyor epic prs KEY [--commits] [--json]      conveyor epic search KEY <regex>
 conveyor epic sessions KEY [--grep text]        conveyor epic flows KEY
+conveyor epic log KEY "<message>"               conveyor epic audit KEY
+conveyor epic review-check KEY [--step N]
 conveyor epic approve KEY                       conveyor epic restart KEY --reason "..."
 conveyor task sync KEY                    conveyor task brief KEY [--preview]
 conveyor task log KEY [--follow]          conveyor task attach KEY
@@ -285,10 +307,11 @@ conveyor agent model <name> <model|""> [--repo r]   ("" inherits default_model)
 conveyor models [--json]                  # model list, tier and alias
 conveyor learning list|accept|reject|edit|apply
 conveyor automation list|add|enable|disable|run|rm
-conveyor app list|presets|add|rm|open
-conveyor hooks status|install|uninstall
+conveyor app list|presets|add|install|export|run|enable|disable|rm|open
+conveyor plugin status|install|uninstall [claude|agy]   # `hooks` is an alias
+conveyor detect [--fix]                        # agent runners found, active default_runner
 conveyor review-webhook [--status|--stop]      # opt-in review-webhooks connector (see Connectors)
-conveyor config list | get <key> | set <key> <value>
+conveyor config list [--reveal] | get <key> [--reveal] | set <key> <value>
 conveyor state export [file] | import <file> [--repo A=name ...] | backup [--keep N]
 conveyor --home <empty dir> mock seed          # mock repos, tasks, settings, connectors, automations (fixtures: internal/core/mock.go)
 conveyor import jira --jql "..." --repo a      # needs acli: install it from the Connectors page (Templates) after `brew install acli` and `acli jira auth login`
@@ -303,7 +326,7 @@ conveyor daemon                                # run the dispatcher in the foreg
 
 ```
 repos/<repo>/LEARNINGS.md   accepted local learnings, loaded into that repo's tasks
-conveyor.db                 tasks, runs, comments, events, learnings, automations, settings, apps
+conveyor.db                 tasks, runs, comments, events, learnings, automations, settings, connectors
 conveyor.log                app log (rotated at 5 MB to conveyor.log.1)
 claude-settings.json        hooks and options passed to launched sessions, rewritten at each launch
 dispatcher.lock             held by whichever process is dispatching

@@ -39,7 +39,7 @@ func TestWebhookSchedulesCheckNow(t *testing.T) {
 		t.Fatalf("issue_comment: %d", c)
 	}
 	as, _ := store.ListAutomations(svc.DB)
-	if len(as) != 1 || as[0].Name != "review-check:"+tk.Key || as[0].RunAt == nil {
+	if len(as) != 1 || as[0].Name != "track-pr:"+tk.Key || as[0].RunAt == nil {
 		t.Fatalf("want one review-check, got %+v", as)
 	}
 	if at, _ := time.Parse(time.RFC3339, *as[0].RunAt); time.Since(at) > time.Minute || at.After(time.Now().Add(time.Second)) {
@@ -65,5 +65,24 @@ func TestWebhookMissingExtension(t *testing.T) {
 	err := CheckWebhookExt()
 	if !errors.Is(err, ErrNoWebhookExt) || !strings.Contains(err.Error(), "gh extension install cli/gh-webhook") {
 		t.Fatalf("got %v", err)
+	}
+}
+
+func TestForwardFailureReachesTimeline(t *testing.T) {
+	svc, tk := reviewTask(t)
+	notifyForwardFailed(svc.DB, "o/r", "HTTP 404")
+	notifyForwardFailed(svc.DB, "x/y", "HTTP 404") // no task there
+	evs, _ := store.ListEvents(svc.DB, tk.ID)
+	n := 0
+	for _, e := range evs {
+		if e.Kind == "connector" && strings.Contains(e.Detail, "o/r") && strings.Contains(e.Detail, "HTTP 404") {
+			n++
+		}
+	}
+	if n != 1 {
+		t.Fatalf("want one connector event, got %+v", evs)
+	}
+	if got := firstLine([]byte("Error: boom\nUsage:\n  forward")); got != "Error: boom" {
+		t.Fatalf("firstLine: %q", got)
 	}
 }

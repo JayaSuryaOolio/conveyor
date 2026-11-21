@@ -1,5 +1,6 @@
 import {useEffect, useRef, useState} from 'react'
-import {ActionIcon, Badge, Button, Checkbox, Code, FileButton, Group, Modal, MultiSelect, NumberInput, Pagination, Paper, Select, Stack, Switch, Table, Tabs, Text, TextInput, Textarea, Title} from '@mantine/core'
+import {ActionIcon, Badge, Checkbox, Code, FileButton, MultiSelect, NumberInput, Pagination, Paper, Select, Switch, Table, Tabs, TextInput, Textarea, Title} from '@mantine/core'
+import {Button, Group, Modal, Stack, Text} from './ui'
 import {IconDownload, IconPlus, IconPuzzle, IconSettings, IconTrash, IconUpload} from '@tabler/icons-react'
 import {AddConnector, ConnectorSettings, SaveConnectorSettings, ExampleConnectors, InstallExample, GetSettings, SetSetting, ConnectorIcons, ConnectorPresets, Confirm, SetConnectorDisabled, DeleteConnector, ExportConnector, InstallManifest, InstallPreset, ListConnectors, SlackLinks, ManifestSchema, Plugin, ValidateManifest} from '../wailsjs/go/ui/App'
 import {runner, store} from '../wailsjs/go/models'
@@ -20,8 +21,8 @@ function AppForm({onClose}: {onClose: (saved: boolean) => void}) {
                        value={command} onChange={e => setCommand(e.target.value)}/>
             <Switch label="Quick action" checked={output} onChange={e => setOutput(e.currentTarget.checked)}
                     description={<>Runs to completion in the task's primary worktree and shows its output as a toast; a button in the task sidebar. Scripts can call <Code>conveyor task sessions {'{key}'}</Code> for the task's Claude session ids.</>}/>
-            <Group justify="flex-end">
-                <Button variant="default" onClick={() => onClose(false)}>Cancel</Button>
+            <Group justify="end">
+                <Button variant="secondary" onClick={() => onClose(false)}>Cancel</Button>
                 <Button onClick={save} disabled={!name.trim() || !command.trim()}>Create</Button>
             </Group>
         </Stack>
@@ -65,26 +66,26 @@ function ManifestForm({onClose}: {onClose: (saved: boolean) => void}) {
     }
     return (
         <Stack gap="sm">
-            <Text size="sm" c="dimmed">
+            <Text size="sm" tone="muted">
                 A manifest (version {schema?.version?.[0]}) declares actions and where they appear, and can ship <Code>agents</Code> and <Code>automations</Code>.
                 Click a placeholder to insert it at the cursor; scripts get its value shell-quoted.
             </Text>
             <Group gap={6}>
-                {(schema?.vars ?? []).map(v => <Button key={v} size="compact-xs" variant="light" ff="monospace" onClick={() => insert(`\${{ ${v} }}`)}>{v}</Button>)}
+                {(schema?.vars ?? []).map(v => <Button style={{fontFamily: "monospace"}} key={v} size="xs" compact variant="soft" onClick={() => insert(`\${{ ${v} }}`)}>{v}</Button>)}
             </Group>
-            <Group align="flex-end" gap="xs">
+            <Group align="end" gap="xs">
                 <MultiSelect label="Places" size="xs" data={schema?.places ?? []} value={places} onChange={setPlaces} style={{flex: 1}}/>
-                <Button size="xs" variant="default" leftSection={<IconPlus size={14}/>} disabled={!places.length} onClick={addAction}>Add action</Button>
+                <Button size="xs" variant="secondary" icon={<IconPlus size={14}/>} disabled={!places.length} onClick={addAction}>Add action</Button>
             </Group>
             <Textarea ref={ref} autosize minRows={10} maxRows={20} ff="monospace" placeholder={MANIFEST_EXAMPLE} value={text} onChange={e => setText(e.target.value)}
                       error={problem || undefined}/>
-            <Group justify="space-between">
+            <Group justify="between">
                 <FileButton accept="application/json,.json" onChange={f => f?.text().then(setText)}>
-                    {p => <Button {...p} variant="default" leftSection={<IconUpload size={16}/>}>Load file</Button>}
+                    {p => <Button {...p} variant="secondary" icon={<IconUpload size={16}/>}>Load file</Button>}
                 </FileButton>
                 <Group>
                     <Checkbox label="Replace connector with the same name" checked={replace} onChange={e => setReplace(e.currentTarget.checked)}/>
-                    <Button variant="default" onClick={() => onClose(false)}>Cancel</Button>
+                    <Button variant="secondary" onClick={() => onClose(false)}>Cancel</Button>
                     <Button disabled={!text.trim() || !!problem} onClick={() => InstallManifest(text, replace).then(() => onClose(true), errMsg)}>Install</Button>
                 </Group>
             </Group>
@@ -107,16 +108,16 @@ function SettingsForm({app, onClose}: {app: string; onClose: () => void}) {
     useEffect(() => { if (data) setVals(v => Object.keys(v).length ? v : Object.fromEntries(data.map(s => [s.key, s.value]))) }, [data])
     return (
         <Stack gap="md">
-            {error && <Text c="red" size="sm">{error}</Text>}
+            {error && <Text tone="danger" size="sm">{error}</Text>}
             {data?.map(s => {
                 const v = vals[s.key] ?? s.value, set = (x: string) => setVals({...vals, [s.key]: x})
                 return (
                     <div key={s.key}>
-                        <Text size="sm" fw={600} ff="monospace">{s.key}</Text>
+                        <Text size="sm" weight={600} mono>{s.key}</Text>
                         {s.type === 'boolean'
                             ? <Switch mt={4} label={s.description} checked={v === 'true'} onChange={e => set(String(e.currentTarget.checked))}/>
                             : <>
-                                {s.description && <Text size="xs" c="dimmed" mb={4}>{s.description}</Text>}
+                                {s.description && <Text size="xs" tone="muted" style={{marginBottom: 4}}>{s.description}</Text>}
                                 {s.type === 'number' ? <NumberInput value={v} onChange={x => set(String(x))}/>
                                     : s.type === 'enum' ? <Select data={s.options ?? []} value={v} onChange={x => x && set(x)} allowDeselect={false}/>
                                     : <TextInput value={v} onChange={e => set(e.target.value)}/>}
@@ -124,8 +125,8 @@ function SettingsForm({app, onClose}: {app: string; onClose: () => void}) {
                     </div>
                 )
             })}
-            <Group justify="flex-end">
-                <Button variant="default" onClick={onClose}>Cancel</Button>
+            <Group justify="end">
+                <Button variant="secondary" onClick={onClose}>Cancel</Button>
                 <Button onClick={() => SaveConnectorSettings(app, vals).then(onClose, errMsg)}>Save</Button>
             </Group>
         </Stack>
@@ -141,16 +142,16 @@ const pluginColor: Record<string, string> = {installed: 'green', outdated: 'oran
 function PluginRow({st, act}: {st: runner.PluginStatus, act: (tool: string, a: string) => void}) {
     const supported = st.status !== 'not supported'
     return (
-        <Group justify="space-between">
+        <Group justify="between">
             <Group gap="xs">
-                <Text size="sm" fw={500}>{st.tool}</Text>
+                <Text size="sm" weight={500}>{st.tool}</Text>
                 <Badge variant="light" color={pluginColor[st.status] ?? 'gray'}>{st.status}</Badge>
                 {st.path && <Code>{st.path}</Code>}
-                {st.note && <Text size="xs" c="dimmed">{st.note}</Text>}
+                {st.note && <Text size="xs" tone="muted">{st.note}</Text>}
             </Group>
             {supported && <Group gap="xs">
                 {st.status !== 'installed' && <Button size="xs" onClick={() => act(st.tool, 'install')}>{st.status === 'outdated' ? 'Update' : 'Install'}</Button>}
-                {st.status !== 'not installed' && <Button size="xs" variant="default" onClick={() => act(st.tool, 'uninstall')}>Uninstall</Button>}
+                {st.status !== 'not installed' && <Button size="xs" variant="secondary" onClick={() => act(st.tool, 'uninstall')}>Uninstall</Button>}
             </Group>}
         </Group>
     )
@@ -164,13 +165,13 @@ function ConveyorPlugin() {
             <Stack gap="xs">
                 <Title order={5}>Conveyor plugin</Title>
                 {data?.map(st => <PluginRow key={st.tool} st={st} act={act}/>)}
-                <Text size="sm" c="dimmed">
+                <Text size="sm" tone="muted">
                     Sessions Conveyor starts always report back. The plugin adds the same hooks (prompt, stop, notification) and the
                     {' '}<Code>conveyor</Code> and <Code>epic</Code> skills for sessions you start yourself, so a <Code>claude</Code> run in a task
                     worktree, from an app or any terminal, shows up on the task as an interactive run. Sessions outside Conveyor workspaces are ignored.
                     Installing also removes the older hooks from <Code>~/.claude/settings.json</Code>. Same as <Code>conveyor plugin install</Code>.
                 </Text>
-                {error && <Text c="red" size="sm">{error}</Text>}
+                {error && <Text tone="danger" size="sm">{error}</Text>}
             </Stack>
         </Paper>
     )
@@ -188,27 +189,27 @@ function ConnectorList() {
     const missing = (presets ?? []).filter(p => !have.has(p.name))
     const offered = (examples ?? []).filter(e => !have.has(e.name))
     return (
-        <Stack maw={900}>
-            <Group justify="space-between">
+        <Stack style={{maxWidth: 900}}>
+            <Group justify="between">
                 <Title order={3}>Connectors</Title>
                 <Group gap="xs">
-                    <Button variant="default" leftSection={<IconPuzzle size={16}/>} onClick={() => setImporting(true)}>Install manifest</Button>
-                    <Button leftSection={<IconPlus size={16}/>} onClick={() => setAdding(true)}>New connector</Button>
+                    <Button variant="secondary" icon={<IconPuzzle size={16}/>} onClick={() => setImporting(true)}>Install manifest</Button>
+                    <Button icon={<IconPlus size={16}/>} onClick={() => setAdding(true)}>New connector</Button>
                 </Group>
             </Group>
-            <Text size="sm" c="dimmed">Connectors a task worktree can be opened in, from the icons under each repo on the task page or <Code>conveyor app open NAME KEY</Code>.</Text>
-            {error && <Text c="red">{error}</Text>}
-            {data && data.length === 0 && <Text c="dimmed">None yet. Add one below or create your own.</Text>}
+            <Text size="sm" tone="muted">Connectors a task worktree can be opened in, from the icons under each repo on the task page or <Code>conveyor app open NAME KEY</Code>.</Text>
+            {error && <Text tone="danger">{error}</Text>}
+            {data && data.length === 0 && <Text tone="muted">None yet. Add one below or create your own.</Text>}
             {data && data.length > 0 && (
                 <Table verticalSpacing="xs">
                     <Table.Thead><Table.Tr><Table.Th>Name</Table.Th><Table.Th>Actions</Table.Th><Table.Th/></Table.Tr></Table.Thead>
                     <Table.Tbody>
                         {data.map(a => (
                             <Table.Tr key={a.id} opacity={a.disabled ? 0.5 : 1}>
-                                <Table.Td fw={600}><Group gap="xs" wrap="nowrap"><AppIcon name={a.name} icons={icons}/>{a.name}</Group></Table.Td>
+                                <Table.Td fw={600}><Group gap="xs" wrap={false}><AppIcon name={a.name} icons={icons}/>{a.name}</Group></Table.Td>
                                 <Table.Td><Code title={a.manifest} style={{display: 'block', maxWidth: 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>{manifestSummary(a)}</Code></Table.Td>
                                 <Table.Td>
-                                    <Group gap="xs" wrap="nowrap" justify="flex-end">
+                                    <Group gap="xs" wrap={false} justify="end">
                                         <Switch size="xs" aria-label={`Enable ${a.name}`} title={a.disabled ? 'Disabled: enable to use it again' : 'Disable (keeps its settings)'} checked={!a.disabled} onChange={e => SetConnectorDisabled(a.name, !e.currentTarget.checked).then(reload, errMsg)}/>
                                         {hasSettings(a) && <ActionIcon variant="subtle" color="gray" aria-label="Settings" title="Settings" onClick={() => setSettingsApp(a.name)}><IconSettings size={16}/></ActionIcon>}
                                         <ActionIcon variant="subtle" color="gray" aria-label="Export" title="Export manifest as .json" onClick={() => ExportConnector(a.name).then(p => p && toast(`Exported to ${p}`), errMsg)}><IconDownload size={16}/></ActionIcon>
@@ -224,17 +225,17 @@ function ConnectorList() {
                 <Title order={5}>Detected on this Mac</Title>
                 <Group gap="xs">
                     {missing.map(p => (
-                        <Button key={p.name} size="xs" variant="light" leftSection={<IconPlus size={14}/>}
+                        <Button key={p.name} size="xs" variant="soft" icon={<IconPlus size={14}/>}
                                 onClick={() => InstallPreset(p).then(reload, errMsg)}>{p.name}</Button>
                     ))}
                 </Group>
             </>}
             {offered.length > 0 && <>
                 <Title order={5}>Templates</Title>
-                <Text size="xs" c="dimmed">Bundled examples, not detected on this Mac. Install one to use it or as a starting point.</Text>
+                <Text size="xs" tone="muted">Bundled examples, not detected on this Mac. Install one to use it or as a starting point.</Text>
                 <Group gap="xs">
                     {offered.map(e => (
-                        <Button key={e.file} size="xs" variant="light" leftSection={<IconPlus size={14}/>} title={e.description}
+                        <Button key={e.file} size="xs" variant="soft" icon={<IconPlus size={14}/>} title={e.description}
                                 onClick={() => InstallExample(e.file).then(reload, errMsg)}>{e.name}</Button>
                     ))}
                 </Group>
@@ -273,8 +274,8 @@ function SlackLinksTable() {
     if (!data?.total) return null
     return (
         <Stack gap="xs">
-            <Text size="sm" fw={500}>Threads</Text>
-            <Text size="xs" c="dimmed">Which task each Slack thread replies to. Part of Conveyor's state, so Export state includes them.</Text>
+            <Text size="sm" weight={500}>Threads</Text>
+            <Text size="xs" tone="muted">Which task each Slack thread replies to. Part of Conveyor's state, so Export state includes them.</Text>
             <Table verticalSpacing={4}>
                 <Table.Thead><Table.Tr><Table.Th>Task</Table.Th><Table.Th>Channel</Table.Th><Table.Th>Thread</Table.Th><Table.Th>Notifies</Table.Th></Table.Tr></Table.Thead>
                 <Table.Tbody>
@@ -296,11 +297,11 @@ function Integrations() {
     const set = (k: string, v: string) => SetSetting(k, v).then(reload, errMsg)
     return (
         <Stack>
-            {error && <Text c="red">{error}</Text>}
+            {error && <Text tone="danger">{error}</Text>}
             {data && (
                 <Paper withBorder p="md" radius="md">
                     <Stack gap="sm">
-                        <Group justify="space-between">
+                        <Group justify="between">
                             <Group gap="xs"><Title order={5}>Slack</Title>
                                 <Badge variant="light" color={data.chat_enabled === 'on' && (data.slack_user_token || data.slack_bot_token) && data.slack_app_token && data.slack_user_id ? 'green' : 'gray'}>
                                     {data.chat_enabled !== 'on' ? 'off' : (data.slack_user_token || data.slack_bot_token) && data.slack_app_token && data.slack_user_id ? 'on' : 'needs tokens'}
@@ -308,7 +309,7 @@ function Integrations() {
                             </Group>
                             <Switch label="Send and listen" checked={data.chat_enabled === 'on'} onChange={e => set('chat_enabled', e.currentTarget.checked ? 'on' : 'off')}/>
                         </Group>
-                        <Text size="sm" c="dimmed">
+                        <Text size="sm" tone="muted">
                             Answer needs_you questions, get PR links and run <Code>/conveyor list|comment|move</Code> from the Slack mobile app.
                             Create the Slack app as described in <Code>docs/slack.md</Code>. Changes apply without a restart.
                         </Text>
@@ -328,7 +329,7 @@ export function Connectors() {
         <Tabs defaultValue="apps" keepMounted={false}>
             <Tabs.List mb="md"><Tabs.Tab value="apps">Connectors</Tabs.Tab><Tabs.Tab value="integrations">Integrations</Tabs.Tab></Tabs.List>
             <Tabs.Panel value="apps"><ConnectorList/></Tabs.Panel>
-            <Tabs.Panel value="integrations"><Stack maw={900}><Title order={3}>Integrations</Title><Integrations/></Stack></Tabs.Panel>
+            <Tabs.Panel value="integrations"><Stack style={{maxWidth: 900}}><Title order={3}>Integrations</Title><Integrations/></Stack></Tabs.Panel>
         </Tabs>
     )
 }

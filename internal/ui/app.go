@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -279,6 +280,7 @@ type TaskCard struct {
 	LastMsgAt   string   `json:"lastMsgAt"` // newest comment (human or agent); "" when none
 	LastMsgBy   string   `json:"lastMsgBy"` // its author: human, agent or system
 	OpenPR      bool     `json:"openPR"`    // any repo has an OPEN PR (shows the board's "check reviews" button)
+	PRURLs      []string `json:"prUrls"`    // every repo's PR url, for search by PR number
 }
 
 // TaskDetail is the task page payload; Runs are oldest first (newest last).
@@ -341,7 +343,7 @@ func (a *App) ListTasks() ([]TaskCard, error) {
 		keys[t.ID] = t.Key
 	}
 	for _, t := range tasks {
-		c := TaskCard{Key: t.Key, Title: t.Title, Status: string(t.Status), Priority: t.Priority, Repos: []string{}, Labels: t.Labels, UpdatedAt: t.UpdatedAt}
+		c := TaskCard{Key: t.Key, Title: t.Title, Status: string(t.Status), Priority: t.Priority, Repos: []string{}, Labels: t.Labels, UpdatedAt: t.UpdatedAt, PRURLs: []string{}}
 		if t.Runner != nil {
 			c.Runner = *t.Runner
 		}
@@ -351,6 +353,9 @@ func (a *App) ListTasks() ([]TaskCard, error) {
 		for _, r := range t.Repos {
 			c.Repos = append(c.Repos, r.RepoName)
 			c.OpenPR = c.OpenPR || (r.PRState != nil && *r.PRState == "OPEN")
+			if r.PRURL != nil && *r.PRURL != "" {
+				c.PRURLs = append(c.PRURLs, *r.PRURL)
+			}
 		}
 		if r, ok := runs[t.ID]; ok {
 			c.CtxPeak = r.CtxPeak
@@ -392,6 +397,20 @@ func (a *App) GetTask(key string) (TaskDetail, error) {
 	}
 	by := creator(t, rel.Parent, store.GetSetting(a.svc.DB, "user_name"))
 	return TaskDetail{Task: t, Comments: cs, Runs: rs, Relations: rel, Creator: by}, nil
+}
+
+// Decisions lists a task's decisions.
+func (a *App) Decisions(key string) ([]store.Decision, error) { return a.svc.Decisions(key) }
+
+// AddDecision records a human decision on a task.
+func (a *App) AddDecision(key, body string) error { return a.svc.AddDecision(key, body) }
+
+// RemoveDecision strikes a decision.
+func (a *App) RemoveDecision(key string, id int64) error { return a.svc.RemoveDecision(key, id) }
+
+// DisputeDecision marks a decision disputed with a reason; an empty reason unmarks it.
+func (a *App) DisputeDecision(key string, id int64, reason string) error {
+	return a.svc.DisputeDecision(key, id, reason)
 }
 
 // Link records "from <kind> to" (blocks, relates).
@@ -495,6 +514,91 @@ func (a *App) SendQueuedNow(key string) error {
 		err = fmt.Errorf("the agent already received this message")
 	}
 	return err
+}
+
+// QueueStatus feeds the queued-message badge and its popover.
+type QueueStatus struct {
+	DebounceSecs int         `json:"debounce_secs"`
+	LastTickAt   string      `json:"last_tick_at"` // dispatcher heartbeat (RFC3339); the next tick is this + tick_secs
+	TickSecs     int         `json:"tick_secs"`
+	Stale        bool        `json:"stale"` // no tick for over 3 intervals: the dispatcher is not running
+	Items        []QueueItem `json:"items"`
+}
+
+// QueueItem is one line of the queue popover: a task with a live run, or one holding unsent human messages.
+type QueueItem struct {
+	Key     string `json:"key"`
+	Title   string `json:"title"`
+	Running bool   `json:"running"`
+	Held    string `json:"held"` // why a queued task cannot launch yet; "" when only the debounce is left
+	Pending string `json:"pending"` // created_at of the newest unsent human/system comment, the one launchTodo debounces on; "" when none
+}
+
+// QueueStatus mirrors the checks of dispatch.launchTodo (refactor idea: extract them there as one
+// func so the badge and the dispatcher cannot drift). The debounce itself is left to the UI, which
+// has the comment times; `held` covers the reasons the dispatcher skips a task past the debounce.
+func (a *App) QueueStatus() (QueueStatus, error) {
+	runs, err := store.ActiveRuns(a.svc.DB)
+	if err != nil {
+		return QueueStatus{}, err
+	}
+	max, err := strconv.Atoi(store.GetSetting(a.svc.DB, "max_parallel"))
+	if err != nil {
+		max, _ = strconv.Atoi(store.Defaults["max_parallel"])
+	}
+	debounce, err := strconv.Atoi(store.GetSetting(a.svc.DB, "comment_debounce_secs"))
+	if err != nil {
+		debounce, _ = strconv.Atoi(store.Defaults["comment_debounce_secs"])
+	}
+	out := QueueStatus{DebounceSecs: debounce, TickSecs: store.TickSecs(a.svc.DB), Items: []QueueItem{}}
+	if last, _, ok := store.Heartbeat(a.svc.DB); ok {
+		out.LastTickAt = last.UTC().Format(time.RFC3339Nano)
+	}
+	out.Stale = store.HeartbeatStale(a.svc.DB, time.Now())
+	pending := func(id int64) string {
+		cs, _ := store.UnconsumedComments(a.svc.DB, id)
+		if len(cs) == 0 {
+			return ""
+		}
+		return cs[len(cs)-1].CreatedAt
+	}
+	busy, auto := map[int64]bool{}, 0
+	for _, r := range runs {
+		busy[r.TaskID] = true
+		if r.Kind == "auto" {
+			auto++
+		}
+		t, err := store.GetTask(a.svc.DB, r.TaskID)
+		if err != nil {
+			return QueueStatus{}, err
+		}
+		out.Items = append(out.Items, QueueItem{Key: t.Key, Title: t.Title, Running: true, Pending: pending(t.ID)})
+	}
+	todo, err := store.ListTasks(a.svc.DB, store.StatusTodo)
+	if err != nil {
+		return QueueStatus{}, err
+	}
+	for _, t := range todo {
+		if busy[t.ID] {
+			continue // already listed as running; its pending messages wait for the next run
+		}
+		held := ""
+		if auto >= max {
+			held = fmt.Sprintf("waiting for a free slot (max_parallel %d)", max)
+		} else if blockers, err := store.OpenBlockers(a.svc.DB, t.ID); err != nil {
+			return QueueStatus{}, err
+		} else if len(blockers) > 0 {
+			held = "blocked by " + strings.Join(blockers, ", ")
+		} else if store.IsEpic(t) {
+			if wait, err := store.EpicHasActiveChildren(a.svc.DB, t); err != nil {
+				return QueueStatus{}, err
+			} else if wait {
+				held = "waiting for its sub-tasks"
+			}
+		}
+		out.Items = append(out.Items, QueueItem{Key: t.Key, Title: t.Title, Held: held, Pending: pending(t.ID)})
+	}
+	return out, nil
 }
 
 // Stop stops the task's running session and moves the task to needs_you.

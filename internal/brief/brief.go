@@ -13,7 +13,24 @@ import (
 	"github.com/JayaSuryaOolio/conveyor/internal/workspace"
 )
 
-const maxComments = 20
+// The brief is a template: fixed sections in a fixed order, each variable one size-capped, because it is
+// read on every run and the effective context is about 60k tokens (docs/research/brief-template.md).
+// Order: header (key, labels, epic, kind, skills), Repos, Decisions, Description, [Continues],
+// Acceptance criteria, [Other repos' context], Latest run, Recent runs, Human comments, Relations,
+// split help, Status block, Rules, Older history. Whatever a cap drops stays reachable through a named command.
+const (
+	maxBriefBytes    = 24000 // whole brief, about 6k tokens; the sum of the caps below plus fixed text
+	maxDecisionLine  = 240   // one decision or pitfall line
+	maxDecisionBytes = 4000  // Decisions: oldest dropped past this, with a count
+	maxDescription   = 6000  // Description, runes
+	maxParentDesc    = 2000  // a follow-up's parent description, runes
+	maxCriteria      = 1500  // Acceptance criteria, runes
+	maxRunLine       = 300   // Latest run state/next, one run summary
+	maxComments      = 20    // human comments carried
+	maxCommentLine   = 200   // first line of each
+	maxRelations     = 30    // relation lines
+	maxRelationLine  = 160
+)
 
 const statusBlock = `## Status block
 
@@ -29,7 +46,9 @@ next: what remains
 criteria:
 - [x] AC1 - evidence
 - [ ] AC2 - why not
-learning: only if this repo had a trap that cost you >10 min and is not in CLAUDE.md/SKILL.md/LEARNINGS.md. Name the file or command. Omit the line otherwise. (repeatable line)
+learning: only a repo-wide trap (not specific to one task or feature) that cost you >10 min and is not in CLAUDE.md/SKILL.md/LEARNINGS.md. Name the file or command. Feature-level facts go in that feature's SKILL.md or a code comment, not here. Omit the line otherwise. (repeatable line)
+decision: what you chose — why; record one whenever you pick between options or the human states one (repeatable line; omit when none)
+dispute: D<n> | one-line reason, when you think decision D<n> is a mistake; undispute: D<n> once resolved (repeatable lines)
 spawn: [todo] child task title | description with everything its agent needs (repeatable line; omit it entirely when there is nothing to spawn, never write a placeholder like "none"; [todo] is optional: the child starts once unblocked, else it waits in backlog)
 </conveyor>
 ` + "```" + `
@@ -53,7 +72,7 @@ If this task depends on another task's unmerged PR, record it with ` + "`conveyo
 New tasks start in backlog; pass ` + "`--todo`" + ` to let the dispatcher launch them.
 `
 
-const defaultRules = `- Work only inside the worktrees listed above. Every one of them is yours, not just the one the session starts in: change whichever the task needs, using absolute paths or ` + "`git -C <path>`" + `. For more than a small change in a repo other than the one the session starts in, hand it to a sub-task with ` + "`--repo <that repo>`" + ` instead: its session starts in that repo and loads its CLAUDE.md, skills, commands and agents, which this session does not fully see.
+const defaultRules = `- Work only inside the worktrees listed above. Every one of them is yours, not just the one the session starts in: change whichever the task needs, using absolute paths or ` + "`git -C <path>`" + `; never cd out of your worktree (use a subshell, (cd <dir> && cmd)). For more than a small change in a repo other than the one the session starts in, hand it to a sub-task with ` + "`--repo <that repo>`" + ` instead: its session starts in that repo and loads its CLAUDE.md, skills, commands and agents, which this session does not fully see.
 - Open at most one PR per repo.
 - Never push to the default branch.
 - The repo's CLAUDE.md, skills, commands and agents are the authority on how to work in it (build, test, commit, PR, changesets). Use them over your own defaults and over generic user-level skills; where they disagree with this brief, follow the repo, except for the worktree, PR and status block rules here.
@@ -85,7 +104,7 @@ func rulesForTask(db *sql.DB, task store.Task, extra bool) string {
 	if authorityRunner(db, task) == "agy" {
 		doc = "AGENTS.md"
 	}
-	r := fmt.Sprintf(`- Work only inside the worktrees listed above. Every one of them is yours, not just the one the session starts in: change whichever the task needs, using absolute paths or `+"`git -C <path>`"+`. For more than a small change in a repo other than the one the session starts in, hand it to a sub-task with `+"`--repo <that repo>`"+` instead: its session starts in that repo and loads its %s, skills, commands and agents, which this session does not fully see.
+	r := fmt.Sprintf(`- Work only inside the worktrees listed above. Every one of them is yours, not just the one the session starts in: change whichever the task needs, using absolute paths or `+"`git -C <path>`"+`; never cd out of your worktree (use a subshell, (cd <dir> && cmd)). For more than a small change in a repo other than the one the session starts in, hand it to a sub-task with `+"`--repo <that repo>`"+` instead: its session starts in that repo and loads its %s, skills, commands and agents, which this session does not fully see.
 - Open at most one PR per repo.
 - Never push to the default branch.
 - The repo's %s, skills, commands and agents are the authority on how to work in it (build, test, commit, PR, changesets). Use them over your own defaults and over generic user-level skills; where they disagree with this brief, follow the repo, except for the worktree, PR and status block rules here.
@@ -97,6 +116,24 @@ func rulesForTask(db *sql.DB, task store.Task, extra bool) string {
 		r += x + "\n"
 	}
 	return r
+}
+
+// approachRule is added to a task's first-run brief unless it is small or states its approach.
+const approachRule = "- First run: before changing any code, post an Approach and end needs_you (omit the status block). Keep it short: files and layer, existing functions and types you will reuse (with paths), new names, open decisions. Change nothing until the human acks; then record the approach as `decision:` lines and build it.\n"
+
+// needsApproach: not labelled small, and the description has no line starting "Approach".
+func needsApproach(task store.Task) bool {
+	for _, l := range task.Labels {
+		if l == "small" {
+			return false
+		}
+	}
+	for _, l := range strings.Split(task.Description, "\n") {
+		if strings.HasPrefix(strings.ToLower(strings.TrimLeft(l, "#* ")), "approach") {
+			return false
+		}
+	}
+	return true
 }
 
 // Protocol is the status-block protocol and the built-in rules (extra rules excluded), for display.
@@ -189,9 +226,15 @@ func Build(db *sql.DB, task store.Task) (string, error) {
 		}
 		fmt.Fprintf(&b, "- %s: %s (branch `%s`, PR: %s)\n", r.RepoName, deref(r.WorktreePath), r.Branch, pr)
 	}
+	if err := decisions(&b, db, task); err != nil {
+		return "", err
+	}
 	desc := strings.TrimSpace(task.Description)
 	if desc == "" {
 		desc = "(none)"
+	}
+	if c := clip(desc, maxDescription); c != desc {
+		desc = c + fmt.Sprintf("\n\n(clipped; full text: `conveyor task show %s`)", task.Key)
 	}
 	fmt.Fprintf(&b, "\n## Description\n\n%s\n", desc)
 	if task.Source == "followup" && task.ParentID != nil {
@@ -199,7 +242,7 @@ func Build(db *sql.DB, task store.Task) (string, error) {
 			return "", err
 		}
 	}
-	fmt.Fprintf(&b, "\n## Acceptance criteria\n\n%s\n", criteria(runs, "see description"))
+	fmt.Fprintf(&b, "\n## Acceptance criteria\n\n%s\n", clip(criteria(runs, "see description"), maxCriteria))
 	runnerTitle, doc := "Claude Code", "CLAUDE.md"
 	if authorityRunner(db, task) == "agy" {
 		runnerTitle, doc = "Antigravity", "AGENTS.md"
@@ -212,22 +255,70 @@ func Build(db *sql.DB, task store.Task) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	fmt.Fprintf(&b, "\n## Relations\n\n")
+	var rels []string
 	if rel.Parent != nil {
-		fmt.Fprintf(&b, "- parent: %s %s (%s)\n", rel.Parent.Key, rel.Parent.Title, rel.Parent.Status)
+		rels = append(rels, fmt.Sprintf("- parent: %s %s (%s)", rel.Parent.Key, rel.Parent.Title, rel.Parent.Status))
 	}
 	for _, c := range rel.Children {
-		fmt.Fprintf(&b, "- sub-task: %s %s (%s)\n", c.Key, c.Title, c.Status)
+		rels = append(rels, fmt.Sprintf("- sub-task: %s %s (%s)", c.Key, c.Title, c.Status))
 	}
 	for _, l := range rel.Links {
-		fmt.Fprintf(&b, "- %s: %s %s (%s)\n", l.Label, l.Task.Key, l.Task.Title, l.Task.Status)
+		rels = append(rels, fmt.Sprintf("- %s: %s %s (%s)", l.Label, l.Task.Key, l.Task.Title, l.Task.Status))
+	}
+	for i := range rels {
+		rels[i] = clip(rels[i], maxRelationLine)
+	}
+	if n := len(rels) - maxRelations; n > 0 {
+		rels = append(rels[:maxRelations], fmt.Sprintf("- (%d more: `conveyor task graph %s`)", n, task.Key))
+	}
+	fmt.Fprintf(&b, "\n## Relations\n\n")
+	if len(rels) > 0 {
+		b.WriteString(strings.Join(rels, "\n") + "\n")
 	}
 	b.WriteString(relationsHelp)
 	if x := connectors.Injected(db, true, func(i connectors.ManifestInject) string { return i.Brief }); x != "" {
 		b.WriteString("\n" + x + "\n")
 	}
-	fmt.Fprintf(&b, "\n%s\n## Rules\n\n%s\n## Older history\n\nFull thread: `conveyor task show %s --thread --json`\n", statusBlock, rulesForTask(db, task, true), task.Key)
+	rl := rulesForTask(db, task, true)
+	if len(runs) == 0 && needsApproach(task) {
+		rl += approachRule
+	}
+	fmt.Fprintf(&b, "\n%s\n## Rules\n\n%s\n## Older history\n\nFull thread: `conveyor task show %s --thread --json`\n", statusBlock, rl, task.Key)
 	return b.String(), nil
+}
+
+func clip(s string, n int) string {
+	if r := []rune(s); len(r) > n {
+		return string(r[:n-1]) + "…"
+	}
+	return s
+}
+
+// decisions writes the Decisions section: durable choices, disputed ones followed by a pitfall line.
+func decisions(b *strings.Builder, db *sql.DB, task store.Task) error {
+	ds, err := store.ListDecisions(db, task.ID)
+	if err != nil || len(ds) == 0 {
+		return err
+	}
+	var blocks []string
+	for _, d := range ds {
+		s := clip(fmt.Sprintf("- D%d (%s): %s", d.ID, d.Author, d.Body), maxDecisionLine) + "\n"
+		if d.DisputedBy != "" {
+			s += clip(fmt.Sprintf("  pitfall (%s): %s", d.DisputedBy, d.Dispute), maxDecisionLine) + "\n"
+		}
+		blocks = append(blocks, s)
+	}
+	size, from := 0, len(blocks)
+	for from > 0 && size+len(blocks[from-1]) <= maxDecisionBytes {
+		from--
+		size += len(blocks[from])
+	}
+	b.WriteString("\n## Decisions\n\n")
+	if from > 0 {
+		fmt.Fprintf(b, "(%d older decisions omitted: `conveyor task decision %s list`)\n", from, task.Key)
+	}
+	b.WriteString(strings.Join(blocks[from:], ""))
+	return nil
 }
 
 // kindRules is the one-line rule per epic_kind (docs/epic-builder.md §2.1).
@@ -288,12 +379,12 @@ func criteria(runs []store.Run, def string) string {
 func history(b *strings.Builder, h string, runs []store.Run, comments []store.Comment) {
 	if len(runs) > 0 {
 		last := runs[len(runs)-1]
-		fmt.Fprintf(b, "\n%s Latest run\n\nState: %s\nNext: %s\n", h, oneLine(deref(last.State)), oneLine(deref(last.Next)))
+		fmt.Fprintf(b, "\n%s Latest run\n\nState: %s\nNext: %s\n", h, clip(oneLine(deref(last.State)), maxRunLine), clip(oneLine(deref(last.Next)), maxRunLine))
 	}
 	var sums []string
 	for _, r := range runs {
 		if s := oneLine(deref(r.Summary)); s != "" {
-			sums = append(sums, fmt.Sprintf("- run %d: %s", r.ID, s))
+			sums = append(sums, clip(fmt.Sprintf("- run %d: %s", r.ID, s), maxRunLine))
 		}
 	}
 	if len(sums) > 3 {
@@ -305,7 +396,7 @@ func history(b *strings.Builder, h string, runs []store.Run, comments []store.Co
 	var human []string
 	for _, c := range comments {
 		if c.Author == store.AuthorHuman {
-			human = append(human, "- "+firstLine(c.Body))
+			human = append(human, clip("- "+firstLine(c.Body), maxCommentLine))
 		}
 	}
 	if len(human) > maxComments {
@@ -339,7 +430,7 @@ func parentContext(b *strings.Builder, db *sql.DB, parentID int64) error {
 	}
 	fmt.Fprintf(b, "\n## Continues %s: %s\n\nThis task is a follow-up of %s, whose PR is merged (%s). Start from the default branch; the parent's work is already in it. Its context:\n",
 		p.Key, p.Title, p.Key, strings.Join(prs, ", "))
-	fmt.Fprintf(b, "\n### Its description\n\n%s\n\n### Its acceptance criteria\n\n%s\n", strings.TrimSpace(p.Description), criteria(runs, "(none recorded)"))
+	fmt.Fprintf(b, "\n### Its description\n\n%s\n\n### Its acceptance criteria\n\n%s\n", clip(strings.TrimSpace(p.Description), maxParentDesc), clip(criteria(runs, "(none recorded)"), maxCriteria))
 	history(b, "###", runs, comments)
 	return nil
 }

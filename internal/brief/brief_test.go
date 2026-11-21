@@ -2,6 +2,7 @@ package brief
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -118,7 +119,7 @@ func TestSettingsShapeBrief(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	tk := store.Task{Key: "CV-3", Title: "T"}
+	tk := store.Task{Key: "CV-3", Title: "T", Labels: []string{"small"}}
 	store.SetSetting(db, "brief_extra_rules", "- Be kind.")
 	store.SetSetting(db, "pr_comment_prefix", "bot: ")
 	got, err := Build(db, tk)
@@ -129,13 +130,14 @@ func TestSettingsShapeBrief(t *testing.T) {
 		t.Fatal("Build must not write")
 	}
 	store.SetSetting(db, "pr_comment_prefix", "")
+	tk.Labels = nil
 	if got, _ = Build(db, tk); strings.Contains(got, "Start every comment") {
 		t.Fatal("empty prefix should drop the rule")
 	}
 	if strings.Contains(got, "Labels:") {
 		t.Fatal("no labels, no Labels line")
 	}
-	tk.Labels = []string{"epic_kind:grilling", "skill:grill-me"}
+	tk.Labels = []string{"small", "epic_kind:grilling", "skill:grill-me"}
 	if got, _ = Build(db, tk); !strings.Contains(got, "Kind grilling: ") || !strings.Contains(got, "open no PR") ||
 		!strings.Contains(got, "Load these skills before starting: grill-me.") || strings.Contains(got, "Load the epic skill") {
 		t.Fatalf("kind/skills lines:\n%s", got)
@@ -167,5 +169,161 @@ func TestAgyRulesAndContext(t *testing.T) {
 	}
 	if !strings.Contains(got, "The repo's AGENTS.md, skills, commands and agents are the authority") {
 		t.Errorf("brief should mention AGENTS.md for agy runner:\n%s", got)
+	}
+}
+
+func TestDecisionsSection(t *testing.T) {
+	db, err := store.Open(filepath.Join(t.TempDir(), "c.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	r, _ := store.AddRepo(db, store.Repo{Name: "api", Path: "/src/api", DefaultBranch: "main"})
+	tk, err := store.CreateTask(db, store.Task{Title: "T", Description: "desc", Status: store.StatusTodo}, []store.TaskRepo{{RepoID: r.ID, IsPrimary: true, Branch: "b"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, _ := Build(db, tk)
+	if strings.Contains(got, "## Decisions") {
+		t.Fatal("no decisions, no section")
+	}
+	a, _ := store.AddDecision(db, tk.ID, store.AuthorAgent, "use sqlite — already a dependency")
+	store.AddDecision(db, tk.ID, store.AuthorHuman, "no new table per kind — keep it small")
+	store.SetDispute(db, tk.ID, a, store.AuthorHuman, "we use a flat file here")
+	got, _ = Build(db, tk)
+	want := "## Decisions\n\n- D1 (agent): use sqlite — already a dependency\n  pitfall (human): we use a flat file here\n- D2 (human): no new table per kind — keep it small\n"
+	if !strings.Contains(got, want) || strings.Index(got, "## Decisions") > strings.Index(got, "## Description") {
+		t.Fatalf("decisions block:\n%s", got)
+	}
+	store.ClearDispute(db, tk.ID, a)
+	if got, _ = Build(db, tk); strings.Contains(got, "pitfall") {
+		t.Fatal("unmarked dispute still rendered")
+	}
+}
+
+func TestDecisionsCap(t *testing.T) {
+	db, err := store.Open(filepath.Join(t.TempDir(), "c.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	r, _ := store.AddRepo(db, store.Repo{Name: "api", Path: "/src/api", DefaultBranch: "main"})
+	tk, err := store.CreateTask(db, store.Task{Title: "T", Status: store.StatusTodo}, []store.TaskRepo{{RepoID: r.ID, IsPrimary: true, Branch: "b"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	long := strings.Repeat("x", 2000)
+	id, _ := store.AddDecision(db, tk.ID, store.AuthorAgent, "long "+long)
+	store.SetDispute(db, tk.ID, id, store.AuthorHuman, long)
+	for i := 0; i < 200; i++ {
+		store.AddDecision(db, tk.ID, store.AuthorAgent, fmt.Sprintf("choice %d — because %s", i, strings.Repeat("y", 100)))
+	}
+	got, _ := Build(db, tk)
+	start := strings.Index(got, "## Decisions")
+	end := strings.Index(got, "## Description")
+	sec := got[start:end]
+	if len(sec) > maxDecisionBytes+300 {
+		t.Fatalf("section %d bytes, cap %d", len(sec), maxDecisionBytes)
+	}
+	for _, l := range strings.Split(sec, "\n") {
+		if len([]rune(l)) > maxDecisionLine+40 {
+			t.Fatalf("line not capped (%d): %.80s", len(l), l)
+		}
+	}
+	// The newest decision survives; the oldest are summarised, not silently dropped.
+	if !strings.Contains(sec, "choice 199") || !strings.Contains(sec, "older decisions omitted") || strings.Contains(sec, "choice 0 ") {
+		t.Fatalf("cap kept the wrong ones:\n%s", sec)
+	}
+}
+
+func TestStatusBlockHelpMentionsDecisions(t *testing.T) {
+	if !strings.Contains(statusBlock, "decision: ") || !strings.Contains(statusBlock, "dispute: ") {
+		t.Fatal("status block help must teach decision/dispute lines")
+	}
+}
+
+func TestApproachRule(t *testing.T) {
+	db, err := store.Open(filepath.Join(t.TempDir(), "c.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	r, _ := store.AddRepo(db, store.Repo{Name: "api", Path: "/src/api", DefaultBranch: "main"})
+	mk := func(desc string, labels ...string) store.Task {
+		tk, err := store.CreateTask(db, store.Task{Title: "T", Description: desc, Status: store.StatusTodo}, []store.TaskRepo{{RepoID: r.ID, IsPrimary: true, Branch: "b" + desc + strings.Join(labels, "")}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		tk.Labels = labels
+		return tk
+	}
+	has := func(tk store.Task) bool {
+		got, _ := Build(db, tk)
+		return strings.Contains(got, "post an Approach")
+	}
+	if !has(mk("add a thing")) {
+		t.Error("first run of a plain task needs the Approach rule")
+	}
+	if has(mk("add a thing", "small")) {
+		t.Error("small tasks skip the Approach")
+	}
+	if has(mk("add a thing\n\nApproach: edit x.go, reuse y()")) {
+		t.Error("a stated approach skips the step")
+	}
+	tk := mk("later run")
+	store.CreateRun(db, store.Run{TaskID: tk.ID})
+	if has(tk) {
+		t.Error("only the first run posts an Approach")
+	}
+}
+
+// TestTemplateCaps checks the template (AC7): sections in a fixed order, each variable one capped,
+// so a task with huge fields still renders a brief well under the budget.
+func TestTemplateCaps(t *testing.T) {
+	db, err := store.Open(filepath.Join(t.TempDir(), "c.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	r, _ := store.AddRepo(db, store.Repo{Name: "api", Path: "/src/api", DefaultBranch: "main"})
+	huge := strings.Repeat("z", 50000)
+	tk, err := store.CreateTask(db, store.Task{Title: "T", Description: "start " + huge, Status: store.StatusTodo}, []store.TaskRepo{{RepoID: r.ID, IsPrimary: true, Branch: "b"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	store.AddDecision(db, tk.ID, store.AuthorAgent, "keep it")
+	for i := 0; i < 5; i++ {
+		run, _ := store.CreateRun(db, store.Run{TaskID: tk.ID, Kind: "auto", Mode: "fresh", Status: "launching"})
+		run.Summary, run.State, run.Next, run.Criteria = &huge, &huge, &huge, &huge
+		store.UpdateRun(db, run)
+	}
+	for i := 0; i < 40; i++ {
+		store.AddComment(db, store.Comment{TaskID: tk.ID, Author: store.AuthorHuman, Body: huge})
+	}
+	for i := 0; i < 80; i++ {
+		store.CreateTask(db, store.Task{Title: huge[:300], Status: store.StatusTodo, ParentID: &tk.ID}, []store.TaskRepo{{RepoID: r.ID, IsPrimary: true, Branch: fmt.Sprint("c", i)}})
+	}
+	tk, _ = store.GetTask(db, tk.ID)
+	got, err := Build(db, tk)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("worst-case brief %d bytes", len(got))
+	if len(got) > maxBriefBytes {
+		t.Fatalf("brief %d bytes, budget %d", len(got), maxBriefBytes)
+	}
+	if !strings.Contains(got, "start zzz") || !strings.Contains(got, "conveyor task show "+tk.Key) {
+		t.Fatal("clipped description must keep its start and point at the full text")
+	}
+	if !strings.Contains(got, "more: `conveyor task graph "+tk.Key) {
+		t.Fatal("clipped relations must point at the graph")
+	}
+	at := -1
+	for _, h := range []string{"## Repos", "## Decisions", "## Description", "## Acceptance criteria", "## Latest run", "## Recent runs", "## Human comments", "## Relations", "## Status block", "## Rules", "## Older history"} {
+		i := strings.Index(got, "\n"+h+"\n")
+		if i <= at {
+			t.Fatalf("%s missing or out of order", h)
+		}
+		at = i
 	}
 }

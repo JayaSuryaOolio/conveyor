@@ -1,6 +1,7 @@
 import {useEffect, useState} from 'react'
-import {ActionIcon, Button, Chip, Code, CopyButton, Group, Modal, MultiSelect, Popover, SegmentedControl, Select, Stack, Switch, Table, Text, TextInput, Textarea, Title, Tooltip} from '@mantine/core'
-import {IconCheck, IconCopy, IconCalendarTime, IconPencil, IconPlus, IconTrash} from '@tabler/icons-react'
+import {ActionIcon, Chip, Code, CopyButton, MultiSelect, Popover, SegmentedControl, Select, Switch, Table, TextInput, Textarea, Title, Tooltip, UnstyledButton} from '@mantine/core'
+import {Button, Group, Modal, Stack, Text} from './ui'
+import {IconCheck, IconClock, IconCopy, IconPencil, IconPlus, IconTrash} from '@tabler/icons-react'
 import {AddAutomation, Confirm, DeleteAutomation, DescribeSchedule, ListAutomations, ListRepos, RunAutomation, SetAutomationEnabled, UpdateAutomation} from '../wailsjs/go/ui/App'
 import {store, ui} from '../wailsjs/go/models'
 import {Time, errMsg} from './components'
@@ -71,7 +72,7 @@ function AutomationForm({initial, edit, onClose}: {initial: Form; edit: boolean;
                 {PRESETS.map(([l, x]) => <Chip key={x} size="xs" checked={f.schedule === x} onChange={() => set({schedule: x})}>{l}</Chip>)}
             </Group>
             {info?.valid && (
-                <Text size="sm" c="dimmed">{info.description}. Next: {info.next.join(' · ')}</Text>
+                <Text size="sm" tone="muted">{info.description}. Next: {info.next.join(' · ')}</Text>
             )}
             <Textarea label="Precheck (optional)" description="Shell command. Exit 0 runs the action, non-zero skips it. Its stdout replaces {output} in the action text."
                       styles={{input: {fontFamily: 'monospace'}}} autosize minRows={1} maxRows={6} value={f.precheck} onChange={e => set({precheck: e.target.value})}/>
@@ -92,34 +93,71 @@ function AutomationForm({initial, edit, onClose}: {initial: Form; edit: boolean;
             </>}
             {f.kind === 'cli' && <TextInput label="Conveyor args" description="Run as `conveyor ARGS`, e.g. task new --repo a" ff="monospace" value={f.args} onChange={e => set({args: e.target.value})}/>}
             <div>
-                <Group justify="space-between"><Text size="sm" fw={500}>Equivalent CLI command</Text>
+                <Group justify="between"><Text size="sm" weight={500}>Equivalent CLI command</Text>
                     <CopyButton value={cmd}>{({copied, copy}) => (
                         <Tooltip label={copied ? 'Copied' : 'Copy'}><ActionIcon variant="subtle" color={copied ? 'teal' : 'gray'} onClick={copy} aria-label="Copy command">{copied ? <IconCheck size={16}/> : <IconCopy size={16}/>}</ActionIcon></Tooltip>
                     )}</CopyButton>
                 </Group>
                 <Code block style={{whiteSpace: 'pre-wrap', wordBreak: 'break-all'}}>{cmd}</Code>
             </div>
-            <Group justify="flex-end">
-                <Button variant="default" onClick={() => onClose(false)}>Cancel</Button>
+            <Group justify="end">
+                <Button variant="secondary" onClick={() => onClose(false)}>Cancel</Button>
                 <Button onClick={save} disabled={!ready}>{edit ? 'Save' : 'Create'}</Button>
             </Group>
         </Stack>
     )
 }
 
-function NextRuns({schedule}: {schedule: string}) {
+type PastRun = {at: string; result: string}
+const PAST_CAP = 10
+
+/** Completed runs the server reports are remembered per automation in localStorage (it keeps only the latest). */
+function usePastRuns(name: string, at?: string | null, result?: string | null): PastRun[] {
+    const key = 'automation-runs:' + name
+    const read = (): PastRun[] => { try { return JSON.parse(localStorage.getItem(key) ?? '[]') } catch { return [] } }
+    const [runs, setRuns] = useState(read)
+    useEffect(() => {
+        if (!at) return
+        const cur = read()
+        if (cur.some(r => r.at === at)) return
+        const next = [{at, result: result ?? ''}, ...cur].slice(0, PAST_CAP)
+        try { localStorage.setItem(key, JSON.stringify(next)) } catch { /* private mode */ }
+        setRuns(next)
+    }, [key, at, result])
+    return runs
+}
+
+function NextRuns({schedule, name, lastRunAt, lastResult}: {schedule: string; name: string; lastRunAt?: string | null; lastResult?: string | null}) {
     const [info, setInfo] = useState<ui.ScheduleInfo>()
+    const past = usePastRuns(name, lastRunAt, lastResult)
     return (
-        <Popover width={240} withArrow position="bottom">
+        <Popover width={300} withArrow position="bottom" onOpen={() => DescribeSchedule(schedule).then(setInfo, errMsg)}>
             <Popover.Target>
-                <ActionIcon variant="subtle" color="gray" aria-label="Next runs" onClick={() => DescribeSchedule(schedule).then(setInfo, errMsg)}><IconCalendarTime size={16}/></ActionIcon>
+                {/* Native button: click, Enter and Space all toggle; ClickableCode's onClick would be overridden by the one Popover.Target injects. */}
+                <UnstyledButton aria-label={`Next runs of ${schedule}`}><Code style={{cursor: 'pointer'}}>{schedule}</Code></UnstyledButton>
             </Popover.Target>
             <Popover.Dropdown>
-                <Text size="xs" c="dimmed" mb={4}>Next runs</Text>
-                {info?.valid ? info.next.map(t => <Text key={t} size="sm">{t}</Text>) : <Text size="sm" c="red">{info?.error}</Text>}
+                {past.length > 0 && <>
+                    <Text size="xs" tone="muted" style={{marginBottom: 4}}>Completed runs</Text>
+                    {past.map(r => <Group key={r.at} gap={6} wrap={false}><Time iso={r.at}/><Text size="xs" tone="muted" clamp={1}>{r.result}</Text></Group>)}
+                    <Text size="xs" tone="muted" style={{marginTop: 10, marginBottom: 4}}>Next runs</Text>
+                </>}
+                {past.length === 0 && <Text size="xs" tone="muted" style={{marginBottom: 4}}>Next runs</Text>}
+                {info?.valid ? info.next.map(t => <Text key={t} size="sm">{t}</Text>) : <Text size="sm" tone="danger">{info?.error}</Text>}
             </Popover.Dropdown>
         </Popover>
     )
+}
+
+function RunButton({name, onDone}: {name: string; onDone: () => void}) {
+    const [state, setState] = useState<'idle' | 'running' | 'ran'>('idle')
+    const run = () => {
+        setState('running')
+        RunAutomation(name)
+            .then(() => { setState('ran'); setTimeout(() => setState('idle'), 2500) }, e => { errMsg(e); setState('idle') })
+            .finally(onDone)
+    }
+    return <Button size="xs" variant="secondary" loading={state === 'running'} tone={state === 'ran' ? 'success' : undefined} onClick={run}>{state === 'ran' ? 'Ran ✓' : 'Run now'}</Button>
 }
 
 export function Automations() {
@@ -127,12 +165,12 @@ export function Automations() {
     const [form, setForm] = useState<{initial: Form; edit: boolean}>()
     return (
         <Stack>
-            <Group justify="space-between">
+            <Group justify="between">
                 <Title order={3}>Automations</Title>
-                <Button leftSection={<IconPlus size={16}/>} onClick={() => setForm({initial: EMPTY, edit: false})}>New automation</Button>
+                <Button icon={<IconPlus size={16}/>} onClick={() => setForm({initial: EMPTY, edit: false})}>New automation</Button>
             </Group>
-            {error && <Text c="red">{error}</Text>}
-            {data && data.length === 0 && <Text c="dimmed">None yet. Create one, or use <Code>conveyor automation add --template pr-sweep</Code>.</Text>}
+            {error && <Text tone="danger">{error}</Text>}
+            {data && data.length === 0 && <Text tone="muted">None yet. Create one, or use <Code>conveyor automation add --template pr-sweep</Code>.</Text>}
             {data && data.length > 0 && (
                 <Table.ScrollContainer minWidth={700}>
                     <Table verticalSpacing="xs">
@@ -142,13 +180,14 @@ export function Automations() {
                                 <Table.Tr key={a.name}>
                                     <Table.Td><Switch checked={a.enabled} onChange={e => SetAutomationEnabled(a.name, e.currentTarget.checked).then(reload, errMsg)}/></Table.Td>
                                     <Table.Td fw={600}>{a.name}</Table.Td>
-                                    <Table.Td><Group gap={4} wrap="nowrap"><Code>{a.schedule}</Code><NextRuns schedule={a.schedule}/></Group></Table.Td>
+                                    {/* Refactor: fold this cell and NextRuns into one ScheduleCell. */}
+                                    <Table.Td>{a.schedule ? <NextRuns schedule={a.schedule} name={a.name} lastRunAt={a.last_run_at} lastResult={a.last_result}/> : a.run_at ? <Group gap={4} wrap={false}><IconClock size={14} color="var(--mantine-color-dimmed)" aria-label="Runs once"/><Time iso={a.run_at}/></Group> : null}</Table.Td>
                                     <Table.Td>{a.action_kind}</Table.Td>
                                     <Table.Td>{a.last_run_at ? <Time iso={a.last_run_at}/> : ''}</Table.Td>
-                                    <Table.Td><Text size="sm" lineClamp={1}>{a.last_result ?? ''}</Text></Table.Td>
+                                    <Table.Td><Text size="sm" clamp={1}>{a.last_result ?? ''}</Text></Table.Td>
                                     <Table.Td>
-                                        <Group gap="xs" wrap="nowrap">
-                                            <Button size="xs" variant="default" onClick={() => RunAutomation(a.name).then(reload, e => { errMsg(e); reload() })}>Run now</Button>
+                                        <Group gap="xs" wrap={false}>
+                                            <RunButton name={a.name} onDone={reload}/>
                                             <ActionIcon variant="subtle" color="gray" aria-label="Edit" onClick={() => setForm({initial: toForm(a), edit: true})}><IconPencil size={16}/></ActionIcon>
                                             <ActionIcon variant="subtle" color="red" aria-label="Delete" onClick={() => Confirm(`Delete automation ${a.name}?`).then(ok => { if (ok) return DeleteAutomation(a.name).then(reload) }).catch(errMsg)}><IconTrash size={16}/></ActionIcon>
                                         </Group>
