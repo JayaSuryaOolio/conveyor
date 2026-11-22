@@ -12,11 +12,13 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/JayaSuryaOolio/conveyor/internal/core"
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
+	"github.com/JayaSuryaOolio/conveyor/internal/workspace"
 	"github.com/robfig/cron/v3"
 )
 
@@ -197,11 +199,7 @@ func (act action) run(ctx context.Context, svc *core.Service, name, kind, out, k
 		}
 		return res, nil
 	case "prune":
-		t, l, err := store.PruneClosed(svc.DB, 7*24*time.Hour, time.Now())
-		if err != nil {
-			return "", err
-		}
-		return fmt.Sprintf("pruned %d tasks, %d slack links", t, l), nil
+		return pruneClosed(svc, 7*24*time.Hour, time.Now())
 	case "comment":
 		if key == "" || act.Body == "" {
 			return "", errors.New("comment needs task_status or task_key, and body")
@@ -387,4 +385,35 @@ func seedBuiltins(svc *core.Service) error {
 		}
 	}
 	return store.SetSetting(svc.DB, "seeded_prune_closed", "1")
+}
+
+// pruneClosed removes the workspace of every done/cancelled task last updated before at-olderThan,
+// then deletes those task rows unless they carry the archived label. A dirty workspace is left
+// with its row, so a later run retries it once it is clean.
+func pruneClosed(svc *core.Service, olderThan time.Duration, at time.Time) (string, error) {
+	cutoff := at.Add(-olderThan).UTC().Format(time.RFC3339)
+	ts, err := store.ListTasks(svc.DB, store.StatusDone, store.StatusCancelled)
+	if err != nil {
+		return "", err
+	}
+	var del []int64
+	kept := 0
+	for _, t := range ts {
+		if t.UpdatedAt >= cutoff {
+			continue
+		}
+		if err := workspace.Remove(svc.DB, svc.Home, t, false); err != nil {
+			log.Printf("prune %s: keep workspace: %v", t.Key, err)
+			kept++
+			continue
+		}
+		if !slices.Contains(t.Labels, store.LabelArchived) {
+			del = append(del, t.ID)
+		}
+	}
+	n, l, err := store.DeleteTasks(svc.DB, del, at)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("pruned %d tasks, %d slack links, %d dirty workspaces kept", n, l, kept), nil
 }

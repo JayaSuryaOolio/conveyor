@@ -413,7 +413,7 @@ func TestApprovedLabelQueuesMessage(t *testing.T) {
 
 	// add: one queued human message, task requeued; adding again does not duplicate it
 	for range 2 {
-		if err := s.AddLabel(tk.Key, "Approved"); err != nil {
+		if err := s.AddLabel(tk.Key, "approved"); err != nil {
 			t.Fatal(err)
 		}
 	}

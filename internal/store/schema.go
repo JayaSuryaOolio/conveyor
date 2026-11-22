@@ -233,6 +233,11 @@ func Migrate(db *sql.DB) error {
 	if _, err := db.Exec(schema); err != nil {
 		return fmt.Errorf("migrate: %w", err)
 	}
+	// Seed reserved labels; NOCASE matching also lower-cases an older custom spelling.
+	if _, err := db.Exec(`INSERT OR IGNORE INTO labels (name) VALUES ('approved'),('archived');
+UPDATE labels SET name=lower(name) WHERE name IN ('approved','archived')`); err != nil {
+		return fmt.Errorf("seed reserved labels: %w", err)
+	}
 	if _, err := db.Exec(`DELETE FROM task_links WHERE kind='duplicates'`); err != nil {
 		return fmt.Errorf("drop duplicates links: %w", err)
 	}
@@ -382,7 +387,7 @@ func migrateAddCommentSource(db *sql.DB) error {
 	return nil
 }
 
-// migrateAddTaskDeletedAt adds tasks.deleted_at (CV-206): PruneClosed soft-deletes so keys are never reused.
+// migrateAddTaskDeletedAt adds tasks.deleted_at (CV-206): DeleteTasks soft-deletes so keys are never reused.
 func migrateAddTaskDeletedAt(db *sql.DB) error {
 	var n int
 	if err := db.QueryRow(`SELECT count(*) FROM pragma_table_info('tasks') WHERE name='deleted_at'`).Scan(&n); err != nil {

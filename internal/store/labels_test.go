@@ -30,7 +30,23 @@ func TestLabels(t *testing.T) {
 	if got, _ := TaskLabels(db, a.ID); !slices.Equal(got, []string{"bug"}) {
 		t.Fatalf("after remove = %v", got)
 	}
-	if all, _ := ListLabels(db); !slices.Equal(all, []string{"bug", "ui"}) {
+	if all, _ := ListLabels(db); !slices.Equal(all, []string{"approved", "archived", "bug", "ui"}) {
 		t.Fatalf("all = %v", all)
+	}
+}
+
+func TestReservedLabels(t *testing.T) {
+	db := openTest(t)
+	a := mkTask(t, db, StatusBacklog)
+	for _, n := range []string{"Archived", "APPROVED", " Archived "} {
+		if err := AddLabel(db, a.ID, n); err == nil {
+			t.Errorf("%q accepted", n)
+		}
+	}
+	if err := AddLabel(db, a.ID, " archived "); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := TaskLabels(db, a.ID); !slices.Equal(got, []string{"archived"}) {
+		t.Fatalf("labels = %v", got)
 	}
 }
