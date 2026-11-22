@@ -87,7 +87,7 @@ type Relations struct {
 
 // reachKeys runs a recursive query that yields task ids and returns their keys in id order.
 func reachKeys(db *sql.DB, cte string, args ...any) ([]string, error) {
-	rows, err := db.Query(`WITH RECURSIVE r(id) AS (`+cte+`) SELECT t.key FROM r JOIN tasks t ON t.id=r.id ORDER BY t.id`, args...)
+	rows, err := db.Query(`WITH RECURSIVE r(id) AS (`+cte+`) SELECT t.key FROM r JOIN tasks t ON t.id=r.id WHERE t.deleted_at IS NULL ORDER BY t.id`, args...)
 	if err != nil {
 		return nil, fmt.Errorf("reach: %w", err)
 	}
@@ -250,7 +250,7 @@ func ListRelations(db *sql.DB, t Task) (Relations, error) {
 			rel.Parent = &ps[0]
 		}
 	}
-	if rel.Children, err = listRefs(db, `SELECT key, title, status FROM tasks WHERE parent_id=? ORDER BY id`, t.ID); err != nil {
+	if rel.Children, err = listRefs(db, `SELECT key, title, status FROM tasks WHERE parent_id=? AND deleted_at IS NULL ORDER BY id`, t.ID); err != nil {
 		return rel, fmt.Errorf("children: %w", err)
 	}
 	rows, err := db.Query(`SELECT l.kind, 1, t.key, t.title, t.status FROM task_links l JOIN tasks t ON t.id=l.to_id WHERE l.from_id=?

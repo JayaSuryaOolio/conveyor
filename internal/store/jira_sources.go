@@ -162,7 +162,7 @@ func SyncedProgress(db *sql.DB, epicID int64) (total, open int, err error) {
 	err = db.QueryRow(`WITH RECURSIVE d(id) AS (
  SELECT id FROM tasks WHERE parent_id=? UNION SELECT t.id FROM tasks t JOIN d ON t.parent_id=d.id)
 SELECT count(*), coalesce(sum(status NOT IN (?,?)),0) FROM tasks
-WHERE id IN (SELECT id FROM d) AND source='jira' AND external_key IS NOT NULL`, epicID, StatusDone, StatusCancelled).Scan(&total, &open)
+WHERE deleted_at IS NULL AND id IN (SELECT id FROM d) AND source='jira' AND external_key IS NOT NULL`, epicID, StatusDone, StatusCancelled).Scan(&total, &open)
 	return
 }
 

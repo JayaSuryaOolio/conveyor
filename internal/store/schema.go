@@ -272,6 +272,9 @@ func Migrate(db *sql.DB) error {
 	if err := migrateAddCommentEdits(db); err != nil {
 		return err
 	}
+	if err := migrateAddTaskDeletedAt(db); err != nil {
+		return err
+	}
 	if err := migrateAddRunWaste(db); err != nil {
 		return err
 	}
@@ -371,6 +374,20 @@ func migrateAddCommentSource(db *sql.DB) error {
 	if n == 0 {
 		if _, err := db.Exec(`ALTER TABLE comments ADD COLUMN source TEXT NOT NULL DEFAULT ''`); err != nil {
 			return fmt.Errorf("add comments.source: %w", err)
+		}
+	}
+	return nil
+}
+
+// migrateAddTaskDeletedAt adds tasks.deleted_at (CV-206): PruneClosed soft-deletes so keys are never reused.
+func migrateAddTaskDeletedAt(db *sql.DB) error {
+	var n int
+	if err := db.QueryRow(`SELECT count(*) FROM pragma_table_info('tasks') WHERE name='deleted_at'`).Scan(&n); err != nil {
+		return fmt.Errorf("check tasks.deleted_at: %w", err)
+	}
+	if n == 0 {
+		if _, err := db.Exec(`ALTER TABLE tasks ADD COLUMN deleted_at TEXT`); err != nil {
+			return fmt.Errorf("add tasks.deleted_at: %w", err)
 		}
 	}
 	return nil
