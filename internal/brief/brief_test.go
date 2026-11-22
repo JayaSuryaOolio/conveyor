@@ -259,7 +259,7 @@ func TestApproachRule(t *testing.T) {
 	}
 	has := func(tk store.Task) bool {
 		got, _ := Build(db, tk)
-		return strings.Contains(got, "post an Approach")
+		return strings.Contains(got, "reply with an Approach")
 	}
 	if !has(mk("add a thing")) {
 		t.Error("first run of a plain task needs the Approach rule")

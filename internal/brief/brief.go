@@ -35,6 +35,7 @@ const (
 const statusBlock = `## Status block
 
 End every final reply with this block. Omit it to ask the human a question instead.
+Your final reply, with or without the block, is posted to the thread as your comment. ` + "`conveyor task comment`" + ` is only for commenting outside a reply, such as when an automation or background task woke you.
 Blocked on something only the human can do (install a tool, log in, make a decision)? Omit the block and ask: status: failed triggers an automatic retry.
 
 ` + "```" + `
@@ -119,7 +120,7 @@ func rulesForTask(db *sql.DB, task store.Task, extra bool) string {
 }
 
 // approachRule is added to a task's first-run brief unless its approach was discussed or is stated.
-const approachRule = "- First run: before changing any code, post an Approach and end needs_you (omit the status block). Lead with a diagram, the human reads pictures faster than text: write a self-contained SVG to `approach.svg` next to BRIEF.md (inline styles, its own background, no scripts or external refs) and start the Approach with `![approach](<its absolute path>)`. Draw the change, not a generic box chart: the layers or modules it touches as lanes, the request or data flow through them as numbered arrows, new parts in one colour and reused ones (with paths) in another, and the open decisions as callouts on the spot they affect. Text after it only for what the picture cannot say: new names, open decisions, risks, in a few short lines. Change nothing until the human acks; then record the approach as `decision:` lines and build it.\n"
+const approachRule = "- First run: before changing any code, reply with an Approach and no status block; the task then waits in needs_you. Lead with a diagram, the human reads pictures faster than text: write a self-contained SVG to `approach.svg` next to BRIEF.md (inline styles, its own background, no scripts or external refs) and start the Approach with `![approach](<its absolute path>)`. Draw the change, not a generic box chart: the layers or modules it touches as lanes, the request or data flow through them as numbered arrows, new parts in one colour and reused ones (with paths) in another, and the open decisions as callouts on the spot they affect. Text after it only for what the picture cannot say: new names, open decisions, risks, in a few short lines. Change nothing until the human acks; then record the approach as `decision:` lines and build it.\n"
 
 // needsApproach: not labelled approach_discussed, and the description has no line starting "Approach".
 func needsApproach(task store.Task) bool {
