@@ -47,7 +47,8 @@ func SaveAttachment(home, key, name, dataB64 string) (string, error) {
 }
 
 // AttachmentHandler serves GET /attachments/<abs path> for image files under
-// the conveyor home, so the webview can show them.
+// the conveyor home, so the webview can show them. SVG (the agent-drawn
+// approach.svg) is served too, never uploaded, with scripts blocked.
 func AttachmentHandler(home string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rest, ok := strings.CutPrefix(r.URL.Path, "/attachments/")
@@ -56,9 +57,13 @@ func AttachmentHandler(home string) http.Handler {
 			return
 		}
 		p := filepath.Clean("/" + rest)
-		if !strings.HasPrefix(p, home+string(filepath.Separator)) || !imageExt[strings.ToLower(filepath.Ext(p))] {
+		ext := strings.ToLower(filepath.Ext(p))
+		if !strings.HasPrefix(p, home+string(filepath.Separator)) || !imageExt[ext] && ext != ".svg" {
 			http.NotFound(w, r)
 			return
+		}
+		if ext == ".svg" {
+			w.Header().Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:; script-src 'none'")
 		}
 		http.ServeFile(w, r, p)
 	})

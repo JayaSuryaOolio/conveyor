@@ -119,7 +119,7 @@ func rulesForTask(db *sql.DB, task store.Task, extra bool) string {
 }
 
 // approachRule is added to a task's first-run brief unless it is small or states its approach.
-const approachRule = "- First run: before changing any code, post an Approach and end needs_you (omit the status block). Keep it short: files and layer, existing functions and types you will reuse (with paths), new names, open decisions. Change nothing until the human acks; then record the approach as `decision:` lines and build it.\n"
+const approachRule = "- First run: before changing any code, post an Approach and end needs_you (omit the status block). Lead with a diagram, the human reads pictures faster than text: write a self-contained SVG to `approach.svg` next to BRIEF.md with Bash (Write can't reach that dir; inline styles, its own background, no scripts or external refs) and start the Approach with `![approach](<its absolute path>)`. Draw the change, not a generic box chart: the layers or modules it touches as lanes, the request or data flow through them as numbered arrows, new parts in one colour and reused ones (with paths) in another, and the open decisions as callouts on the spot they affect. Text after it only for what the picture cannot say: new names, open decisions, risks, in a few short lines. Change nothing until the human acks; then record the approach as `decision:` lines and build it.\n"
 
 // needsApproach: not labelled small, and the description has no line starting "Approach".
 func needsApproach(task store.Task) bool {
