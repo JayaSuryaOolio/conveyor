@@ -3,6 +3,7 @@ package ui
 import (
 	"context"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -174,6 +175,51 @@ func TestQueueStatusHoldsWhenSlotsFull(t *testing.T) {
 	for _, i := range q.Items {
 		if i.Key == run && !i.Running || i.Key == wait && i.Held == "" {
 			t.Fatalf("item %+v", i)
+		}
+	}
+}
+
+// AC6: the ring counts from the newest unconsumed human/system comment, and a heartbeat older than 3 ticks is stale.
+func TestQueueStatusPendingAndStale(t *testing.T) {
+	a, _ := newApp(t)
+	key, _ := a.CreateTask(core.NewTaskInput{Title: "Queued", Repos: []string{"a"}, Start: true})
+	tk, _ := store.GetTaskByKey(a.svc.DB, key)
+	for i, c := range []struct{ author, at string }{
+		{store.AuthorHuman, "2026-01-01T00:00:00Z"},
+		{store.AuthorSystem, "2026-01-01T00:00:10Z"}, // newest pending: the debounce runs from here
+		{"agent", "2026-01-01T00:00:20Z"},            // agents never queue a launch
+	} {
+		c2, err := store.AddComment(a.svc.DB, store.Comment{TaskID: tk.ID, Author: c.author, Body: strconv.Itoa(i)})
+		if err != nil {
+			t.Fatal(err)
+		}
+		a.svc.DB.Exec(`UPDATE comments SET created_at=? WHERE id=?`, c.at, c2.ID)
+	}
+	pending := func() string {
+		q, err := a.QueueStatus()
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, i := range q.Items {
+			if i.Key == key {
+				return i.Pending
+			}
+		}
+		t.Fatalf("%s not queued: %+v", key, q)
+		return ""
+	}
+	if got := pending(); got != "2026-01-01T00:00:10Z" {
+		t.Fatalf("pending = %q, want the newest human/system comment", got)
+	}
+
+	for _, c := range []struct {
+		ago   time.Duration
+		stale bool
+	}{{2 * time.Second, false}, {16 * time.Second, true}} { // tick 5s: stale past 15s
+		store.RecordTick(a.svc.DB, time.Now().Add(-c.ago), 5)
+		q, _ := a.QueueStatus()
+		if q.Stale != c.stale || q.TickSecs != 5 || q.LastTickAt == "" {
+			t.Fatalf("heartbeat %v ago: %+v, want stale=%v", c.ago, q, c.stale)
 		}
 	}
 }
