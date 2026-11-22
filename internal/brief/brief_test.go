@@ -119,7 +119,7 @@ func TestSettingsShapeBrief(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	tk := store.Task{Key: "CV-3", Title: "T", Labels: []string{"small"}}
+	tk := store.Task{Key: "CV-3", Title: "T", Labels: []string{"approach_discussed"}}
 	store.SetSetting(db, "brief_extra_rules", "- Be kind.")
 	store.SetSetting(db, "pr_comment_prefix", "bot: ")
 	got, err := Build(db, tk)
@@ -137,7 +137,7 @@ func TestSettingsShapeBrief(t *testing.T) {
 	if strings.Contains(got, "Labels:") {
 		t.Fatal("no labels, no Labels line")
 	}
-	tk.Labels = []string{"small", "epic_kind:grilling", "skill:grill-me"}
+	tk.Labels = []string{"approach_discussed", "epic_kind:grilling", "skill:grill-me"}
 	if got, _ = Build(db, tk); !strings.Contains(got, "Kind grilling: ") || !strings.Contains(got, "open no PR") ||
 		!strings.Contains(got, "Load these skills before starting: grill-me.") || strings.Contains(got, "Load the epic skill") {
 		t.Fatalf("kind/skills lines:\n%s", got)
@@ -269,8 +269,8 @@ func TestApproachRule(t *testing.T) {
 	} else if strings.Contains(got, "with Bash") {
 		t.Error("agents can Write in the workspace dir now; no Bash workaround")
 	}
-	if has(mk("add a thing", "small")) {
-		t.Error("small tasks skip the Approach")
+	if has(mk("add a thing", "approach_discussed")) {
+		t.Error("approach_discussed tasks skip the Approach")
 	}
 	if has(mk("add a thing\n\nApproach: edit x.go, reuse y()")) {
 		t.Error("a stated approach skips the step")
