@@ -262,6 +262,25 @@ For tasks in review, every 60 seconds Conveyor runs `gh pr list --head <branch>`
 
 PR review checks run on push and a backoff (30 min, 2 h, 8 h). For instant checks, Conveyor starts the review-webhook listener by itself (under the id of the enabled connector whose action runs `conveyor review-webhook`, found by manifest so a variant with another id shares one instance; `review-webhooks` when none is installed) while an epic task (label `epic` or `epic:<name>`) is unfinished; for non-epic tasks, add the bundled **Review webhooks** example from "Detected on this Mac" on the Apps screen (or `conveyor app install examples/review-webhooks.json`). Once started (by an epic or the app), Conveyor runs `conveyor review-webhook` itself: a listener on `127.0.0.1` (random port, pid in `<home>/apps/<app-id>.pid`, log `logs/app/<app-id>.log`; the id is the manifest `id`, else its name as a slug, and is `${{ app.id }}` in scripts so two versions of an app can run side by side) plus one `gh webhook forward` per repo with an open PR of any unfinished task (needs `gh extension install cli/gh-webhook` and admin on the repo; GitHub allows one forward per repo, so a leftover hook fails a forward with `422 Hook already exists`, so the listener deletes the repo's old `gh webhook forward` hooks before each forward; needs the `admin:repo_hook` token scope). No tunnel (ngrok etc.) is needed: `gh webhook forward` registers a hook that GitHub relays over a websocket the extension opens outbound, and Conveyor's listener only receives from that local process. A review or review comment schedules that task's check for now. Without an open epic, the app or the extension, tasks keep the timed checks. `--status` exits 0 when running; `--stop` stops it (Conveyor restarts it within a minute while the app is enabled (its service is `"autostart": true`, which the dispatcher honors for any app) or an epic is open; uninstall the app and finish the epic to opt out).
 
+## Driving the open app from the CLI
+
+`conveyor ui go` moves the running app (and raises its window) without touching the mouse, so a shell alias, Raycast or a voice tool can navigate it:
+
+```
+conveyor ui go CV-128                  # same as: ui go task CV-128
+conveyor ui go board --label epic      # also --repo R
+conveyor ui go epic CV-120 --task CV-120B
+conveyor ui go learnings|automations|apps|agents|logs|settings|focus
+conveyor ui palette "review"           # Cmd+K, prefilled
+conveyor ui current [--json]           # what the app shows now
+```
+
+A bad task key or view name fails at once (exit 1). If the app does not pick the request up within 3 seconds the command prints `Conveyor app is not running` and exits 3; a request is never replayed later.
+
+**`@` is the task you are looking at.** A positional argument that is exactly `@` becomes the task open in the app (the task page, or the task modal on an epic page, else the epic itself): `conveyor task move @ review`. With the app closed, or no task open, the command exits 3.
+
+The app writes its current view to `<home>/ui-state.json` on each navigation.
+
 ## Settings
 
 Settings are in the app (Settings page) or `conveyor config list|get|set`. Secret settings (keys containing `token`, `secret` or `password`, or ending `_key`) are masked in `config list` (first 4 characters + `****`) and `config get` refuses them; add `--reveal` to print them.
