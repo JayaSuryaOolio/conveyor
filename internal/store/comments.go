@@ -187,3 +187,42 @@ func LatestComments(db *sql.DB) (map[int64]Comment, error) {
 	}
 	return out, nil
 }
+
+// SetWantsReply marks a task message sent with --reply: when the run that reads it ends, the
+// dispatcher sends that run's answer back to the sender (core.TickReplies).
+func SetWantsReply(db *sql.DB, id int64) error {
+	if _, err := db.Exec(`UPDATE comments SET wants_reply=1 WHERE id=?`, id); err != nil {
+		return fmt.Errorf("set wants_reply: %w", err)
+	}
+	return nil
+}
+
+// RepliesDue are the --reply comments whose consuming run has ended and that have no reply yet.
+func RepliesDue(db *sql.DB) ([]Comment, error) {
+	return queryComments(db, `wants_reply=1 AND replied_at IS NULL AND consumed_by_run_id IN (SELECT id FROM runs WHERE ended_at IS NOT NULL)`)
+}
+
+// ClaimReply marks a --reply comment answered. It reports false when another tick already did, so a
+// reply is sent at most once, even across restarts.
+func ClaimReply(db *sql.DB, id int64) (bool, error) {
+	res, err := db.Exec(`UPDATE comments SET replied_at=? WHERE id=? AND replied_at IS NULL`, now(), id)
+	if err != nil {
+		return false, fmt.Errorf("claim reply: %w", err)
+	}
+	n, _ := res.RowsAffected()
+	return n == 1, nil
+}
+
+// ReplyRequestsSinceHuman counts the --reply messages between two tasks, either direction, since the
+// newest human comment on either of them.
+func ReplyRequestsSinceHuman(db *sql.DB, a, b Task) (int, error) {
+	var n int
+	err := db.QueryRow(`SELECT count(*) FROM comments WHERE wants_reply=1
+ AND ((task_id=? AND source=?) OR (task_id=? AND source=?))
+ AND id > COALESCE((SELECT MAX(id) FROM comments WHERE author=? AND task_id IN (?,?)), 0)`,
+		b.ID, "task:"+a.Key, a.ID, "task:"+b.Key, AuthorHuman, a.ID, b.ID).Scan(&n)
+	if err != nil {
+		return 0, fmt.Errorf("count reply requests: %w", err)
+	}
+	return n, nil
+}
