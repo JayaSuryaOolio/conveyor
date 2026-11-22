@@ -12,6 +12,9 @@ type Item = {id: string; label: string; hint: string; pr?: string; go: () => voi
 
 const PER_GROUP = 20
 
+/** Opens the palette prefilled (`conveyor ui palette Q`). Event instead of a prop: App fires it from a Wails event, outside the palette's tree. */
+export const openPalette = (q: string) => window.dispatchEvent(new CustomEvent('palette:open', {detail: q}))
+
 /** onFocus opens the Focus popup, which is reachable only from here. */
 export function CommandPalette({nav, onFocus}: {nav: Nav; onFocus: () => void}) {
     const [raw, setRaw] = useState<Raw>()
@@ -24,6 +27,11 @@ export function CommandPalette({nav, onFocus}: {nav: Nav; onFocus: () => void}) 
         load(force).then(setRaw, e => setError(String(e))).finally(() => setBusy(false))
     }, [])
     useEffect(() => refresh(false), [refresh])
+    useEffect(() => {
+        const on = (e: Event) => { setQuery((e as CustomEvent<string>).detail); spotlight.open() }
+        window.addEventListener('palette:open', on)
+        return () => window.removeEventListener('palette:open', on)
+    }, [])
     useEffect(() => { // own listener: Mantine's `shortcut` skips focused inputs; capture so no field swallows it
         const onKey = (e: KeyboardEvent) => {
             if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); spotlight.toggle() }

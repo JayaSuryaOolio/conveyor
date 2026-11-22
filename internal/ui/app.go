@@ -100,7 +100,7 @@ func (a *App) Startup(ctx context.Context) {
 	jira.Attach(a.svc)
 	a.startTerms()
 	ctx, a.cancel = context.WithCancel(ctx)
-	go pollDataVersion(ctx, core.DBPath(home), pollEvery, func() { runtime.EventsEmit(ctx, "db:changed") })
+	go pollDataVersion(ctx, core.DBPath(home), pollEvery, func() { a.onDataChange(ctx) })
 	go a.startDispatcher(ctx)
 }
 

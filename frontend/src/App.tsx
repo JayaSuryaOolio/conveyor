@@ -4,7 +4,8 @@ import {ActionIcon, AppShell, Badge, Box, Kbd, NavLink, Title, Tooltip} from '@m
 import {Button, Group, Modal, Stack, Text} from './ui'
 import {useLocalStorage} from '@mantine/hooks'
 import {IconApps, IconBolt, IconArrowLeft, IconBook2, IconClock, IconLayoutKanban, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconLogs, IconPlus, IconRobot, IconSettings, IconSitemap} from '@tabler/icons-react'
-import {AppVersion, DispatcherState, Learnings, ShellPATHError} from '../wailsjs/go/ui/App'
+import {AppVersion, DispatcherState, Learnings, SetView, ShellPATHError} from '../wailsjs/go/ui/App'
+import {EventsOn} from '../wailsjs/runtime/runtime'
 import {Agents} from './agents'
 import {EpicView} from './epic'
 import {Connectors} from './connectors'
@@ -13,7 +14,7 @@ import {Nav, PlacedButtons, Toasts, View, toast} from './components'
 import {NewTask, Settings} from './forms'
 import {LearningsPage} from './learnings'
 import {Logs} from './logs'
-import {CommandPalette} from './palette'
+import {CommandPalette, openPalette} from './palette'
 import {useData} from './util'
 import {NavContext} from './markdown'
 import {fromLocation, toPath} from './router'
@@ -52,6 +53,18 @@ export default function App() {
     const nav: Nav = v => setView(v)
     const viewRef = useRef({view, path: ''})
     viewRef.current = {view, path: loc.pathname + loc.search}
+
+    // Tell the backend what is on screen: `conveyor ui current` and the `@` token read it from ui-state.json.
+    useEffect(() => { SetView(view).catch(() => {}) }, [view])
+
+    // `conveyor ui go|palette` arrives as a ui:intent event (the app already raised its window). The ref keeps the latest closures without resubscribing.
+    const onIntent = useRef((_: {verb: string; args: View & {q?: string}}) => {})
+    onIntent.current = ({verb, args}) => {
+        if (verb === 'palette') openPalette(args.q ?? '')
+        else if (args.name === 'focus') setShowFocus(true)
+        else setView(args)
+    }
+    useEffect(() => EventsOn('ui:intent', i => onIntent.current(i)), [])
 
     // No close button: without the login shell's PATH, runners, gh and hooks may not be found.
     useEffect(() => { ShellPATHError().then(e => { if (e) toast(`Could not load your shell's PATH, so claude, agy, gh or git hooks may not be found. Restart Conveyor after fixing your shell rc files.\n${e}`, true) }) }, [])

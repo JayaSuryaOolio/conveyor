@@ -4,6 +4,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -55,9 +56,17 @@ func run(args []string, stdout, stderr io.Writer) int {
 	home, err := core.Home(*homeFlag)
 	if err == nil {
 		audit.Install(home)
-		err = c.fn(home, rest[1:])
+		var args []string
+		if args, err = expandAt(home, rest[1:]); err == nil {
+			err = c.fn(home, args)
+		}
 	}
 	if err != nil {
+		var ee exitErr
+		if errors.As(err, &ee) {
+			fmt.Fprintln(stderr, "error:", ee)
+			return ee.code
+		}
 		if rest[0] == "hook" {
 			return 0 // hooks never fail Claude
 		}
@@ -65,6 +74,27 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	return 0
+}
+
+// expandAt replaces every argument that is exactly "@" with the task open in the app
+// (docs/ui-control-spec.md §4). One rewrite here instead of a change in every command.
+// ponytail: a literal "@" comment body or title cannot be typed; add an escape if anyone needs it.
+func expandAt(home string, args []string) ([]string, error) {
+	out := args
+	for i, a := range args {
+		if a != "@" {
+			continue
+		}
+		k, err := currentTaskKey(home)
+		if err != nil {
+			return nil, err
+		}
+		if &out[0] == &args[0] {
+			out = append([]string(nil), args...) // do not mutate the caller's slice
+		}
+		out[i] = k
+	}
+	return out, nil
 }
 
 func usage(w io.Writer) {

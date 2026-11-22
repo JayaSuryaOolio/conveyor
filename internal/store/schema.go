@@ -210,6 +210,15 @@ CREATE TABLE IF NOT EXISTS connectors (
   disabled INTEGER NOT NULL DEFAULT 0,
   settings TEXT NOT NULL DEFAULT '{}'
 );
+
+-- ui_intents is the CLI-to-app channel (docs/ui-control-spec.md §2): the CLI inserts, the app consumes.
+CREATE TABLE IF NOT EXISTS ui_intents (
+  id INTEGER PRIMARY KEY,
+  verb TEXT NOT NULL,
+  args TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  consumed_at TEXT
+);
 `
 
 // Migrate drops the v1 tables and creates the v2 schema if missing. Later

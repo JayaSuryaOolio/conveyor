@@ -223,3 +223,44 @@ func TestQueueStatusPendingAndStale(t *testing.T) {
 		}
 	}
 }
+
+func TestConsumeIntents(t *testing.T) {
+	a, _ := newApp(t)
+	now := time.Now()
+	add := func(verb string, age time.Duration) int64 {
+		id, err := store.AddIntent(a.svc.DB, verb, []byte(`{"name":"logs"}`), now.Add(-age))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return id
+	}
+	stale, fresh := add("go", 11*time.Second), add("palette", time.Second)
+	var got []int64
+	consumeIntents(a.svc.DB, now, func(i store.Intent) { got = append(got, i.ID) })
+	if len(got) != 1 || got[0] != fresh {
+		t.Fatalf("emitted %v, want only %d", got, fresh)
+	}
+	if ok, _ := store.IntentConsumed(a.svc.DB, fresh); !ok {
+		t.Fatal("fresh row not marked consumed")
+	}
+	if _, err := store.IntentConsumed(a.svc.DB, stale); err == nil {
+		t.Fatal("stale row should be deleted")
+	}
+	got = nil
+	consumeIntents(a.svc.DB, now, func(i store.Intent) { got = append(got, i.ID) })
+	if len(got) != 0 {
+		t.Fatalf("re-emitted %v", got)
+	}
+}
+
+func TestSetViewWritesState(t *testing.T) {
+	a, _ := newApp(t)
+	a.svc.Home = t.TempDir()
+	if err := a.SetView(core.UIView{Name: "epic", Key: "CV-1", Task: "CV-1B"}); err != nil {
+		t.Fatal(err)
+	}
+	s, err := core.ReadUIState(a.svc.Home)
+	if k, _ := s.CurrentTask(); err != nil || k != "CV-1B" {
+		t.Fatalf("state %+v err %v", s, err)
+	}
+}

@@ -657,3 +657,117 @@ func TestCLIAppAddManifest(t *testing.T) {
 		t.Fatalf("%v %s", err, b)
 	}
 }
+
+// cvCode runs the CLI and returns combined output and exit code.
+func cvCode(t *testing.T, home string, args ...string) (string, int) {
+	t.Helper()
+	b, err := exec.Command(bin, append([]string{"--home", home}, args...)...).CombinedOutput()
+	if ee, ok := err.(*exec.ExitError); ok {
+		return string(b), ee.ExitCode()
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b), 0
+}
+
+func intentCount(t *testing.T, home string) int {
+	t.Helper()
+	db, err := core.OpenDB(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	var n int
+	db.QueryRow(`SELECT count(*) FROM ui_intents WHERE consumed_at IS NULL`).Scan(&n)
+	return n
+}
+
+func TestUIGo(t *testing.T) {
+	home := t.TempDir()
+	db, err := core.OpenDB(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	store.AddRepo(db, store.Repo{Name: "a", Path: "/x/a", DefaultBranch: "main"})
+	db.Close()
+	cv(t, home, "task", "new", "x", "--repo", "a")
+
+	if out, code := cvCode(t, home, "ui", "go", "BAD-1"); code != 1 || intentCount(t, home) != 0 {
+		t.Fatalf("bad key: code %d rows %d\n%s", code, intentCount(t, home), out)
+	}
+	if out, code := cvCode(t, home, "ui", "go", "nowhere"); code != 1 {
+		t.Fatalf("bad view: code %d\n%s", code, out)
+	}
+	// A stand-in for the app consuming rows: the CLI exits 0 and the intent carries the view.
+	app, _ := core.OpenDB(home)
+	defer app.Close()
+	got := make(chan store.Intent, 1)
+	go func() {
+		for {
+			if is, _ := store.ConsumeIntents(app, time.Now()); len(is) > 0 {
+				got <- is[0]
+				return
+			}
+			time.Sleep(20 * time.Millisecond)
+		}
+	}()
+	if out, code := cvCode(t, home, "ui", "go", "CV-1"); code != 0 {
+		t.Fatalf("consumed: code %d\n%s", code, out)
+	}
+	if i := <-got; i.Verb != "go" || string(i.Args) != `{"name":"task","key":"CV-1"}` {
+		t.Fatalf("intent %+v", i)
+	}
+	// No app consumes the row: wait out the 3 s, exit 3, leave nothing behind.
+	if out, code := cvCode(t, home, "ui", "go", "CV-1"); code != 3 || !strings.Contains(out, "not running") || intentCount(t, home) != 0 {
+		t.Fatalf("no app: code %d rows %d\n%s", code, intentCount(t, home), out)
+	}
+}
+
+func TestAtToken(t *testing.T) {
+	home := t.TempDir()
+	db, err := core.OpenDB(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	store.AddRepo(db, store.Repo{Name: "a", Path: "/x/a", DefaultBranch: "main"})
+	db.Close()
+	cv(t, home, "task", "new", "x", "--repo", "a")
+	cv(t, home, "task", "new", "y", "--repo", "a")
+
+	if out, code := cvCode(t, home, "task", "show", "@"); code != 3 || !strings.Contains(out, "not running") {
+		t.Fatalf("no state file: %d\n%s", code, out)
+	}
+	dead := exec.Command("true")
+	dead.Run() // exited and reaped: its pid is dead
+	if err := core.WriteUIState(home, core.UIView{Name: "task", Key: "CV-1"}, dead.Process.Pid, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if out, code := cvCode(t, home, "task", "show", "@"); code != 3 || !strings.Contains(out, "not running") {
+		t.Fatalf("dead pid: %d\n%s", code, out)
+	}
+	for _, c := range []struct {
+		v    core.UIView
+		want string // "" = no task open
+	}{
+		{core.UIView{Name: "task", Key: "CV-1"}, "CV-1"},
+		{core.UIView{Name: "epic", Key: "CV-1", Task: "CV-2"}, "CV-2"},
+		{core.UIView{Name: "epic", Key: "CV-1"}, "CV-1"},
+		{core.UIView{Name: "board"}, ""},
+	} {
+		core.WriteUIState(home, c.v, os.Getpid(), time.Now())
+		out, code := cvCode(t, home, "task", "show", "@", "--json")
+		if c.want == "" {
+			if code != 3 || !strings.Contains(out, "no task is open") {
+				t.Fatalf("%+v: %d\n%s", c.v, code, out)
+			}
+			continue
+		}
+		if code != 0 || !strings.Contains(out, `"key": "`+c.want+`"`) {
+			t.Fatalf("%+v: %d\n%s", c.v, code, out)
+		}
+	}
+	if out := cv(t, home, "ui", "current", "--json"); !strings.Contains(out, `"name": "board"`) {
+		t.Fatal(out)
+	}
+}
