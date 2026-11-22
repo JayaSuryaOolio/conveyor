@@ -102,6 +102,10 @@ conveyor task unlink CV-1A blocks CV-1B
 conveyor task label CV-1A add bug        # labels: shown on cards, filterable on the Board; `rm` removes
 ```
 
+**Task messages**: `conveyor task message TO <text|-> [--from KEY] [--reply] [--ask|--note]` puts a system comment from one task in another's thread (`Service.Message`, source `task:FROM`, shown as "from CV-5"). `--from` defaults to the task whose workspace holds the cwd, so an agent session needs no flag. It goes through the same inbox as any comment: a running or todo target reads it with its next run, a finished one is requeued, and the command prints which. A backlog or cancelled target is refused with an error, never silently dropped. It is not a human comment.
+
+With `--reply`, Conveyor (not the agent) guarantees an answer: when the run that read the message ends, the dispatcher tick (`Service.TickReplies`) sends that run's final message back to the sender as "reply from KEY", or "KEY stopped: <status> – <reason>" when the run failed, ended without `status: done` or the task was cancelled. The reply is a plain message (never `--reply` itself), delivered like `--ask` if the sender's PR is merged. `comments.replied_at` is set before sending, so a reply is sent at most once, also across restarts. Cap: at most 3 `--reply` messages between the same two tasks (either direction) since the last human comment on either; the 4th is refused until a human comments.
+
 **Epics** (docs/epic-builder.md): `task new --epic` labels the root `epic` + `epic:<name>` (name unique among open epics). After charting, the epic waits in needs_you until `conveyor epic approve KEY` (or a human comment `approve`) starts flow 1 at stage `decide`; label `epic_gate:off` skips the wait. The dispatcher wakes an epic with a system comment when its sub-tasks have all settled; only `conveyor epic restart KEY --reason` abandons a flow (cancels open sub-tasks, starts the next flow at `spec`). Agents in epic runs cannot `gh pr merge`. Stage logic lives in the `epic` skill (`skills/epic/`, planner adapters in `skills/epic/planners/`), installed with the plugin; `plugin install` also seeds a user agent `epic-builder` whose prompt only loads it (never overwritten). The brief of a labelled task adds a `Labels:` line and, from them, the epic/stage/flow line, the rule for its `epic_kind:` and "Load these skills before starting" from `skill:*` labels.
 
 **Epic view** (`e` on a task page, the sitemap icon on board cards and the task header, or sidebar *Epics* = board filtered by `label:epic`): sub-tasks as cards in a group per parent, layered by `blocks`. Cards edit agent, model, skills and kind; drag handle to handle to add a `blocks` link, select an edge and press Backspace to unlink, `+` on a group adds a sub-task. Header: stage pipeline, n/m done, wants-you count, Approve plan at the gate, Restart (reason required). Updates live on `db:changed`.
@@ -309,6 +313,7 @@ conveyor task stop KEY                    conveyor task sessions KEY [--json]
 conveyor task repo KEY add|rm NAME
 conveyor task set KEY [--repo r] [--branch b] [--pr url] [--model m] [--desc d | --desc-file f]
 conveyor task link KEY blocks|relates OTHER    conveyor task unlink KEY kind OTHER
+conveyor task message TO <text|-> [--from KEY] [--reply] [--ask|--note]
 conveyor task parent KEY PARENT|--none   conveyor task label KEY add|rm NAME | set <prefix>:<value>
 conveyor task graph KEY [--json]          conveyor task new "t" --repo r --epic [--epic-name n]
 conveyor epic status KEY [--flow N] [--json]    conveyor epic check KEY [--fix]

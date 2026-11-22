@@ -283,7 +283,7 @@ export function Message({m, onEdit, onSendNow, queue}: {m: store.Comment; onEdit
     return (
         <Paper withBorder p="sm" radius="md" style={old ? {borderStyle: 'dashed'} : undefined} bg={m.author === 'human' ? 'var(--mantine-color-default-hover)' : undefined}>
             <Group gap="xs" style={{marginBottom: 4}}>
-                <Text size="xs" weight={600}>{m.author}{m.source ? ` (via ${m.source})` : ''}</Text>
+                <Text size="xs" weight={600}>{m.source?.startsWith('task:') ? `from ${m.source.slice(5)}` : <>{m.author}{m.source ? ` (via ${m.source})` : ''}</>}</Text>
                 <Time iso={m.created_at}/>
                 {onEdit && <QueuedBadge m={m} queue={queue} onSendNow={onSendNow && (() => setAsking(true))}/>}
                 {onEdit && <Tooltip label="Move back to the editor"><ActionIcon variant="subtle" color="gray" size="xs" aria-label="Edit queued message" onClick={onEdit}><IconPencil size={12}/></ActionIcon></Tooltip>}

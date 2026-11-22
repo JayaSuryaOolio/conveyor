@@ -34,6 +34,7 @@ conveyor task comment KEY "text" [--ask|--note]   conveyor task move KEY <status
 conveyor task stop KEY                # end the running bg session -> needs_you
 conveyor task set KEY [--branch b] [--pr url] [--model m] [--desc d]   # --desc: any status; after a run, a system comment quotes the old one
 conveyor task link KEY blocks|relates OTHER     conveyor task unlink KEY kind OTHER
+conveyor task message TO <text|-> [--from KEY] [--reply]   # task-to-task comment (source `task:FROM`, FROM defaults to the cwd's workspace); refuses backlog/cancelled. --reply: dispatcher (`TickReplies`) sends the reading run's final message back, or "KEY stopped: <status> – <reason>", once; max 3 --reply per task pair since the last human comment (core/message.go)
 conveyor task parent KEY PARENT|--none
 conveyor task repo KEY add|rm NAME   # rm refused once the repo has a PR or is the last one
 conveyor task label KEY add|rm NAME     # labels: many per task (labels + task_labels tables), filter chips on the Board

@@ -14,13 +14,14 @@ import (
 	"github.com/JayaSuryaOolio/conveyor/internal/core"
 	"github.com/JayaSuryaOolio/conveyor/internal/gh"
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
+	"github.com/JayaSuryaOolio/conveyor/internal/workspace"
 )
 
 func init() {
-	register("task", runTask, "manage tasks (new|list|show|comment|move|set|repo|link|unlink|decision|parent|sessions|stop|cancel|done|sync|brief|log|attach|open|label|graph)")
+	register("task", runTask, "manage tasks (new|list|show|comment|message|move|set|repo|link|unlink|decision|parent|sessions|stop|cancel|done|sync|brief|log|attach|open|label|graph)")
 }
 
-const taskUsage = "usage: conveyor task new|list|show|comment|move|set|link|unlink|decision|parent|sessions|stop|cancel|done|sync|brief|log|attach|open|label|graph ..."
+const taskUsage = "usage: conveyor task new|list|show|comment|message|move|set|link|unlink|decision|parent|sessions|stop|cancel|done|sync|brief|log|attach|open|label|graph ..."
 
 func runTask(home string, args []string) error {
 	if len(args) == 0 {
@@ -37,6 +38,8 @@ func runTask(home string, args []string) error {
 			return taskShow(s, rest)
 		case "comment":
 			return taskComment(s, rest)
+		case "message":
+			return taskMessage(s, rest)
 		case "move":
 			stop := len(rest) == 3 && rest[2] == "--stop"
 			if len(rest) != 2 && !stop {
@@ -335,6 +338,42 @@ func taskComment(s *core.Service, args []string) error {
 		body = strings.TrimSpace(body)
 	}
 	_, err = s.AddComment(args[0], store.AuthorHuman, body, after)
+	return err
+}
+
+// taskMessage sends text from one task to another: a system comment "from FROM" in the target's
+// thread, delivered like any comment. FROM defaults to the task whose workspace holds the cwd, so an
+// agent session needs no flag. --reply makes the dispatcher send the target's answer back (core.TickReplies).
+func taskMessage(s *core.Service, args []string) error {
+	cwd, _ := os.Getwd()
+	fs := flag.NewFlagSet("task message", flag.ContinueOnError)
+	from := fs.String("from", workspace.KeyFromCwd(s.Home, cwd), "sending task key (default: the task whose workspace holds the cwd)")
+	ask := fs.Bool("ask", false, "after a merged PR: requeue the task to answer, without changing code")
+	note := fs.Bool("note", false, "after a merged PR: only add the message")
+	reply := fs.Bool("reply", false, "send the target's answer back to FROM when the run that reads it ends")
+	args, err := parseArgs(fs, args)
+	if err != nil {
+		return err
+	}
+	if len(args) != 2 || *ask && *note || *from == "" {
+		return fmt.Errorf("usage: conveyor task message TO <text|-> [--from KEY] [--reply] [--ask|--note]")
+	}
+	after := core.FollowUp
+	if *ask {
+		after = core.Ask
+	} else if *note {
+		after = core.Note
+	}
+	body := args[1]
+	if body == "-" {
+		if body, err = readText("-"); err != nil {
+			return fmt.Errorf("read stdin: %w", err)
+		}
+	}
+	res, err := s.Message(*from, args[0], strings.TrimSpace(body), after, *reply)
+	if err == nil {
+		fmt.Fprintln(out, res)
+	}
 	return err
 }
 

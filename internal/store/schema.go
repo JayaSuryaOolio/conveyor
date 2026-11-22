@@ -275,6 +275,9 @@ func Migrate(db *sql.DB) error {
 	if err := migrateAddTaskDeletedAt(db); err != nil {
 		return err
 	}
+	if err := migrateAddCommentReply(db); err != nil {
+		return err
+	}
 	if err := migrateAddRunWaste(db); err != nil {
 		return err
 	}
@@ -402,6 +405,23 @@ func migrateAddCommentEdits(db *sql.DB) error {
 	if n == 0 {
 		if _, err := db.Exec(`ALTER TABLE comments ADD COLUMN edits TEXT NOT NULL DEFAULT ''`); err != nil {
 			return fmt.Errorf("add comments.edits: %w", err)
+		}
+	}
+	return nil
+}
+
+// migrateAddCommentReply adds comments.wants_reply (a task message sent with --reply) and
+// comments.replied_at (when the reply went back to the sender; NULL = not yet).
+func migrateAddCommentReply(db *sql.DB) error {
+	for col, def := range map[string]string{"wants_reply": "INTEGER NOT NULL DEFAULT 0", "replied_at": "TEXT"} {
+		var n int
+		if err := db.QueryRow(`SELECT count(*) FROM pragma_table_info('comments') WHERE name=?`, col).Scan(&n); err != nil {
+			return fmt.Errorf("check comments.%s: %w", col, err)
+		}
+		if n == 0 {
+			if _, err := db.Exec(`ALTER TABLE comments ADD COLUMN ` + col + ` ` + def); err != nil {
+				return fmt.Errorf("add comments.%s: %w", col, err)
+			}
 		}
 	}
 	return nil
