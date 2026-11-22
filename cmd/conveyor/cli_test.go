@@ -771,3 +771,49 @@ func TestAtToken(t *testing.T) {
 		t.Fatal(out)
 	}
 }
+
+// Golden: a running task with the bundled PR check installed.
+func TestActionsGolden(t *testing.T) {
+	home := t.TempDir()
+	db, err := core.OpenDB(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	store.AddRepo(db, store.Repo{Name: "a", Path: "/x/a", DefaultBranch: "main"})
+	db.Close()
+	cv(t, home, "task", "new", "x", "--repo", "a")
+	db, _ = core.OpenDB(home)
+	db.Exec(`UPDATE tasks SET status='running'`) // humans can't move into running
+	db.Close()
+	cv(t, home, "app", "install", "../../examples/pr-check.json")
+
+	const want = `[
+{"label":"Move to review","kind":"builtin","argv":["conveyor","task","move","CV-1","review"]},
+{"label":"Cancel","kind":"builtin","argv":["conveyor","task","cancel","CV-1"],"confirm":"Cancel CV-1?"},
+{"label":"Stop","kind":"builtin","argv":["conveyor","task","stop","CV-1"],"confirm":"Stop CV-1?"},
+{"label":"Open shell","kind":"builtin","argv":["conveyor","task","open","CV-1","--shell"]},
+{"label":"Open resume","kind":"builtin","argv":["conveyor","task","open","CV-1","--resume"]},
+{"label":"Open fresh","kind":"builtin","argv":["conveyor","task","open","CV-1","--fresh"]},
+{"label":"Comment","kind":"builtin","argv":["conveyor","task","comment","CV-1","{text}"],"needs_text":true},
+{"label":"Check PR","kind":"app","app":"PR check","argv":["conveyor","app","run","PR check","check","CV-1","--place","task_sidebar"]},
+{"label":"Open in PR check","kind":"app","app":"PR check","argv":["conveyor","app","open","PR check","CV-1"]},
+{"label":"Open task","kind":"nav","argv":["conveyor","ui","go","CV-1"]}
+]`
+	var norm = func(s string) string {
+		var v any
+		if err := json.Unmarshal([]byte(s), &v); err != nil {
+			t.Fatal(err, s)
+		}
+		b, _ := json.Marshal(v)
+		return string(b)
+	}
+	if got := cv(t, home, "actions", "CV-1", "--json"); norm(got) != norm(want) {
+		t.Fatalf("got %s\nwant %s", norm(got), norm(want))
+	}
+	if got := norm(cv(t, home, "actions", "--json")); strings.Contains(got, "CV-1") || !strings.Contains(got, `"ui","palette"`) {
+		t.Fatalf("no-key list: %s", got)
+	}
+	if _, code := cvCode(t, home, "actions", "NOPE-9"); code != 1 {
+		t.Fatalf("bad key: code %d", code)
+	}
+}

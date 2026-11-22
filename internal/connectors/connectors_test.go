@@ -175,7 +175,7 @@ func TestExampleApps(t *testing.T) {
 	for _, app := range apps {
 		names[app.File] = true
 	}
-	for _, expected := range []string{"acli", "review-webhooks", "graft", "vscode", "nautilus"} {
+	for _, expected := range []string{"acli", "review-webhooks", "graft", "vscode", "nautilus", "pr-check"} {
 		if !names[expected] {
 			t.Errorf("missing expected example app: %s", expected)
 		}
