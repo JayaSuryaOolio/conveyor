@@ -264,6 +264,11 @@ func TestApproachRule(t *testing.T) {
 	if !has(mk("add a thing")) {
 		t.Error("first run of a plain task needs the Approach rule")
 	}
+	if got, _ := Build(db, mk("draw it")); !strings.Contains(got, "approach.svg") || !strings.Contains(got, "![approach](") {
+		t.Error("the Approach leads with an SVG diagram embedded in the reply (AC6)")
+	} else if strings.Contains(got, "with Bash") {
+		t.Error("agents can Write in the workspace dir now; no Bash workaround")
+	}
 	if has(mk("add a thing", "small")) {
 		t.Error("small tasks skip the Approach")
 	}

@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -141,6 +142,33 @@ func TestRemoveDirty(t *testing.T) {
 	}
 	if _, err := os.Stat(Dir(home, tk.Key)); !os.IsNotExist(err) {
 		t.Fatal("workspace dir remains")
+	}
+}
+
+// TestRemoveClearsAgentFiles: pruning the worktrees also removes what agents wrote in the
+// workspace dir (STATE.md, approach.svg), but keeps attachments the thread links to.
+func TestRemoveClearsAgentFiles(t *testing.T) {
+	db, home, tk := setup(t)
+	got, _ := Ensure(db, home, tk)
+	ws := Dir(home, tk.Key)
+	os.WriteFile(filepath.Join(ws, "STATE.md"), []byte("x"), 0o644)
+	os.MkdirAll(filepath.Join(ws, "notes"), 0o755)
+	os.MkdirAll(filepath.Join(ws, "attachments"), 0o755)
+	os.WriteFile(filepath.Join(ws, "attachments", "1-a.png"), []byte("png"), 0o644)
+	if err := Remove(db, home, got, false); err != nil {
+		t.Fatal(err)
+	}
+	left, _ := os.ReadDir(ws)
+	if len(left) != 1 || left[0].Name() != "attachments" {
+		t.Fatalf("left %v, want only attachments", left)
+	}
+}
+
+func TestAddDirs(t *testing.T) {
+	p := "/w/K-1/b"
+	tk := store.Task{Key: "K-1", Repos: []store.TaskRepo{{IsPrimary: true}, {WorktreePath: &p}}}
+	if got := AddDirs("/h", tk); !reflect.DeepEqual(got, []string{p, "/h/workspaces/K-1"}) {
+		t.Fatalf("got %v", got)
 	}
 }
 

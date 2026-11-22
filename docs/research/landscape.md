@@ -528,3 +528,26 @@ A hybrid is possible:
 - Hermes nudge interval defaults.
 - Whether Paperclip offers any terminal attach.
 - Version gates: this machine runs Claude Code 2.1.310 (`claude --version`), which satisfies every gate cited above (≥ v2.1.257 for `--resume --bg` in place, ≥ v2.1.304 for skill re-injection). That a feature works in practice was not tested.
+
+## 8. Showing a plan visually (CV-184F, AC6)
+
+The human finds a text plan tiring and reads a picture faster. How other tools show a plan or a run:
+
+| Tool | Plan or run shown as | Notes |
+|---|---|---|
+| Claude artifacts | A self-contained HTML or SVG page the model writes | Rich diagrams (lanes, colour, icons) with no renderer beyond a browser. The model is good at writing SVG directly. |
+| Kiro specs | `requirements.md`, `design.md`, `tasks.md`; `design.md` carries Mermaid diagrams | Needs a Mermaid renderer in the viewer. |
+| Cursor plan mode, Copilot Workspace, Devin | An editable Markdown plan or checklist | Text first; diagrams only if the model adds Mermaid. |
+| alexeyw/lot-map (Claude Code plugin) | A live map of one run: the session in the centre, spokes to Model, Files, Shell, Skills, Hooks, Agents, Memory with counts, and a step timeline with durations and failures | Introspection of what a run did, not a plan of what it will do. Suggested by the human on CV-184F. |
+
+Options for the Approach step:
+
+| Option | Pros | Cons |
+|---|---|---|
+| A. SVG file next to BRIEF.md, embedded as `![approach](<abs path>)` in the Approach reply | The task page already shows images under the conveyor home inline with click-to-zoom (`md-render.tsx` `Img`, `core.AttachmentHandler`); one extension to serve; any agent can write SVG; free-form, so not a stock box chart | The agent draws layout by hand; text-heavy SVGs are possible if the rule is ignored |
+| B. Mermaid block in the reply | Short to write; diffable | Needs a Mermaid renderer in the frontend (a large dependency); auto-layout gives the generic box-and-arrow look the human asked to avoid |
+| C. HTML page (artifact-style) | Richest: interaction, motion | Can't be shown inline without an iframe and script sandboxing; opens outside the task page |
+
+Chosen: A. The Approach rule (`approachRule` in `internal/brief`) asks for `approach.svg`: lanes for the layers it touches, numbered flow arrows, new parts and reused parts (with paths) in two colours, open decisions as callouts where they apply, and a few lines of text only for what the picture cannot say. The handler serves `.svg` with a CSP that blocks scripts; uploads still refuse SVG.
+
+Not done here: a lot-map-style run map on the task page (which files, tools and steps a run touched, from the transcript). It fits "introspection for improving dev flow" better than the Approach does and would be its own task.

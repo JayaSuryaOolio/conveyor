@@ -35,8 +35,12 @@ func TestAttachmentHandler(t *testing.T) {
 	home := t.TempDir()
 	p, _ := SaveAttachment(home, "", "a.png", base64.StdEncoding.EncodeToString([]byte("png")))
 	os.WriteFile(filepath.Join(home, "secret.txt"), []byte("x"), 0o644)
+	svg := filepath.Join(home, "workspaces", "K-1", "approach.svg")
+	os.MkdirAll(filepath.Dir(svg), 0o755)
+	os.WriteFile(svg, []byte("<svg/>"), 0o644)
 	for u, want := range map[string]int{
 		"/attachments" + p:                             http.StatusOK,
+		"/attachments" + svg:                           http.StatusOK,
 		"/attachments" + home + "/secret.txt":          http.StatusNotFound,
 		"/attachments" + home + "/../x.png":            http.StatusNotFound,
 		"/attachments" + filepath.Dir(home) + "/x.png": http.StatusNotFound,
@@ -46,5 +50,22 @@ func TestAttachmentHandler(t *testing.T) {
 		if w.Code != want {
 			t.Errorf("%s: %d want %d", u, w.Code, want)
 		}
+	}
+}
+
+// TestAttachmentSVG: the Approach diagram (approach.svg next to BRIEF.md) is served
+// as an image with scripts blocked (AC6).
+func TestAttachmentSVG(t *testing.T) {
+	home := t.TempDir()
+	svg := filepath.Join(home, "workspaces", "K-1", "approach.svg")
+	os.MkdirAll(filepath.Dir(svg), 0o755)
+	os.WriteFile(svg, []byte("<svg/>"), 0o644)
+	w := httptest.NewRecorder()
+	AttachmentHandler(home).ServeHTTP(w, httptest.NewRequest("GET", "/attachments"+svg, nil))
+	if w.Code != http.StatusOK || w.Header().Get("Content-Type") != "image/svg+xml" {
+		t.Fatalf("svg: %d %q", w.Code, w.Header().Get("Content-Type"))
+	}
+	if !strings.Contains(w.Header().Get("Content-Security-Policy"), "script-src 'none'") {
+		t.Fatal("svg served without a no-script CSP")
 	}
 }
