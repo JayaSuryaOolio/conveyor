@@ -1,9 +1,9 @@
 import {lazy, Ref, Suspense, useEffect, useRef, useState} from 'react'
-import {ActionIcon, Anchor, Badge, Box, Breadcrumbs, CloseButton, Code, CopyButton, Divider, Kbd, Paper, Popover, TextInput, Timeline, Title, Tooltip} from '@mantine/core'
+import {ActionIcon, Anchor, Badge, Box, Breadcrumbs, CloseButton, Code, CopyButton, Divider, Kbd, Paper, Popover, Tabs, TextInput, Timeline, Title, Tooltip} from '@mantine/core'
 import {Button, Clickable, ClickableCode, Group, Modal, Stack, Text} from './ui'
 import {useLocalStorage} from '@mantine/hooks'
 import {IconAbc, IconSitemap, IconArrowDown, IconArrowUp, IconClock, IconFlame, IconHash, IconPencil, IconSearch, IconTerminal, IconX, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconMessage, IconPlayerPlay} from '@tabler/icons-react'
-import {Actions, GetTask, QueueStatus, RunLog, SendQueuedNow, SetTaskDescription, Stop, TakeQueuedComment, TermStart} from '../wailsjs/go/ui/App'
+import {Actions, GetTask, PreviewBrief, QueueStatus, RunLog, SendQueuedNow, SetTaskDescription, Stop, TakeQueuedComment, TermStart} from '../wailsjs/go/ui/App'
 import {core, store, ui} from '../wailsjs/go/models'
 import {Card, CommentBox, Message, Nav, StatusBadge, Time, View, errMsg} from './components'
 import {Markdown, MarkdownEditor, TaskKey} from './markdown'
@@ -341,10 +341,9 @@ export function TaskPage({k, nav, height = 'calc(100vh - 2 * var(--mantine-spaci
                 <ScrollBox floating={floatingAnswer}>
                     <Stack>
                         <WatchedTitle onGone={setTitleGone}>{t.title}</WatchedTitle>
-                        <Decisions k={t.key}/>
                         <Description t={t} reload={reload}/>
                         <Relations k={t.key} status={t.status} rel={d.relations} nav={nav} reload={reload}/>
-                        {latest?.criteria && <><Title order={5}>Acceptance criteria</Title><Criteria text={latest.criteria}/></>}
+                        <DetailTabs k={t.key} criteria={latest?.criteria} nav={nav}/>
                         <Title order={5}>Thread</Title>
                         <Timeline bulletSize={24} lineWidth={2}>
                             {items.map(it => it.run ? (
@@ -382,6 +381,34 @@ export function TaskPage({k, nav, height = 'calc(100vh - 2 * var(--mantine-spaci
         </Box>
         </Box>
         </TaskKey.Provider>
+    )
+}
+
+/** Acceptance criteria, decisions and brief as tabs. keepMounted={false} unmounts hidden panels, so each fetches only while shown and its DOM is freed on switch. */
+function DetailTabs({k, criteria, nav}: {k: string; criteria?: string; nav: Nav}) {
+    return (
+        <Tabs defaultValue={criteria ? 'criteria' : 'decisions'} keepMounted={false}>
+            <Tabs.List mb="xs">
+                {criteria && <Tabs.Tab value="criteria">Acceptance criteria</Tabs.Tab>}
+                <Tabs.Tab value="decisions">Decisions</Tabs.Tab>
+                <Tabs.Tab value="brief">Brief</Tabs.Tab>
+            </Tabs.List>
+            {criteria && <Tabs.Panel value="criteria"><Criteria text={criteria}/></Tabs.Panel>}
+            <Tabs.Panel value="decisions"><Decisions k={k}/></Tabs.Panel>
+            <Tabs.Panel value="brief"><Brief k={k} nav={nav}/></Tabs.Panel>
+        </Tabs>
+    )
+}
+
+/** BRIEF.md as the next launch would write it (brief.Build, the same renderer as the file), plus a link to the prompt preview in Settings. */
+function Brief({k, nav}: {k: string; nav: Nav}) {
+    const {data, error} = useData(() => PreviewBrief(k), [k])
+    if (error) return <Text tone="danger">{error}</Text>
+    return (
+        <Stack gap="xs">
+            <Anchor size="sm" component="button" style={{alignSelf: 'start'}} onClick={() => nav({name: 'settings', label: 'Prompts', task: k})}>Show the launch prompt</Anchor>
+            {data ? <Markdown>{data.brief}</Markdown> : <Text tone="muted">Loading…</Text>}
+        </Stack>
     )
 }
 

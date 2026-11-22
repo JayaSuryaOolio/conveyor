@@ -148,7 +148,7 @@ export default function App() {
                 {view.name === 'apps' && <Connectors/>}
                 {view.name === 'agents' && <Agents/>}
                 {view.name === 'logs' && <Logs/>}
-                {view.name === 'settings' && <Settings/>}
+                {view.name === 'settings' && <Settings tab={view.label} task={view.task}/>}
             </AppShell.Main>
             <Modal opened={showFocus} onClose={() => setShowFocus(false)} size="min(800px, 96vw)" title="Focus" keepMounted><Focus nav={nav} onClose={() => setShowFocus(false)}/></Modal>
             <Modal opened={showNew} onClose={() => setShowNew(false)} size="clamp(28rem, 60vw, 64rem)" title="New task" keepMounted onExitTransitionEnd={() => setNewKey(k => k + 1)}><NewTask key={newKey} nav={nav} close={() => setShowNew(false)}/></Modal>

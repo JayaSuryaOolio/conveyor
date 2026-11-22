@@ -1,4 +1,4 @@
-import {useState} from 'react'
+import {useEffect, useState} from 'react'
 import {ActionIcon, Checkbox, Code, MultiSelect, PasswordInput, ScrollArea, SegmentedControl, Select, SelectProps, SimpleGrid, Table, TagsInput, Tabs, TextInput, Textarea, Title, Tooltip} from '@mantine/core'
 import {Button, Group, Modal, Stack, Text} from './ui'
 import {IconAdjustments} from '@tabler/icons-react'
@@ -201,7 +201,8 @@ const TABS: {name: string; fields: Field[]}[] = [
 /** Every setting label, for the command palette. */
 export const SETTING_LABELS = TABS.flatMap(t => t.fields.map(f => f.label))
 
-export function Settings() {
+/** tab opens that settings tab; task preselects it in the Prompts preview (the task Brief tab links here). */
+export function Settings({tab, task}: {tab?: string; task?: string}) {
     const {data, error, reload} = useData(GetSettings, [])
     const {data: defs} = useData(GetPromptDefaults, [])
     const known = new Set(TABS.flatMap(t => t.fields.map(f => f.k)))
@@ -211,14 +212,14 @@ export function Settings() {
             <Title order={3}>Settings</Title>
             {error && <Text tone="danger">{error}</Text>}
             {data && (
-                <Tabs defaultValue="General" keepMounted={false}>
+                <Tabs defaultValue={tab ?? "General"} keepMounted={false}>
                     <Tabs.List mb="md">{TABS.map(t => <Tabs.Tab key={t.name} value={t.name}>{t.name}</Tabs.Tab>)}<Tabs.Tab value="UI">UI</Tabs.Tab><Tabs.Tab value="Repos">Repos</Tabs.Tab><Tabs.Tab value="Requirements">Requirements</Tabs.Tab></Tabs.List>
                     {TABS.map(t => (
                         <Tabs.Panel key={t.name} value={t.name}>
                             <Stack>
                                 {(t.name === "General" ? [...t.fields, ...extra] : t.fields).map(f => <SettingRow key={f.k} f={f} v={data[f.k] ?? ""} reload={reload} ph={f.k === "prompt_fresh" ? defs?.fresh : f.k === "prompt_resume" ? defs?.resume : undefined}/>)}
                                 {t.name === "General" && <StateButtons reload={reload}/>}
-                                {t.name === "Prompts" && <PromptsInfo settings={data} protocol={defs?.protocol ?? ""}/>}
+                                {t.name === "Prompts" && <PromptsInfo settings={data} protocol={defs?.protocol ?? ""} task={task}/>}
                             </Stack>
                         </Tabs.Panel>
                     ))}
@@ -289,12 +290,15 @@ export function SettingRow({f, v, ph, reload}: {f: Field; v: string; ph?: string
 }
 
 /** What the agent receives: the built-in protocol (read-only) and a live preview of a task brief. */
-function PromptsInfo({settings, protocol}: {settings: Record<string, string>; protocol: string}) {
+function PromptsInfo({settings, protocol, task}: {settings: Record<string, string>; protocol: string; task?: string}) {
     const {data: tasks} = useData(listTasks, [])
-    const [key, setKey] = useState<string | null>(null)
+    const [key, setKey] = useState<string | null>(task ?? null)
     const [raw, setRaw] = useState("rendered")
     const sig = JSON.stringify(settings) // refetch when any setting is saved
     const {data: pv, error} = useData(() => key ? PreviewBrief(key) : Promise.resolve(undefined), [key, sig])
+    // Opened from a task's Brief tab: jump to the prompt it links to.
+    const shown = !!pv
+    useEffect(() => { if (task && shown) document.getElementById('fresh-prompt')?.scrollIntoView() }, [task, shown])
     return (
         <Stack style={{marginTop: 'var(--mantine-spacing-md)'}}>
             <Title order={5}>Built-in protocol and rules</Title>
@@ -312,7 +316,7 @@ function PromptsInfo({settings, protocol}: {settings: Record<string, string>; pr
                 <Text size="sm" weight={600}>BRIEF.md</Text>
                 {raw === "raw" ? <Code block>{pv.brief}</Code> : <Markdown>{pv.brief}</Markdown>}
                 <Text size="sm" weight={600}>Fresh prompt</Text>
-                <Code block>{pv.prompt}</Code>
+                <Code block id="fresh-prompt">{pv.prompt}</Code>
             </>}
         </Stack>
     )
