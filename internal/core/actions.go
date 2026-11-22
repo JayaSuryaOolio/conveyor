@@ -72,9 +72,9 @@ func (s *Service) runAction(t store.Task, r store.Run) (cmd, kind string, ok boo
 		if r.BgID == nil {
 			return "", "", false, nil
 		}
-		return attachCommand(rr, r, settings, workspace.OtherPaths(t)), "attach", true, nil
+		return attachCommand(rr, r, settings, workspace.AddDirs(s.Home, t)), "attach", true, nil
 	}
-	return rr.ResumeCommand(*r.SessionID, settings, workspace.OtherPaths(t)), "resume", true, nil
+	return rr.ResumeCommand(*r.SessionID, settings, workspace.AddDirs(s.Home, t)), "resume", true, nil
 }
 
 // bin is the conveyor CLI the hooks call: Bin if set, else this executable.
@@ -187,7 +187,7 @@ func (s *Service) Actions(key string) ([]Action, error) {
 	if err != nil {
 		return nil, err
 	}
-	out = append(out, Action{"New session from brief", primary, cwd, bgRunner.FreshCommand(settings, briefPath, workspace.OtherPaths(t)), "fresh"})
+	out = append(out, Action{"New session from brief", primary, cwd, bgRunner.FreshCommand(settings, briefPath, workspace.AddDirs(s.Home, t)), "fresh"})
 	for _, r := range t.Repos {
 		if r.WorktreePath == nil {
 			continue

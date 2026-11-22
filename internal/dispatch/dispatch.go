@@ -648,7 +648,7 @@ func (d *Dispatcher) unconsume(run store.Run) {
 }
 
 func (d *Dispatcher) spec(task store.Task, cwd, settings, prompt string) runner.LaunchSpec {
-	s := runner.LaunchSpec{Cwd: cwd, AddDirs: workspace.OtherPaths(task), Prompt: prompt, TaskKey: task.Key, SettingsPath: settings, Bypass: true}
+	s := runner.LaunchSpec{Cwd: cwd, AddDirs: workspace.AddDirs(d.Svc.Home, task), Prompt: prompt, TaskKey: task.Key, SettingsPath: settings, Bypass: true}
 	if task.Agent != nil {
 		s.Agent = *task.Agent
 	}

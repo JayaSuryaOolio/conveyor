@@ -225,7 +225,7 @@ func WriteSettings(home, conveyorBin string) (string, error) {
 }
 
 // writeScope confines Claude's Edit/Write/NotebookEdit tools to the session's working directories (cwd and
-// --add-dir: the task's worktrees) in every permission mode, bypass included, plus the temp dirs (the
+// --add-dir: the task's worktrees and its workspace dir) in every permission mode, bypass included, plus the temp dirs (the
 // scratchpad lives in /tmp) and ~/.claude's memory and plans. Claude Code (2.1.314+) enforces it and
 // tells the agent which dirs are allowed; older versions ignore the key. Bash writes are not covered.
 func writeScope() map[string]any {

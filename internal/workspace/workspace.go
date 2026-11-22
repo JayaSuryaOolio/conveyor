@@ -172,6 +172,12 @@ func OtherPaths(task store.Task) []string {
 	return out
 }
 
+// AddDirs returns the --add-dir list for a task's sessions: the other worktrees and the task's
+// workspace dir, so Write/Edit can reach BRIEF.md's folder (STATE.md, approach.svg).
+func AddDirs(home string, task store.Task) []string {
+	return append(OtherPaths(task), Dir(home, task.Key))
+}
+
 // KeyFromCwd returns the task key if cwd is inside <home>/workspaces/<KEY>/..., else "".
 func KeyFromCwd(home, cwd string) string {
 	rel, err := filepath.Rel(realPath(filepath.Join(home, "workspaces")), realPath(cwd))
@@ -182,7 +188,8 @@ func KeyFromCwd(home, cwd string) string {
 }
 
 // Remove runs `git worktree remove` for each worktree, without --force unless force is set.
-// The workspace folder is removed only when every worktree is gone. Dirty worktrees return ErrDirty.
+// Once every worktree is gone, the workspace folder is cleared (BRIEF.md and what agents wrote there)
+// except attachments/, which the thread's images link to. Dirty worktrees return ErrDirty.
 func Remove(db *sql.DB, home string, task store.Task, force bool) error {
 	if !force { // check all first so a dirty repo doesn't leave a half-removed workspace
 		for _, tr := range task.Repos {
@@ -223,6 +230,15 @@ func Remove(db *sql.DB, home string, task store.Task, force bool) error {
 			return err
 		}
 	}
-	os.Remove(Dir(home, task.Key)) // only succeeds when empty
+	ws := Dir(home, task.Key)
+	entries, _ := os.ReadDir(ws)
+	for _, e := range entries {
+		if e.Name() != "attachments" {
+			if err := os.RemoveAll(filepath.Join(ws, e.Name())); err != nil {
+				return err
+			}
+		}
+	}
+	os.Remove(ws) // only succeeds when empty (no attachments)
 	return nil
 }
