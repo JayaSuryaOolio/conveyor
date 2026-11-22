@@ -581,6 +581,10 @@ func (d *Dispatcher) start(ctx context.Context, task store.Task, delta []store.C
 	if err != nil {
 		return store.Run{}, err
 	}
+	check, err := brief.RunPrecheck(d.Svc.DB, d.Svc.Home, task) // before Render, which moves BRIEF.md's mtime
+	if err != nil {
+		return store.Run{}, err
+	}
 	briefPath, err := brief.Render(d.Svc.DB, d.Svc.Home, task)
 	if err != nil {
 		return store.Run{}, err
@@ -599,6 +603,9 @@ func (d *Dispatcher) start(ctx context.Context, task store.Task, delta []store.C
 		run.Prompt = brief.WithInjected(d.Svc.DB, brief.ResumePrompt(task, briefPath, delta, store.GetSetting(d.Svc.DB, "prompt_resume")))
 	} else {
 		run.Prompt = brief.WithInjected(d.Svc.DB, brief.FreshPrompt(task, briefPath, delta, store.GetSetting(d.Svc.DB, "prompt_fresh")))
+	}
+	if check.Decision != "" {
+		run.Prompt += "\n\n" + check.Decision
 	}
 	if run, err = store.CreateRun(d.Svc.DB, run); err != nil {
 		return store.Run{}, err

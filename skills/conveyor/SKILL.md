@@ -26,6 +26,7 @@ conveyor [--home dir] <cmd>          # no args = usage; list/show take --json
 conveyor task list [--status todo,running] --json
 conveyor task show KEY --thread --runs [--json]
 conveyor task brief KEY --preview     # what the agent is told
+conveyor task precheck KEY            # start check: must the next run re-read the description
 conveyor task log KEY [--follow]      # live session output
 conveyor task sessions KEY [--json]   # Claude session ids (runs + manual)
 conveyor app open NAME KEY            # runs the first action; a quick action (--output) prints its output

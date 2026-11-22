@@ -5,7 +5,7 @@ import {useLocalStorage} from '@mantine/hooks'
 import {IconAbc, IconSitemap, IconArrowDown, IconArrowUp, IconClock, IconFlame, IconHash, IconPencil, IconSearch, IconTerminal, IconX, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconMessage, IconPlayerPlay} from '@tabler/icons-react'
 import {Actions, GetTask, PreviewBrief, QueueStatus, RunLog, SendQueuedNow, SetTaskDescription, Stop, TakeQueuedComment, TermStart} from '../wailsjs/go/ui/App'
 import {core, store, ui} from '../wailsjs/go/models'
-import {Card, CommentBox, Message, Nav, StatusBadge, Time, View, errMsg} from './components'
+import {Card, CommentBox, Edits, Message, Nav, StatusBadge, Time, View, errMsg} from './components'
 import {Markdown, MarkdownEditor, TaskKey} from './markdown'
 import {Decisions} from './decisions'
 import {Relations} from './relations'
@@ -260,14 +260,17 @@ function SessionLog({run, onStop}: {run: store.Run; onStop?: () => void}) {
     )
 }
 
-/** The task description; the pencil edits it in any status (an edit after a run posts a system comment quoting the old text). */
+/** The task description; the pencil edits it in any status, the pager shows earlier versions (dashed border; not persisted). */
 function Description({t, reload}: {t: store.Task; reload: () => void}) {
     const [draft, setDraft] = useState<string | null>(null)
     const [busy, setBusy] = useState(false)
+    const [ver, setVer] = useState<number | null>(null) // null shows the current description
+    const old = ver === null ? undefined : t.description_edits?.[ver]
+    const body = old ? old.body : t.description
     if (draft !== null) {
         const save = () => {
             setBusy(true)
-            SetTaskDescription(t.key, draft).then(() => { setDraft(null); reload() }).catch(errMsg).finally(() => setBusy(false))
+            SetTaskDescription(t.key, draft).then(() => { setDraft(null); setVer(null); reload() }).catch(errMsg).finally(() => setBusy(false))
         }
         return (
             <Stack gap={4}>
@@ -277,11 +280,14 @@ function Description({t, reload}: {t: store.Task; reload: () => void}) {
         )
     }
     return (
-        <Paper withBorder p="md" radius="md" pos="relative">
-            <ActionIcon variant="subtle" color="gray" size="sm" pos="absolute" top={8} right={8} aria-label="Edit description" onClick={() => setDraft(t.description)}>
-                <IconPencil size={14}/>
-            </ActionIcon>
-            <Markdown c={t.description ? undefined : 'dimmed'}>{t.description || '(no description)'}</Markdown>
+        <Paper withBorder p="md" radius="md" pos="relative" style={old ? {borderStyle: 'dashed'} : undefined}>
+            <div style={{position: 'absolute', top: 8, right: 8, display: 'flex', alignItems: 'center', gap: 4}}>
+                {!!t.description_edits?.length && <Edits edits={t.description_edits} i={ver} setI={setVer}/>}
+                <ActionIcon variant="subtle" color="gray" size="sm" aria-label="Edit description" onClick={() => setDraft(t.description)}>
+                    <IconPencil size={14}/>
+                </ActionIcon>
+            </div>
+            <Markdown c={body ? undefined : 'dimmed'}>{body || '(no description)'}</Markdown>
         </Paper>
     )
 }

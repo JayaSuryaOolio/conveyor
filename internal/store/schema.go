@@ -277,6 +277,9 @@ UPDATE labels SET name=lower(name) WHERE name IN ('approved','archived')`); err 
 	if err := migrateAddCommentEdits(db); err != nil {
 		return err
 	}
+	if err := migrateAddTaskDescriptionEdits(db); err != nil {
+		return err
+	}
 	if err := migrateAddTaskDeletedAt(db); err != nil {
 		return err
 	}
@@ -410,6 +413,20 @@ func migrateAddCommentEdits(db *sql.DB) error {
 	if n == 0 {
 		if _, err := db.Exec(`ALTER TABLE comments ADD COLUMN edits TEXT NOT NULL DEFAULT ''`); err != nil {
 			return fmt.Errorf("add comments.edits: %w", err)
+		}
+	}
+	return nil
+}
+
+// migrateAddTaskDescriptionEdits adds tasks.description_edits (JSON list of replaced descriptions; "" = never edited).
+func migrateAddTaskDescriptionEdits(db *sql.DB) error {
+	var n int
+	if err := db.QueryRow(`SELECT count(*) FROM pragma_table_info('tasks') WHERE name='description_edits'`).Scan(&n); err != nil {
+		return fmt.Errorf("check tasks.description_edits: %w", err)
+	}
+	if n == 0 {
+		if _, err := db.Exec(`ALTER TABLE tasks ADD COLUMN description_edits TEXT NOT NULL DEFAULT ''`); err != nil {
+			return fmt.Errorf("add tasks.description_edits: %w", err)
 		}
 	}
 	return nil

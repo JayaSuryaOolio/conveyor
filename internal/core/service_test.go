@@ -258,34 +258,31 @@ func TestSubtaskDefaultsToParentAgent(t *testing.T) {
 	}
 }
 
-func TestSetTaskDescriptionNotesEditAfterRun(t *testing.T) {
+func TestSetTaskDescriptionKeepsHistoryNoComment(t *testing.T) {
 	s := newSvc(t)
-	tk, err := s.CreateTask(NewTaskInput{Title: "t", Description: "old\nline", Repos: []string{"a"}})
+	tk, err := s.CreateTask(NewTaskInput{Title: "t", Description: "old", Repos: []string{"a"}})
 	if err != nil {
 		t.Fatal(err)
-	}
-	if err := s.SetTaskDescription("CV-1", "draft"); err != nil {
-		t.Fatal(err)
-	}
-	if cs, _ := store.ListComments(s.DB, tk.ID); len(cs) != 0 {
-		t.Fatalf("noted an edit no run saw: %+v", cs)
 	}
 	if _, err := store.CreateRun(s.DB, store.Run{TaskID: tk.ID, Kind: "auto", Mode: "fresh", Status: "finished"}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.UpdateTaskStatus(s.DB, tk.ID, store.StatusTodo, store.ActorHuman); err != nil {
+	if err := s.SetTaskDescription("CV-1", "mine", "agent:CV-1"); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.SetTaskDescription("CV-1", "new"); err != nil {
+	if err := s.SetTaskDescription("CV-1", "new", "human"); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.SetTaskDescription("CV-1", "new"); err != nil { // unchanged: no second note
+	if err := s.SetTaskDescription("CV-1", "new", "human"); err != nil { // unchanged: no edit
 		t.Fatal(err)
 	}
 	got, _ := store.GetTaskByKey(s.DB, "CV-1")
-	cs, _ := store.UnconsumedComments(s.DB, tk.ID)
-	if got.Description != "new" || len(cs) != 1 || cs[0].Author != store.AuthorSystem || !strings.Contains(cs[0].Body, "> draft") {
-		t.Fatalf("%q %+v", got.Description, cs)
+	e := got.DescriptionEdits
+	if got.Description != "new" || len(e) != 2 || e[0].Body != "old" || e[0].By != "agent:CV-1" || e[1].Body != "mine" || e[1].By != "human" {
+		t.Fatalf("%q %+v", got.Description, e)
+	}
+	if cs, _ := store.ListComments(s.DB, tk.ID); len(cs) != 0 { // the next run's start check reports it instead
+		t.Fatalf("posted a comment: %+v", cs)
 	}
 }
 

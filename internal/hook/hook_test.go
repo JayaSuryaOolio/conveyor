@@ -231,6 +231,23 @@ func TestStopWithPendingCommentsToTodo(t *testing.T) {
 	}
 }
 
+func TestStopAfterDescriptionEditMidRun(t *testing.T) {
+	for _, by := range []string{"human", "agent:OTHER", "own"} {
+		e := setup(t, store.StatusRunning)
+		e.run(t, "auto", "running", "S1", "")
+		if by == "own" {
+			by = "agent:" + e.task.Key
+		}
+		if err := store.SetTaskDescription(e.db, e.task, "changed", by); err != nil {
+			t.Fatal(err)
+		}
+		e.fire(t, "Stop", map[string]any{"session_id": "S1", "last_assistant_message": doneMsg})
+		if got, own := e.status(t).Status, by == "agent:"+e.task.Key; (got == store.StatusTodo) == own {
+			t.Fatalf("%s: status %s", by, got)
+		}
+	}
+}
+
 func TestInteractiveStopLeavesTask(t *testing.T) {
 	e := setup(t, store.StatusReview)
 	// no run yet: an interactive run is created on the fly

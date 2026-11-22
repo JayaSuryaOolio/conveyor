@@ -39,9 +39,11 @@ type Task struct {
 	CreatedAt           string  `json:"created_at"`
 	UpdatedAt           string  `json:"updated_at"`
 	// CreatedBy is "human", "agent:<KEY>", "automation:<name>", "jira", "learning" or "followup:<KEY>"; nil on rows from before the column.
-	CreatedBy *string    `json:"created_by"`
-	Repos     []TaskRepo `json:"repos,omitempty"`
-	Labels    []string   `json:"labels"`
+	CreatedBy *string `json:"created_by"`
+	// DescriptionEdits are the replaced descriptions, oldest first (SetTaskDescription).
+	DescriptionEdits []CommentEdit `json:"description_edits"`
+	Repos            []TaskRepo    `json:"repos,omitempty"`
+	Labels           []string      `json:"labels"`
 }
 
 // TaskRepo links a task to a repo. On input to CreateTask, Branch is the
@@ -104,10 +106,12 @@ type Comment struct {
 	Edits           []CommentEdit `json:"edits"` // earlier versions, oldest first; a run's agent comment is updated, not re-posted
 }
 
-// CommentEdit is a replaced version of a comment: its body and when it was replaced.
+// CommentEdit is a replaced version of a comment or task description: its body, when it was replaced
+// and, for a description, by whom ("human", "agent:<KEY>" or "agent").
 type CommentEdit struct {
 	Body string `json:"body"`
 	At   string `json:"at"`
+	By   string `json:"by,omitempty"`
 }
 
 // Event is an audit-log row.

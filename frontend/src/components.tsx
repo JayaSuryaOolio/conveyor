@@ -209,15 +209,15 @@ export function CommentBox({k, placeholder = 'Comment…', onDone, restored}: {k
     </>
 }
 
-/** Pager over a comment's replaced versions: `i` is an index into `edits` (oldest first), null is the current body. */
-function Edits({edits, i, setI}: {edits: store.CommentEdit[]; i: number | null; setI: (i: number | null) => void}) {
+/** Pager over a comment's or description's replaced versions: `i` is an index into `edits` (oldest first), null is the current body. */
+export function Edits({edits, i, setI}: {edits: store.CommentEdit[]; i: number | null; setI: (i: number | null) => void}) {
     const at = i ?? edits.length
     return (
         <Group gap={2} wrap={false} style={{marginLeft: 'auto'}}>
             <ActionIcon variant="subtle" color="gray" size="xs" aria-label="Older version" disabled={at === 0} onClick={() => setI(at - 1)}><IconChevronLeft size={12}/></ActionIcon>
             {i === null
                 ? <Text size="xs" tone="muted">Current</Text>
-                : <Tooltip label="Back to current"><Badge size="xs" variant="light" color="gray" style={{cursor: 'pointer'}} component="button" type="button" onClick={() => setI(null)}>Edit {i + 1}/{edits.length}</Badge></Tooltip>}
+                : <Tooltip label={edits[i].by ? `Replaced by ${edits[i].by}; back to current` : 'Back to current'}><Badge size="xs" variant="light" color="gray" style={{cursor: 'pointer'}} component="button" type="button" onClick={() => setI(null)}>Edit {i + 1}/{edits.length}</Badge></Tooltip>}
             <ActionIcon variant="subtle" color="gray" size="xs" aria-label="Newer version" disabled={i === null} onClick={() => setI(i! + 1 >= edits.length ? null : i! + 1)}><IconChevronRight size={12}/></ActionIcon>
         </Group>
     )
