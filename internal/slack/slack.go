@@ -39,7 +39,7 @@ var mine sync.Map
 // slack_thread:CHANNEL:ROOT_TS -> KEY routes a reply to its task, slack_task:KEY -> CHANNEL:ROOT_TS
 // keeps a task's notifications in one thread. Message text is only parsed (keyOf) for threads
 // that predate this.
-// The prune-closed automation (store.PruneClosed) removes a task's rows when it deletes the task.
+// The prune-closed automation (store.PruneClosed) soft-deletes a task and drops its dependent rows.
 
 // link records that the thread rooted at ts in channel belongs to key.
 func (s *Slack) link(channel, ts, key string) {

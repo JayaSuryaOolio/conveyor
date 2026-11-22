@@ -1,6 +1,9 @@
 package store
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 func TestChildKey(t *testing.T) {
 	for _, c := range []struct {
@@ -143,5 +146,36 @@ func TestSetParent(t *testing.T) {
 	}
 	if got, _ := GetTaskByKey(db, c.Key); got.ParentID != nil {
 		t.Fatalf("after clear: %+v", got)
+	}
+}
+
+func TestPruneNeverReusesKeys(t *testing.T) {
+	db := openTest(t)
+	r := mkRepo(t, db, "a")
+	links := []TaskRepo{{RepoID: r.ID, IsPrimary: true, Branch: "t"}}
+	p, _ := CreateTask(db, Task{Title: "p"}, links)
+	c, err := CreateTask(db, Task{Title: "c", ParentID: &p.ID, Status: StatusDone}, links)
+	if err != nil || c.Key != "CV-1A" {
+		t.Fatalf("child = %q, %v", c.Key, err)
+	}
+	top, _ := CreateTask(db, Task{Title: "t2", Status: StatusDone}, links)
+	db.Exec(`UPDATE tasks SET updated_at='2000-01-01T00:00:00Z' WHERE id IN (?,?)`, c.ID, top.ID)
+	if n, _, err := PruneClosed(db, time.Hour, time.Now()); err != nil || n != 2 {
+		t.Fatalf("pruned %d, %v", n, err)
+	}
+	if _, err := GetTaskByKey(db, c.Key); err == nil {
+		t.Error("pruned task still readable")
+	}
+	if ts, _ := ListTasks(db); len(ts) != 1 {
+		t.Errorf("list shows %d tasks, want 1", len(ts))
+	}
+	if rel, _ := ListRelations(db, p); len(rel.Children) != 0 {
+		t.Errorf("pruned child in relations: %+v", rel.Children)
+	}
+	if n, err := CreateTask(db, Task{Title: "n", ParentID: &p.ID}, links); err != nil || n.Key == c.Key {
+		t.Errorf("new child key %q, %v; pruned key reused", n.Key, err)
+	}
+	if n, err := CreateTask(db, Task{Title: "n"}, links); err != nil || n.Key == top.Key {
+		t.Errorf("new top key %q, %v; pruned key reused", n.Key, err)
 	}
 }

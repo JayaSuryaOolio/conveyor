@@ -37,7 +37,7 @@ func loadRepos(db dbtx, taskID int64) ([]TaskRepo, error) {
 }
 
 func getTask(db dbtx, where string, arg any, what string) (Task, error) {
-	t, err := scanTask(db.QueryRow(`SELECT `+taskCols+` FROM tasks WHERE `+where, arg))
+	t, err := scanTask(db.QueryRow(`SELECT `+taskCols+` FROM tasks WHERE deleted_at IS NULL AND `+where, arg))
 	if err != nil {
 		return Task{}, fmt.Errorf("task %s: %w", what, err)
 	}
@@ -126,10 +126,10 @@ func CreateTask(db *sql.DB, t Task, repos []TaskRepo) (Task, error) {
 // ListTasks returns tasks (with Repos), priority desc then created_at asc,
 // optionally filtered to the given statuses.
 func ListTasks(db *sql.DB, statuses ...Status) ([]Task, error) {
-	q := `SELECT ` + taskCols + ` FROM tasks`
+	q := `SELECT ` + taskCols + ` FROM tasks WHERE deleted_at IS NULL`
 	var args []any
 	if len(statuses) > 0 {
-		q += ` WHERE status IN (` + placeholders(len(statuses)) + `)`
+		q += ` AND status IN (` + placeholders(len(statuses)) + `)`
 		for _, s := range statuses {
 			args = append(args, string(s))
 		}
