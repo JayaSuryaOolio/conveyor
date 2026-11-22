@@ -61,11 +61,25 @@ func ListLabels(db *sql.DB) ([]string, error) {
 	return out, rows.Err()
 }
 
+// Reserved labels carry behaviour and are seeded at migrate time.
+const (
+	LabelApproved = "approved" // queues a "spec approved" comment (core.AddLabel)
+	LabelArchived = "archived" // prune-closed keeps the task row
+)
+
+var ReservedLabels = []string{LabelApproved, LabelArchived}
+
 // AddLabel creates the label if new (names are case-insensitive, trimmed) and puts it on the task. Adding twice is a no-op.
+// A custom spelling of a reserved label (e.g. "Archived") is rejected.
 func AddLabel(db *sql.DB, taskID int64, name string) error {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return fmt.Errorf("label name is empty")
+	}
+	for _, r := range ReservedLabels {
+		if strings.EqualFold(name, r) && name != r {
+			return fmt.Errorf("label %q is reserved; use %q", name, r)
+		}
 	}
 	return inTx(db, func(tx *sql.Tx) error {
 		if err := addLabel(tx, taskID, name); err != nil {

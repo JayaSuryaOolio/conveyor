@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/JayaSuryaOolio/conveyor/internal/core"
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
+	"github.com/JayaSuryaOolio/conveyor/internal/workspace"
 )
 
 func at(s string) time.Time { t, _ := time.Parse(time.RFC3339, s); return t }
@@ -212,13 +214,46 @@ func TestAddRejectsDuplicateName(t *testing.T) {
 	}
 }
 
+// gitRepo registers a real repo "g" with a bare origin, so workspace.Ensure can add worktrees.
+func gitRepo(t *testing.T, svc *core.Service) store.Repo {
+	t.Helper()
+	root := t.TempDir()
+	p, o := filepath.Join(root, "g"), filepath.Join(root, "g.git")
+	git := func(dir string, args ...string) {
+		if out, err := exec.Command("git", append([]string{"-C", dir, "-c", "user.email=a@b", "-c", "user.name=t"}, args...)...).CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v %s", args, err, out)
+		}
+	}
+	os.MkdirAll(p, 0o755)
+	git(p, "init", "-b", "main")
+	git(p, "commit", "--allow-empty", "-m", "init")
+	git(root, "init", "--bare", o)
+	git(p, "remote", "add", "origin", o)
+	git(p, "push", "origin", "main")
+	r, err := store.AddRepo(svc.DB, store.Repo{Name: "g", Path: p, DefaultBranch: "main"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return r
+}
+
 func TestPruneClosed(t *testing.T) {
 	svc, _ := env(t)
-	repo, _ := store.GetRepoByName(svc.DB, "a")
-	mk := func(status store.Status, age time.Duration) store.Task {
+	fake, _ := store.GetRepoByName(svc.DB, "a")
+	real := gitRepo(t, svc)
+	// mk makes a task; with a worktree when on the real repo.
+	mk := func(repo store.Repo, status store.Status, age time.Duration, labels ...string) store.Task {
 		tk, err := store.CreateTask(svc.DB, store.Task{Title: "T", Status: status}, []store.TaskRepo{{RepoID: repo.ID, IsPrimary: true, Branch: "t"}})
 		if err != nil {
 			t.Fatal(err)
+		}
+		if repo.ID == real.ID {
+			if tk, err = workspace.Ensure(svc.DB, svc.Home, tk); err != nil {
+				t.Fatal(err)
+			}
+		}
+		for _, l := range labels {
+			store.AddLabel(svc.DB, tk.ID, l)
 		}
 		ts := time.Now().Add(-age).UTC().Format(time.RFC3339)
 		svc.DB.Exec(`UPDATE tasks SET updated_at=? WHERE id=?`, ts, tk.ID)
@@ -227,28 +262,54 @@ func TestPruneClosed(t *testing.T) {
 		return tk
 	}
 	day := 24 * time.Hour
-	oldDone, oldCan := mk(store.StatusDone, 8*day), mk(store.StatusCancelled, 9*day)
-	newDone, run, todo := mk(store.StatusDone, day), mk(store.StatusRunning, 30*day), mk(store.StatusTodo, 30*day)
+	oldDone, oldCan := mk(fake, store.StatusDone, 8*day), mk(fake, store.StatusCancelled, 9*day)
+	newDone, run, todo := mk(fake, store.StatusDone, day), mk(fake, store.StatusRunning, 30*day), mk(fake, store.StatusTodo, 30*day)
+	archived := mk(fake, store.StatusCancelled, 30*day, store.LabelArchived)
+	wtDone := mk(real, store.StatusDone, 8*day)
+	wtArchived := mk(real, store.StatusDone, 8*day, store.LabelArchived)
+	wtDirty := mk(real, store.StatusDone, 8*day)
+	dirty := filepath.Join(workspace.PrimaryPath(wtDirty), "wip")
+	os.WriteFile(dirty, []byte("x"), 0o644)
 	store.SetSetting(svc.DB, "slack_thread:C:orphan", "CV-999")
 	store.SetSetting(svc.DB, "slack_task:CV-998", "C:x")
 
 	a := Templates["prune-closed"]
 	res, err := RunOne(context.Background(), svc, a)
-	if err != nil || res != "pruned 2 tasks, 6 slack links" {
+	if err != nil || res != "pruned 3 tasks, 8 slack links, 1 dirty workspaces kept" {
 		t.Fatalf("%q %v", res, err)
 	}
-	for _, k := range []string{oldDone.Key, oldCan.Key} {
+	for _, k := range []string{oldDone.Key, oldCan.Key, wtDone.Key} {
 		if _, err := store.GetTaskByKey(svc.DB, k); err == nil {
 			t.Errorf("%s kept", k)
 		}
 	}
-	for _, tk := range []store.Task{newDone, run, todo} {
+	for _, tk := range []store.Task{newDone, run, todo, archived, wtArchived, wtDirty} {
 		if _, err := store.GetTaskByKey(svc.DB, tk.Key); err != nil {
 			t.Errorf("%s pruned", tk.Key)
 		}
 		if store.GetSetting(svc.DB, "slack_task:"+tk.Key) == "" {
 			t.Errorf("%s link pruned", tk.Key)
 		}
+	}
+	for _, tk := range []store.Task{wtDone, wtArchived} {
+		if _, err := os.Stat(workspace.Dir(svc.Home, tk.Key)); !os.IsNotExist(err) {
+			t.Errorf("%s workspace remains", tk.Key)
+		}
+	}
+	if got, _ := store.GetTaskByKey(svc.DB, wtArchived.Key); got.Repos[0].WorktreePath != nil {
+		t.Error("archived task still points at its worktree")
+	}
+	if _, err := os.Stat(dirty); err != nil {
+		t.Fatalf("dirty worktree removed: %v", err)
+	}
+
+	// once clean, the next run removes it
+	os.Remove(dirty)
+	if res, err := RunOne(context.Background(), svc, a); err != nil || res != "pruned 1 tasks, 2 slack links, 0 dirty workspaces kept" {
+		t.Fatalf("%q %v", res, err)
+	}
+	if _, err := os.Stat(workspace.Dir(svc.Home, wtDirty.Key)); !os.IsNotExist(err) {
+		t.Error("cleaned workspace remains")
 	}
 }
 

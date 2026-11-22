@@ -138,7 +138,7 @@ function Labels({k, labels, reload}: {k: string; labels: string[]; reload: () =>
         const lower = (xs: string[]) => xs.map(x => x.toLowerCase())
         const adds = next.filter(n => !lower(labels).includes(n.toLowerCase()))
         const drops = labels.filter(l => !lower(next).includes(l.toLowerCase()))
-        Promise.all([...adds.map(n => AddLabel(k, n)), ...drops.map(n => RemoveLabel(k, n))]).then(() => { reload(); reloadAll() }).catch(errMsg)
+        Promise.all([...adds.map(n => AddLabel(k, n)), ...drops.map(n => RemoveLabel(k, n))]).catch(e => toast(String(e))).finally(() => { reload(); reloadAll() })
     }
     return <TagsInput size="xs" label="Labels" placeholder="Add label…" value={labels} data={all ?? []} onChange={change} clearable={false} splitChars={[',']}/>
 }

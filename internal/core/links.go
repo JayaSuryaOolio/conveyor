@@ -75,7 +75,7 @@ func (s *Service) AdoptChild(parent, child string) error {
 // SourceApprovedLabel marks the "spec approved" comment the 'approved' label queues.
 const SourceApprovedLabel = "label:approved"
 
-func isApproved(name string) bool { return strings.EqualFold(strings.TrimSpace(name), "approved") }
+func isApproved(name string) bool { return strings.EqualFold(strings.TrimSpace(name), store.LabelApproved) }
 
 // AddLabel puts a label (created if new) on the task with key. Newly adding 'approved' queues a
 // "spec approved" human comment: like a typed one it waits out comment_debounce_secs, then starts the task.

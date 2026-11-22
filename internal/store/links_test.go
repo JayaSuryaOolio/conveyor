@@ -159,8 +159,7 @@ func TestPruneNeverReusesKeys(t *testing.T) {
 		t.Fatalf("child = %q, %v", c.Key, err)
 	}
 	top, _ := CreateTask(db, Task{Title: "t2", Status: StatusDone}, links)
-	db.Exec(`UPDATE tasks SET updated_at='2000-01-01T00:00:00Z' WHERE id IN (?,?)`, c.ID, top.ID)
-	if n, _, err := PruneClosed(db, time.Hour, time.Now()); err != nil || n != 2 {
+	if n, _, err := DeleteTasks(db, []int64{c.ID, top.ID}, time.Now()); err != nil || n != 2 {
 		t.Fatalf("pruned %d, %v", n, err)
 	}
 	if _, err := GetTaskByKey(db, c.Key); err == nil {
