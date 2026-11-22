@@ -1,5 +1,5 @@
 import {useState} from 'react'
-import {ActionIcon, TextInput, Title, Tooltip} from '@mantine/core'
+import {ActionIcon, TextInput, Tooltip} from '@mantine/core'
 import {Group, Stack, Text} from './ui'
 import {IconAlertTriangle, IconCheck, IconPlus, IconTrash} from '@tabler/icons-react'
 import {AddDecision, Decisions as ListDecisions, DisputeDecision, RemoveDecision} from '../wailsjs/go/ui/App'
@@ -15,7 +15,6 @@ export function Decisions({k}: {k: string}) {
     const add = () => { if (text.trim()) done(AddDecision(k, text)).then(() => setText('')) }
     return (
         <Stack gap={4}>
-            <Title order={5}>Decisions</Title>
             {(data ?? []).map(d => (
                 <Stack key={d.id} gap={0}>
                     <Group gap={4} wrap={false} align="start">
