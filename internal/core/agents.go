@@ -231,11 +231,10 @@ func (s *Service) SetTaskModel(key, model string) error {
 	return store.UpdateTask(s.DB, t)
 }
 
-// SetTaskDescription replaces the task's description. Once a run has seen the
-// old one, it also posts a system comment quoting it: the next run (or the
-// running one, at its Stop) receives it and re-checks its acceptance criteria,
-// and the human sees the edit in the thread.
-func (s *Service) SetTaskDescription(key, desc string) error {
+// SetTaskDescription replaces the task's description, keeping the old one in its history with who
+// edited it (by: "human", "agent:<KEY>" or "agent"). It posts no comment: the next run's start check
+// (brief.Precheck) tells the agent whether to re-read it, and the UI pages through the history.
+func (s *Service) SetTaskDescription(key, desc, by string) error {
 	t, err := store.GetTaskByKey(s.DB, key)
 	if err != nil {
 		return err
@@ -243,22 +242,7 @@ func (s *Service) SetTaskDescription(key, desc string) error {
 	if t.Description == desc {
 		return nil
 	}
-	old := t.Description
-	t.Description = desc
-	if err := store.UpdateTask(s.DB, t); err != nil {
-		return err
-	}
-	runs, err := store.ListRuns(s.DB, t.ID)
-	if err != nil || len(runs) == 0 {
-		return err
-	}
-	quoted := "> (empty)"
-	if strings.TrimSpace(old) != "" {
-		quoted = "> " + strings.ReplaceAll(strings.TrimSpace(old), "\n", "\n> ")
-	}
-	note := "The human edited the description; BRIEF.md has the new one. Re-read it and update your acceptance criteria to match.\n\nPrevious description:\n\n" + quoted
-	_, err = store.AddComment(s.DB, store.Comment{TaskID: t.ID, Author: store.AuthorSystem, Body: note})
-	return err
+	return store.SetTaskDescription(s.DB, t, desc, by)
 }
 
 // AddTaskRepo adds a registered repo to an existing task.

@@ -2,6 +2,7 @@ package store
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -9,13 +10,32 @@ import (
 )
 
 const taskCols = `id, key, title, description, status, priority, model, agent, runner, source, external_key,
- external_url, parent_id, consecutive_failures, created_at, updated_at, created_by`
+ external_url, parent_id, consecutive_failures, created_at, updated_at, created_by, description_edits`
 
 func scanTask(r interface{ Scan(...any) error }) (Task, error) {
 	var t Task
+	var edits string
 	err := r.Scan(&t.ID, &t.Key, &t.Title, &t.Description, &t.Status, &t.Priority, &t.Model, &t.Agent, &t.Runner, &t.Source,
-		&t.ExternalKey, &t.ExternalURL, &t.ParentID, &t.ConsecutiveFailures, &t.CreatedAt, &t.UpdatedAt, &t.CreatedBy)
+		&t.ExternalKey, &t.ExternalURL, &t.ParentID, &t.ConsecutiveFailures, &t.CreatedAt, &t.UpdatedAt, &t.CreatedBy, &edits)
+	if err == nil && edits != "" {
+		if err = json.Unmarshal([]byte(edits), &t.DescriptionEdits); err != nil {
+			err = fmt.Errorf("task %s description_edits: %w", t.Key, err)
+		}
+	}
 	return t, err
+}
+
+// SetTaskDescription replaces a task's description, keeping the old one in description_edits with who replaced it.
+func SetTaskDescription(db *sql.DB, t Task, desc, by string) error {
+	edits, _ := json.Marshal(append(t.DescriptionEdits, CommentEdit{Body: t.Description, At: now(), By: by}))
+	res, err := db.Exec(`UPDATE tasks SET description=?, description_edits=?, updated_at=? WHERE id=?`, desc, string(edits), now(), t.ID)
+	if err != nil {
+		return fmt.Errorf("set description %s: %w", t.Key, err)
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return fmt.Errorf("task %d not found", t.ID)
+	}
+	return nil
 }
 
 func loadRepos(db dbtx, taskID int64) ([]TaskRepo, error) {

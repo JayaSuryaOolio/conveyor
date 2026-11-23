@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -18,7 +19,7 @@ import (
 )
 
 func init() {
-	register("task", runTask, "manage tasks (new|list|show|comment|message|move|set|repo|link|unlink|decision|parent|sessions|stop|cancel|done|sync|brief|log|attach|open|label|graph)")
+	register("task", runTask, "manage tasks (new|list|show|comment|message|move|set|repo|link|unlink|decision|parent|sessions|stop|cancel|done|sync|brief|precheck|log|attach|open|label|graph)")
 }
 
 const taskUsage = "usage: conveyor task new|list|show|comment|message|move|set|link|unlink|decision|parent|sessions|stop|cancel|done|sync|brief|log|attach|open|label|graph ..."
@@ -103,6 +104,11 @@ func runTask(home string, args []string) error {
 				return fmt.Errorf("usage: conveyor task brief KEY [--preview]")
 			}
 			return taskBrief(s, rest[0])
+		case "precheck":
+			if len(rest) != 1 {
+				return fmt.Errorf("usage: conveyor task precheck KEY")
+			}
+			return taskPrecheck(s, rest[0])
 		case "sync":
 			if len(rest) != 1 {
 				return fmt.Errorf("usage: conveyor task sync KEY")
@@ -386,7 +392,7 @@ func taskSet(s *core.Service, args []string) error {
 	pr := fs.String("pr", "", "PR URL (empty clears it)")
 	model := fs.String("model", "", "model override (empty clears it); see `conveyor models`")
 	runner := fs.String("runner", "", "runner override (claude, agy; empty resets to default)")
-	desc := fs.String("desc", "", "description; once a run saw the old one, a system comment quotes it for the next run")
+	desc := fs.String("desc", "", "description; the old one is kept with who replaced it (see `conveyor task precheck`)")
 	descFile := fs.String("desc-file", "", "read the description from a file")
 	pos, err := parseArgs(fs, args)
 	if err != nil {
@@ -404,7 +410,7 @@ func taskSet(s *core.Service, args []string) error {
 		given["desc"] = true
 	}
 	if given["desc"] {
-		if err := s.SetTaskDescription(pos[0], *desc); err != nil {
+		if err := s.SetTaskDescription(pos[0], *desc, editor(s.Home)); err != nil {
 			return err
 		}
 	}
@@ -563,6 +569,34 @@ func createdBy(parent string) string {
 		return "agent:" + parent
 	}
 	return "human"
+}
+
+// editor attributes a CLI description edit: an agent session (Conveyor's settings set CONVEYOR_HOOKS,
+// Claude Code sets CLAUDECODE) is "agent:<KEY>" when its cwd is under <home>/workspaces/<KEY>, else
+// "agent"; anything else is the human.
+func editor(home string) string {
+	if os.Getenv("CONVEYOR_HOOKS") == "" && os.Getenv("CLAUDECODE") == "" {
+		return "human"
+	}
+	if wd, err := os.Getwd(); err == nil {
+		if rel, err := filepath.Rel(filepath.Join(home, "workspaces"), wd); err == nil && rel != "." && !strings.HasPrefix(rel, "..") {
+			return "agent:" + strings.Split(rel, string(filepath.Separator))[0]
+		}
+	}
+	return "agent"
+}
+
+// taskPrecheck prints the start check the dispatcher runs before the task's next run (brief.RunPrecheck).
+func taskPrecheck(s *core.Service, key string) error {
+	t, err := store.GetTaskByKey(s.DB, key)
+	if err != nil {
+		return err
+	}
+	c, err := brief.RunPrecheck(s.DB, s.Home, t)
+	if err != nil {
+		return err
+	}
+	return printJSON(c)
 }
 
 // withStopHint tells the CLI user how to confirm a move that ends running runs.

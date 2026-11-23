@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/JayaSuryaOolio/conveyor/internal/brief"
 	"github.com/JayaSuryaOolio/conveyor/internal/core"
 	"github.com/JayaSuryaOolio/conveyor/internal/gh"
 	"github.com/JayaSuryaOolio/conveyor/internal/statusblock"
@@ -323,6 +324,8 @@ func ProcessStop(db *sql.DB, task store.Task, run store.Run, lastAssistantMessag
 	to, oldFails := store.StatusNeedsYou, task.ConsecutiveFailures
 	switch {
 	case len(pending) > 0:
+		to = store.StatusTodo
+	case brief.Precheck(task, []store.Run{run}, "").Reread: // edited by someone else mid-run: the next run's start check says so
 		to = store.StatusTodo
 	case !hasBlock && bgPending(transcriptPath, run.Prompt):
 		return nil // waiting on its own background job; its completion wakes the session and Stops again

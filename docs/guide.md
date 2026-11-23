@@ -116,7 +116,7 @@ With `--reply`, Conveyor (not the agent) guarantees an answer: when the run that
 
 A comment from you, or a system note, on a task in needs_you, review, failed or done puts it back in todo, and the dispatcher launches it again. A comment on a running task is queued (marked "queued" in the thread) and sent with the next run: when the run stops or its session vanishes, the task goes to todo instead of review or needs_you. A comment on a backlog or todo task just waits. Until a run receives it, your comment shows an edit icon that moves it back into the editor.
 
-The description can be edited in any status (pencil on the task page, or `conveyor task set KEY --desc ...`). Once a run has seen it, an edit also posts a system comment quoting the previous description, so you can see what changed and the next run (or the running one, when it stops) is told to re-read the brief and update its acceptance criteria. An edit alone does not relaunch a finished task; comment to start a run.
+The description can be edited in any status (pencil on the task page, or `conveyor task set KEY --desc ...`). Each edit keeps the previous version and who replaced it: `human` for the UI or a plain terminal, `agent:<KEY>` for `task set` run inside a Conveyor agent session (detected from `CONVEYOR_HOOKS`/`CLAUDECODE` and the session's `workspaces/<KEY>` cwd). The task page pages through the versions like an edited comment (`< Current >`, dashed border on an old one). An edit posts no comment. Before every run the dispatcher runs the start check (`brief.RunPrecheck`; `conveyor task precheck KEY` prints it): it compares the last run's start, BRIEF.md's mtime and the latest description edit, and adds its decision to the run's prompt. The run is told to re-read the description, quoting the version its last run saw, only when someone other than the task's own agent edited it since that run started. An agent's edit of its own description wakes nothing. An edit by someone else while a run is live sends the task back to todo when the run stops, as a new comment would. An edit alone does not relaunch a finished task; comment to start a run.
 
 **Stop run** (link beside the running timer, asks to confirm; or `conveyor task stop KEY`) marks the run failed ("stopped"), moves the task to needs_you (todo if comments are queued) and stops and removes the background Claude session. Comment to resume.
 
@@ -325,6 +325,7 @@ conveyor epic log KEY "<message>"               conveyor epic audit KEY
 conveyor epic review-check KEY [--step N]
 conveyor epic approve KEY                       conveyor epic restart KEY --reason "..."
 conveyor task sync KEY                    conveyor task brief KEY [--preview]
+conveyor task precheck KEY
 conveyor task log KEY [--follow]          conveyor task attach KEY
 conveyor task open KEY [--shell|--resume|--fresh] [--repo r] [--print]
 
