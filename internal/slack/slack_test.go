@@ -271,7 +271,7 @@ func TestThreadLinksPersist(t *testing.T) {
 	if got.Key != "CV-8" || got.Text != "more" {
 		t.Fatalf("got %+v", got)
 	}
-	if mk().rootOf("D1", "CV-8") != "40.0" {
+	if mk().rootOf("U1", "CV-8") != "40.0" {
 		t.Fatalf("task not linked to its thread: %v", cfg)
 	}
 }
@@ -293,7 +293,7 @@ func TestClosedTaskReplyIsError(t *testing.T) {
 	}))
 	defer srv.Close()
 	api = srv.URL + "/"
-	cfg := map[string]string{"slack_bot_token": "x", "slack_user_id": "U1", "slack_thread:D1:163.1": "CV-8"}
+	cfg := map[string]string{"slack_bot_token": "x", "slack_user_id": "U1", "slack_thread:U1:163.1": "CV-8"}
 	s := &Slack{get: func(k string) string { return cfg[k] }, set: func(k, v string) error { cfg[k] = v; return nil }}
 	h := func(in chat.In) string { return chat.Closed + in.Key + " is closed." }
 	s.event([]byte(`{"event":{"type":"message","user":"U1","text":"hi","channel":"D1","ts":"163.2","thread_ts":"163.1"}}`), h)
@@ -306,7 +306,7 @@ func TestClosedTaskReplyIsError(t *testing.T) {
 			t.Fatalf("closed reply shown as a comment: %s", p)
 		}
 	}
-	if cfg["slack_thread:D1:163.5"] != "" {
+	if cfg["slack_thread:U1:163.5"] != "" {
 		t.Fatal("closed task linked to thread")
 	}
 }
@@ -328,5 +328,29 @@ func TestBackfillHandlesMissedMessages(t *testing.T) {
 	s.backfill(func(in chat.In) string { got = append(got, in.Text); return "ok" })
 	if len(got) != 1 || got[0] != "new msg" || cfg["slack_cursor"] != "D1:3.0" {
 		t.Fatalf("got %v cursor %q", got, cfg["slack_cursor"])
+	}
+}
+
+// A task update is posted to the user id; the reply to it arrives on the DM channel id (D...).
+// The thread link must match across that, or the reply is dropped.
+func TestReplyToSentUpdateReachesTask(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "conversations.replies") {
+			t.Error("a thread we posted must be found by link, not read back")
+		}
+		fmt.Fprint(w, `{"ok":true,"ts":"70.0"}`)
+	}))
+	defer srv.Close()
+	api = srv.URL + "/"
+	cfg := map[string]string{"slack_bot_token": "x", "slack_user_id": "U1"}
+	s := &Slack{get: func(k string) string { return cfg[k] }, set: func(k, v string) error { cfg[k] = v; return nil }}
+	if err := s.Send(chat.Msg{Key: "CV-7", Title: "t", Status: "needs_you"}); err != nil {
+		t.Fatal(err)
+	}
+	var got chat.In
+	s.event([]byte(`{"event":{"type":"message","user":"U1","text":"go on","channel":"D1","ts":"71.0","thread_ts":"70.0"}}`),
+		func(in chat.In) string { got = in; return "ok" })
+	if got.Key != "CV-7" || got.Text != "go on" {
+		t.Fatalf("reply not routed to the task: %+v", got)
 	}
 }
