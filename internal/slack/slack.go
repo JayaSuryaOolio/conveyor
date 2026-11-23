@@ -450,13 +450,15 @@ func (s *Slack) event(payload []byte, handle func(chat.In) string) {
 		return
 	}
 	s.advance(e.Channel, e.TS)
+	// links are keyed by slack_user_id (what Send posts to), but events carry the D... channel id
+	dm := s.get("slack_user_id")
 	// reply answers in thread (the command's own thread for a top-level DM) and keeps a created
 	// task's later notifications in that thread too
 	reply := func(thread, text string) {
 		ts, _ := s.post(map[string]any{"channel": e.Channel, "thread_ts": thread, "text": text})
 		if m := createdRe.FindStringSubmatch(text); m != nil { // our own answer to "new"
-			s.link(e.Channel, thread, m[1])
-			s.link(e.Channel, ts, m[1]) // and the confirmation itself, should it be replied to as a root
+			s.link(dm, thread, m[1])
+			s.link(dm, ts, m[1]) // and the confirmation itself, should it be replied to as a root
 		}
 	}
 	if e.ThreadTS == "" { // a plain DM is a command, so /conveyor is optional
@@ -474,7 +476,7 @@ func (s *Slack) event(payload []byte, handle func(chat.In) string) {
 		reply(e.TS, handle(chat.In{Text: e.Text, Fwd: fwd}))
 		return
 	}
-	if key := s.taskOf(e.Channel, e.ThreadTS); key != "" { // the usual path: no API call, no parsing
+	if key := s.taskOf(dm, e.ThreadTS); key != "" { // the usual path: no API call, no parsing
 		reply(e.ThreadTS, commented(handle(chat.In{Key: key, Text: e.Text})))
 		return
 	}
@@ -513,7 +515,7 @@ func (s *Slack) event(payload []byte, handle func(chat.In) string) {
 	}
 	out := handle(chat.In{Key: key, Text: e.Text})
 	if !strings.HasPrefix(out, chat.Closed) {
-		s.link(e.Channel, e.ThreadTS, key) // the agent's answer comes back into this thread
+		s.link(dm, e.ThreadTS, key) // the agent's answer comes back into this thread
 	}
 	reply(e.ThreadTS, commented(out))
 }
