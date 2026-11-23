@@ -287,6 +287,10 @@ A bad task key or view name fails at once (exit 1). If the app does not pick the
 
 The app writes its current view to `<home>/ui-state.json` on each navigation.
 
+**`conveyor actions [KEY|@] [--json]`** lists everything a tool can run, each with a ready `argv`, so it needs no hard-coded Conveyor knowledge. Kinds: `builtin` (the moves a human may make from the task's status, `stop` while running, `task open --shell|--resume|--fresh`, `comment` with `needs_text`: replace `{text}` in argv), `app` (each enabled connector's `task_sidebar` and `board_card` actions, plus `app open`; `confirm` comes from the manifest) and `nav` (`ui go` task and epic). Without KEY it lists only what needs no task: `ui go` views, `ui palette`, and `global_nav` connector actions. `confirm` is a contract for the caller; the CLI never prompts. `cancel`, `done` and `stop` always carry it.
+
+**Check PR** is not built in: install the bundled `examples/pr-check.json` (Apps > Detected, or `conveyor app install examples/pr-check.json`). Its `check` action runs `conveyor epic review-check KEY` and shows the result, so `conveyor app run "PR check" check @` and `actions` pick it up. It runs even when the task has no PR; the output then says so.
+
 ## Settings
 
 Settings are in the app (Settings page) or `conveyor config list|get|set`. Secret settings (keys containing `token`, `secret` or `password`, or ending `_key`) are masked in `config list` (first 4 characters + `****`) and `config get` refuses them; add `--reveal` to print them.
