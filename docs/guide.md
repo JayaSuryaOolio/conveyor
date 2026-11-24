@@ -137,7 +137,7 @@ To choose yourself, start a comment with `#fresh` or `#resume` (CLI, app or Slac
 
 The rule Conveyor is built around: **help the human get things done, not make them weaker. The agent types; the human owns the approach.** Standards in the codebase and skills don't replace your call on which module, which existing API and what names. Tasks that skipped that call took about 8 PR rounds instead of one short plan (`docs/research/cv-117b-117i-study.md`).
 
-**Decisions.** A run's status block can carry `decision: what — why` lines. Each is stored on the task as `D<n>` and listed under `## Decisions` in every later `BRIEF.md`, so it survives `#fresh`. Manage them with `conveyor task decision KEY list | add "what — why" | rm D<n> | dispute D<n> "reason" | undispute D<n>`, or from the task page. An agent that thinks a decision is wrong writes `dispute: D<n> | reason` instead of quietly undoing it.
+**Decisions.** A run's status block can carry `decision: what — why` lines. Each is stored on the task as `D<n>` and listed under `## Decisions` in every later `BRIEF.md`, so it survives `#fresh`. A fact learned along the way (a review, CI, a test run, the human) is a decision line starting `[finding:review]`, `[finding:CI]`, `[finding:test]` or `[finding:human]`; the page shows it with a badge. Manage them with `conveyor task decision KEY list | add "what — why" | rm D<n> | dispute D<n> "reason" | undispute D<n>`, or from the task page. An agent that thinks a decision is wrong writes `dispute: D<n> | reason` instead of quietly undoing it.
 
 Habits that keep you in touch with the code:
 
