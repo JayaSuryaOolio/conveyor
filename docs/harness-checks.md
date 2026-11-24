@@ -6,7 +6,7 @@ by measured waste in recent runs and records which ones are built.
 
 ## Built: the Stop completion gate
 
-`internal/hook/complete.go` (base from CV-84A; this task added the changeset and tests-after-edit checks). On the Stop of an `auto` run whose status block says `status: done`, the
+The checks live in `internal/harness` (CV-112D1): pure functions over a `Facts` snapshot (task, per-repo git facts, transcript tool uses, collect errors) returning `[]Gap`. `GitCollector` fills it via `git --no-optional-locks status --porcelain=v2`; `Facts.Refresh`, `Validate` and `Stale(harness.MaxAge)` (30s) manage it. `internal/hook/complete.go` only builds the Facts and renders the gaps. New deterministic checks go in `internal/harness` and are listed here. On the Stop of an `auto` run whose status block says `status: done`, the
 hook checks the facts below. If any fail, it prints `{"decision":"block","reason":...}`: Claude
 Code keeps the session going with the list as its next prompt, and the run stays `running`. Claude
 Code sets `stop_hook_active` on the retry's Stop; that one is never checked again (no loops). Each
@@ -17,7 +17,7 @@ Per task repo with a worktree:
 
 | Check | How | Only when |
 |---|---|---|
-| Worktree clean | `git status --porcelain` | always |
+| Worktree clean | `git status --porcelain=v2` | always |
 | Branch pushed | `HEAD == refs/remotes/origin/<branch>` | commits ahead of `origin/<default>` |
 | PR exists | task repo has a PR URL after the Stop's PR refresh | commits ahead; not prototype/research tasks |
 | Changeset added | `git diff --name-only base...HEAD` has a `.changeset/*.md` | repo has `.changeset/config.json` and the branch changes code files |
