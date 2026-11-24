@@ -30,6 +30,8 @@ Per run (transcript):
 | Skills from the brief loaded | a `Skill` tool call per `skill:<name>` label, plus `epic` for epic tasks (`plugin:<name>` counts) |
 | Tests ran after the last code edit | no `Edit`/`Write` of a code file after the last Bash command containing test/build/vet/lint/tsc/check/make |
 
+Every harness change adds an attempt row (with a prediction) to `docs/harness-ledger.md`; conveyor-doctor fills in the observed result.
+
 ## Measurements (last 120 auto sessions, 458 `done` runs in the DB, 2026-11-06)
 
 | Signal | Count |
