@@ -770,6 +770,12 @@ func (a *App) AddAgent(name, description, prompt, scope, model string) error {
 	return a.svc.AddAgent(name, description, prompt, scope, model)
 }
 
+// ReadAgent returns the raw text of a user-level agent file.
+func (a *App) ReadAgent(path string) (string, error) { return a.svc.ReadAgent(path) }
+
+// SaveAgent overwrites a user-level agent file (and its gemini mirror).
+func (a *App) SaveAgent(path, content string) error { return a.svc.SaveAgent(path, content) }
+
 // SetAgentModel sets the agent's default model in its file ("" removes it).
 func (a *App) SetAgentModel(scope, name, model string) error {
 	return a.svc.SetAgentModel(scope, name, model)

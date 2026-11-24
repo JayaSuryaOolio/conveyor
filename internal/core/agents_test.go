@@ -33,7 +33,7 @@ func TestAgents(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []Agent{{Name: "rev-1", Description: "Reviews: code", Scope: "a", Model: "opus", Skills: []string{}}, {Name: "me", Description: "Mine", Scope: "user", Skills: []string{}}}
+	want := []Agent{{Name: "rev-1", Description: "Reviews: code", Scope: "a", Model: "opus", Path: filepath.Join(repo, ".claude", "agents", "rev-1.md"), Skills: []string{}}, {Name: "me", Description: "Mine", Scope: "user", Path: filepath.Join(home, ".claude", "agents", "me.md"), Skills: []string{}}}
 	if len(got) != 2 || !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %+v", got)
 	}
@@ -52,6 +52,36 @@ func TestAgents(t *testing.T) {
 	}
 	if tk, _ = store.GetTaskByKey(s.DB, tk.Key); tk.Agent != nil {
 		t.Fatal("agent not cleared")
+	}
+}
+
+func TestSaveAgent(t *testing.T) {
+	s := newSvc(t)
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	if err := s.AddAgent("me", "Mine", "Hi", "user", ""); err != nil {
+		t.Fatal(err)
+	}
+	f := filepath.Join(home, ".claude", "agents", "me.md")
+	mirror := filepath.Join(home, ".gemini", "config", "agents", "me.md")
+	os.MkdirAll(filepath.Dir(mirror), 0o755)
+	os.WriteFile(mirror, []byte("old"), 0o644)
+	const next = "---\nname: me\ndescription: New\n---\nBye\n"
+	if err := s.SaveAgent(f, next); err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range []string{f, mirror} {
+		if b, _ := os.ReadFile(p); string(b) != next {
+			t.Errorf("%s = %q", p, b)
+		}
+	}
+	if got, err := s.ReadAgent(f); err != nil || got != next {
+		t.Fatalf("read: %q %v", got, err)
+	}
+	other := filepath.Join(home, "x.md")
+	os.WriteFile(other, []byte(next), 0o644)
+	if s.SaveAgent(other, next) == nil || s.SaveAgent(filepath.Join(home, ".claude", "agents", "..", "..", "x.md"), next) == nil || s.SaveAgent(f, "no name") == nil {
+		t.Fatal("bad save should fail")
 	}
 }
 

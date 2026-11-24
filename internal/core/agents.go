@@ -18,6 +18,7 @@ type Agent struct {
 	Description string   `json:"description"`
 	Scope       string   `json:"scope"`
 	Model       string   `json:"model"`
+	Path        string   `json:"path"`   // absolute path of the agent file
 	Skills      []string `json:"skills"` // frontmatter `skills:`, comma separated; shown read-only on epic cards
 	// Resolved is the model id Model resolves to. Set by `conveyor agent list`, not ListAgents.
 	Resolved string `json:"resolved,omitempty"`
@@ -37,7 +38,7 @@ func scanAgents(dir, scope string) []Agent {
 		if fm["name"] == "" {
 			continue
 		}
-		out = append(out, Agent{Name: fm["name"], Description: fm["description"], Scope: scope, Model: fm["model"], Skills: splitList(fm["skills"])})
+		out = append(out, Agent{Name: fm["name"], Description: fm["description"], Scope: scope, Model: fm["model"], Path: f, Skills: splitList(fm["skills"])})
 	}
 	return out
 }
@@ -295,4 +296,47 @@ func splitList(v string) []string {
 		}
 	}
 	return out
+}
+
+// userAgentFile returns the cleaned path when it is an existing .md file directly in a user agents dir.
+func userAgentFile(path string) (string, error) {
+	p := filepath.Clean(path)
+	if d := filepath.Dir(p); filepath.Ext(p) != ".md" || (d != userAgentsDir() && d != geminiAgentsDir()) {
+		return "", fmt.Errorf("%s is not a user agent file", path)
+	}
+	if _, err := os.Stat(p); err != nil {
+		return "", err
+	}
+	return p, nil
+}
+
+// ReadAgent returns the raw text of a user-level agent file.
+func (s *Service) ReadAgent(path string) (string, error) {
+	p, err := userAgentFile(path)
+	if err != nil {
+		return "", err
+	}
+	b, err := os.ReadFile(p)
+	return string(b), err
+}
+
+// SaveAgent overwrites a user-level agent file. A ~/.claude/agents file also updates its ~/.gemini mirror when one exists.
+func (s *Service) SaveAgent(path, content string) error {
+	p, err := userAgentFile(path)
+	if err != nil {
+		return err
+	}
+	if fm, _ := claude.Frontmatter([]byte(content)); fm["name"] == "" {
+		return fmt.Errorf("agent needs frontmatter with a name")
+	}
+	if err := os.WriteFile(p, []byte(content), 0o644); err != nil {
+		return err
+	}
+	if filepath.Dir(p) == userAgentsDir() {
+		mirror := filepath.Join(geminiAgentsDir(), filepath.Base(p))
+		if _, err := os.Stat(mirror); err == nil {
+			return os.WriteFile(mirror, []byte(content), 0o644)
+		}
+	}
+	return nil
 }
