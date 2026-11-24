@@ -242,3 +242,50 @@ func Remove(db *sql.DB, home string, task store.Task, force bool) error {
 	os.Remove(ws) // only succeeds when empty (no attachments)
 	return nil
 }
+
+// Sync deletes the workspace folder (attachments included) of every soft-deleted task. It reads the
+// folder, not the DB, since soft-delete drops task_repos. A folder with a dirty worktree is kept
+// whole and counted, so a later Sync retries it.
+func Sync(db *sql.DB, home string) (kept int, err error) {
+	keys, err := store.DeletedTaskKeys(db)
+	if err != nil {
+		return 0, err
+	}
+	for _, key := range keys {
+		if err := removeDir(Dir(home, key)); err != nil {
+			log.Printf("sync %s: keep workspace: %v", key, err)
+			kept++
+		}
+	}
+	return kept, nil
+}
+
+// removeDir removes the worktrees under ws (any subfolder holding a .git file), then ws itself.
+func removeDir(ws string) error {
+	entries, err := os.ReadDir(ws)
+	if err != nil {
+		return nil // nothing on disk
+	}
+	var wts []string
+	for _, e := range entries {
+		p := filepath.Join(ws, e.Name())
+		if _, err := os.Stat(filepath.Join(p, ".git")); err != nil {
+			continue
+		}
+		if out, err := Git(p, "status", "--porcelain"); err != nil || out != "" {
+			if err == nil {
+				err = ErrDirty
+			}
+			return fmt.Errorf("%s: %w", e.Name(), err)
+		}
+		wts = append(wts, p)
+	}
+	for _, p := range wts {
+		if cd := commonDir(p); cd != "" {
+			if _, err := Git(cd, "worktree", "remove", p); err != nil {
+				return err
+			}
+		}
+	}
+	return os.RemoveAll(ws)
+}
