@@ -1,18 +1,10 @@
 import {useState} from 'react'
-import {ActionIcon, Badge, TextInput, Tooltip} from '@mantine/core'
+import {ActionIcon, TextInput, Tooltip} from '@mantine/core'
 import {Group, Stack, Text} from './ui'
 import {IconAlertTriangle, IconCheck, IconPlus, IconTrash} from '@tabler/icons-react'
 import {AddDecision, Decisions as ListDecisions, DisputeDecision, RemoveDecision} from '../wailsjs/go/ui/App'
 import {errMsg} from './components'
 import {useData} from './util'
-
-const findingRe = /^\[finding:([^\]]+)\]\s*/i
-
-/** A "[finding:review] fact" body shows its source as a badge: a finding is something learned along the way, not a choice. */
-function Body({text}: {text: string}) {
-    const m = findingRe.exec(text)
-    return m ? <><Badge size="xs" variant="light" color="teal" mr={4}>finding · {m[1]}</Badge>{text.slice(m[0].length)}</> : <>{text}</>
-}
 
 /** Decisions recorded on a task ("what — why"): the human adds, strikes, disputes or unmarks one. Agents add theirs in the status block. */
 export function Decisions({k}: {k: string}) {
@@ -26,7 +18,7 @@ export function Decisions({k}: {k: string}) {
             {(data ?? []).map(d => (
                 <Stack key={d.id} gap={0}>
                     <Group gap={4} wrap={false} align="start">
-                        <Text size="sm" style={{flex: 1}}><b>D{d.id}</b> ({d.author}) <Body text={d.body}/></Text>
+                        <Text size="sm" style={{flex: 1}}><b>D{d.id}</b> ({d.author}) {d.body}</Text>
                         <Tooltip label={d.disputed_by ? 'Resolved: remove the pitfall' : 'Dispute'}>
                             <ActionIcon size="sm" variant="subtle" color={d.disputed_by ? 'green' : 'orange'} aria-label={d.disputed_by ? 'Unmark dispute' : 'Dispute decision'}
                                         onClick={() => d.disputed_by ? done(DisputeDecision(k, d.id, '')) : dispute(d.id)}>
@@ -39,7 +31,7 @@ export function Decisions({k}: {k: string}) {
                 </Stack>
             ))}
             <Group gap={4} wrap={false}>
-                <TextInput size="xs" style={{flex: 1}} placeholder="what — why, or [finding:human] fact" value={text} onChange={e => setText(e.currentTarget.value)} onKeyDown={e => e.key === 'Enter' && add()}/>
+                <TextInput size="xs" style={{flex: 1}} placeholder="what — why" value={text} onChange={e => setText(e.currentTarget.value)} onKeyDown={e => e.key === 'Enter' && add()}/>
                 <ActionIcon variant="default" size="md" aria-label="Add decision" disabled={!text.trim()} onClick={add}><IconPlus size={14}/></ActionIcon>
             </Group>
         </Stack>

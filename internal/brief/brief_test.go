@@ -237,7 +237,7 @@ func TestDecisionsCap(t *testing.T) {
 }
 
 func TestStatusBlockHelpMentionsDecisions(t *testing.T) {
-	if !strings.Contains(statusBlock, "decision: ") || !strings.Contains(statusBlock, "dispute: ") || !strings.Contains(statusBlock, "[finding:") {
+	if !strings.Contains(statusBlock, "decision: ") || !strings.Contains(statusBlock, "dispute: ") {
 		t.Fatal("status block help must teach decision/dispute lines")
 	}
 }
