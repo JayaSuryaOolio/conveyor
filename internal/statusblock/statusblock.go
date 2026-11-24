@@ -20,6 +20,8 @@ type Block struct {
 	Learnings, Spawn     []string
 	// Decisions are "what — why" lines; Disputes are "D<n> | reason"; Undisputes are "D<n>".
 	Decisions, Disputes, Undisputes []string
+	// Findings are "fact (source: review|CI|test|human)" lines: what came to light that nobody planned for.
+	Findings []string
 }
 
 var (
@@ -64,9 +66,9 @@ func parseBody(body string) (Block, bool) {
 				if !emptyLearning(v) {
 					b.Learnings = append(b.Learnings, v)
 				}
-			case "decision", "dispute", "undispute":
+			case "decision", "finding", "dispute", "undispute":
 				if !emptyLearning(v) {
-					p := map[string]*[]string{"decision": &b.Decisions, "dispute": &b.Disputes, "undispute": &b.Undisputes}[key]
+					p := map[string]*[]string{"decision": &b.Decisions, "finding": &b.Findings, "dispute": &b.Disputes, "undispute": &b.Undisputes}[key]
 					*p = append(*p, v)
 				}
 			case "spawn":

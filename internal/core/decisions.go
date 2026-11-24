@@ -18,11 +18,14 @@ func ParseDecisionID(s string) (int64, error) {
 	return id, nil
 }
 
-// ApplyDecisionLines records a status block's decision, dispute and undispute lines as the agent.
+// ApplyDecisionLines records a status block's decision, finding, dispute and undispute lines as the agent.
 // Bad lines are skipped: an agent's typo must not fail its run.
-func ApplyDecisionLines(db *sql.DB, taskID int64, decisions, disputes, undisputes []string) {
+func ApplyDecisionLines(db *sql.DB, taskID int64, decisions, findings, disputes, undisputes []string) {
 	for _, d := range decisions {
 		store.AddDecision(db, taskID, store.AuthorAgent, d)
+	}
+	for _, f := range findings {
+		store.AddEntry(db, taskID, store.AuthorAgent, store.KindFinding, f)
 	}
 	for _, l := range disputes {
 		ref, reason, _ := strings.Cut(l, "|")
