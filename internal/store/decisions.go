@@ -14,11 +14,23 @@ type Decision struct {
 	Author     string `json:"author"`      // AuthorHuman | AuthorAgent
 	DisputedBy string `json:"disputed_by"` // "" when not disputed
 	Dispute    string `json:"dispute"`
+	Kind       string `json:"kind"` // KindDecision | KindFinding
 	CreatedAt  string `json:"created_at"`
 }
 
+// Decision kinds. A finding is a fact learned along the way (review, CI, test, human), not a choice.
+const (
+	KindDecision = "decision"
+	KindFinding  = "finding"
+)
+
 // AddDecision records a decision unless the task already has the same body (agents repeat lines across runs).
 func AddDecision(db *sql.DB, taskID int64, author, body string) (int64, error) {
+	return AddEntry(db, taskID, author, KindDecision, body)
+}
+
+// AddEntry records a decision or finding (kind) with the same repeat check.
+func AddEntry(db *sql.DB, taskID int64, author, kind, body string) (int64, error) {
 	body = strings.Join(strings.Fields(body), " ")
 	if body == "" {
 		return 0, fmt.Errorf("decision is empty")
@@ -27,7 +39,7 @@ func AddDecision(db *sql.DB, taskID int64, author, body string) (int64, error) {
 	if err := db.QueryRow(`SELECT id FROM decisions WHERE task_id=? AND body=?`, taskID, body).Scan(&id); err == nil {
 		return id, nil
 	}
-	res, err := db.Exec(`INSERT INTO decisions(task_id, body, author) VALUES(?,?,?)`, taskID, body, author)
+	res, err := db.Exec(`INSERT INTO decisions(task_id, body, author, kind) VALUES(?,?,?,?)`, taskID, body, author, kind)
 	if err != nil {
 		return 0, fmt.Errorf("add decision: %w", err)
 	}
@@ -36,7 +48,7 @@ func AddDecision(db *sql.DB, taskID int64, author, body string) (int64, error) {
 
 // ListDecisions returns the task's decisions, oldest first.
 func ListDecisions(db *sql.DB, taskID int64) ([]Decision, error) {
-	rows, err := db.Query(`SELECT id, task_id, body, author, disputed_by, dispute, created_at FROM decisions WHERE task_id=? ORDER BY id`, taskID)
+	rows, err := db.Query(`SELECT id, task_id, body, author, disputed_by, dispute, kind, created_at FROM decisions WHERE task_id=? ORDER BY id`, taskID)
 	if err != nil {
 		return nil, fmt.Errorf("list decisions: %w", err)
 	}
@@ -44,7 +56,7 @@ func ListDecisions(db *sql.DB, taskID int64) ([]Decision, error) {
 	var out []Decision
 	for rows.Next() {
 		var d Decision
-		if err := rows.Scan(&d.ID, &d.TaskID, &d.Body, &d.Author, &d.DisputedBy, &d.Dispute, &d.CreatedAt); err != nil {
+		if err := rows.Scan(&d.ID, &d.TaskID, &d.Body, &d.Author, &d.DisputedBy, &d.Dispute, &d.Kind, &d.CreatedAt); err != nil {
 			return nil, fmt.Errorf("scan decision: %w", err)
 		}
 		out = append(out, d)

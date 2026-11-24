@@ -49,6 +49,7 @@ criteria:
 - [ ] AC2 - why not
 learning: only a repo-wide trap (not specific to one task or feature) that cost you >10 min and is not in CLAUDE.md/SKILL.md/LEARNINGS.md. Name the file or command. Feature-level facts go in that feature's SKILL.md or a code comment, not here. Omit the line otherwise. (repeatable line)
 decision: what you chose — why; record one whenever you pick between options or the human states one (repeatable line; omit when none)
+finding: a fact nobody planned for that came to light from a review, CI, a test run or the human, and what it changed (source: review|CI|test|human) (repeatable line; omit when none)
 dispute: D<n> | one-line reason, when you think decision D<n> is a mistake; undispute: D<n> once resolved (repeatable lines)
 spawn: [todo] child task title | description with everything its agent needs (repeatable line; omit it entirely when there is nothing to spawn, never write a placeholder like "none"; [todo] is optional: the child starts once unblocked, else it waits in backlog)
 </conveyor>
@@ -227,8 +228,10 @@ func Build(db *sql.DB, task store.Task) (string, error) {
 		}
 		fmt.Fprintf(&b, "- %s: %s (branch `%s`, PR: %s)\n", r.RepoName, deref(r.WorktreePath), r.Branch, pr)
 	}
-	if err := decisions(&b, db, task); err != nil {
-		return "", err
+	for _, k := range []struct{ kind, head string }{{store.KindDecision, "Decisions"}, {store.KindFinding, "Findings"}} {
+		if err := decisions(&b, db, task, k.kind, k.head); err != nil {
+			return "", err
+		}
 	}
 	desc := strings.TrimSpace(task.Description)
 	if desc == "" {
@@ -295,11 +298,20 @@ func clip(s string, n int) string {
 	return s
 }
 
-// decisions writes the Decisions section: durable choices, disputed ones followed by a pitfall line.
-func decisions(b *strings.Builder, db *sql.DB, task store.Task) error {
-	ds, err := store.ListDecisions(db, task.ID)
-	if err != nil || len(ds) == 0 {
+// decisions writes the Decisions or Findings section (kind): durable entries, disputed ones followed by a pitfall line.
+func decisions(b *strings.Builder, db *sql.DB, task store.Task, kind, head string) error {
+	all, err := store.ListDecisions(db, task.ID)
+	if err != nil {
 		return err
+	}
+	var ds []store.Decision
+	for _, d := range all {
+		if d.Kind == kind {
+			ds = append(ds, d)
+		}
+	}
+	if len(ds) == 0 {
+		return nil
 	}
 	var blocks []string
 	for _, d := range ds {
@@ -314,9 +326,9 @@ func decisions(b *strings.Builder, db *sql.DB, task store.Task) error {
 		from--
 		size += len(blocks[from])
 	}
-	b.WriteString("\n## Decisions\n\n")
+	fmt.Fprintf(b, "\n## %s\n\n", head)
 	if from > 0 {
-		fmt.Fprintf(b, "(%d older decisions omitted: `conveyor task decision %s list`)\n", from, task.Key)
+		fmt.Fprintf(b, "(%d older %s omitted: `conveyor task decision %s list`)\n", from, strings.ToLower(head), task.Key)
 	}
 	b.WriteString(strings.Join(blocks[from:], ""))
 	return nil

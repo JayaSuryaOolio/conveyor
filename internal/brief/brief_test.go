@@ -195,6 +195,10 @@ func TestDecisionsSection(t *testing.T) {
 	if !strings.Contains(got, want) || strings.Index(got, "## Decisions") > strings.Index(got, "## Description") {
 		t.Fatalf("decisions block:\n%s", got)
 	}
+	store.AddEntry(db, tk.ID, store.AuthorAgent, store.KindFinding, "location filter drops old rows (source: review)")
+	if got, _ = Build(db, tk); !strings.Contains(got, "## Findings\n\n- D3 (agent): location filter drops old rows (source: review)\n") || strings.Contains(got, "## Decisions\n\n- D1 (agent): use sqlite — already a dependency\n  pitfall (human): we use a flat file here\n- D2 (human): no new table per kind — keep it small\n- D3") {
+		t.Fatalf("findings block:\n%s", got)
+	}
 	store.ClearDispute(db, tk.ID, a)
 	if got, _ = Build(db, tk); strings.Contains(got, "pitfall") {
 		t.Fatal("unmarked dispute still rendered")
@@ -237,7 +241,7 @@ func TestDecisionsCap(t *testing.T) {
 }
 
 func TestStatusBlockHelpMentionsDecisions(t *testing.T) {
-	if !strings.Contains(statusBlock, "decision: ") || !strings.Contains(statusBlock, "dispute: ") {
+	if !strings.Contains(statusBlock, "decision: ") || !strings.Contains(statusBlock, "dispute: ") || !strings.Contains(statusBlock, "finding: ") {
 		t.Fatal("status block help must teach decision/dispute lines")
 	}
 }

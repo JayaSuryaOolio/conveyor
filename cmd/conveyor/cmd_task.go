@@ -651,7 +651,7 @@ func taskDecision(s *core.Service, args []string) error {
 	case "list":
 		ds, err := s.Decisions(key)
 		for _, d := range ds {
-			fmt.Fprintf(out, "D%d (%s): %s\n", d.ID, d.Author, d.Body)
+			fmt.Fprintf(out, "D%d (%s, %s): %s\n", d.ID, d.Author, d.Kind, d.Body)
 			if d.DisputedBy != "" {
 				fmt.Fprintf(out, "  pitfall (%s): %s\n", d.DisputedBy, d.Dispute)
 			}

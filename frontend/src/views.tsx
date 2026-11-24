@@ -396,7 +396,7 @@ function DetailTabs({k, criteria, nav}: {k: string; criteria?: string; nav: Nav}
         <Tabs defaultValue={criteria ? 'criteria' : 'decisions'} keepMounted={false}>
             <Tabs.List mb="xs">
                 {criteria && <Tabs.Tab value="criteria">Acceptance criteria</Tabs.Tab>}
-                <Tabs.Tab value="decisions">Decisions</Tabs.Tab>
+                <Tabs.Tab value="decisions">Decisions &amp; Findings</Tabs.Tab>
                 <Tabs.Tab value="brief">Brief</Tabs.Tab>
             </Tabs.List>
             {criteria && <Tabs.Panel value="criteria"><Criteria text={criteria}/></Tabs.Panel>}

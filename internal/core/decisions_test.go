@@ -18,12 +18,12 @@ func TestApplyDecisionLines(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ApplyDecisionLines(db, tk.ID, []string{"a — x", "a — x"}, []string{"D1 | wrong", "junk", "D99 | gone"}, nil)
+	ApplyDecisionLines(db, tk.ID, []string{"a — x", "a — x"}, []string{"f — y (source: CI)"}, []string{"D1 | wrong", "junk", "D99 | gone"}, nil)
 	ds, _ := store.ListDecisions(db, tk.ID)
-	if len(ds) != 1 || ds[0].DisputedBy != store.AuthorAgent || ds[0].Dispute != "wrong" {
+	if len(ds) != 2 || ds[1].Kind != store.KindFinding || ds[0].DisputedBy != store.AuthorAgent || ds[0].Dispute != "wrong" {
 		t.Fatalf("%+v", ds)
 	}
-	ApplyDecisionLines(db, tk.ID, nil, nil, []string{"d1"})
+	ApplyDecisionLines(db, tk.ID, nil, nil, nil, []string{"d1"})
 	if ds, _ = store.ListDecisions(db, tk.ID); ds[0].DisputedBy != "" {
 		t.Fatalf("not unmarked: %+v", ds)
 	}

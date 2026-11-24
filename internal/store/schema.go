@@ -194,6 +194,7 @@ CREATE TABLE IF NOT EXISTS decisions (
   author TEXT NOT NULL,
   disputed_by TEXT NOT NULL DEFAULT '',
   dispute TEXT NOT NULL DEFAULT '',
+  kind TEXT NOT NULL DEFAULT 'decision',
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_decisions_task ON decisions(task_id);
@@ -260,6 +261,9 @@ UPDATE labels SET name=lower(name) WHERE name IN ('approved','archived')`); err 
 		return err
 	}
 	if err := migrateSplitPRWatermark(db); err != nil {
+		return err
+	}
+	if err := migrateAddDecisionKind(db); err != nil {
 		return err
 	}
 	if err := migrateAddTaskCreatedBy(db); err != nil {
@@ -558,6 +562,20 @@ func migrateAddPRReported(db *sql.DB) error {
 	if n == 0 {
 		if _, err := db.Exec(`ALTER TABLE pr_reviews ADD COLUMN reported TEXT NOT NULL DEFAULT ''`); err != nil {
 			return fmt.Errorf("add pr_reviews.reported: %w", err)
+		}
+	}
+	return nil
+}
+
+// migrateAddDecisionKind adds decisions.kind ('decision' | 'finding', CV-213).
+func migrateAddDecisionKind(db *sql.DB) error {
+	var n int
+	if err := db.QueryRow(`SELECT count(*) FROM pragma_table_info('decisions') WHERE name='kind'`).Scan(&n); err != nil {
+		return fmt.Errorf("check decisions.kind: %w", err)
+	}
+	if n == 0 {
+		if _, err := db.Exec(`ALTER TABLE decisions ADD COLUMN kind TEXT NOT NULL DEFAULT 'decision'`); err != nil {
+			return fmt.Errorf("add decisions.kind: %w", err)
 		}
 	}
 	return nil
