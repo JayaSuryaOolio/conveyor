@@ -288,3 +288,36 @@ func TestReviewCheckReschedulesAfterError(t *testing.T) {
 		t.Errorf("arg %s", a.ActionArg)
 	}
 }
+
+func TestReviewHeaderByReviewerKind(t *testing.T) {
+	noThreads := `{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[]}}}}}`
+	for _, c := range []struct {
+		name, review       string
+		wantHuman, wantBot bool
+	}{
+		{"human", `{"login":"bob"}`, true, false},
+		{"bot", `{"login":"coderabbitai[bot]","type":"Bot"}`, false, true},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			fakeAPI(t, `[{"id":10,"body":"please rename","state":"COMMENTED","user":`+c.review+`}]`, `[]`, noThreads)
+			svc, tk := reviewTask(t)
+			if _, err := ReviewCheck(context.Background(), svc, tk.Key, 0); err != nil {
+				t.Fatal(err)
+			}
+			cs, _ := store.ListComments(svc.DB, tk.ID)
+			if len(cs) != 1 {
+				t.Fatalf("want one comment, got %d", len(cs))
+			}
+			b := cs[0].Body
+			if got := strings.Contains(b, "do not resolve"); got != c.wantHuman {
+				t.Errorf("human rule present=%v in %q", got, b)
+			}
+			if got := strings.Contains(b, "then resolve it"); got != c.wantBot {
+				t.Errorf("bot rule present=%v in %q", got, b)
+			}
+			if !strings.Contains(b, "Decision needed:") {
+				t.Errorf("no decision rule in %q", b)
+			}
+		})
+	}
+}
