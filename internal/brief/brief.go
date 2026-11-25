@@ -2,6 +2,7 @@
 package brief
 
 import (
+	"cmp"
 	"database/sql"
 	"fmt"
 	"os"
@@ -15,7 +16,7 @@ import (
 
 // The brief is a template: fixed sections in a fixed order, each variable one size-capped, because it is
 // read on every run and the effective context is about 60k tokens (docs/research/brief-template.md).
-// Order: header (key, labels, epic, kind, skills), Repos, Decisions, Description, [Continues],
+// Order: header (key, Jira, labels, epic, kind, skills), Repos, Decisions, Description, [Continues],
 // Acceptance criteria, [Other repos' context], Latest run, Recent runs, Human comments, Relations,
 // split help, Status block, Rules, Older history. Whatever a cap drops stays reachable through a named command.
 const (
@@ -216,7 +217,11 @@ func Build(db *sql.DB, task store.Task) (string, error) {
 		return "", err
 	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "# %s\n\nKey: %s\n", task.Title, task.Key)
+	// Name the key as Conveyor's: a bare "Key: CV-220" reads like a tracker ticket and ends up in PRs as "Fixes CV-220".
+	fmt.Fprintf(&b, "# %s\n\nConveyor key (local): %s\n", task.Title, task.Key)
+	if j := cmp.Or(deref(task.ExternalURL), deref(task.ExternalKey), store.LabelValue(task, "jira:")); j != "" {
+		fmt.Fprintf(&b, "Jira: %s\n", j)
+	}
 	if err := labelLines(&b, db, task); err != nil {
 		return "", err
 	}
