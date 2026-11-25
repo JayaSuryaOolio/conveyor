@@ -1,7 +1,8 @@
 # Add login
 
-Key: CV-1A
-Labels: epic:os-4, epic_kind:build, repo:api, skill:grilling, skill:tdd
+Conveyor key (local): CV-1A
+Jira: OS-9
+Labels: epic:os-4, epic_kind:build, jira:OS-9, repo:api, skill:grilling, skill:tdd
 Epic os-4 (root CV-1), stage build, flow 1. Load the epic skill and run `conveyor epic status CV-1` first.
 Kind build: write the failing test first, open one PR, cite the AC ids it covers. Never merge it.
 Load these skills before starting: grilling, tdd.

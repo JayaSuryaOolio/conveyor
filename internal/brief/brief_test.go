@@ -38,7 +38,7 @@ func TestRenderGolden(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, l := range []string{"epic:os-4", "epic_kind:build", "repo:api", "skill:tdd", "skill:grilling"} {
+	for _, l := range []string{"epic:os-4", "epic_kind:build", "jira:OS-9", "repo:api", "skill:tdd", "skill:grilling"} {
 		store.AddLabel(db, tk.ID, l)
 	}
 	wt, pr := "/ws/CV-1A/api", "https://example.com/pr/1"
