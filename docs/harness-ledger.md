@@ -54,6 +54,12 @@ Snapshot 2026-11-04: 312 rows, 214 still `proposed`, about 40% one-task recaps, 
 Proposed in CV-81A, not yet attempted here: parser drop of `none`/`n/a`, bulk reject by first 40 chars, auto-reject
 of the duplicate classes. Fix the source (put the fact where agents read it) instead of fuzzy dedupe.
 
+## Red CI and merge conflicts not reaching the agent
+
+| PR | Reason | Predicted runs | Observed | Model | Date |
+|---|---|---|---|---|---|
+| CV-112D3 | Review check lists failing CI checks in its system comment (deduped per head sha) and stores them in `epic_flow_prs.checks` | fewer human "CI is red" steering comments; requeue after red CI without a human comment | pending | Sonnet 5.5 | 2026-11 |
+
 ## Rejected ideas (do not re-propose without new evidence)
 
 - `done` with unchecked criteria or `tests: not run`: partial work is often legitimate; the tests-after-edit check covers the useful part.
