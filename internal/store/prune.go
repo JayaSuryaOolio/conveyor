@@ -21,6 +21,13 @@ func DeleteTasks(db *sql.DB, ids []int64, at time.Time) (tasks, links int, err e
 			if _, err := tx.Exec(`UPDATE learnings SET applied_task_id=NULL WHERE applied_task_id=?`, id); err != nil {
 				return fmt.Errorf("detach learnings: %w", err)
 			}
+			// Comments (of any task) may point at this task's runs; clear them or the runs delete hits the FK.
+			if _, err := tx.Exec(`UPDATE comments SET run_id=NULL WHERE run_id IN (SELECT id FROM runs WHERE task_id=?)`, id); err != nil {
+				return fmt.Errorf("detach comment runs: %w", err)
+			}
+			if _, err := tx.Exec(`UPDATE comments SET consumed_by_run_id=NULL WHERE consumed_by_run_id IN (SELECT id FROM runs WHERE task_id=?)`, id); err != nil {
+				return fmt.Errorf("detach consumed runs: %w", err)
+			}
 			// The row stays, so FK cascade no longer fires: drop dependents by hand.
 			for _, d := range []struct{ table, col string }{
 				{"task_repos", "task_id"}, {"runs", "task_id"}, {"comments", "task_id"}, {"events", "task_id"},

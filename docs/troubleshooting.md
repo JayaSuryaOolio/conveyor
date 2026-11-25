@@ -141,3 +141,15 @@ grep -c "claude CLI not found" ~/.conveyor/logs/dispatcher.log
 **Fix.** Quit Conveyor and relaunch it from a terminal so it inherits your PATH: `/Applications/Conveyor.app/Contents/MacOS/Conveyor`. Then re-queue the failed tasks with `conveyor task move KEY todo`.
 
 **Prevented since this change.** `Startup` runs `$SHELL -ilc` and adds the login shell's PATH entries when `claude` is not on PATH (`internal/ui/shellenv.go`). If it still fails, check that `claude` is found in a fresh login shell (`zsh -ilc 'which claude'`).
+
+## Launch fails with "Added folder not trusted"
+
+Seen on CV-174E runs 1437-1442 (six failures in under an hour, no retry helped). `claude --bg` refuses an `--add-dir` it has not been trusted in, here the task's workspace folder `~/.conveyor/workspaces/KEY`. The run fails at once with no session.
+
+**Confirm**
+
+```sh
+conveyor task show KEY --runs --json | jq '.runs[] | {id, error}'   # error: "... Added folder not trusted: ..."
+```
+
+**Fix.** Start `claude` once in that folder and accept the trust prompt (`cd ~/.conveyor/workspaces/KEY && claude`), then re-queue with `conveyor task move KEY todo`.

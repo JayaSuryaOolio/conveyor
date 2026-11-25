@@ -178,3 +178,21 @@ func TestPruneNeverReusesKeys(t *testing.T) {
 		t.Errorf("new top key %q, %v; pruned key reused", n.Key, err)
 	}
 }
+
+// A comment that references a run of the pruned task (run_id) must not block the run delete.
+func TestPruneTaskWithRunComment(t *testing.T) {
+	db := openTest(t)
+	r := mkRepo(t, db, "a")
+	links := []TaskRepo{{RepoID: r.ID, IsPrimary: true, Branch: "t"}}
+	tk, _ := CreateTask(db, Task{Title: "t", Status: StatusDone}, links)
+	run, err := CreateRun(db, Run{TaskID: tk.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := AddComment(db, Comment{TaskID: tk.ID, Author: AuthorAgent, Body: "x", RunID: &run.ID}); err != nil {
+		t.Fatal(err)
+	}
+	if n, _, err := DeleteTasks(db, []int64{tk.ID}, time.Now()); err != nil || n != 1 {
+		t.Fatalf("pruned %d, %v", n, err)
+	}
+}
