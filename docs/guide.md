@@ -46,11 +46,11 @@ Moving a task to done or cancelled also stops and removes its Claude background 
 
 One dispatcher runs per Conveyor home. It is part of the app, and `conveyor daemon` runs it in the foreground when the app is closed. A lock file (`dispatcher.lock`) keeps it to one; the app tries to take over every 10 seconds, so closing the daemon hands over to a running app.
 
-Every 2 seconds the dispatcher:
+Every `dispatch_tick_secs` (default 5, clamped 1-15) seconds, and whenever something wakes it (a comment, a status change, a run ending, the next automation due), the dispatcher:
 
 1. Reaps runs. If a run's background session is gone from `claude agents`, after a 30 second grace, the run is marked failed ("session vanished") and the task goes to needs_you.
 2. Every 60 seconds, checks PRs of tasks in review with `gh` (see below).
-3. Every 30 seconds, runs due automations.
+3. Runs due automations.
 4. Launches `todo` tasks, highest priority first, up to `max_parallel` (default 3) at once. A task with new comments waits `comment_debounce_secs` (default 20) after the last one, so you can write several comments before it starts.
    Adding the label `approved` to a task queues a `spec approved` comment the same way; removing the label before a run takes it withdraws the comment (and a task that has run goes back to needs_you). It does not pass an epic's gate: use Approve for that.
 
@@ -196,7 +196,7 @@ conveyor learning apply [--repo r]
 
 ## Automations
 
-An automation has a name, a standard 5-field cron schedule, an optional shell precheck, a kind and a JSON argument. The dispatcher checks every 30 seconds. After downtime a missed run fires once. The precheck runs with `sh -c` (60 second limit); a non-zero exit skips the run, and its output (up to 8 KB) can be used as `{output}` in the arguments. The last run time and result are shown on the page.
+An automation has a name, a standard 5-field cron schedule, an optional shell precheck, a kind and a JSON argument. The dispatcher checks on every tick and at the next due time. After downtime a missed run fires once. The precheck runs with `sh -c` (60 second limit); a non-zero exit skips the run, and its output (up to 8 KB) can be used as `{output}` in the arguments. The last run time and result are shown on the page.
 
 Kinds:
 
@@ -297,7 +297,7 @@ Settings are in the app (Settings page) or `conveyor config list|get|set`. Secre
 
 - **General**: `key_prefix` (CV), `user_name`, `default_model`, `default_runner` (`claude`, or `agy` for Antigravity; a task can override it with `--runner`; `conveyor detect [--fix]` shows the installed runners).
 - **Chat** (Slack bridge, see [slack.md](slack.md)): `chat_enabled` (on), `chat_transport` (slack), `chat_statuses` (`needs_you,review,done,failed`) and the `slack_*` tokens and ids.
-- **Dispatch**: `max_parallel` (3), `resume_threshold` (60000), `comment_debounce_secs` (20), `max_consecutive_failures` (3).
+- **Dispatch**: `dispatch_tick_secs` (5, clamped 1-15), `max_parallel` (3), `resume_threshold` (60000), `comment_debounce_secs` (20), `max_consecutive_failures` (3).
 - **External terminal**: `terminal_template`, the command for external terminals (`{cwd}` and `{cmd}` are substituted; default uses macOS Terminal).
 - **Prompts**: `pr_comment_prefix`, `brief_extra_rules`, and `prompt_fresh` / `prompt_resume` to replace the launch prompts (placeholders `{key}`, `{title}`, `{brief}`, `{comments}`). Empty means the built-in prompt. The page also shows the status block protocol the agent is given.
 - **Repos**: registered repos and their setup scripts (see Workspace and worktree).
