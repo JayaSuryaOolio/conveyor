@@ -329,6 +329,17 @@ func SyncFlowTasks(db *sql.DB, flowID int64, tasks []Task) error {
 	})
 }
 
+// SaveFlowPRState records the review check's result on the task's rows in active flows.
+func SaveFlowPRState(db *sql.DB, taskID, repoID int64, headSHA, review, checks string, unresolved int) error {
+	_, err := db.Exec(`UPDATE epic_flow_prs SET head_sha=?, review=?, checks=?, unresolved=?, updated_at=?
+ WHERE task_id=? AND repo_id=? AND flow_id IN (SELECT id FROM epic_flows WHERE status='active')`,
+		headSHA, review, checks, unresolved, now(), taskID, repoID)
+	if err != nil {
+		return fmt.Errorf("save flow pr state: %w", err)
+	}
+	return nil
+}
+
 // ListFlowPRs returns the flow's rows ordered by task key then repo.
 func ListFlowPRs(db *sql.DB, flowID int64) ([]FlowPR, error) {
 	rows, err := db.Query(`SELECT p.flow_id, t.key, r.name, p.pr_url, p.head_sha, p.review, p.checks, p.unresolved

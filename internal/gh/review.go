@@ -133,15 +133,22 @@ func get(ctx context.Context, dir string, dst any, args ...string) error {
 	return nil
 }
 
-// ciState describes failing CI checks and merge conflicts; state is "" when all is well,
-// else a signature that changes only when the problem does (new push, other check failing).
-func ciState(mergeable string, runs []struct{ Name, Conclusion string }, sha string) (state, text string) {
+// failedChecks returns the sorted names of failed or timed-out runs.
+func failedChecks(runs []struct{ Name, Conclusion string }) []string {
 	var failed []string
 	for _, r := range runs {
 		if r.Conclusion == "failure" || r.Conclusion == "timed_out" {
 			failed = append(failed, r.Name)
 		}
 	}
+	sort.Strings(failed)
+	return failed
+}
+
+// ciState describes failing CI checks and merge conflicts; state is "" when all is well,
+// else a signature that changes only when the problem does (new push, other check failing).
+func ciState(mergeable string, runs []struct{ Name, Conclusion string }, sha string) (state, text string) {
+	failed := failedChecks(runs)
 	var lines []string
 	if len(failed) > 0 {
 		lines = append(lines, "Failing CI checks: "+strings.Join(failed, ", ")+". Find out why (`gh pr checks`, `gh run view --log-failed`) and fix.")
@@ -152,7 +159,6 @@ func ciState(mergeable string, runs []struct{ Name, Conclusion string }, sha str
 	if len(lines) == 0 {
 		return "", ""
 	}
-	sort.Strings(failed)
 	return sha + "|" + strings.Join(failed, ",") + "|" + strconv.FormatBool(mergeable == "dirty"), strings.Join(lines, "\n")
 }
 
@@ -337,6 +343,10 @@ func checkPR(ctx context.Context, db *sql.DB, taskID, repoID int64, dir, url str
 	}
 	st.Reported = state
 	if err := store.SavePRReview(db, st); err != nil {
+		return "", err
+	}
+	failed, _ := json.Marshal(append([]string{}, failedChecks(runs.CheckRuns)...))
+	if err := store.SaveFlowPRState(db, taskID, repoID, pr.Head.SHA, st.Review, string(failed), unresolved); err != nil {
 		return "", err
 	}
 	if sb.Len() == 0 {

@@ -321,3 +321,32 @@ func TestReviewHeaderByReviewerKind(t *testing.T) {
 		})
 	}
 }
+
+func TestReviewCheckStoresChecksOnEpicFlow(t *testing.T) {
+	dir := fakeAPI(t, `[]`, `[]`, threads)
+	os.WriteFile(filepath.Join(dir, "runs.json"), []byte(`{"check_runs":[{"name":"test","conclusion":"failure"},{"name":"lint","conclusion":"success"}]}`), 0o644)
+	os.WriteFile(filepath.Join(dir, "pulls.json"), []byte(`{"mergeable_state":"clean","head":{"sha":"abc"}}`), 0o644)
+	svc, tk := reviewTask(t)
+	if err := store.MakeEpic(svc.DB, tk.ID, "e"); err != nil {
+		t.Fatal(err)
+	}
+	f, err := store.StartFlow(svc.DB, tk.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tk, _ = store.GetTask(svc.DB, tk.ID)
+	if err := store.SyncFlowTasks(svc.DB, f.ID, []store.Task{tk}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ReviewCheck(context.Background(), svc, tk.Key, 0); err != nil {
+		t.Fatal(err)
+	}
+	cs, _ := store.ListComments(svc.DB, tk.ID)
+	if len(cs) != 1 || !strings.Contains(cs[0].Body, "Failing CI checks: test.") {
+		t.Fatalf("want one CI comment, got %+v", cs)
+	}
+	prs, _ := store.ListFlowPRs(svc.DB, f.ID)
+	if len(prs) != 1 || prs[0].Checks == nil || *prs[0].Checks != `["test"]` || *prs[0].HeadSHA != "abc" {
+		t.Errorf("flow pr %+v", prs)
+	}
+}
