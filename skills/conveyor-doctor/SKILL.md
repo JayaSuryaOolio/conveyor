@@ -16,6 +16,10 @@ When asked to fix (`fix KEY`, or `fix` for every task), skip the review below. F
 2. Apply the **Fix** of every recipe that matches. Fixes go through `conveyor` commands (`conveyor hook ...`, `conveyor task set/sync/move`), never by editing the DB; that is the one exception to the read-only rule above. A resume run stuck `running` while an extra `interactive` run exists is the session-id drift in `docs/session-identity.md`: replay Stop under the resume run's own session id (see its recipe), not the new one. `conveyor task stop KEY` ends a live background session that will not end on its own; it fails the run and moves the task to needs_you.
 3. Report per task: what was wrong, the commands you ran, and the state afterwards. A stuck state no recipe covers: describe it and propose a recipe; do not improvise a fix.
 
+## 0. Read the harness ledger
+
+Read all of `docs/harness-ledger.md` before anything else. For each attempt with Observed `pending`, fill it in from the runs since its merge date (the run columns it predicted, plus the held-out outcomes below). A closed or reverted harness PR gets a row as a failed attempt (`failed: <why>`), including ones whose PR you only find in `gh pr list --state closed`. Judge success by held-out outcomes: tasks merged without rework, human steering comments per task, requeue rate (runs per task). Not by the run the change was written from. Ledger edits go in your PR.
+
 ## 1. Pick the sample (6-10 runs from the last 7 days)
 
 ```
@@ -78,6 +82,7 @@ Rules for proposals:
 - Every change cites the runs that motivate it (task key + run number). One run is an anecdote; prefer patterns seen in 2+ runs.
 - Prefer deleting or tightening text over adding it. Each line in the brief is paid for on every launch.
 - Keep the PR small: at most 3 prompt changes per week, so their effect can be seen in next week's sample.
+- A harness change (a check in `internal/harness`, a brief rule) must not repeat a ledger attempt; if it retries a failed one, say what differs. Add its ledger row with a prediction on the runs column.
 - Before proposing a change, check last week's report (the previous "Conveyor doctor" task's thread and PR) and say whether its changes helped.
 
 ## 5. Report
