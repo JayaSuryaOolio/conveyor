@@ -78,3 +78,21 @@ func DeleteTasks(db *sql.DB, ids []int64, at time.Time) (tasks, links int, err e
 	})
 	return
 }
+
+// DeletedTaskKeys lists the keys of soft-deleted tasks.
+func DeletedTaskKeys(db *sql.DB) ([]string, error) {
+	rows, err := db.Query(`SELECT key FROM tasks WHERE deleted_at IS NOT NULL`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var keys []string
+	for rows.Next() {
+		var k string
+		if err := rows.Scan(&k); err != nil {
+			return nil, err
+		}
+		keys = append(keys, k)
+	}
+	return keys, rows.Err()
+}

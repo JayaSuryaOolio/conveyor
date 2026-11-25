@@ -270,20 +270,23 @@ func TestPruneClosed(t *testing.T) {
 	wtDirty := mk(real, store.StatusDone, 8*day)
 	dirty := filepath.Join(workspace.PrimaryPath(wtDirty), "wip")
 	os.WriteFile(dirty, []byte("x"), 0o644)
+	att := filepath.Join(workspace.Dir(svc.Home, wtDone.Key), "attachments")
+	os.MkdirAll(att, 0o755)
+	os.WriteFile(filepath.Join(att, "a.png"), []byte("x"), 0o644)
 	store.SetSetting(svc.DB, "slack_thread:C:orphan", "CV-999")
 	store.SetSetting(svc.DB, "slack_task:CV-998", "C:x")
 
 	a := Templates["prune-closed"]
 	res, err := RunOne(context.Background(), svc, a)
-	if err != nil || res != "pruned 3 tasks, 8 slack links, 1 dirty workspaces kept" {
+	if err != nil || res != "pruned 4 tasks, 10 slack links, 1 dirty workspaces kept" {
 		t.Fatalf("%q %v", res, err)
 	}
-	for _, k := range []string{oldDone.Key, oldCan.Key, wtDone.Key} {
+	for _, k := range []string{oldDone.Key, oldCan.Key, wtDone.Key, wtDirty.Key} {
 		if _, err := store.GetTaskByKey(svc.DB, k); err == nil {
 			t.Errorf("%s kept", k)
 		}
 	}
-	for _, tk := range []store.Task{newDone, run, todo, archived, wtArchived, wtDirty} {
+	for _, tk := range []store.Task{newDone, run, todo, archived, wtArchived} {
 		if _, err := store.GetTaskByKey(svc.DB, tk.Key); err != nil {
 			t.Errorf("%s pruned", tk.Key)
 		}
@@ -291,7 +294,7 @@ func TestPruneClosed(t *testing.T) {
 			t.Errorf("%s link pruned", tk.Key)
 		}
 	}
-	for _, tk := range []store.Task{wtDone, wtArchived} {
+	for _, tk := range []store.Task{wtDone, wtArchived} { // attachments go with a deleted task
 		if _, err := os.Stat(workspace.Dir(svc.Home, tk.Key)); !os.IsNotExist(err) {
 			t.Errorf("%s workspace remains", tk.Key)
 		}
@@ -303,9 +306,9 @@ func TestPruneClosed(t *testing.T) {
 		t.Fatalf("dirty worktree removed: %v", err)
 	}
 
-	// once clean, the next run removes it
+	// the row is soft-deleted; once clean, the next run's sync removes the workspace
 	os.Remove(dirty)
-	if res, err := RunOne(context.Background(), svc, a); err != nil || res != "pruned 1 tasks, 2 slack links, 0 dirty workspaces kept" {
+	if res, err := RunOne(context.Background(), svc, a); err != nil || res != "pruned 0 tasks, 0 slack links, 0 dirty workspaces kept" {
 		t.Fatalf("%q %v", res, err)
 	}
 	if _, err := os.Stat(workspace.Dir(svc.Home, wtDirty.Key)); !os.IsNotExist(err) {

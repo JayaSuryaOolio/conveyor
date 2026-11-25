@@ -387,9 +387,9 @@ func seedBuiltins(svc *core.Service) error {
 	return store.SetSetting(svc.DB, "seeded_prune_closed", "1")
 }
 
-// pruneClosed removes the workspace of every done/cancelled task last updated before at-olderThan,
-// then deletes those task rows unless they carry the archived label. A dirty workspace is left
-// with its row, so a later run retries it once it is clean.
+// pruneClosed soft-deletes every done/cancelled task last updated before at-olderThan, except those
+// carrying the archived label, which keep their row but lose their workspace. Then workspace.Sync
+// removes the folders of soft-deleted tasks; a dirty one stays and is retried on the next run.
 func pruneClosed(svc *core.Service, olderThan time.Duration, at time.Time) (string, error) {
 	cutoff := at.Add(-olderThan).UTC().Format(time.RFC3339)
 	ts, err := store.ListTasks(svc.DB, store.StatusDone, store.StatusCancelled)
@@ -402,18 +402,20 @@ func pruneClosed(svc *core.Service, olderThan time.Duration, at time.Time) (stri
 		if t.UpdatedAt >= cutoff {
 			continue
 		}
-		if err := workspace.Remove(svc.DB, svc.Home, t, false); err != nil {
-			log.Printf("prune %s: keep workspace: %v", t.Key, err)
-			kept++
-			continue
-		}
 		if !slices.Contains(t.Labels, store.LabelArchived) {
 			del = append(del, t.ID)
+		} else if err := workspace.Remove(svc.DB, svc.Home, t, false); err != nil {
+			log.Printf("prune %s: keep workspace: %v", t.Key, err)
+			kept++
 		}
 	}
 	n, l, err := store.DeleteTasks(svc.DB, del, at)
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("pruned %d tasks, %d slack links, %d dirty workspaces kept", n, l, kept), nil
+	k, err := workspace.Sync(svc.DB, svc.Home)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("pruned %d tasks, %d slack links, %d dirty workspaces kept", n, l, kept+k), nil
 }
