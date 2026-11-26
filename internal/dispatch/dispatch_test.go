@@ -1055,3 +1055,30 @@ func TestTickWritesHeartbeat(t *testing.T) {
 		t.Error("stale should start after 3 intervals")
 	}
 }
+
+func TestSkillPreflight(t *testing.T) {
+	t.Setenv("HOME", t.TempDir()) // ListSkills also scans ~/.claude
+	e := setup(t)
+	sk := filepath.Join(e.repo.Path, ".claude", "skills", "tdd")
+	os.MkdirAll(sk, 0o755)
+	os.WriteFile(filepath.Join(sk, "SKILL.md"), []byte("---\nname: tdd\ndescription: d\n---\n"), 0o644)
+	bad, ok := e.task(t, "Bad", 1), e.task(t, "Ok", 0)
+	store.AddLabel(e.db, bad.ID, "skill:tdd")
+	store.AddLabel(e.db, bad.ID, "skill:nope")
+	store.AddLabel(e.db, ok.ID, "skill:tdd")
+	store.AddLabel(e.db, ok.ID, "skill:plug:thing") // namespaced: not checkable, passes
+	e.tick(t)
+	if got := e.get(t, bad.ID); got.Status != store.StatusNeedsYou {
+		t.Fatalf("bad status %s", got.Status)
+	}
+	if got := e.get(t, ok.ID); got.Status != store.StatusRunning {
+		t.Fatalf("ok status %s", got.Status)
+	}
+	cs, _ := store.ListComments(e.db, bad.ID)
+	if len(cs) != 1 || cs[0].Author != store.AuthorSystem || !strings.Contains(cs[0].Body, "nope") || strings.Contains(cs[0].Body, "tdd") {
+		t.Errorf("comments %+v", cs)
+	}
+	if ls := launches(t, e.fake); len(ls) != 1 {
+		t.Errorf("launches %v", ls)
+	}
+}
