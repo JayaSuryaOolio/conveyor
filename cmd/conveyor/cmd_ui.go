@@ -79,11 +79,12 @@ func parseGo(s *core.Service, args []string) (core.UIView, error) {
 	label := fs.String("label", "", "board: filter by label")
 	repo := fs.String("repo", "", "board: filter by repo")
 	task := fs.String("task", "", "epic: open this task's modal")
+	q := fs.String("q", "", "automations: search text (partial name)")
 	pos, err := parseArgs(fs, args)
 	if err != nil {
 		return core.UIView{}, err
 	}
-	usage := fmt.Errorf("usage: conveyor ui go board [--label L] [--repo R] | task KEY | KEY | epic KEY [--task KEY] | %s", strings.Join(uiViews, "|"))
+	usage := fmt.Errorf("usage: conveyor ui go board [--label L] [--repo R] | automations [--q TEXT] | task KEY | KEY | epic KEY [--task KEY] | %s", strings.Join(uiViews, "|"))
 	if len(pos) == 0 {
 		return core.UIView{}, usage
 	}
@@ -95,7 +96,11 @@ func parseGo(s *core.Service, args []string) (core.UIView, error) {
 	case name == "board" && len(pos) == 1:
 		return core.UIView{Name: "board", Label: *label, Repo: *repo}, nil
 	case slices.Contains(uiViews, name) && len(pos) == 1:
-		return core.UIView{Name: name}, nil
+		v := core.UIView{Name: name}
+		if name == "automations" {
+			v.Q = *q
+		}
+		return v, nil
 	case (name == "task" || name == "epic") && len(pos) == 2:
 		if err := needTask(pos[1]); err != nil {
 			return core.UIView{}, err

@@ -16,6 +16,7 @@ type UIView struct {
 	Label string `json:"label,omitempty"`
 	Repo  string `json:"repo,omitempty"`
 	Task  string `json:"task,omitempty"`
+	Q     string `json:"q,omitempty"` // automations: search text
 }
 
 // UIState is <home>/ui-state.json: what the running app shows (docs/ui-control-spec.md §4).

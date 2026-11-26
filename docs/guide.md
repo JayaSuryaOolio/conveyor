@@ -277,6 +277,7 @@ conveyor ui go CV-128                  # same as: ui go task CV-128
 conveyor ui go board --label epic      # also --repo R
 conveyor ui go epic CV-120 --task CV-120B
 conveyor ui go learnings|automations|apps|agents|logs|settings|focus
+conveyor ui go automations --q CV-128  # prefill the search box
 conveyor ui palette "review"           # Cmd+K, prefilled
 conveyor ui current [--json]           # what the app shows now
 ```
