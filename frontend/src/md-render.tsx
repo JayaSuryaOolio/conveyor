@@ -20,6 +20,8 @@ function Img({src, alt}: {src?: string; alt?: string}) {
     const home = useHome()
     const [open, setOpen] = useState(false)
     const url = src && home && src.startsWith(home + '/') ? '/attachments' + src : src
+    // Interactive Approach diagram: scripts run, but without allow-same-origin the page cannot reach the app or its bindings (the server also sends a no-network CSP).
+    if (url?.startsWith('/attachments/') && /\.html$/i.test(url)) return <iframe src={url} title={alt} sandbox="allow-scripts" style={{width: '100%', height: 480, border: '1px solid var(--mantine-color-default-border)', borderRadius: 4}}/>
     return (
         <>
             <Clickable as="img" src={url} alt={alt} style={{maxWidth: '100%', cursor: 'zoom-in'}} onActivate={() => setOpen(true)}/>
