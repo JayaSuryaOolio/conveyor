@@ -271,6 +271,12 @@ func (s *Slack) Send(m chat.Msg) error {
 	return err
 }
 
+// Alert DMs plain text with no task thread (chat.Alerter).
+func (s *Slack) Alert(text string) error {
+	_, err := s.post(map[string]any{"channel": s.get("slack_user_id"), "text": text})
+	return err
+}
+
 // ---- inbound: Socket Mode ----
 
 type envelope struct {
