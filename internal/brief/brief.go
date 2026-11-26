@@ -365,8 +365,13 @@ func labelLines(b *strings.Builder, db *sql.DB, task store.Task) error {
 		} else if f != nil {
 			flow = fmt.Sprint(f.Attempt)
 		}
-		fmt.Fprintf(b, "Epic %s (root %s), stage %s, flow %s. Load the epic skill and run `conveyor epic status %s` first.\n",
-			name, root.Key, store.EpicStage(root), flow, root.Key)
+		fmt.Fprintf(b, "Epic %s (root %s), stage %s, flow %s. ", name, root.Key, store.EpicStage(root), flow)
+		if task.ID == root.ID {
+			fmt.Fprintf(b, "Load the epic skill and run `conveyor epic status %s` first.\n", root.Key)
+		} else {
+			// A child run answers its own task: epic status/check cost calls and bury the answer.
+			b.WriteString("Load the epic skill, do your step by the Kind rule, and skip `conveyor epic status` and `epic check` unless the task asks. Lead your summary with the answer to the latest human comment; leave checks of other tasks to the root.\n")
+		}
 	}
 	if k := store.LabelValue(task, store.PrefixKind); kindRules[k] != "" {
 		fmt.Fprintf(b, "Kind %s: %s\n", k, kindRules[k])
