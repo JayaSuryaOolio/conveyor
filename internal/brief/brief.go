@@ -410,9 +410,21 @@ func history(b *strings.Builder, h string, runs []store.Run, comments []store.Co
 	}
 	var sums []string
 	for _, r := range runs {
-		if s := oneLine(deref(r.Summary)); s != "" {
-			sums = append(sums, clip(fmt.Sprintf("- run %d: %s", r.ID, s), maxRunLine))
+		s, e := oneLine(deref(r.Summary)), oneLine(deref(r.Error))
+		if s == "" && e == "" {
+			continue
 		}
+		line := fmt.Sprintf("- run %d", r.ID)
+		if bs := oneLine(deref(r.BlockStatus)); bs != "" {
+			line += " [" + bs + "]"
+		}
+		if s != "" {
+			line += ": " + clip(s, maxRunLine/2) // leave room so the error survives the final clip
+		}
+		if e != "" {
+			line += " | error: " + e
+		}
+		sums = append(sums, clip(line, maxRunLine))
 	}
 	if len(sums) > 3 {
 		sums = sums[len(sums)-3:]
