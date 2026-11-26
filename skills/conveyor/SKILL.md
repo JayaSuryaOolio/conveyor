@@ -46,7 +46,7 @@ conveyor task graph KEY [--json]         # parent tree + links around KEY
 conveyor task new "t" --repo r --epic [--epic-name n]   # epic root: labels epic + epic:<name> (default: lower-cased key)
 conveyor epic status|check|flows|prs|search|sessions|log|audit|approve|restart KEY   # docs/epic-builder.md §13; status/prs take --json
 conveyor agent list|add|model         conveyor config list|get|set [--reveal]
-conveyor repo add|list|rm|setup <name> [script|-]
+conveyor repo add|list|rm|setup|check <name> [script|command|-]   # check = repo check_command: only Bash calls containing it satisfy the tests-after-edit gate (empty: keyword fallback)
 conveyor models [--json]            # model list (API with ANTHROPIC_API_KEY, else built-in); names are not validated, a bad model fails the session -> needs_you
 conveyor state export [FILE] | import FILE [--repo A=name]   # settings/connectors/automations/user agents, repos as placeholders
 conveyor state backup [--keep N]   # whole DB to <home>/backups via VACUUM INTO, keeps newest N (5); state-backup automation runs it every 6h

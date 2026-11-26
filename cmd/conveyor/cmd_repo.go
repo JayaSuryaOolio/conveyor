@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strings"
 	"text/tabwriter"
 
 	"flag"
@@ -10,7 +11,7 @@ import (
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 )
 
-func init() { register("repo", runRepo, "manage registered repos (add|list|rm|setup)") }
+func init() { register("repo", runRepo, "manage registered repos (add|list|rm|setup|check)") }
 
 func runRepo(home string, args []string) error {
 	if len(args) == 0 {
@@ -83,6 +84,32 @@ func runRepo(home string, args []string) error {
 				return err
 			}
 			fmt.Fprintf(out, "setup script for %s saved\n", args[1])
+			return nil
+		})
+	case "check":
+		if len(args) < 2 || len(args) > 3 {
+			return fmt.Errorf("usage: conveyor repo check <name> [command|-]  (no command prints it, - reads stdin, \"\" clears)")
+		}
+		return withService(home, func(s *core.Service) error {
+			if len(args) == 2 {
+				r, err := store.GetRepoByName(s.DB, args[1])
+				if err != nil {
+					return err
+				}
+				fmt.Fprintln(out, r.CheckCommand)
+				return nil
+			}
+			cmd := args[2]
+			if cmd == "-" {
+				var err error
+				if cmd, err = readText("-"); err != nil {
+					return err
+				}
+			}
+			if err := store.SetRepoCheckCommand(s.DB, args[1], strings.TrimSpace(cmd)); err != nil {
+				return err
+			}
+			fmt.Fprintf(out, "check command for %s saved\n", args[1])
 			return nil
 		})
 	case "rm":

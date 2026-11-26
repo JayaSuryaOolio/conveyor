@@ -29,6 +29,10 @@ func completionGaps(db *sql.DB, task store.Task, run store.Run, p payload, prSyn
 	if err != nil {
 		return nil, err
 	}
+	cmds, err := store.RepoMap(db, func(r store.Repo) string { return r.CheckCommand })
+	if err != nil {
+		return nil, err
+	}
 	events, err := store.ListEvents(db, task.ID)
 	if err != nil {
 		return nil, err
@@ -36,6 +40,11 @@ func completionGaps(db *sql.DB, task store.Task, run store.Run, p payload, prSyn
 	kind := store.LabelValue(task, store.PrefixKind)
 	f := &harness.Facts{Task: task, Default: def, RunStart: run.StartedAt, Events: events,
 		WantPR: prSynced && kind != "prototype" && kind != "research"} // their kind rules say open no PR
+	for _, tr := range task.Repos {
+		if c := strings.TrimSpace(cmds[tr.RepoID]); c != "" {
+			f.CheckCmds = append(f.CheckCmds, c)
+		}
+	}
 	if p.TranscriptPath != "" {
 		f.Uses, f.UsesErr = transcript.ToolUses(p.TranscriptPath)
 	} else {

@@ -5,11 +5,11 @@ import (
 	"fmt"
 )
 
-const repoCols = `id, name, path, default_branch, created_at, setup_script`
+const repoCols = `id, name, path, default_branch, created_at, setup_script, check_command`
 
 func scanRepo(r interface{ Scan(...any) error }) (Repo, error) {
 	var x Repo
-	err := r.Scan(&x.ID, &x.Name, &x.Path, &x.DefaultBranch, &x.CreatedAt, &x.SetupScript)
+	err := r.Scan(&x.ID, &x.Name, &x.Path, &x.DefaultBranch, &x.CreatedAt, &x.SetupScript, &x.CheckCommand)
 	return x, err
 }
 
@@ -66,6 +66,18 @@ func SetRepoSetupScript(db *sql.DB, name, script string) error {
 	res, err := db.Exec(`UPDATE repos SET setup_script=? WHERE name=?`, script, name)
 	if err != nil {
 		return fmt.Errorf("set setup script %q: %w", name, err)
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return fmt.Errorf("repo %q: %w", name, sql.ErrNoRows)
+	}
+	return nil
+}
+
+// SetRepoCheckCommand sets the repo's check command; "" clears it.
+func SetRepoCheckCommand(db *sql.DB, name, cmd string) error {
+	res, err := db.Exec(`UPDATE repos SET check_command=? WHERE name=?`, cmd, name)
+	if err != nil {
+		return fmt.Errorf("set check command %q: %w", name, err)
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
 		return fmt.Errorf("repo %q: %w", name, sql.ErrNoRows)

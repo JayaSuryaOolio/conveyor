@@ -57,6 +57,10 @@ func TestCLIFlow(t *testing.T) {
 	if out := cv(t, home, "repo", "setup", name); strings.TrimSpace(out) != "direnv allow ." {
 		t.Fatal(out)
 	}
+	cv(t, home, "repo", "check", name, "make ci")
+	if out := cv(t, home, "repo", "check", name); strings.TrimSpace(out) != "make ci" {
+		t.Fatal(out)
+	}
 	cv(t, home, "task", "new", "Do the thing", "--repo", name, "--todo")
 	var tasks []struct {
 		Key    string `json:"key"`

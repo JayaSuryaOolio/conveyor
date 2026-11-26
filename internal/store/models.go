@@ -16,7 +16,8 @@ type Repo struct {
 	Path          string `json:"path"`
 	DefaultBranch string `json:"default_branch"`
 	CreatedAt     string `json:"created_at"`
-	SetupScript   string `json:"setup_script"` // run in each new worktree of this repo
+	SetupScript   string `json:"setup_script"`  // run in each new worktree of this repo
+	CheckCommand  string `json:"check_command"` // the repo's test/lint command; the tests-after-edit gate counts only runs containing it
 }
 
 // Task is a kanban task. Repos is filled by GetTask, GetTaskByKey and ListTasks.
@@ -103,7 +104,7 @@ type Comment struct {
 	ConsumedByRunID *int64        `json:"consumed_by_run_id"`
 	CreatedAt       string        `json:"created_at"`
 	SendNow         bool          `json:"send_now"` // human chose "Send now": the dispatcher skips the comment debounce
-	Edits           []CommentEdit `json:"edits"` // earlier versions, oldest first; a run's agent comment is updated, not re-posted
+	Edits           []CommentEdit `json:"edits"`    // earlier versions, oldest first; a run's agent comment is updated, not re-posted
 }
 
 // CommentEdit is a replaced version of a comment or task description: its body, when it was replaced

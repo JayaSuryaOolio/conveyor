@@ -131,6 +131,16 @@ func TestTranscriptChecks(t *testing.T) {
 	if g := Check(f); len(g) != 0 {
 		t.Fatalf("gaps: %s", msgs(g))
 	}
+	// A configured check_command replaces the keyword fallback.
+	f.Uses, f.CheckCmds = []transcript.ToolUse{edit, test}, []string{"make ci"}
+	if out := msgs(Check(f)); !strings.Contains(out, "untested-edit") {
+		t.Fatalf("go test must not count when check_command is make ci:\n%s", out)
+	}
+	f.Uses = []transcript.ToolUse{edit, {Name: "Bash", Command: "make ci"}, {Name: "Skill", Skill: "tdd"}}
+	if g := Check(f); len(g) != 0 {
+		t.Fatalf("gaps: %s", msgs(g))
+	}
+	f.CheckCmds = nil
 	// An unreadable transcript skips the checks that need it.
 	f.Uses, f.UsesErr = []transcript.ToolUse{edit}, errors.New("read")
 	if g := Check(f); len(g) != 0 {

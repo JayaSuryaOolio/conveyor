@@ -644,6 +644,11 @@ func (a *App) AddRepo(path, name string) error {
 	return err
 }
 
+// SetRepoCheckCommand sets the repo's test/lint command for the tests-after-edit gate.
+func (a *App) SetRepoCheckCommand(name, cmd string) error {
+	return store.SetRepoCheckCommand(a.svc.DB, name, strings.TrimSpace(cmd))
+}
+
 // SetRepoSetupScript sets the script run in each new worktree of the repo.
 func (a *App) SetRepoSetupScript(name, script string) error {
 	return store.SetRepoSetupScript(a.svc.DB, name, script)
