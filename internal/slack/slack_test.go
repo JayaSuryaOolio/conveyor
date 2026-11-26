@@ -311,6 +311,33 @@ func TestClosedTaskReplyIsError(t *testing.T) {
 	}
 }
 
+// CV-212: a reply in a thread with no link, where conversations.replies fails, still gets an
+// answer in the thread; and the read call is form-encoded (Slack rejects JSON there).
+func TestUnlinkedThreadRepliesFailureAnswers(t *testing.T) {
+	var posts []map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "conversations.replies") {
+			if r.Header.Get("Content-Type") != "application/x-www-form-urlencoded" || r.FormValue("ts") != "212.1" {
+				t.Errorf("replies not form-encoded: %q %q", r.Header.Get("Content-Type"), r.FormValue("ts"))
+			}
+			fmt.Fprint(w, `{"ok":false,"error":"invalid_arguments"}`)
+			return
+		}
+		var a map[string]any
+		json.NewDecoder(r.Body).Decode(&a)
+		posts = append(posts, a)
+		fmt.Fprint(w, `{"ok":true,"ts":"212.9"}`)
+	}))
+	defer srv.Close()
+	api = srv.URL + "/"
+	s := &Slack{get: func(k string) string { return map[string]string{"slack_bot_token": "x", "slack_user_id": "U1"}[k] }}
+	s.event([]byte(`{"event":{"type":"message","user":"U1","text":"hello?","channel":"D1","ts":"212.2","thread_ts":"212.1"}}`),
+		func(chat.In) string { t.Fatal("must not run a command"); return "" })
+	if len(posts) != 1 || posts[0]["thread_ts"] != "212.1" || !strings.Contains(fmt.Sprint(posts[0]["text"]), "closed or unknown") {
+		t.Fatalf("posts %v", posts)
+	}
+}
+
 func TestBackfillHandlesMissedMessages(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`{"ok":true,"ts":"9.9","messages":[
