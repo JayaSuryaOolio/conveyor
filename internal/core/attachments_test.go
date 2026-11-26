@@ -69,3 +69,32 @@ func TestAttachmentSVG(t *testing.T) {
 		t.Fatal("svg served without a no-script CSP")
 	}
 }
+
+// TestAttachmentHTML: the interactive Approach diagram (approach.html) is served as
+// HTML whose CSP lets inline script run but blocks every network load.
+func TestAttachmentHTML(t *testing.T) {
+	home := t.TempDir()
+	p := filepath.Join(home, "workspaces", "K-1", "approach.html")
+	os.MkdirAll(filepath.Dir(p), 0o755)
+	os.WriteFile(p, []byte("<script>1</script>"), 0o644)
+	w := httptest.NewRecorder()
+	AttachmentHandler(home).ServeHTTP(w, httptest.NewRequest("GET", "/attachments"+p, nil))
+	if w.Code != http.StatusOK || !strings.HasPrefix(w.Header().Get("Content-Type"), "text/html") {
+		t.Fatalf("html: %d %q", w.Code, w.Header().Get("Content-Type"))
+	}
+	csp := w.Header().Get("Content-Security-Policy")
+	for _, want := range []string{"default-src 'none'", "script-src 'unsafe-inline'", "connect-src 'none'", "base-uri 'none'", "sandbox allow-scripts"} {
+		if !strings.Contains(csp, want) {
+			t.Errorf("CSP %q lacks %q", csp, want)
+		}
+	}
+	if strings.Contains(csp, "http") {
+		t.Errorf("CSP allows network: %q", csp)
+	}
+	// html outside the home stays a 404
+	w = httptest.NewRecorder()
+	AttachmentHandler(home).ServeHTTP(w, httptest.NewRequest("GET", "/attachments"+filepath.Dir(home)+"/x.html", nil))
+	if w.Code != http.StatusNotFound {
+		t.Errorf("html outside home: %d", w.Code)
+	}
+}

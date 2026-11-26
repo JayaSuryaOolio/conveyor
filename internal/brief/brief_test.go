@@ -283,8 +283,10 @@ func TestApproachRule(t *testing.T) {
 	if !has(mk("add a thing")) {
 		t.Error("first run of a plain task needs the Approach rule")
 	}
-	if got, _ := Build(db, mk("draw it")); !strings.Contains(got, "approach.svg") || !strings.Contains(got, "![approach](") {
-		t.Error("the Approach leads with an SVG diagram embedded in the reply (AC6)")
+	if got, _ := Build(db, mk("draw it")); !strings.Contains(got, "approach.html") || !strings.Contains(got, "![approach](") || !strings.Contains(got, "approach.svg") {
+		t.Error("the Approach leads with an interactive HTML diagram (SVG fallback) embedded in the reply (AC6)")
+	} else if !strings.Contains(got, "click") || !strings.Contains(got, "no external") {
+		t.Error("the HTML rule asks for click-to-highlight and no external loads")
 	} else if strings.Contains(got, "with Bash") {
 		t.Error("agents can Write in the workspace dir now; no Bash workaround")
 	}

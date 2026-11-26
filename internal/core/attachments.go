@@ -48,7 +48,7 @@ func SaveAttachment(home, key, name, dataB64 string) (string, error) {
 
 // AttachmentHandler serves GET /attachments/<abs path> for image files under
 // the conveyor home, so the webview can show them. SVG (the agent-drawn
-// approach.svg) is served too, never uploaded, with scripts blocked.
+// approach.svg, scripts blocked) and any .html under the home (the interactive approach.html: inline scripts only, no network) are served too, never uploaded.
 func AttachmentHandler(home string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rest, ok := strings.CutPrefix(r.URL.Path, "/attachments/")
@@ -58,12 +58,16 @@ func AttachmentHandler(home string) http.Handler {
 		}
 		p := filepath.Clean("/" + rest)
 		ext := strings.ToLower(filepath.Ext(p))
-		if !strings.HasPrefix(p, home+string(filepath.Separator)) || !imageExt[ext] && ext != ".svg" {
+		if !strings.HasPrefix(p, home+string(filepath.Separator)) || !imageExt[ext] && ext != ".svg" && ext != ".html" {
 			http.NotFound(w, r)
 			return
 		}
-		if ext == ".svg" {
+		switch ext {
+		case ".svg":
 			w.Header().Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:; script-src 'none'")
+		case ".html":
+			// Inline script and style only; no network, forms or same-origin access (also if opened directly).
+			w.Header().Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; font-src data:; connect-src 'none'; form-action 'none'; base-uri 'none'; sandbox allow-scripts")
 		}
 		http.ServeFile(w, r, p)
 	})

@@ -173,7 +173,7 @@ func OtherPaths(task store.Task) []string {
 }
 
 // AddDirs returns the --add-dir list for a task's sessions: the other worktrees and the task's
-// workspace dir, so Write/Edit can reach BRIEF.md's folder (STATE.md, approach.svg).
+// workspace dir, so Write/Edit can reach BRIEF.md's folder (STATE.md, approach.html).
 func AddDirs(home string, task store.Task) []string {
 	return append(OtherPaths(task), Dir(home, task.Key))
 }
