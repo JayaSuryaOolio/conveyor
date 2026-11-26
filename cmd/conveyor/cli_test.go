@@ -718,6 +718,22 @@ func TestUIGo(t *testing.T) {
 	if i := <-got; i.Verb != "go" || string(i.Args) != `{"name":"task","key":"CV-1"}` {
 		t.Fatalf("intent %+v", i)
 	}
+	// `automations --q` carries the search text (a connector action's `run` can pass a task key).
+	go func() {
+		for {
+			if is, _ := store.ConsumeIntents(app, time.Now()); len(is) > 0 {
+				got <- is[0]
+				return
+			}
+			time.Sleep(20 * time.Millisecond)
+		}
+	}()
+	if out, code := cvCode(t, home, "ui", "go", "automations", "--q", "CV-1"); code != 0 {
+		t.Fatalf("automations --q: code %d\n%s", code, out)
+	}
+	if i := <-got; string(i.Args) != `{"name":"automations","q":"CV-1"}` {
+		t.Fatalf("intent %+v", i)
+	}
 	// No app consumes the row: wait out the 3 s, exit 3, leave nothing behind.
 	if out, code := cvCode(t, home, "ui", "go", "CV-1"); code != 3 || !strings.Contains(out, "not running") || intentCount(t, home) != 0 {
 		t.Fatalf("no app: code %d rows %d\n%s", code, intentCount(t, home), out)
