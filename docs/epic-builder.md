@@ -130,7 +130,7 @@ An **epic flow** is one attempt to finish the epic. It is not a task and is not 
 
 The skill ships in this repo at `skills/epic/`. Installing the Conveyor plugin (Apps page, `conveyor plugin install`) copies it to `~/.claude/skills/conveyor/skills/epic/`, and "uninstall" removes it. Every epic run and every child run loads it (the brief names it).
 
-Tasks remember nothing between runs. The skill makes them seem to: **every run starts from `conveyor epic status KEY --json`**, which assembles flow, tasks, PRs, AC coverage and the recent audit tail from the DB. That status is the state. The workspace's STATE.md is only a scratchpad.
+Tasks remember nothing between runs. The skill makes them seem to: **every root run starts from `conveyor epic status KEY --json`** (a child run skips it and `epic check` unless its task asks, and leads its summary with the answer to the latest human comment), which assembles flow, tasks, PRs, AC coverage and the recent audit tail from the DB. That status is the state. The workspace's STATE.md is only a scratchpad.
 
 Checklist, run at the start and before the status block (`conveyor epic check KEY` does the mechanical items and prints what fails):
 
@@ -240,7 +240,7 @@ ALTER TABLE automations ADD COLUMN flow_id INTEGER REFERENCES epic_flows(id) ON 
 - **Skill files**: `skills/epic/SKILL.md` (loop, gate, checklist, no-merge rule, commands), `skills/epic/planners/wayfinder.md` (§2.1 table as commands). They are embedded with `go:embed` and written by `Plugin("claude", "install")` into the plugin next to the hooks. `status` reports the skill too.
 - **Brief** (`internal/brief`):
   - a `Labels:` line,
-  - for epic members: `Epic <name> (root <ROOTKEY>), stage <s>, flow <n>. Load the epic skill and run conveyor epic status <ROOTKEY> first.`,
+  - for epic members: `Epic <name> (root <ROOTKEY>), stage <s>, flow <n>.` then, for the root, `Load the epic skill and run conveyor epic status <ROOTKEY> first.`; for a child, `Load the epic skill, do your step by the Kind rule, and skip conveyor epic status and epic check unless the task asks...`,
   - for `epic_kind:*`: the one-line rule for that kind (§2.1),
   - for `skill:*` labels: `Load these skills before starting: a, b.`,
   - update the golden test.

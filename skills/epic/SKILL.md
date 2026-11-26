@@ -13,14 +13,14 @@ No agent merges a PR, in any form, ever. The human always merges. (`gh pr merge`
 
 ## State
 
-You remember nothing between runs. **Start every run with `conveyor epic status ROOT --json`** (ROOT is the root key from your brief). If it shows no flow while the stage is `decide` or later, tell the human: `conveyor epic restart ROOT` starts flow 1. That is the state: flow, stage, tasks, PRs, AC coverage and the recent audit tail. STATE.md in the workspace is only a scratchpad.
+You remember nothing between runs. **A root run starts with `conveyor epic status ROOT --json`** (ROOT is the root key from your brief). If it shows no flow while the stage is `decide` or later, tell the human: `conveyor epic restart ROOT` starts flow 1. That is the state: flow, stage, tasks, PRs, AC coverage and the recent audit tail. STATE.md in the workspace is only a scratchpad.
 
-Then run `conveyor epic check ROOT` and fix what it prints (`--fix` repairs labels only). Run it again before your status block.
+Then a root run runs `conveyor epic check ROOT` and fixes what it prints (`--fix` repairs labels only), and again before its status block. A child run skips both unless its task asks for them: they cost calls and say nothing about your task.
 
 ## Which run are you?
 
 - **Root run** (your task has the bare `epic` label): you drive the stages below.
-- **Child run** (you have `epic:<name>` but not `epic`): do your step by the `Kind` rule in your brief, record the outcome where the rule says, end with the status block. Do not change stage labels or other tasks.
+- **Child run** (you have `epic:<name>` but not `epic`): do your step by the `Kind` rule in your brief, record the outcome where the rule says, end with the status block. Do not change stage labels or other tasks. Open your summary with the answer to the latest human comment, before any epic detail. If you did run `epic check` and it flags other tasks, do not report that in your summary or try to fix it: record it with `conveyor epic log ROOT "<finding>"` for the root run.
 
 ## Stage loop (root run)
 
