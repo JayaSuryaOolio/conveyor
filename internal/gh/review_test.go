@@ -50,7 +50,7 @@ func reviewTask(t *testing.T) (*core.Service, store.Task) {
 
 const threads = `{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[
  {"isResolved":true,"comments":{"nodes":[{"databaseId":12}]}},
- {"isResolved":false,"comments":{"nodes":[{"databaseId":11}]}}]}}}}}`
+ {"isResolved":false,"comments":{"nodes":[{"databaseId":11},{"databaseId":13}]}}]}}}}}`
 
 func TestReviewCheckPostsOnceThenBacksOff(t *testing.T) {
 	dir := fakeAPI(t,
@@ -106,6 +106,36 @@ func TestReviewCheckPostsOnceThenBacksOff(t *testing.T) {
 	}
 	if !strings.Contains(a.ActionArg, `"--step","1"`) {
 		t.Errorf("arg %s", a.ActionArg)
+	}
+}
+
+// CV-226: an unresolved thread older than the watermark is sent again until the agent replies in it.
+func TestReviewCheckResendsUnresolvedThread(t *testing.T) {
+	thread := `{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[
+ {"isResolved":false,"comments":{"nodes":[{"databaseId":11}]}}]}}}}}`
+	old := `{"id":11,"body":"nil deref","path":"a.go","line":3,"user":{"login":"bob"}}`
+	dir := fakeAPI(t, `[]`, `[`+old+`]`, thread)
+	svc, tk := reviewTask(t)
+	ctx := context.Background()
+	if err := store.SavePRReview(svc.DB, store.PRReview{TaskID: tk.ID, RepoID: tk.Repos[0].RepoID, SeenInlineID: 11}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ReviewCheck(ctx, svc, tk.Key, 0); err != nil {
+		t.Fatal(err)
+	}
+	cs, _ := store.ListComments(svc.DB, tk.ID)
+	if len(cs) != 1 || !strings.Contains(cs[0].Body, "> a.go:3 (bob), still unresolved\nnil deref") {
+		t.Fatalf("unresolved thread not resent: %+v", cs)
+	}
+	// The agent replied in the thread: quiet until the reviewer answers.
+	os.WriteFile(filepath.Join(dir, "comments.json"), []byte(`[`+old+`,{"id":12,"body":"ai agent: fixed","path":"a.go","line":3,"user":{"login":"me"}}]`), 0o644)
+	os.WriteFile(filepath.Join(dir, "threads.json"), []byte(`{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[
+ {"isResolved":false,"comments":{"nodes":[{"databaseId":11},{"databaseId":12}]}}]}}}}}`), 0o644)
+	if _, err := ReviewCheck(ctx, svc, tk.Key, 0); err != nil {
+		t.Fatal(err)
+	}
+	if cs, _ = store.ListComments(svc.DB, tk.ID); len(cs) != 1 {
+		t.Fatalf("thread with an agent reply resent: %d comments", len(cs))
 	}
 }
 
