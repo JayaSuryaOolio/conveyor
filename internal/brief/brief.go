@@ -111,7 +111,7 @@ func rulesForTask(db *sql.DB, task store.Task, extra bool) string {
 - Open at most one PR per repo.
 - Never push to the default branch.
 - The repo's %s, skills, commands and agents are the authority on how to work in it (build, test, commit, PR, changesets). Use them over your own defaults and over generic user-level skills; where they disagree with this brief, follow the repo, except for the worktree, PR and status block rules here.
-`, doc, doc)
+`, doc, doc) + loopRule
 	if p := store.GetSetting(db, "pr_comment_prefix"); p != "" {
 		r += fmt.Sprintf("- Start every comment or reply you post on a PR or issue with `%s`.\n", p)
 	}
@@ -120,6 +120,10 @@ func rulesForTask(db *sql.DB, task store.Task, extra bool) string {
 	}
 	return r
 }
+
+// loopRule asks a run to loop with subagents before it reports done (docs/loop-engineering.md).
+// The run decides whether its stage calls for it; nothing enforces it yet.
+const loopRule = "- Loop before `status: done`: when this run wrote code, have a subagent that has not seen your reasoning review the diff against this brief and the repo's conventions (the repo's reviewer or architect agent if it has one, else a general one), and have one exercise the change when it has behaviour to run. Fix what is valid; at most two rounds. No loop when the run only addresses PR review comments or makes a small fix to a nearly done task. Put what the loop found in your summary.\n"
 
 // approachRule is added to a task's first-run brief unless its approach was discussed or is stated.
 const approachRule = "- First run: before changing any code, reply with an Approach and no status block; the task then waits in needs_you. Lead with a diagram, the human reads pictures faster than text: write a self-contained SVG to `approach.svg` next to BRIEF.md (inline styles, its own background, no scripts or external refs) and start the Approach with `![approach](<its absolute path>)`. Draw the change, not a generic box chart: the layers or modules it touches as lanes, the request or data flow through them as numbered arrows, new parts in one colour and reused ones (with paths) in another, and the open decisions as callouts on the spot they affect. Text after it only for what the picture cannot say: new names, open decisions, risks, in a few short lines. Change nothing until the human acks; then record the approach as `decision:` lines and build it.\n"
