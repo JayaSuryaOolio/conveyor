@@ -67,7 +67,8 @@ CREATE TABLE IF NOT EXISTS runs (
   error TEXT,
   started_at TEXT NOT NULL,
   ended_at TEXT,
-  runner TEXT NOT NULL DEFAULT ''
+  runner TEXT NOT NULL DEFAULT '',
+  model TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS idx_runs_task ON runs(task_id);
 CREATE INDEX IF NOT EXISTS idx_runs_session ON runs(session_id);
@@ -299,6 +300,9 @@ UPDATE labels SET name=lower(name) WHERE name IN ('approved','archived')`); err 
 	if err := migrateAddRunRunner(db); err != nil {
 		return err
 	}
+	if err := migrateAddRunModel(db); err != nil {
+		return err
+	}
 	if err := migrateTerminalTemplate(db); err != nil {
 		return err
 	}
@@ -507,6 +511,20 @@ func migrateAddRunRunner(db *sql.DB) error {
 	if n == 0 {
 		if _, err := db.Exec(`ALTER TABLE runs ADD COLUMN runner TEXT NOT NULL DEFAULT ''`); err != nil {
 			return fmt.Errorf("add runs.runner: %w", err)
+		}
+	}
+	return nil
+}
+
+// migrateAddRunModel adds runs.model; older runs read "" (model unknown).
+func migrateAddRunModel(db *sql.DB) error {
+	var n int
+	if err := db.QueryRow(`SELECT count(*) FROM pragma_table_info('runs') WHERE name='model'`).Scan(&n); err != nil {
+		return fmt.Errorf("check runs.model: %w", err)
+	}
+	if n == 0 {
+		if _, err := db.Exec(`ALTER TABLE runs ADD COLUMN model TEXT NOT NULL DEFAULT ''`); err != nil {
+			return fmt.Errorf("add runs.model: %w", err)
 		}
 	}
 	return nil

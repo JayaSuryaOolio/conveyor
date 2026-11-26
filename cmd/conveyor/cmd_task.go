@@ -310,7 +310,7 @@ func taskShow(s *core.Service, args []string) error {
 	if *runs {
 		fmt.Fprintln(out, "\nruns:")
 		for _, r := range rs {
-			fmt.Fprintf(out, "#%d %s/%s %s peak=%d calls=%d denials=%d rereads=%d dupbash=%d big=%d %s\n", r.ID, r.Kind, r.Mode, r.Status,
+			fmt.Fprintf(out, "#%d %s/%s %s model=%s peak=%d calls=%d denials=%d rereads=%d dupbash=%d big=%d %s\n", r.ID, r.Kind, r.Mode, r.Status, r.Model,
 				r.CtxPeak, r.APICalls, r.HookDenials, r.Rereads, r.DupBash, r.BigResults, deref(r.Summary))
 		}
 	}

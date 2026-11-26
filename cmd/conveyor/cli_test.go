@@ -837,3 +837,38 @@ func TestActionsGolden(t *testing.T) {
 		t.Fatalf("bad key: code %d", code)
 	}
 }
+
+// harness grade maps difficulty to a runner's model; harness models groups runs by (runner, model); show --runs prints it.
+func TestHarnessModelsCLI(t *testing.T) {
+	home := t.TempDir()
+	if got := strings.TrimSpace(cv(t, home, "harness", "grade", "agy", "hard")); got != "gemini-4-hydrogen-high" {
+		t.Fatalf("grade: %q", got)
+	}
+	if out := cvFail(t, home, "harness", "grade", "claude", "trivial"); !strings.Contains(out, "grades: easy, medium, hard") {
+		t.Fatal(out)
+	}
+	repo := t.TempDir()
+	for _, args := range [][]string{{"init", "-b", "main"}, {"-c", "user.name=t", "-c", "user.email=t@t", "commit", "--allow-empty", "-m", "i"}} {
+		if b, err := exec.Command("git", append([]string{"-C", repo}, args...)...).CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, b)
+		}
+	}
+	cv(t, home, "repo", "add", repo)
+	cv(t, home, "task", "new", "T", "--repo", filepath.Base(repo))
+	db, err := core.OpenDB(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tk, _ := store.GetTaskByKey(db, "CV-1")
+	store.CreateRun(db, store.Run{TaskID: tk.ID, Kind: "auto", Mode: "fresh", Status: "finished", Runner: "claude", Model: "opus"})
+	db.Close()
+	if out := cv(t, home, "task", "show", "CV-1", "--runs"); !strings.Contains(out, "finished model=opus") {
+		t.Fatal(out)
+	}
+	if out := cv(t, home, "harness", "models"); !regexp.MustCompile(`claude\s+opus\s+1\s+0\s+0\s+0`).MatchString(out) {
+		t.Fatal(out)
+	}
+	if out := cv(t, home, "harness", "stale", "--ledger", "../../docs/harness-ledger.md", "--current", "Nothing 1"); !strings.Contains(out, "CV-112D4") {
+		t.Fatal(out)
+	}
+}
