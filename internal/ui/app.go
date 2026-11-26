@@ -22,6 +22,7 @@ import (
 	"github.com/JayaSuryaOolio/conveyor/internal/gh"
 	"github.com/JayaSuryaOolio/conveyor/internal/jira"
 	"github.com/JayaSuryaOolio/conveyor/internal/learning"
+	"github.com/JayaSuryaOolio/conveyor/internal/playbook"
 	"github.com/JayaSuryaOolio/conveyor/internal/runner"
 	"github.com/JayaSuryaOolio/conveyor/internal/slack"
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
@@ -430,6 +431,9 @@ func (a *App) RemoveLabel(key, name string) error { return a.svc.RemoveLabel(key
 func (a *App) SetLabel(key, prefix, value string) error {
 	return a.svc.SetLabel(key, strings.TrimSuffix(prefix, ":")+":"+value)
 }
+
+// ListPlaybooks returns the playbook names the picker offers, default first.
+func (a *App) ListPlaybooks() []string { return playbook.List() }
 
 // ListLabels returns every known label name.
 func (a *App) ListLabels() ([]string, error) { return store.ListLabels(a.svc.DB) }

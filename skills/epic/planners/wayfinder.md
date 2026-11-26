@@ -1,6 +1,6 @@
 # Planner adapter: wayfinder
 
-Maps Matt Pocock's [wayfinder](https://github.com/mattpocock/skills/blob/main/skills/engineering/wayfinder/SKILL.md) onto Conveyor's epic labels. The default planner (`epic_planner:wayfinder`, or no `epic_planner:` label). Another planner is another file in this folder with the same table; no Go changes.
+Maps Matt Pocock's [wayfinder](https://github.com/mattpocock/skills/blob/main/skills/engineering/wayfinder/SKILL.md) onto Conveyor's epic labels. The planner of an epic root with no `playbook:` label or `playbook:default` (`playbook:wayfinder`). For epic roots only; on a task that is not an epic root, ignore this file and follow the default loop. Another planner is another file in this folder with the same table; no Go changes.
 
 | wayfinder | Conveyor command |
 |---|---|

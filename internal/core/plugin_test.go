@@ -38,7 +38,7 @@ func TestPlugin(t *testing.T) {
 	status("status", "outdated", "not installed")
 
 	status("install", "installed", "installed")
-	for _, f := range []string{".claude-plugin/plugin.json", "hooks/hooks.json", "skills/epic/SKILL.md", "skills/epic/planners/wayfinder.md", "skills/conveyor/SKILL.md", "skills/conveyor-drift/SKILL.md", "skills/write-migration/SKILL.md"} {
+	for _, f := range []string{".claude-plugin/plugin.json", "hooks/hooks.json", "skills/epic/SKILL.md", "skills/epic/planners/wayfinder.md", "skills/epic/planners/default.md", "skills/epic/planners/superpowers.md", "skills/epic/planners/pstack.md", "skills/epic/planners/impeccable.md", "skills/conveyor/SKILL.md", "skills/conveyor-drift/SKILL.md", "skills/write-migration/SKILL.md"} {
 		if _, err := os.Stat(filepath.Join(claudePlugin, f)); err != nil {
 			t.Fatal(err)
 		}

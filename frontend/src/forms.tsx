@@ -4,7 +4,7 @@ import {Button, Group, Modal, Stack, Text} from './ui'
 import {IconAdjustments} from '@tabler/icons-react'
 import {AddLabel, AddRepo, CreateTask, ExportState, GetPromptDefaults, GetTask, GetSettings, ImportState, ListAgents, ListCLIAgents, ListLabels, ListModels, ListRepos, PreviewBrief, Requirements, ShellPATHError, SetRepoCheckCommand, SetRepoSetupScript, SetSetting, SetTaskAgent, SetTaskModel, SetTaskRunner} from '../wailsjs/go/ui/App'
 import {core, store} from '../wailsjs/go/models'
-import {Nav, errMsg, toast} from './components'
+import {Nav, PlaybookSelect, errMsg, toast} from './components'
 import {Markdown, MarkdownEditor} from './markdown'
 import {listTasks, useData, useDraft} from './util'
 import {ThemePicker} from './themes'
@@ -26,12 +26,13 @@ export function NewTask({nav, close}: {nav: Nav; close: () => void}) {
     const {data: allLabels} = useData(ListLabels, [])
     const [epic, setEpic] = useState(false)
     const [epicName, setEpicName] = useState('')
+    const [playbook, setPlaybook] = useState('default')
     const prim = sel.includes(primary) ? primary : sel[0] ?? ''
     const submit = () =>
         CreateTask(core.NewTaskInput.createFrom({
             Title: title, Description: desc, Repos: sel, Primary: prim,
             Start: start, Model: model, Agent: agent, Runner: runner, ParentKey: parent, Epic: epic, EpicName: epicName.trim(),
-        })).then(key => Promise.all(labels.map(l => AddLabel(key, l).catch(e => toast(String(e))))).then(() => key)).then(key => { setTitle(''); setDesc(''); close(); nav({name: 'task', key}) }, errMsg)
+        })).then(key => Promise.all((playbook === 'default' ? labels : [...labels.filter(l => !l.startsWith('playbook:')), 'playbook:' + playbook]).map(l => AddLabel(key, l).catch(e => toast(String(e))))).then(() => key)).then(key => { setTitle(''); setDesc(''); close(); nav({name: 'task', key}) }, errMsg)
     // Picking a parent prefills repos, primary, agent and runner from it; they stay editable. Clearing leaves them.
     const pickParent = (key: string | null) => {
         setParent(key ?? '')
@@ -53,6 +54,7 @@ export function NewTask({nav, close}: {nav: Nav; close: () => void}) {
                     <MultiSelect label="Repos" placeholder="Pick repos" description={repos?.length === 0 ? 'Add one on the Repos page first' : undefined}
                                  data={repos?.map(r => r.name) ?? []} value={sel} onChange={setSel}/>
                     {sel.length > 1 && <Select label="Primary repo" allowDeselect={false} data={sel} value={prim} onChange={v => setPrimary(v ?? '')}/>}
+                    <PlaybookSelect value={playbook} onChange={setPlaybook}/>
                     <TagsInput label="Labels" placeholder="Add label…" data={allLabels ?? []} value={labels} onChange={setLabels} splitChars={[',']}/>
                 </SimpleGrid>
                 <Text size="sm" weight={500} style={{marginTop: 10}}>Agents</Text>

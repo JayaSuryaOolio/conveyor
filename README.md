@@ -106,6 +106,8 @@ Start with [`.claude/skills/conveyor/SKILL.md`](.claude/skills/conveyor/SKILL.md
 agent  app  automation  config  daemon  hook  hooks  import  learning  repo  task
 ```
 
+**Playbooks:** a `playbook:<name>` label on any task picks the workflow its agent follows (an epic's planner is its playbook). No label runs `default`: architect, implement, review. Shipped: `default`, `wayfinder`, `superpowers`, `pstack`, `impeccable`, in `skills/epic/planners/`; names live in `internal/playbook`.
+
 Integrations (terminal templates, external connectors, global hooks, automations, Jira import) are covered in the [guide](docs/guide.md).
 
 **Checks:** `gofmt -l .`, `go vet ./...`, `go test ./...`; frontend: `cd frontend && npm ci && npm run build`. End-to-end: `scripts/e2e.sh` against real `claude` (haiku) on two pre-trusted throwaway repos in `~/work/conveyor-e2e/` (override with `E2E_ROOT`).

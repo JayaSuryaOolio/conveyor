@@ -59,7 +59,7 @@ Every epic label has one meaning per prefix, so a filter never mixes them:
 | `epic:` | belongs to the epic with this name | `epic:os-4` |
 | `epic_stage:` | the root's current stage | `epic_stage:build` |
 | `epic_kind:` | what sort of step a child is | `epic_kind:grilling` |
-| `epic_planner:`, `epic_gate:` | root settings | `epic_planner:wayfinder`, `epic_gate:off` |
+| `playbook:`, `epic_gate:` | root settings | `playbook:wayfinder`, `epic_gate:off` |
 
 **What a kind is.** A kind says what sort of work a child task is, so Conveyor and the agent know how to run it and when it counts as finished. There are four:
 
@@ -91,7 +91,7 @@ Conveyor speaks this one vocabulary. A **planner adapter** maps a planning skill
 | AFK ticket (research, build) | runs with no human |
 | resolution, close, pointer on the map | status block summary, task `done`, one line appended to the map's Decisions so far |
 
-An adapter is one markdown file, `skills/epic/planners/<name>.md`, holding this table as commands. The root picks a planner with `epic_planner:<name>` (default `wayfinder`). Another skill, such as a spec-kit style planner or your own grilling skill, needs only a new file. No Go changes.
+An adapter is one markdown file, `skills/epic/planners/<name>.md`, holding this table as commands. The root picks a planner with `playbook:<name>` (none or `default` means `wayfinder`); a planner is a playbook, and any task, epic or not, can carry the label (no label: `default`, architect, implement, review). Shipped: `default`, `wayfinder`, `superpowers`, `pstack`, `impeccable`. The names are constants in `internal/playbook`; a new planner is a new file there plus one name in that list, and the UI picker lists them through `ListPlaybooks`.
 
 ### 2.2 The loop
 
@@ -237,7 +237,7 @@ ALTER TABLE automations ADD COLUMN flow_id INTEGER REFERENCES epic_flows(id) ON 
 ## 8. Epic agent, skill and brief
 
 - **Agent** `epic-builder`, seeded into `~/.claude/agents` by `plugin install` (no UI). The prompt is short: "You run an epic. Load the `epic` skill and follow it." Stage logic lives in the skill, so it can change without a Go release.
-- **Skill files**: `skills/epic/SKILL.md` (loop, gate, checklist, no-merge rule, commands), `skills/epic/planners/wayfinder.md` (§2.1 table as commands). They are embedded with `go:embed` and written by `Plugin("claude", "install")` into the plugin next to the hooks. `status` reports the skill too.
+- **Skill files**: `skills/epic/SKILL.md` (loop, gate, checklist, no-merge rule, commands), `skills/epic/planners/*.md`, one per playbook (`wayfinder` holds the §2.1 table as commands). They are embedded with `go:embed` and written by `Plugin("claude", "install")` into the plugin next to the hooks. `status` reports the skill too.
 - **Brief** (`internal/brief`):
   - a `Labels:` line,
   - for epic members: `Epic <name> (root <ROOTKEY>), stage <s>, flow <n>.` then, for the root, `Load the epic skill and run conveyor epic status <ROOTKEY> first.`; for a child, `Load the epic skill, do your step by the Kind rule, and skip conveyor epic status and epic check unless the task asks...`,
