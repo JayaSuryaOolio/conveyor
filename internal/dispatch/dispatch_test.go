@@ -694,6 +694,23 @@ func TestEpicWaitsWhileChildrenQueued(t *testing.T) {
 	}
 }
 
+// A human comment on an epic must not wait for its sub-tasks to settle.
+func TestEpicLaunchesForHumanCommentBesideTodoChild(t *testing.T) {
+	e := setup(t)
+	root, child := e.epic(t, store.StatusNeedsYou)
+	store.UpdateTaskStatus(e.db, root.ID, store.StatusTodo, store.ActorHuman)
+	store.UpdateTaskStatus(e.db, child.ID, store.StatusTodo, store.ActorHuman)
+	c, err := store.AddComment(e.db, store.Comment{TaskID: root.ID, Author: "human", Body: "expand on AC4"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.db.Exec(`UPDATE comments SET send_now=1 WHERE id=?`, c.ID)
+	e.tick(t)
+	if got := e.get(t, root.ID); got.Status != store.StatusRunning {
+		t.Fatalf("epic did not answer the human comment: %s", got.Status)
+	}
+}
+
 // A spawned `[todo]` child blocked by a task starts once the blocker is done; a plain one stays in backlog.
 func TestSpawnedTodoChildStartsAfterBlocker(t *testing.T) {
 	e := setup(t)

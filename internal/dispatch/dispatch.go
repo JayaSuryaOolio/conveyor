@@ -538,7 +538,12 @@ func (d *Dispatcher) launchTodo(ctx context.Context) error {
 		if busy[t.ID] {
 			continue
 		}
-		if store.IsEpic(t) { // an epic waits while its sub-tasks run (R6)
+		pending, err := store.UnconsumedComments(d.Svc.DB, t.ID)
+		if err != nil {
+			return err
+		}
+		// an epic waits while its sub-tasks run (R6), unless a human comment is pending: a question must not sit until the children settle
+		if store.IsEpic(t) && !slices.ContainsFunc(pending, func(c store.Comment) bool { return c.Author == "human" }) {
 			if wait, err := store.EpicHasActiveChildren(d.Svc.DB, t); err != nil {
 				return err
 			} else if wait {
@@ -549,10 +554,6 @@ func (d *Dispatcher) launchTodo(ctx context.Context) error {
 			return err
 		} else if len(blockers) > 0 {
 			continue
-		}
-		pending, err := store.UnconsumedComments(d.Svc.DB, t.ID)
-		if err != nil {
-			return err
 		}
 		if n := len(pending); n > 0 && d.now().Sub(parseTime(pending[n-1].CreatedAt)) < debounce && !slices.ContainsFunc(pending, func(c store.Comment) bool { return c.SendNow }) {
 			continue
