@@ -3,7 +3,7 @@ import type {View} from './components'
 
 // Views <-> URLs. The app still speaks `nav(View)`; react-router (hash history: works under Wails' custom
 // scheme and vite dev without server fallback) owns history/back. Only this file knows the URL shape.
-//   /board?label=epic&repo=x   /settings?label=Prompts&task=KEY   /task/KEY   /epic/KEY   /epic/KEY/task/KEY   /agents ...
+//   /board?label=epic&repo=x   /settings?label=Prompts&task=KEY   /task/KEY   /epic/KEY   /epic/KEY/task/KEY   /automations?q=name   /agents ...
 // refactor: if routes grow params, move to <Routes> with element per path and drop View.
 
 export function toPath(v: View): string {
@@ -12,6 +12,7 @@ export function toPath(v: View): string {
     const q = new URLSearchParams()
     if (v.label) q.set('label', v.label)
     if (v.repo) q.set('repo', v.repo)
+    if (v.q) q.set('q', v.q) // /automations?q=pr filters by partial name
     if (v.task) q.set('task', v.task) // /settings?label=Prompts&task=KEY preselects the prompt preview
     return `/${v.name}` + (q.size ? `?${q}` : '')
 }
@@ -21,5 +22,5 @@ export function fromLocation({pathname, search}: Location): View {
     if (name === 'task' && key) return {name, key}
     if (name === 'epic' && key) return {name, key, task: sub === 'task' ? task : undefined}
     const p = new URLSearchParams(search)
-    return {name, label: p.get('label') ?? undefined, repo: p.get('repo') ?? undefined, task: p.get('task') ?? undefined}
+    return {name, label: p.get('label') ?? undefined, repo: p.get('repo') ?? undefined, task: p.get('task') ?? undefined, q: p.get('q') ?? undefined}
 }

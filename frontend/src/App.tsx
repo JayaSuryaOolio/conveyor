@@ -1,6 +1,6 @@
 import {useEffect, useMemo, useRef, useState} from 'react'
 import {useLocation, useNavigate} from 'react-router'
-import {ActionIcon, AppShell, Badge, Box, Kbd, NavLink, Title, Tooltip} from '@mantine/core'
+import {ActionIcon, AppShell, Badge, Box, Code, Kbd, NavLink, Title, Tooltip} from '@mantine/core'
 import {Button, Group, Modal, Stack, Text} from './ui'
 import {useLocalStorage} from '@mantine/hooks'
 import {IconApps, IconBolt, IconArrowLeft, IconBook2, IconClock, IconLayoutKanban, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconLogs, IconPlus, IconRobot, IconSettings, IconSitemap} from '@tabler/icons-react'
@@ -31,6 +31,20 @@ const NAV: {name: string; key?: string; label: string; icon: typeof IconBolt; fi
     {name: 'logs', key: 'l', label: 'Logs', icon: IconLogs},
     {name: 'settings', label: 'Settings', icon: IconSettings},
 ]
+
+const ROUTES = ['board', 'task', 'epic', 'learnings', 'automations', 'apps', 'agents', 'logs', 'settings']
+
+/** Shown for a deep link no view handles: the link as typed, and a way out. */
+function NotFound({link, canBack, back, home}: {link: string; canBack: boolean; back: () => void; home: () => void}) {
+    return (
+        <Stack align="center" justify="center" gap="sm" style={{minHeight: "80vh"}}>
+            <Title order={3}>Page not found</Title>
+            <Text tone="muted">No page matches this link:</Text>
+            <Code>{link}</Code>
+            <Button icon={<IconArrowLeft size={16}/>} onClick={canBack ? back : home}>Back</Button>
+        </Stack>
+    )
+}
 
 export default function App() {
     // History lives in react-router (hash history); views map to URLs in router.ts.
@@ -144,11 +158,12 @@ export default function App() {
                                 {view.name === 'task' && <TaskPage k={view.key!} nav={nav}/>}
                 {view.name === 'epic' && <EpicView k={view.key!} task={view.task} nav={nav}/>}
                 {view.name === 'learnings' && <LearningsPage nav={nav}/>}
-                {view.name === 'automations' && <Automations/>}
+                {view.name === 'automations' && <Automations q={view.q} setQ={q => navigate(toPath({name: 'automations', q}), {replace: true})}/>}
                 {view.name === 'apps' && <Connectors/>}
                 {view.name === 'agents' && <Agents/>}
                 {view.name === 'logs' && <Logs/>}
                 {view.name === 'settings' && <Settings tab={view.label} task={view.task}/>}
+                {!ROUTES.includes(view.name) && <NotFound link={loc.pathname + loc.search} canBack={canBack} back={back} home={() => setView({name: 'board'})}/>}
             </AppShell.Main>
             <Modal opened={showFocus} onClose={() => setShowFocus(false)} size="min(800px, 96vw)" title="Focus" keepMounted><Focus nav={nav} onClose={() => setShowFocus(false)}/></Modal>
             <Modal opened={showNew} onClose={() => setShowNew(false)} size="clamp(28rem, 60vw, 64rem)" title="New task" keepMounted onExitTransitionEnd={() => setNewKey(k => k + 1)}><NewTask key={newKey} nav={nav} close={() => setShowNew(false)}/></Modal>

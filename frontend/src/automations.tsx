@@ -1,7 +1,7 @@
 import {useEffect, useState} from 'react'
 import {ActionIcon, Chip, Code, CopyButton, MultiSelect, Popover, SegmentedControl, Select, Switch, Table, TextInput, Textarea, Title, Tooltip, UnstyledButton} from '@mantine/core'
 import {Button, Group, Modal, Stack, Text} from './ui'
-import {IconCheck, IconClock, IconCopy, IconPencil, IconPlus, IconTrash} from '@tabler/icons-react'
+import {IconCheck, IconClock, IconCopy, IconPencil, IconPlus, IconSearch, IconTrash} from '@tabler/icons-react'
 import {AddAutomation, Confirm, DeleteAutomation, DescribeSchedule, ListAutomations, ListRepos, RunAutomation, SetAutomationEnabled, UpdateAutomation} from '../wailsjs/go/ui/App'
 import {store, ui} from '../wailsjs/go/models'
 import {Time, errMsg} from './components'
@@ -160,8 +160,11 @@ function RunButton({name, onDone}: {name: string; onDone: () => void}) {
     return <Button size="xs" variant="secondary" loading={state === 'running'} tone={state === 'ran' ? 'success' : undefined} onClick={run}>{state === 'ran' ? 'Ran ✓' : 'Run now'}</Button>
 }
 
-export function Automations() {
-    const {data, error, reload} = useData(ListAutomations, [])
+/** `q` is the partial-name filter; a deep link sets it as /automations?q=name. */
+export function Automations({q = '', setQ}: {q?: string; setQ?: (q: string) => void}) {
+    const {data: all, error, reload} = useData(ListAutomations, [])
+    const needle = q.trim().toLowerCase()
+    const data = needle ? all?.filter(a => a.name.toLowerCase().includes(needle)) : all
     const [form, setForm] = useState<{initial: Form; edit: boolean}>()
     return (
         <Stack>
@@ -169,8 +172,10 @@ export function Automations() {
                 <Title order={3}>Automations</Title>
                 <Button icon={<IconPlus size={16}/>} onClick={() => setForm({initial: EMPTY, edit: false})}>New automation</Button>
             </Group>
+            <TextInput size="xs" placeholder="Filter by name" aria-label="Filter automations by name" leftSection={<IconSearch size={14}/>} value={q} onChange={e => setQ?.(e.currentTarget.value)} style={{maxWidth: 320}}/>
             {error && <Text tone="danger">{error}</Text>}
-            {data && data.length === 0 && <Text tone="muted">None yet. Create one, or use <Code>conveyor automation add --template pr-sweep</Code>.</Text>}
+            {all && needle && data?.length === 0 && <Text tone="muted">No automation name contains “{q}”.</Text>}
+            {data && data.length === 0 && !needle && <Text tone="muted">None yet. Create one, or use <Code>conveyor automation add --template pr-sweep</Code>.</Text>}
             {data && data.length > 0 && (
                 <Table.ScrollContainer minWidth={700}>
                     <Table verticalSpacing="xs">

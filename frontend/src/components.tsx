@@ -8,7 +8,7 @@ import {Markdown, MarkdownEditor, TaskKey} from './markdown'
 import {ALL_STATUSES, STATUS_COLOR, STATUS_LABEL, ago, fmtK, fmtTime, prNumbers, useData, useDraft} from './util'
 
 /** A screen to show; board views may carry a label or repo filter to apply (deep link); epic views a task key for the open modal. */
-export type View = {name: string; key?: string; label?: string; repo?: string; task?: string}
+export type View = {name: string; key?: string; label?: string; repo?: string; task?: string; q?: string}
 export type Nav = (v: View) => void
 
 export const errMsg = (e: unknown) => ShowError(String(e))

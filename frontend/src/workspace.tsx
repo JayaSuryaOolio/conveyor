@@ -2,7 +2,7 @@ import {useState} from 'react'
 import {ActionIcon, Anchor, Badge, Code, Divider, Menu, Paper, TagsInput, TextInput, Title, Tooltip} from '@mantine/core'
 import {Button, ClickableCode, Group, Modal, Stack, Text} from './ui'
 import {useClipboard} from '@mantine/hooks'
-import {IconCopy, IconMessageSearch, IconPencil, IconPlus, IconStar, IconX, IconTerminal, IconTerminal2} from '@tabler/icons-react'
+import {IconCopy, IconExternalLink, IconMessageSearch, IconPencil, IconPlus, IconStar, IconX, IconTerminal, IconTerminal2} from '@tabler/icons-react'
 import {Actions, AddLabel, AddTaskRepo, CheckReviews, EnsureWorkspace, ListLabels, ListRepos, RemoveLabel, RemoveTaskRepo, RunAction, Sessions, SetTaskRepo, TermStart} from '../wailsjs/go/ui/App'
 import {core, store, ui} from '../wailsjs/go/models'
 import {BrowserOpenURL} from '../wailsjs/runtime/runtime'
@@ -110,15 +110,21 @@ function RepoFields({k, r, reload, canRemove, children}: {k: string; r: store.Ta
                     <Group gap={6} style={{marginBottom: 2}}>
                         <Text size="xs" tone="muted">PR</Text>
                         {r.pr_url && r.pr_state && <Badge size="xs" variant="light" color={PR_COLOR[r.pr_state.toLowerCase()] ?? 'gray'}>{r.pr_state}</Badge>}
-                        {r.pr_url && <Anchor size="xs" href={r.pr_url} onClick={e => { e.preventDefault(); BrowserOpenURL(r.pr_url!) }}>Open PR</Anchor>}
-                        {r.pr_state === 'OPEN' && (
-                            <Tooltip label="Check PR now (reviews, CI, conflicts)">
-                                <ActionIcon variant="subtle" color="gray" size="xs" aria-label="Check PR" onClick={() => CheckReviews(k).then(() => toast('Checking the PR for reviews, CI and conflicts…', false, 3000), errMsg)}><IconMessageSearch size={12}/></ActionIcon>
+                        <Group gap={6} wrap={false} style={{marginLeft: 'auto'}}>
+                            <Tooltip label="Edit PR URL">
+                                <ActionIcon variant="subtle" color="gray" size="xs" aria-label="Edit PR URL" onClick={() => setEditPr(!editPr)}><IconPencil size={12}/></ActionIcon>
                             </Tooltip>
-                        )}
-                        <Tooltip label="Edit PR URL">
-                            <ActionIcon variant="subtle" color="gray" size="xs" aria-label="Edit PR URL" onClick={() => setEditPr(!editPr)}><IconPencil size={12}/></ActionIcon>
-                        </Tooltip>
+                            {r.pr_url && (
+                                <Tooltip label="Open link">
+                                    <ActionIcon variant="subtle" color="gray" size="xs" aria-label="Open link" onClick={() => BrowserOpenURL(r.pr_url!)}><IconExternalLink size={12}/></ActionIcon>
+                                </Tooltip>
+                            )}
+                            {r.pr_state === 'OPEN' && (
+                                <Tooltip label="Check PR now (reviews, CI, conflicts)">
+                                    <ActionIcon variant="subtle" color="gray" size="xs" aria-label="Check PR" onClick={() => CheckReviews(k).then(() => toast('Checking the PR for reviews, CI and conflicts…', false, 3000), errMsg)}><IconMessageSearch size={12}/></ActionIcon>
+                                </Tooltip>
+                            )}
+                        </Group>
                     </Group>
                     {editPr || !r.pr_url
                         ? <TextInput size="xs" value={pr} placeholder="https://github.com/…/pull/1" onChange={e => setPr(e.target.value)} onKeyDown={onKey}/>
