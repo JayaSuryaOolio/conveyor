@@ -2,7 +2,7 @@ import {lazy, Ref, Suspense, useEffect, useRef, useState} from 'react'
 import {ActionIcon, Anchor, Badge, Box, Breadcrumbs, CloseButton, Code, CopyButton, Divider, Kbd, Paper, Popover, Tabs, TextInput, Timeline, Title, Tooltip} from '@mantine/core'
 import {Button, Clickable, ClickableCode, Group, Modal, Stack, Text} from './ui'
 import {useLocalStorage} from '@mantine/hooks'
-import {IconAbc, IconSitemap, IconArrowDown, IconArrowUp, IconClock, IconFlame, IconHash, IconPencil, IconSearch, IconTerminal, IconX, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconMessage, IconPlayerPlay} from '@tabler/icons-react'
+import {IconAbc, IconSitemap, IconArrowDown, IconArrowUp, IconClock, IconFlame, IconHash, IconPencil, IconSearch, IconTerminal, IconX, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconMessage, IconPlayerPlay, IconRepeat} from '@tabler/icons-react'
 import {Actions, GetTask, PreviewBrief, QueueStatus, RunLog, SendQueuedNow, SetTaskDescription, Stop, TakeQueuedComment, TermStart} from '../wailsjs/go/ui/App'
 import {core, store, ui} from '../wailsjs/go/models'
 import {Card, CommentBox, Edits, Message, Nav, StatusBadge, Time, View, errMsg} from './components'
@@ -191,7 +191,7 @@ export function TaskPreview({k, onClose, nav}: {k: string; onClose: () => void; 
     )
 }
 
-type Item = {t: string; run?: store.Run; comment?: store.Comment}
+type Item = {t: string; run?: store.Run; comment?: store.Comment; check?: store.Event}
 
 const Criteria = ({text}: {text: string}) => <Markdown>{text}</Markdown>
 
@@ -323,6 +323,7 @@ export function TaskPage({k, nav, height = 'calc(100vh - 2 * var(--mantine-spaci
     const items: Item[] = [
         ...d.runs.map((run): Item => ({t: run.started_at, run})),
         ...d.comments.map((comment): Item => ({t: comment.created_at, comment})),
+        ...(d.checks ?? []).map((check): Item => ({t: check.created_at, check})),
     ].sort((a, b) => (a.t < b.t ? -1 : a.t > b.t ? 1 : a.run ? -1 : 1))
     const runNo = new Map(d.runs.map((r, i) => [r.id, i + 1]))
     return (
@@ -362,6 +363,13 @@ export function TaskPage({k, nav, height = 'calc(100vh - 2 * var(--mantine-spaci
                                     </Text>
                                     <SessionLog run={it.run} onStop={it.run.kind !== 'interactive' ? stop : undefined}/>
                                     {it.run === latest && answer && <Box mt="xs">{answer}</Box>}
+                                </Timeline.Item>
+                            ) : it.check ? (
+                                // Stop hook's completion check sent the session back to work; its reply was held, so say why here.
+                                <Timeline.Item key={'e' + it.check.id} bullet={<IconRepeat size={12}/>}
+                                               title={`Run ${runNo.get([...d.runs].reverse().find(r => r.started_at <= it.check!.created_at)?.id ?? 0) ?? '?'} · completion check sent the session back`}>
+                                    <Text size="xs" tone="muted">The run tried to finish, but Conveyor found work left; that reply was held and the session kept going. <Time iso={it.check.created_at}/></Text>
+                                    <Box component="ul" m={0} pl="md">{it.check.detail.split('; ').map((g, i) => <li key={i}><Text size="xs">{g}</Text></li>)}</Box>
                                 </Timeline.Item>
                             ) : (
                                 <Timeline.Item key={'c' + it.comment!.id} bullet={<IconMessage size={12}/>}>

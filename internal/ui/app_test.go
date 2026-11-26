@@ -264,3 +264,19 @@ func TestSetViewWritesState(t *testing.T) {
 		t.Fatalf("state %+v err %v", s, err)
 	}
 }
+
+// CV-184I1: the Stop hook's completion check keeps a run going; the task page shows why.
+func TestGetTaskCarriesCompletionChecks(t *testing.T) {
+	a, _ := newApp(t)
+	key, _ := a.CreateTask(core.NewTaskInput{Title: "One", Repos: []string{"a"}})
+	if d, _ := a.GetTask(key); d.Checks == nil || len(d.Checks) != 0 {
+		t.Fatalf("no checks must be [], got %#v", d.Checks)
+	}
+	tk, _ := store.GetTaskByKey(a.svc.DB, key)
+	store.RecordEvent(a.svc.DB, tk.ID, "run_started", "run 1")
+	store.RecordEvent(a.svc.DB, tk.ID, "completion_check", "epic skill not loaded")
+	d, err := a.GetTask(key)
+	if err != nil || len(d.Checks) != 1 || d.Checks[0].Detail != "epic skill not loaded" {
+		t.Fatalf("checks: %+v %v", d.Checks, err)
+	}
+}

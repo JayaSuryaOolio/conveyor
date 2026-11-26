@@ -290,6 +290,7 @@ type TaskDetail struct {
 	Runs      []store.Run     `json:"runs"`
 	Relations store.Relations `json:"relations"`
 	Creator   string          `json:"creator"` // who made the task, for the sidebar
+	Checks    []store.Event   `json:"checks"`  // completion_check events: why a run kept going after Stop
 }
 
 // creator labels who made t: from created_by, else (rows from before it existed) from its parent and source.
@@ -395,8 +396,18 @@ func (a *App) GetTask(key string) (TaskDetail, error) {
 	if err != nil {
 		return TaskDetail{}, err
 	}
+	evs, err := store.ListEvents(a.svc.DB, t.ID)
+	if err != nil {
+		return TaskDetail{}, err
+	}
+	checks := []store.Event{}
+	for _, e := range evs {
+		if e.Kind == "completion_check" {
+			checks = append(checks, e)
+		}
+	}
 	by := creator(t, rel.Parent, store.GetSetting(a.svc.DB, "user_name"))
-	return TaskDetail{Task: t, Comments: cs, Runs: rs, Relations: rel, Creator: by}, nil
+	return TaskDetail{Task: t, Comments: cs, Runs: rs, Relations: rel, Creator: by, Checks: checks}, nil
 }
 
 // Decisions lists a task's decisions.
