@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/JayaSuryaOolio/conveyor/internal/connectors"
+	"github.com/JayaSuryaOolio/conveyor/internal/playbook"
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 	"github.com/JayaSuryaOolio/conveyor/internal/workspace"
 )
@@ -379,6 +380,9 @@ func labelLines(b *strings.Builder, db *sql.DB, task store.Task) error {
 	}
 	if k := store.LabelValue(task, store.PrefixKind); kindRules[k] != "" {
 		fmt.Fprintf(b, "Kind %s: %s\n", k, kindRules[k])
+	}
+	if p := playbook.Of(task.Labels); p != playbook.Default {
+		fmt.Fprintf(b, "Playbook %s: load the epic skill and follow its planners/%s.md.\n", p, p)
 	}
 	var skills []string
 	for _, l := range task.Labels {

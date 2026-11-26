@@ -24,7 +24,7 @@ Then a root run runs `conveyor epic check ROOT` and fixes what it prints (`--fix
 
 ## Stage loop (root run)
 
-The stage is the root's `epic_stage:<stage>` label; none means `chart`. Move it with `conveyor task label ROOT set epic_stage:<next>`, never by adding a second one. The planner adapter (`planners/<name>.md`, from `epic_planner:<name>`, default `wayfinder`) says how to write the map and create tickets.
+The stage is the root's `epic_stage:<stage>` label; none means `chart`. Move it with `conveyor task label ROOT set epic_stage:<next>`, never by adding a second one. The planner adapter (`planners/<name>.md`, from the root's `playbook:<name>` label; none or `default` means `wayfinder`) says how to write the map and create tickets. A planner is a playbook: any task can carry `playbook:<name>` (none means `default`: architect, implement, review), and the brief names the file to follow.
 
 | Stage | Do | Move on when |
 |---|---|---|

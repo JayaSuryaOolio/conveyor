@@ -146,6 +146,13 @@ func TestSettingsShapeBrief(t *testing.T) {
 		!strings.Contains(got, "Load these skills before starting: grill-me.") || strings.Contains(got, "Load the epic skill") {
 		t.Fatalf("kind/skills lines:\n%s", got)
 	}
+	for label, want := range map[string]bool{"playbook:superpowers": true, "playbook:default": false, "playbook:nope": false} {
+		tk.Labels = []string{label}
+		got, _ = Build(db, tk)
+		if has := strings.Contains(got, "follow its planners/superpowers.md"); has != want {
+			t.Fatalf("%s: playbook line = %v, want %v:\n%s", label, has, want, got)
+		}
+	}
 	rk := store.Task{ID: 1, Key: "CV-1", Labels: []string{"epic", "epic:os-4"}}
 	if got, _ = Build(db, rk); !strings.Contains(got, "run `conveyor epic status CV-1` first") {
 		t.Fatalf("root keeps the status step:\n%s", got)

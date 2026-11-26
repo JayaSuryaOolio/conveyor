@@ -2,7 +2,7 @@ import {useContext, useEffect, useState} from 'react'
 import {ActionIcon, Badge, Box, Indicator, Menu, Notification, Paper, Popover, RingProgress, Select, Tooltip} from '@mantine/core'
 import {Button, ButtonSize, ClickableCard, Group, Modal, Stack, Text} from './ui'
 import {IconAppWindow, IconCheck, IconChevronLeft, IconChevronRight, IconDots, IconMessageSearch, IconPencil, IconSitemap, IconX} from '@tabler/icons-react'
-import {AddComment, ConnectorServiceRunning, CheckReviews, MergedPR, Move, PlacedActions, RunConnectorAction, ShowError, SendQueuedNow, StopConnectorService, TakeQueuedComment} from '../wailsjs/go/ui/App'
+import {AddComment, ConnectorServiceRunning, CheckReviews, ListPlaybooks, MergedPR, Move, PlacedActions, RunConnectorAction, ShowError, SendQueuedNow, StopConnectorService, TakeQueuedComment} from '../wailsjs/go/ui/App'
 import {store, ui} from '../wailsjs/go/models'
 import {Markdown, MarkdownEditor, TaskKey} from './markdown'
 import {ALL_STATUSES, STATUS_COLOR, STATUS_LABEL, ago, fmtK, fmtTime, prNumbers, useData, useDraft} from './util'
@@ -300,4 +300,10 @@ export function Message({m, onEdit, onSendNow, queue}: {m: store.Comment; onEdit
             </Modal>
         </Paper>
     )
+}
+
+/** Playbook picker; names come from Go (internal/playbook), "default" is the architect, implement, review loop. */
+export function PlaybookSelect({value, onChange}: {value: string; onChange: (v: string) => void}) {
+    const {data} = useData(ListPlaybooks, [], {static: true})
+    return <Select label="Playbook" allowDeselect={false} data={data ?? []} value={value} onChange={v => onChange(v ?? 'default')}/>
 }

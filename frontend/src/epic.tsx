@@ -5,10 +5,10 @@ import {useLocalStorage} from '@mantine/hooks'
 import {IconCode, IconExternalLink, IconGitPullRequest, IconMessageQuestion, IconPlayerPlay, IconPlayerStop, IconPlus, IconTerminal2} from '@tabler/icons-react'
 import {Background, Controls, Handle, MarkerType, Position, ReactFlow, useEdgesState, useNodesState, type Connection, type Edge, type Node, type NodeProps} from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import {CreateTask, EpicApprove, EpicGraph, EpicRestart, InstallExample, ListConnectors, Move, OpenConnector, RunAction, Stop, Link, Unlink} from '../wailsjs/go/ui/App'
+import {CreateTask, EpicApprove, EpicGraph, EpicRestart, InstallExample, SetLabel, ListConnectors, Move, OpenConnector, RunAction, Stop, Link, Unlink} from '../wailsjs/go/ui/App'
 import {BrowserOpenURL} from '../wailsjs/runtime/runtime'
 import {core, store} from '../wailsjs/go/models'
-import {Nav, StatusBadge, errMsg} from './components'
+import {Nav, PlaybookSelect, StatusBadge, errMsg} from './components'
 import {CARD, columns, layout, trace} from './epicLayout'
 import {STATUS_COLOR, useData} from './util'
 import {JiraSource} from './jiraSource'
@@ -155,6 +155,7 @@ function Header({g, nav, root}: {g: core.Graph; nav: Nav; root: core.GraphNode})
                 <Group gap="sm">
                     <Text size="sm">{live.filter(n => n.status === 'done').length}/{live.length} done</Text>
                     <Badge color={wants ? 'orange' : 'gray'} variant={wants ? 'filled' : 'light'}>{wants} want{wants === 1 ? 's' : ''} you</Badge>
+                    {epic && <PlaybookSelect value={root.labels.find(l => l.startsWith('playbook:'))?.slice(9) ?? 'default'} onChange={v => SetLabel(g.root, 'playbook', v).catch(errMsg)}/>}
                     {g.gate && <Button size="sm" compact tone="success" onClick={() => EpicApprove(g.root).catch(errMsg)}>Approve plan</Button>}
                     {epic && <Button size="sm" compact variant="secondary" onClick={() => setRestart(true)}>Restart</Button>}
                 </Group>
