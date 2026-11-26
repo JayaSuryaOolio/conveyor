@@ -239,3 +239,40 @@ func TestListShowsPRAndRunAndKeyFirst(t *testing.T) {
 		t.Fatalf("threadCmd: %q", got)
 	}
 }
+
+func TestMuteSkipsNotifyWithoutReplay(t *testing.T) {
+	db, err := store.Open(filepath.Join(t.TempDir(), "c.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	repo, _ := store.AddRepo(db, store.Repo{Name: "a", Path: "/x/a", DefaultBranch: "main"})
+	tk, _ := store.CreateTask(db, store.Task{Title: "t", Status: store.StatusRunning, Description: "why"}, []store.TaskRepo{{RepoID: repo.ID, IsPrimary: true, Branch: "t"}})
+	b := &bridge{&core.Service{DB: db}, t.Logf}
+	f := &fake{}
+	b.notify(f)
+	store.SetSetting(db, "chat_statuses", "needs_you")
+	if out := b.command("mute"); !strings.Contains(out, "muted") || !b.board().Muted {
+		t.Fatalf("mute: %q", out)
+	}
+	store.UpdateTaskStatus(db, tk.ID, store.StatusNeedsYou, store.ActorSystem)
+	b.notify(f)
+	b.command("unmute")
+	b.notify(f)
+	if len(f.got) != 0 {
+		t.Fatalf("sent while muted or replayed after: %+v", f.got)
+	}
+	if bd := b.board(); len(bd.Rows) != 1 || bd.Rows[0].Key != tk.Key || len(bd.Repos) != 1 || bd.Muted {
+		t.Fatalf("board %+v", bd)
+	}
+	d, err := b.detail(strings.ToLower(tk.Key))
+	if err != nil || d.Description != "why" || d.LastRun != "" {
+		t.Fatalf("detail %+v %v", d, err)
+	}
+	if _, err := b.detail("nope"); err == nil {
+		t.Fatal("bad key accepted")
+	}
+	if _, err := b.detail("ZZ-999"); err == nil {
+		t.Fatal("missing task accepted")
+	}
+}

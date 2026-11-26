@@ -36,9 +36,14 @@ obeys your `slack_user_id`. Two choices:
 API. Nothing listens on your machine, so no public URL or tunnel. Slack on your phone talks to Slack;
 Slack relays to the running Conveyor. Conveyor must be running (desktop app or daemon) to answer.
 
-**Yes, there is an App page.** Slack shows your app's Home tab; Conveyor publishes the command
-guide there once each time it connects (not on every open; Slack keeps it). Slack's website has no
-static editor for Home content, only the API can set it. It is Block Kit (header, dividers, sections), not HTML. The **Messages** tab is on too: that is
+**Yes, there is an App page.** Slack shows your app's Home tab: a task board (needs you, failed,
+running, todo) built from Block Kit (not HTML; Slack allows nothing else there). Each task has a `⋯` menu
+(view details, done, requeue, cancel). Buttons: **New task** (modal: repo + what to do), **View task**
+(modal: type a key like `CV-12`, press VIEW for status, repos, PR links, last run and description),
+**Refresh**, **Mute DMs / Unmute DMs** (same as sending `mute` / `unmute`: no task DMs while you work at
+your laptop; nothing is replayed on unmute) and **Help**. Home is not live: it is drawn when Conveyor
+connects and by these buttons, so press Refresh to see new tasks. The modals need *Interactivity* (below).
+The **Messages** tab is on too: that is
 the DM where you send commands and receive task updates. The app appears under *Apps* in your
 sidebar; pin it or message it once and it shows in your DMs.
 
@@ -79,6 +84,7 @@ Only `slack_user_id` is DMed and obeyed; everyone else is ignored.
 ## Using it from your phone
 Open the Conveyor DM. Type a plain message, no slash needed:
 - `help` - the guide (also on the app's Home tab)
+- `mute` / `unmute` - stop or resume task DMs (also on the Home tab)
 - `list` - tasks waiting on you
 - `show CV-12` (or just `CV-12`) - status, repos, PRs, last agent message
 - `CV-12 use the v2 API` - comment on CV-12 (requeues it)
