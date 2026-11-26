@@ -158,7 +158,7 @@ Checklist, run at the start and before the status block (`conveyor epic check KE
 - R3. After `chart`, the epic waits in `needs_you` for approval unless it has `epic_gate:off`. Approval starts a flow and moves the epic to `decide`. Nothing after that needs the human, except HITL tickets, stuck agents, and merging.
 - R4. No agent merges a PR. The `epic` skill says so, and the PreToolUse hook denies `gh pr merge` in runs of epic tasks.
 - R5. Children carry `epic:<name>`, `epic_kind:<kind>` and `repo:*`. Build tickets carry their AC ids and a link to the spec, and are told to work test-first.
-- R6. While any child is running or in `todo`, the epic does not run. When the last open child settles, the epic is requeued with a system comment that names its stage.
+- R6. While any child is running or in `todo`, the epic does not run. When the last open child settles, the epic is requeued with a system comment that names its stage. A pending human comment is the exception: it launches the epic at once, so a question is not held until the children settle.
 
 **Flows**
 - R7. `epic_flows` records attempts. Only one flow per epic is active. `conveyor epic flows|status|restart` work on flows. Only the human restarts a flow. The flow id never appears on the board or the cards.
