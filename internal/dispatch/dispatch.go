@@ -631,7 +631,7 @@ func (d *Dispatcher) start(ctx context.Context, task store.Task, delta []store.C
 		prev = nil // the task switched backends: one cannot resume the other's session
 	}
 	cwd := workspace.PrimaryPath(task)
-	run := store.Run{TaskID: task.ID, Kind: "auto", Mode: "fresh", Status: "launching", Runner: bgRunner.Name()}
+	run := store.Run{TaskID: task.ID, Kind: "auto", Mode: "fresh", Status: "launching", Runner: bgRunner.Name(), Model: d.resolvedModel(task)}
 	if prev != nil {
 		run.Mode, run.SessionID = "resume", prev.SessionID // the hook matches resumed sessions by id
 		run.Prompt = brief.WithInjected(d.Svc.DB, brief.ResumePrompt(task, briefPath, delta, store.GetSetting(d.Svc.DB, "prompt_resume")))
@@ -726,21 +726,35 @@ func (d *Dispatcher) model(task store.Task) string {
 	if task.Model != nil {
 		return *task.Model
 	}
-	if task.Agent != nil {
-		var dirs []string
-		for _, r := range task.Repos {
-			if r.WorktreePath != nil {
-				dirs = append(dirs, *r.WorktreePath)
-			}
-			if repo, err := store.GetRepoByName(d.Svc.DB, r.RepoName); err == nil {
-				dirs = append(dirs, repo.Path)
-			}
-		}
-		if core.AgentModel(*task.Agent, dirs...) != "" {
-			return ""
-		}
+	if d.agentModel(task) != "" {
+		return ""
 	}
 	return store.GetSetting(d.Svc.DB, "default_model")
+}
+
+// resolvedModel is the model the run will use: model(), else the agent's own. Stored on runs.model.
+func (d *Dispatcher) resolvedModel(task store.Task) string {
+	if m := d.model(task); m != "" {
+		return m
+	}
+	return d.agentModel(task)
+}
+
+// agentModel is the model set by the task's agent definition, "" when none.
+func (d *Dispatcher) agentModel(task store.Task) string {
+	if task.Agent == nil {
+		return ""
+	}
+	var dirs []string
+	for _, r := range task.Repos {
+		if r.WorktreePath != nil {
+			dirs = append(dirs, *r.WorktreePath)
+		}
+		if repo, err := store.GetRepoByName(d.Svc.DB, r.RepoName); err == nil {
+			dirs = append(dirs, repo.Path)
+		}
+	}
+	return core.AgentModel(*task.Agent, dirs...)
 }
 
 func fileExists(p string) bool { _, err := os.Stat(p); return err == nil }

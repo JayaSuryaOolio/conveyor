@@ -80,3 +80,9 @@ A retry's brief showed run summaries only, so the cause of the previous failure 
 | PR | Reason | Predicted runs | Observed | Model | Date |
 |---|---|---|---|---|---|
 | CV-112D6 | `brief.history()` shows each run's `block_status` and clipped `error` | fewer repeat failures on retried tasks (second run fails for the same reason); requeue rate on `failed` tasks down | pending | Sonnet 5.5 | 2026-11 |
+
+## Model chosen without evidence (no per-run model, no difficulty grade)
+
+| PR | Reason | Predicted runs | Observed | Model | Date |
+|---|---|---|---|---|---|
+| CV-112D13 | Record `runs.model` at launch; `spec` grades build children easy/medium/hard and sets `--model` through `conveyor harness grade`; doctor compares outcomes by (runner, model) | easy-graded children on sonnet (claude) fail or requeue no more often than medium ones; `hard` on opus needs fewer runs per task than `hard` on sonnet did; `runs.model` is set on every new auto run | pending | Sonnet 5.5 | 2026-11 |

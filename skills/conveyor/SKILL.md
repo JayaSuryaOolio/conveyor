@@ -27,6 +27,7 @@ Model precedence: task `model` > agent file `model:` > `default_model` setting.
 conveyor [--home dir] <cmd>          # no args = usage; list/show take --json
 conveyor task list [--status todo,running] --json
 conveyor task show KEY --thread --runs [--json]
+conveyor harness grade RUNNER GRADE | models [--json] | stale --current MODEL   # difficulty -> model; runs by (runner, model); ledger rows by an older model
 conveyor task brief KEY --preview     # what the agent is told
 conveyor task precheck KEY            # start check: must the next run re-read the description
 conveyor task log KEY [--follow]      # live session output

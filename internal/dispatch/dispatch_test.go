@@ -1082,3 +1082,28 @@ func TestSkillPreflight(t *testing.T) {
 		t.Errorf("launches %v", ls)
 	}
 }
+
+// A launched run records the model it resolved to, including one set only by the agent's frontmatter.
+func TestRunRecordsModel(t *testing.T) {
+	e := setup(t)
+	t.Setenv("HOME", t.TempDir())
+	store.SetSetting(e.db, "default_model", "sonnet")
+	dir := filepath.Join(e.repo.Path, ".claude", "agents")
+	os.MkdirAll(dir, 0o755)
+	os.WriteFile(filepath.Join(dir, "a.md"), []byte("---\nname: a\nmodel: opus\n---\n"), 0o644)
+	str := func(s string) *string { return &s }
+	for _, c := range []struct {
+		model, agent *string
+		want         string
+	}{{nil, nil, "sonnet"}, {str("haiku"), nil, "haiku"}, {nil, str("a"), "opus"}} {
+		tk := e.task(t, "t", 0)
+		tk.Model, tk.Agent = c.model, c.agent
+		if err := store.UpdateTask(e.db, tk); err != nil {
+			t.Fatal(err)
+		}
+		e.tick(t)
+		if run, _ := store.LatestRun(e.db, tk.ID); run.Model != c.want {
+			t.Errorf("%v %v: run model %q want %q", c.model, c.agent, run.Model, c.want)
+		}
+	}
+}

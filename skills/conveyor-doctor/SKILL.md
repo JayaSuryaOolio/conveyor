@@ -18,6 +18,8 @@ When asked to fix (`fix KEY`, or `fix` for every task), skip the review below. F
 
 ## 0. Read the harness ledger
 
+Run `conveyor harness models` for done/failed and average context peak per (runner, model), and compare models only within a runner. From the repo root, run `conveyor harness stale --current "<your model>"` and re-check each ledger attempt it lists (written by an older model) before relying on it.
+
 Read all of `docs/harness-ledger.md` before anything else. For each attempt with Observed `pending`, fill it in from the runs since its merge date (the run columns it predicted, plus the held-out outcomes below). A closed or reverted harness PR gets a row as a failed attempt (`failed: <why>`), including ones whose PR you only find in `gh pr list --state closed`. Judge success by held-out outcomes: tasks merged without rework, human steering comments per task, requeue rate (runs per task). Not by the run the change was written from. Ledger edits go in your PR.
 
 ## 1. Pick the sample (6-10 runs from the last 7 days)
