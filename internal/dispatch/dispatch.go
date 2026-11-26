@@ -558,6 +558,16 @@ func (d *Dispatcher) launchTodo(ctx context.Context) error {
 		if n := len(pending); n > 0 && d.now().Sub(parseTime(pending[n-1].CreatedAt)) < debounce && !slices.ContainsFunc(pending, func(c store.Comment) bool { return c.SendNow }) {
 			continue
 		}
+		if missing := d.missingSkills(t); len(missing) > 0 {
+			note := fmt.Sprintf("Skill(s) not found in the task's repos or ~/.claude: %s. Fix the skill:* label or add the skill, then move the task to todo.", strings.Join(missing, ", "))
+			if _, err := store.AddComment(d.Svc.DB, store.Comment{TaskID: t.ID, Author: store.AuthorSystem, Body: note}); err != nil {
+				return err
+			}
+			if _, err := store.UpdateTaskStatus(d.Svc.DB, t.ID, store.StatusNeedsYou, store.ActorSystem); err != nil {
+				return err
+			}
+			continue
+		}
 		run, err := d.start(ctx, t, pending)
 		if err != nil {
 			d.logf("launch %s: %v", t.Key, err)
@@ -569,6 +579,29 @@ func (d *Dispatcher) launchTodo(ctx context.Context) error {
 		auto++
 	}
 	return nil
+}
+
+// missingSkills lists the task's skill:* labels that no repo or user skill provides.
+// Namespaced names (plugin:skill) are skipped: plugin skills are not scanned.
+func (d *Dispatcher) missingSkills(t store.Task) []string {
+	var want []string
+	for _, l := range t.Labels {
+		if s, ok := strings.CutPrefix(l, "skill:"); ok && s != "" && !strings.Contains(s, ":") {
+			want = append(want, s)
+		}
+	}
+	if len(want) == 0 {
+		return nil
+	}
+	repos := make([]string, len(t.Repos))
+	for i, r := range t.Repos {
+		repos[i] = r.RepoName
+	}
+	have := map[string]bool{}
+	for _, c := range d.Svc.ListSkills(repos) {
+		have[c.Name] = true
+	}
+	return slices.DeleteFunc(want, func(s string) bool { return have[s] })
 }
 
 // start launches one run. On error the returned run is the launching row if one was created.

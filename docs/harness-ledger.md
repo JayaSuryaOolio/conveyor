@@ -61,6 +61,12 @@ of the duplicate classes. Fix the source (put the fact where agents read it) ins
 |---|---|---|---|---|---|
 | CV-112D3 | Review check lists failing CI checks in its system comment (deduped per head sha) and stores them in `epic_flow_prs.checks` | fewer human "CI is red" steering comments; requeue after red CI without a human comment | pending | Sonnet 5.5 | 2026-11 |
 
+## Missing skill labels
+
+| PR | Reason | Predicted runs | Observed | Model | Date |
+|---|---|---|---|---|---|
+| CV-112D5 | `launchTodo` parks a task in needs_you, with a system comment naming the skill, when a `skill:*` label does not resolve | no runs that start without the skill the brief tells them to load; no gate block for a skill that was never loadable | pending | Sonnet 5.5 | 2026-11 |
+
 ## Rejected ideas (do not re-propose without new evidence)
 
 - `done` with unchecked criteria or `tests: not run`: partial work is often legitimate; the tests-after-edit check covers the useful part.

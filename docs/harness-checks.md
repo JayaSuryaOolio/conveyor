@@ -63,3 +63,4 @@ Every harness change adds an attempt row (with a prediction) to `docs/harness-le
 | 10 | Re-read of an unchanged large doc | PreToolUse on Read | stat + per-session state | medium: context compaction drops earlier reads | not planned until 5 measures it per run |
 | 11 | Push to the default branch | PreToolUse (Bash) | regex | low | not planned: 0 occurrences, branch protection covers it |
 | 12 | Missing status block | Stop | none | high: a missing block is how agents ask questions | not planned |
+| 13 | Skill preflight: every `skill:*` label must resolve through `core.ListSkills` for the task's repos (+ `~/.claude`); otherwise the task goes todo → needs_you with a system comment naming the skill, before any run starts. Namespaced `plugin:skill` labels are skipped (plugin skills are not scanned) | `launchTodo` (`internal/dispatch`) | one directory scan per todo task with skill labels | low | built (CV-112D5) |
