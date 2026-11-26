@@ -311,7 +311,7 @@ Settings are in the app (Settings page) or `conveyor config list|get|set`. Secre
 Global flag: `conveyor [--home dir] <command>`. Running a command with no arguments prints its usage. List and show commands take `--json`.
 
 ```
-conveyor repo add <path> [--name n]       conveyor repo list | rm <name> | setup <name> [script|-]
+conveyor repo add <path> [--name n]       conveyor repo list | rm <name> | setup <name> [script|-] | check <name> [command|-]
 
 conveyor task new "<title>" --repo a[,b] [--primary r] [--desc t | --desc-file f]
                   [--todo] [--model m] [--agent a] [--runner r] [--parent KEY] [--priority n]

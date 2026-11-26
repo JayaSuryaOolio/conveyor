@@ -24,6 +24,7 @@ Measured 2026-11-06: 22 of 102 `done` runs edited code after their last test or 
 |---|---|---|---|---|---|
 | CV-84A | Stop completion gate: clean, pushed, PR, changeset, CLAUDE.md, skills | not recorded | pending | unknown | 2026-11 |
 | CV-112D1 (#355) | Move the gate into `internal/harness` (Facts, pure checks) so new checks land in one package | none (refactor); no change in gate blocks | pending | unknown | 2026-11 |
+| CV-112D4 | Per-repo `check_command`: tests-after-edit counts only Bash calls containing it, so `go build` or `ls build` no longer clears a stale edit | fewer `done` runs with code edited after their last real test run in repos that set it; more untested-edit blocks at first, then fewer | pending | Sonnet 5.5 | 2026-11 |
 
 ## Wasted turns and context (denied hooks, re-reads, duplicate commands, huge results)
 

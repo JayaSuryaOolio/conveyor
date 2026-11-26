@@ -38,7 +38,7 @@ func Check(f *Facts) []Gap {
 		}
 	}
 	if f.UsesErr == nil {
-		if file := UntestedEdit(f.Uses); file != "" {
+		if file := UntestedEdit(f.Uses, f.CheckCmds); file != "" {
 			add("untested-edit", "you edited %s after the last test/build/lint command; run the repo's checks again and fix what fails", file)
 		}
 		for _, s := range briefSkills(f.Task) {
@@ -107,9 +107,18 @@ func needsChangeset(wt, base string) bool {
 var codeExt = map[string]bool{".go": true, ".ts": true, ".tsx": true, ".js": true, ".jsx": true, ".mjs": true,
 	".py": true, ".rs": true, ".java": true, ".kt": true, ".swift": true, ".rb": true, ".cs": true, ".sql": true}
 
-// checkCmd matches a Bash command that plausibly ran the repo's tests, build or linters.
-// ponytail: keyword heuristic, not the repo's real test command; read it from repo config if it misfires.
-func checkCmd(c string) bool {
+// checkCmd matches a Bash command that ran the repo's checks: one containing a configured check_command,
+// else (none configured) one that plausibly ran tests, build or linters.
+// ponytail: keyword fallback for repos without check_command.
+func checkCmd(c string, cmds []string) bool {
+	if len(cmds) > 0 {
+		for _, k := range cmds {
+			if strings.Contains(c, k) {
+				return true
+			}
+		}
+		return false
+	}
 	for _, k := range []string{"test", "build", "vet", "lint", "tsc", "check", "make"} {
 		if strings.Contains(c, k) {
 			return true
@@ -119,11 +128,11 @@ func checkCmd(c string) bool {
 }
 
 // UntestedEdit returns the last code file edited after the last check command, or "".
-func UntestedEdit(uses []transcript.ToolUse) string {
+func UntestedEdit(uses []transcript.ToolUse, cmds []string) string {
 	last := ""
 	for _, u := range uses {
 		switch {
-		case u.Name == "Bash" && checkCmd(u.Command):
+		case u.Name == "Bash" && checkCmd(u.Command, cmds):
 			last = ""
 		case (u.Name == "Edit" || u.Name == "Write" || u.Name == "MultiEdit") && codeExt[filepath.Ext(u.FilePath)]:
 			last = u.FilePath

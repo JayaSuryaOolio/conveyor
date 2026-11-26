@@ -40,6 +40,7 @@ type Facts struct {
 	Events    []store.Event
 	Uses      []transcript.ToolUse // whole-session transcript tool calls
 	UsesErr   error                // set when the transcript could not be read: transcript checks are skipped
+	CheckCmds []string             // the task repos' check_command values; none means the keyword fallback
 	WantPR    bool                 // false when the PR refresh failed or the task kind opens no PR
 	Repos     []RepoFacts
 	Collected time.Time

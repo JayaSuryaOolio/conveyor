@@ -2,7 +2,7 @@ import {useEffect, useState} from 'react'
 import {ActionIcon, Checkbox, Code, MultiSelect, PasswordInput, ScrollArea, SegmentedControl, Select, SelectProps, SimpleGrid, Table, TagsInput, Tabs, TextInput, Textarea, Title, Tooltip} from '@mantine/core'
 import {Button, Group, Modal, Stack, Text} from './ui'
 import {IconAdjustments} from '@tabler/icons-react'
-import {AddLabel, AddRepo, CreateTask, ExportState, GetPromptDefaults, GetTask, GetSettings, ImportState, ListAgents, ListCLIAgents, ListLabels, ListModels, ListRepos, PreviewBrief, Requirements, ShellPATHError, SetRepoSetupScript, SetSetting, SetTaskAgent, SetTaskModel, SetTaskRunner} from '../wailsjs/go/ui/App'
+import {AddLabel, AddRepo, CreateTask, ExportState, GetPromptDefaults, GetTask, GetSettings, ImportState, ListAgents, ListCLIAgents, ListLabels, ListModels, ListRepos, PreviewBrief, Requirements, ShellPATHError, SetRepoCheckCommand, SetRepoSetupScript, SetSetting, SetTaskAgent, SetTaskModel, SetTaskRunner} from '../wailsjs/go/ui/App'
 import {core, store} from '../wailsjs/go/models'
 import {Nav, errMsg, toast} from './components'
 import {Markdown, MarkdownEditor} from './markdown'
@@ -160,7 +160,8 @@ function Repos() {
 
 function RepoRow({r, reload}: {r: store.Repo; reload: () => void}) {
     const [val, setVal] = useState(r.setup_script)
-    return (
+    const [chk, setChk] = useState(r.check_command)
+    return (<Stack gap="xs">
         <Group wrap={false} align="end">
             <Textarea style={{flex: 1}} autosize minRows={2} maxRows={10} value={val} onChange={e => setVal(e.target.value)}
                       styles={{input: {fontFamily: 'var(--mantine-font-family-monospace)'}}}
@@ -168,7 +169,13 @@ function RepoRow({r, reload}: {r: store.Repo; reload: () => void}) {
                       placeholder="direnv allow . && direnv exec . true"/>
             <Button disabled={val === r.setup_script} onClick={() => SetRepoSetupScript(r.name, val).then(reload, errMsg)}>Save</Button>
         </Group>
-    )
+        <Group wrap={false} align="end">
+            <TextInput style={{flex: 1}} value={chk} onChange={e => setChk(e.target.value)}
+                       label="Check command" description="Only Bash calls containing this count as running the repo's tests after an edit; empty falls back to keywords (test, build, lint...)."
+                       placeholder="make test"/>
+            <Button disabled={chk === r.check_command} onClick={() => SetRepoCheckCommand(r.name, chk).then(reload, errMsg)}>Save</Button>
+        </Group>
+    </Stack>)
 }
 
 export type Field = {k: string; label: string; desc: string; kind?: "area" | "md" | "model" | "runner" | "secret"}

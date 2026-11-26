@@ -275,6 +275,9 @@ UPDATE labels SET name=lower(name) WHERE name IN ('approved','archived')`); err 
 	if err := migrateAddRepoSetupScript(db); err != nil {
 		return err
 	}
+	if err := migrateAddRepoCheckCommand(db); err != nil {
+		return err
+	}
 	if err := migrateAddCommentSource(db); err != nil {
 		return err
 	}
@@ -361,6 +364,20 @@ func migrateAddRepoSetupScript(db *sql.DB) error {
 	if n == 0 {
 		if _, err := db.Exec(`ALTER TABLE repos ADD COLUMN setup_script TEXT NOT NULL DEFAULT ''`); err != nil {
 			return fmt.Errorf("add repos.setup_script: %w", err)
+		}
+	}
+	return nil
+}
+
+// migrateAddRepoCheckCommand adds repos.check_command; existing repos get none (keyword fallback).
+func migrateAddRepoCheckCommand(db *sql.DB) error {
+	var n int
+	if err := db.QueryRow(`SELECT count(*) FROM pragma_table_info('repos') WHERE name='check_command'`).Scan(&n); err != nil {
+		return fmt.Errorf("check repos.check_command: %w", err)
+	}
+	if n == 0 {
+		if _, err := db.Exec(`ALTER TABLE repos ADD COLUMN check_command TEXT NOT NULL DEFAULT ''`); err != nil {
+			return fmt.Errorf("add repos.check_command: %w", err)
 		}
 	}
 	return nil

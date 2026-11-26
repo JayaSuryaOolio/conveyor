@@ -130,14 +130,19 @@ func TestUntestedEdit(t *testing.T) {
 	test, ls := transcript.ToolUse{Name: "Bash", Command: "go test ./..."}, transcript.ToolUse{Name: "Bash", Command: "ls"}
 	for _, c := range []struct {
 		uses []transcript.ToolUse
+		cmds []string
 		want string
 	}{
-		{[]transcript.ToolUse{edit, test}, ""},
-		{[]transcript.ToolUse{test, edit, ls}, "/w/a.go"},
-		{[]transcript.ToolUse{test, doc}, ""},
-		{nil, ""},
+		{[]transcript.ToolUse{edit, test}, nil, ""},
+		{[]transcript.ToolUse{test, edit, ls}, nil, "/w/a.go"},
+		{[]transcript.ToolUse{test, doc}, nil, ""},
+		{nil, nil, ""},
+		// With a check_command only a Bash call containing it counts; the keyword fallback is off.
+		{[]transcript.ToolUse{edit, test}, []string{"make ci"}, "/w/a.go"},
+		{[]transcript.ToolUse{edit, {Name: "Bash", Command: "cd x && make ci"}}, []string{"make ci"}, ""},
+		{[]transcript.ToolUse{edit, test}, []string{"make ci", "go test"}, ""},
 	} {
-		if got := untestedEdit(c.uses); got != c.want {
+		if got := untestedEdit(c.uses, c.cmds); got != c.want {
 			t.Errorf("%v: got %q want %q", c.uses, got, c.want)
 		}
 	}
