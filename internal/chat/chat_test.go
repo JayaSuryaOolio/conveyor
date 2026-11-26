@@ -276,3 +276,47 @@ func TestMuteSkipsNotifyWithoutReplay(t *testing.T) {
 		t.Fatal("missing task accepted")
 	}
 }
+
+type alerter struct {
+	fake
+	alerts []string
+}
+
+func (a *alerter) Alert(s string) error { a.alerts = append(a.alerts, s); return nil }
+
+func TestAlertAutomationsDedupes(t *testing.T) {
+	db, err := store.Open(filepath.Join(t.TempDir(), "c.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	b := &bridge{&core.Service{DB: db}, t.Logf}
+	_, err = store.CreateAutomation(db, store.Automation{Name: "x", Schedule: "@daily", ActionKind: "comment", ActionArg: "{}", Enabled: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	a := &alerter{}
+	set := func(r string) {
+		au, _ := store.GetAutomation(db, "x")
+		au.LastResult = &r
+		store.UpdateAutomation(db, au)
+		b.alertAutomations(a)
+	}
+	set("error: boom")
+	set("error: boom") // same: quiet
+	if len(a.alerts) != 1 || !strings.Contains(a.alerts[0], "x failed: boom") {
+		t.Fatalf("first: %q", a.alerts)
+	}
+	set("error: bang") // changed
+	set("ok")          // cleared
+	set("error: bang") // fails again
+	if len(a.alerts) != 3 {
+		t.Fatalf("want 3 alerts, got %q", a.alerts)
+	}
+	store.SetSetting(db, mutedKey, "on")
+	set("error: other")
+	if len(a.alerts) != 3 {
+		t.Fatalf("sent while muted: %q", a.alerts)
+	}
+	b.alertAutomations(&fake{}) // transport without Alert: no panic
+}

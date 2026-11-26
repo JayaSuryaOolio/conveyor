@@ -93,6 +93,9 @@ type Transport interface {
 	Listen(ctx context.Context, h func(In) string) error // one session; returns when it drops
 }
 
+// Alerter is optionally implemented by a Transport that can send a plain alert (no task).
+type Alerter interface{ Alert(text string) error }
+
 // Factory builds a Transport reading its config through get and saving changed config (e.g. rotated tokens) through set.
 type Factory func(get func(string) string, set func(k, v string) error) Transport
 
@@ -124,7 +127,9 @@ func Run(ctx context.Context, svc *core.Service, logf func(string, ...any), fs m
 	b := &bridge{svc, logf}
 	go b.listen(ctx, fs)
 	for ctx.Err() == nil {
-		b.notify(b.active(fs))
+		t := b.active(fs)
+		b.notify(t)
+		b.alertAutomations(t)
 		select {
 		case <-ctx.Done():
 		case <-time.After(3 * time.Second):
@@ -599,4 +604,43 @@ func (b *bridge) runAction(key, spec string) string {
 		return cmp.Or(out, fmt.Sprintf("ran %s:%s on %s", slug, act, t.Key))
 	}
 	return "warning: no app " + slug + "; try `run list`"
+}
+
+// alertAutomations sends one alert when an automation's last_result is a new error (first
+// failure, or the text changed); chat_alerted:<name> remembers the last one sent and is
+// cleared on success so a later failure alerts again. A nil or muted transport defers the
+// alert until it is on.
+func (b *bridge) alertAutomations(t Transport) {
+	a, ok := t.(Alerter)
+	if !ok || b.setting(mutedKey) == "on" {
+		return
+	}
+	list, err := store.ListAutomations(b.svc.DB)
+	if err != nil {
+		return
+	}
+	for _, au := range list {
+		if !au.Enabled { // a disabled automation's old error is not news
+			continue
+		}
+		key := "chat_alerted:" + au.Name
+		res := ""
+		if au.LastResult != nil {
+			res = *au.LastResult
+		}
+		if !strings.HasPrefix(res, "error: ") {
+			if b.setting(key) != "" {
+				store.SetSetting(b.svc.DB, key, "")
+			}
+			continue
+		}
+		if res == b.setting(key) {
+			continue
+		}
+		if err := a.Alert(fmt.Sprintf("⚠️ automation %s failed: %s", au.Name, strings.TrimPrefix(res, "error: "))); err != nil {
+			b.logf("chat: alert %s: %v", au.Name, err)
+			return // retry next tick
+		}
+		store.SetSetting(b.svc.DB, key, res)
+	}
 }
