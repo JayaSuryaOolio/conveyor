@@ -153,7 +153,7 @@ func TestOpenConnRotatesExpiredToken(t *testing.T) {
 	})
 	api = srv.URL + "/"
 	cfg := map[string]string{"slack_app_token": "old", "slack_app_refresh_token": "old-r", "slack_client_id": "cid", "slack_client_secret": "cs"}
-	s := &Slack{func(k string) string { return cfg[k] }, func(k, v string) error { cfg[k] = v; return nil }}
+	s := &Slack{get: func(k string) string { return cfg[k] }, set: func(k, v string) error { cfg[k] = v; return nil }}
 	r, err := s.openConn()
 	if err != nil || r["url"] != "wss://x" || cfg["slack_app_token"] != "new" || cfg["slack_app_refresh_token"] != "new-r" {
 		t.Fatalf("r=%v err=%v cfg=%v", r, err, cfg)
@@ -379,5 +379,111 @@ func TestReplyToSentUpdateReachesTask(t *testing.T) {
 		func(in chat.In) string { got = in; return "ok" })
 	if got.Key != "CV-7" || got.Text != "go on" {
 		t.Fatalf("reply not routed to the task: %+v", got)
+	}
+}
+
+func TestHomeViewStaysUnderBlockLimitAndOffersControls(t *testing.T) {
+	var b chat.Board
+	for i := range 60 {
+		st := []string{"needs_you", "running", "todo", "failed", "review"}[i%5]
+		b.Rows = append(b.Rows, chat.Row{Key: fmt.Sprint("CV-", i), Title: "t <&>", Status: st})
+	}
+	v := homeView(b)
+	if len(v) > 100 {
+		t.Fatalf("home has %d blocks; Slack allows 100", len(v))
+	}
+	js, _ := json.Marshal(v) // Marshal escapes & < > itself, hence the \\u0026 form below
+	for _, want := range []string{"home_new", "home_view", "home_refresh", "home_mute", "home_menu:CV-0", "+", `\u0026lt;\u0026amp;\u0026gt;`} {
+		if !strings.Contains(string(js), want) {
+			t.Fatalf("home lacks %q", want)
+		}
+	}
+	b.Muted = true
+	if js, _ := json.Marshal(homeView(b)); !strings.Contains(string(js), "home_unmute") {
+		t.Fatal("muted home must offer unmute")
+	}
+}
+
+func TestHomeActionsAndSubmissions(t *testing.T) {
+	var calls []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls = append(calls, strings.TrimPrefix(r.URL.Path, "/"))
+		fmt.Fprint(w, `{"ok":true,"ts":"1.0"}`)
+	}))
+	defer srv.Close()
+	api = srv.URL + "/"
+	s := &Slack{get: func(k string) string { return map[string]string{"slack_bot_token": "x", "slack_user_id": "U1"}[k] }}
+	s.UseSource(chat.Source{
+		Board: func() chat.Board { return chat.Board{Repos: []string{"a"}} },
+		Detail: func(k string) (chat.Detail, error) {
+			return chat.Detail{Key: k, Title: "T", Status: "done", Description: "d"}, nil
+		},
+	})
+	var cmds []string
+	h := func(in chat.In) string { cmds = append(cmds, in.Text); return "created CV-9 x (backlog)" }
+
+	s.interactive([]byte(`{"type":"block_actions","user":{"id":"U1"},"trigger_id":"T1","actions":[{"action_id":"home_mute"}]}`), h)
+	s.interactive([]byte(`{"type":"block_actions","user":{"id":"U1"},"trigger_id":"T1","actions":[{"action_id":"home_menu:CV-1","selected_option":{"value":"move CV-1 done"}}]}`), h)
+	s.interactive([]byte(`{"type":"block_actions","user":{"id":"U1"},"trigger_id":"T1","actions":[{"action_id":"home_new"},{"action_id":"home_menu:CV-1","selected_option":{"value":"view CV-1"}}]}`), h)
+	if strings.Join(cmds, "|") != "mute|move CV-1 done" {
+		t.Fatalf("commands %v", cmds)
+	}
+	if got := strings.Join(calls, ","); got != "views.publish,views.publish,views.open,views.open" {
+		t.Fatalf("api calls %s", got)
+	}
+
+	sub := func(cb, vals string) (m, func(), bool) {
+		return s.submit([]byte(`{"type":"view_submission","user":{"id":"U1"},"view":{"callback_id":"`+cb+`","state":{"values":`+vals+`}}}`), h)
+	}
+	resp, _, ok := sub("view_task", `{"key":{"v":{"value":" cv-5 "}}}`)
+	if !ok || resp["response_action"] != "update" {
+		t.Fatalf("view submit: %v", resp)
+	}
+	resp, after, _ := sub("new_task", `{"repo":{"v":{"selected_option":{"value":"a"}}},"text":{"v":{"value":"do it"}}}`)
+	if resp["response_action"] != "clear" || after == nil || cmds[len(cmds)-1] != "new a do it" {
+		t.Fatalf("new submit: %v %v", resp, cmds)
+	}
+	if resp, _, _ = sub("new_task", `{"text":{"v":{"value":"  "}}}`); resp["response_action"] != "errors" {
+		t.Fatalf("empty text accepted: %v", resp)
+	}
+}
+
+// TestListenAcksViewSubmissionWithResponse: a modal submission must be answered in the ack
+// (response_action), otherwise Slack just closes the modal and nothing happens.
+func TestListenAcksViewSubmissionWithResponse(t *testing.T) {
+	acked := make(chan map[string]any, 1)
+	mux := http.NewServeMux()
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+	mux.HandleFunc("/apps.connections.open", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, `{"ok":true,"url":"ws%s/ws"}`, strings.TrimPrefix(srv.URL, "http"))
+	})
+	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		c, _ := (&websocket.Upgrader{}).Upgrade(w, r, nil)
+		defer c.Close()
+		c.WriteJSON(map[string]any{"type": "interactive", "envelope_id": "E2", "payload": map[string]any{
+			"type": "view_submission", "user": map[string]any{"id": "U1"},
+			"view": map[string]any{"callback_id": "view_task", "state": map[string]any{"values": map[string]any{"key": map[string]any{"v": map[string]any{"value": "CV-5"}}}}}}})
+		var ack map[string]any
+		c.ReadJSON(&ack)
+		acked <- ack
+	})
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) { fmt.Fprint(w, `{"ok":true,"ts":"1.0"}`) })
+	api = srv.URL + "/"
+	s := &Slack{get: func(k string) string {
+		return map[string]string{"slack_app_token": "a", "slack_bot_token": "x", "slack_user_id": "U1"}[k]
+	}}
+	s.UseSource(chat.Source{Detail: func(k string) (chat.Detail, error) { return chat.Detail{Key: k}, nil }})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go s.Listen(ctx, func(chat.In) string { return "ok" })
+	select {
+	case ack := <-acked:
+		p, _ := ack["payload"].(map[string]any)
+		if ack["envelope_id"] != "E2" || p["response_action"] != "update" {
+			t.Fatalf("ack %v", ack)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("no ack")
 	}
 }

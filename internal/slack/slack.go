@@ -67,11 +67,12 @@ func (s *Slack) rootOf(channel, key string) string {
 type Slack struct {
 	get func(string) string
 	set func(k, v string) error
+	src chat.Source // task data for the Home tab, set by the bridge before Listen
 }
 
 // New is a chat.Factory.
 func New(get func(string) string, set func(k, v string) error) chat.Transport {
-	return &Slack{get, set}
+	return &Slack{get: get, set: set}
 }
 
 // token is the user token when set, else the bot token.
@@ -291,8 +292,9 @@ func (s *Slack) Listen(ctx context.Context, h func(chat.In) string) error {
 	}
 	defer c.Close()
 	log.Printf("chat: slack connected")
-	// the Home tab keeps its content, so publishing the guide once per connection is enough
-	call(s.token(), "views.publish", map[string]any{"user_id": s.get("slack_user_id"), "view": map[string]any{"type": "home", "blocks": home}})
+	// Home shows a snapshot of the tasks: drawn once per connection, then only by its buttons
+	// (Refresh, mute, moves), never on a timer.
+	go s.publishHome()
 	go func() { <-ctx.Done(); c.Close() }()
 	// After sleep the TCP connection is dead but reads block for ages. Slack pings about every
 	// 30s, so silence for 90s means the link is gone: return and reconnect.
@@ -322,9 +324,18 @@ func (s *Slack) Listen(ctx context.Context, h func(chat.In) string) error {
 		case "events_api":
 			c.WriteJSON(map[string]any{"envelope_id": e.EnvelopeID})
 			work <- func() { s.event(e.Payload, h) }
-		case "interactive": // button clicks
+		case "interactive": // button clicks and modal submissions
+			if resp, after, ok := s.submit(e.Payload, h); ok { // the modal's answer rides in the ack
+				c.WriteJSON(map[string]any{"envelope_id": e.EnvelopeID, "payload": resp})
+				if after != nil {
+					work <- after
+				}
+				continue
+			}
 			c.WriteJSON(map[string]any{"envelope_id": e.EnvelopeID})
-			work <- func() { s.interactive(e.Payload, h) }
+			// Own goroutine, not the ordered worker: a modal's trigger_id expires after 3s and the
+			// worker may be busy downloading images. Clicks only touch the DB and Slack's API.
+			go s.interactive(e.Payload, h)
 		case "slash_commands":
 			var p struct {
 				UserID      string `json:"user_id"`
@@ -405,16 +416,6 @@ func (s *Slack) backfill(handle func(chat.In) string) {
 		b, _ := json.Marshal(map[string]any{"event": m})
 		s.event(b, handle)
 	}
-}
-
-// home is the App Home tab: Block Kit, the only markup Slack allows there.
-var home = []any{
-	map[string]any{"type": "header", "text": map[string]any{"type": "plain_text", "text": ":rocket: Conveyor"}},
-	map[string]any{"type": "context", "elements": []any{map[string]any{"type": "mrkdwn", "text": "Your Conveyor tasks, from anywhere. Open the *Messages* tab to talk to it."}}},
-	map[string]any{"type": "divider"},
-	map[string]any{"type": "section", "text": map[string]any{"type": "mrkdwn", "text": chat.Help}},
-	map[string]any{"type": "divider"},
-	map[string]any{"type": "context", "elements": []any{map[string]any{"type": "mrkdwn", "text": ":bell: Task updates arrive as DMs, one thread per task. Conveyor must be running to answer."}}},
 }
 
 var keyRe = regexp.MustCompile(`^\*([A-Za-z0-9]+-[A-Za-z0-9]+)\*`)
@@ -544,17 +545,20 @@ var createdRe = regexp.MustCompile(`^created ([A-Za-z0-9]+-[A-Za-z0-9]+) `)
 // seen holds channel/ts of handled messages (see event).
 var seen sync.Map
 
-// interactive runs a button click (block_actions) as the matching command and answers in the
-// message's thread. Link buttons (open_pr) also arrive here and are ignored.
+// interactive runs a button click (block_actions): a thread button as the matching command
+// answered in the message's thread, a Home control as its command plus a Home redraw or a modal.
+// Link buttons (open_pr) also arrive here and are ignored.
 func (s *Slack) interactive(payload []byte, handle func(chat.In) string) {
 	var p struct {
-		Type    string `json:"type"`
-		User    struct{ ID string }
-		Channel struct{ ID string }
-		Message struct{ TS string }
-		Actions []struct {
-			ActionID string `json:"action_id"`
-			Value    string
+		Type      string `json:"type"`
+		TriggerID string `json:"trigger_id"`
+		User      struct{ ID string }
+		Channel   struct{ ID string }
+		Message   struct{ TS string }
+		Actions   []struct {
+			ActionID       string `json:"action_id"`
+			Value          string
+			SelectedOption struct{ Value string } `json:"selected_option"`
 		}
 	}
 	if json.Unmarshal(payload, &p) != nil || p.Type != "block_actions" || p.User.ID != s.get("slack_user_id") {
@@ -563,7 +567,35 @@ func (s *Slack) interactive(payload []byte, handle func(chat.In) string) {
 	for _, a := range p.Actions {
 		if status, ok := strings.CutPrefix(a.ActionID, "move_"); ok && a.Value != "" {
 			s.post(map[string]any{"channel": p.Channel.ID, "thread_ts": p.Message.TS, "text": handle(chat.In{Text: "move " + a.Value + " " + status})})
+			continue
 		}
+		s.homeAction(a.ActionID, a.SelectedOption.Value, p.TriggerID, handle)
+	}
+}
+
+// homeAction runs one Home tab control (see homeView).
+func (s *Slack) homeAction(id, picked, trigger string, handle func(chat.In) string) {
+	switch {
+	case id == "home_refresh":
+		s.publishHome()
+	case id == "home_mute" || id == "home_unmute":
+		handle(chat.In{Text: strings.TrimPrefix(id, "home_")})
+		s.publishHome()
+	case id == "home_new":
+		s.open(trigger, newModal(s.board().Repos))
+	case id == "home_view":
+		s.open(trigger, viewAskModal())
+	case id == "home_help":
+		s.open(trigger, noticeModal("Help", chat.Help))
+	case strings.HasPrefix(id, "home_menu:"): // overflow: "view KEY" or a move command
+		if key, ok := strings.CutPrefix(picked, "view "); ok {
+			s.open(trigger, s.detailView(key))
+			return
+		}
+		if out := handle(chat.In{Text: picked}); strings.HasPrefix(out, "warning:") {
+			s.open(trigger, noticeModal("Could not do that", out))
+		}
+		s.publishHome()
 	}
 }
 

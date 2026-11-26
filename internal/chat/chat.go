@@ -25,7 +25,10 @@ import (
 	"github.com/JayaSuryaOolio/conveyor/internal/store"
 )
 
-const cursorKey = "chat_cursor"
+const (
+	cursorKey = "chat_cursor"
+	mutedKey  = "chat_muted"
+)
 
 // Msg is one task notification, rendered by the transport in its own markup.
 type Msg struct {
@@ -49,6 +52,38 @@ type File struct {
 	Name string
 	Data []byte
 }
+
+// Row is one task on a transport's board.
+type Row struct {
+	Key, Title, Status string
+	PRs                []Link
+}
+
+// Board is the data behind a transport's home screen: open tasks, repos "new" can target, and
+// whether task notifications are muted.
+type Board struct {
+	Rows  []Row // needs_you, review, running, todo and failed tasks, in priority order
+	Repos []string
+	Muted bool
+}
+
+// Detail is one task for an on-demand view.
+type Detail struct {
+	Key, Title, Status, Description string
+	Repos                           []string // "name (branch)"
+	PRs                             []Link
+	LastRun, Summary, Next          string // LastRun is "status, started ... ended ..."; empty when never run
+}
+
+// Source feeds a transport that draws a home screen (see Boarded).
+type Source struct {
+	Board  func() Board
+	Detail func(key string) (Detail, error)
+}
+
+// Boarded is optionally implemented by a Transport that renders a Board; it gets its Source
+// before Listen. A Teams transport would implement it the same way.
+type Boarded interface{ UseSource(Source) }
 
 // Transport delivers Msgs to the user and inbound items back. Implementations must be
 // safe to Send from one goroutine while Listen runs in another.
@@ -109,6 +144,9 @@ func (b *bridge) listen(ctx context.Context, fs map[string]Factory) {
 	fails, last := 0, ""
 	for ctx.Err() == nil {
 		if t := b.active(fs); t != nil {
+			if bt, ok := t.(Boarded); ok {
+				bt.UseSource(Source{b.board, b.detail})
+			}
 			sctx, cancel := context.WithCancel(ctx)
 			go func() { // drop the session as soon as it is switched off or reconfigured
 				for sctx.Err() == nil {
@@ -165,7 +203,8 @@ const maxRetry = time.Hour
 // An event the task has since moved past (any later status change) is skipped as stale.
 func (b *bridge) notify(t Transport) {
 	cur, err := strconv.ParseInt(b.setting(cursorKey), 10, 64)
-	if err != nil || t == nil { // first run or off: start from now, never replay history
+	// muted (chat_muted=on, the "mute" command / Home button) skips like off: nothing replays on unmute
+	if err != nil || t == nil || b.setting(mutedKey) == "on" { // first run or off: start from now, never replay history
 		if n, err := store.MaxEventID(b.svc.DB); err == nil {
 			store.SetSetting(b.svc.DB, cursorKey, strconv.FormatInt(n, 10))
 		}
@@ -305,6 +344,7 @@ const Help = `*Conveyor commands* (send as a DM, or /conveyor …)
 • show KEY (or just KEY) — status, repos, PRs and the last agent message
 • move KEY todo|done|cancelled — change status (also KEY move done)
 • KEY run conveyor:check-pr — run an action on a task: built-in conveyor:check-pr, or APP:ACTION of an installed app (e.g. CV-12 run graft:open; APP alone runs its first action); "run list" shows them
+• mute / unmute — stop or resume task DMs (e.g. while you work at your laptop)
 • help — this guide
 Replying in a task's thread (or to my "created" reply) comments on it; "move done" or "show" typed there acts on that task.`
 
@@ -384,6 +424,18 @@ func (b *bridge) command(text string) string {
 		return b.runList()
 	case len(f) == 3 && f[0] == "run":
 		return b.runAction(f[1], f[2])
+	case len(f) == 1 && (f[0] == "mute" || f[0] == "unmute"):
+		v := "off"
+		if f[0] == "mute" {
+			v = "on"
+		}
+		if err := store.SetSetting(b.svc.DB, mutedKey, v); err != nil {
+			return "warning: " + err.Error()
+		}
+		if v == "on" {
+			return "Task notifications muted. Send `unmute` to resume."
+		}
+		return "Task notifications on."
 	case len(f) > 0 && (f[0] == "help" || f[0] == "?"):
 		return Help
 	case len(f) == 0 || f[0] == "list":
@@ -422,6 +474,62 @@ func (b *bridge) command(text string) string {
 		return b.comment(f[0], strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(text), f[0])))
 	}
 	return Help
+}
+
+// board lists the tasks a home screen shows.
+func (b *bridge) board() Board {
+	bd := Board{Muted: b.setting(mutedKey) == "on"}
+	if repos, err := store.ListRepos(b.svc.DB); err == nil {
+		for _, r := range repos {
+			bd.Repos = append(bd.Repos, r.Name)
+		}
+	}
+	ts, err := store.ListTasks(b.svc.DB, store.StatusNeedsYou, store.StatusReview, store.StatusRunning, store.StatusTodo, store.StatusFailed)
+	if err != nil {
+		b.logf("chat: board: %v", err)
+	}
+	for _, t := range ts {
+		r := Row{Key: t.Key, Title: t.Title, Status: string(t.Status)}
+		for _, tr := range t.Repos {
+			if tr.PRURL != nil {
+				r.PRs = append(r.PRs, Link{tr.RepoName, *tr.PRURL})
+			}
+		}
+		bd.Rows = append(bd.Rows, r)
+	}
+	return bd
+}
+
+// detail describes one task (any status) for the "view a task" screen.
+func (b *bridge) detail(key string) (Detail, error) {
+	key = strings.ToUpper(strings.TrimSpace(key))
+	if !keyArg.MatchString(key) {
+		return Detail{}, fmt.Errorf("%q is not a task key (like CV-12)", key)
+	}
+	t, err := store.GetTaskByKey(b.svc.DB, key)
+	if err != nil {
+		return Detail{}, fmt.Errorf("no task %s", key)
+	}
+	d := Detail{Key: t.Key, Title: t.Title, Status: string(t.Status), Description: t.Description}
+	for _, r := range t.Repos {
+		d.Repos = append(d.Repos, r.RepoName+" ("+r.Branch+")")
+		if r.PRURL != nil {
+			d.PRs = append(d.PRs, Link{r.RepoName, *r.PRURL})
+		}
+	}
+	if r, err := store.LatestRun(b.svc.DB, t.ID); err == nil {
+		d.LastRun = r.Status + ", started " + r.StartedAt
+		if r.EndedAt != nil {
+			d.LastRun += ", ended " + *r.EndedAt
+		}
+		if r.Summary != nil {
+			d.Summary = *r.Summary
+		}
+		if r.Next != nil {
+			d.Next = *r.Next
+		}
+	}
+	return d, nil
 }
 
 // prNumber is the trailing number of a PR URL (".../pull/123" -> "123").
