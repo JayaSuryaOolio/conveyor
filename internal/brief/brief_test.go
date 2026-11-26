@@ -47,6 +47,10 @@ func TestRenderGolden(t *testing.T) {
 	for i, s := range []string{"first", "second\nline two", "third", "fourth"} {
 		run, _ := store.CreateRun(db, store.Run{TaskID: tk.ID, Kind: "auto", Mode: "fresh", Status: "launching"})
 		run.Summary = &s
+		if i == 1 {
+			bs, er := "failed", "exit 1:\ntests failed"
+			run.BlockStatus, run.Error = &bs, &er
+		}
 		if i == 3 {
 			st, nx, cr := "branch cv/CV-1-login, tests: pass", "wire up UI", "- [x] AC1 - done\n- [ ] AC2 - todo"
 			run.State, run.Next, run.Criteria = &st, &nx, &cr
@@ -338,5 +342,14 @@ func TestTemplateCaps(t *testing.T) {
 			t.Fatalf("%s missing or out of order", h)
 		}
 		at = i
+	}
+}
+
+func TestHistoryKeepsErrorAfterLongSummary(t *testing.T) {
+	sum, bs, er := strings.Repeat("x", 500), "failed", "boom"
+	var b strings.Builder
+	history(&b, "##", []store.Run{{ID: 7, Summary: &sum, BlockStatus: &bs, Error: &er}}, nil)
+	if !strings.Contains(b.String(), "[failed]") || !strings.Contains(b.String(), "| error: boom") {
+		t.Fatalf("error dropped:\n%s", b.String())
 	}
 }

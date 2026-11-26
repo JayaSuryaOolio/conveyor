@@ -72,3 +72,11 @@ of the duplicate classes. Fix the source (put the fact where agents read it) ins
 - `done` with unchecked criteria or `tests: not run`: partial work is often legitimate; the tests-after-edit check covers the useful part.
 - Missing status block as a failure: it is how agents ask the human a question.
 - Push-to-default-branch check: 0 in 521 sessions, branch protection covers it.
+
+## A failed run is invisible to the next one
+
+A retry's brief showed run summaries only, so the cause of the previous failure was not in its context.
+
+| PR | Reason | Predicted runs | Observed | Model | Date |
+|---|---|---|---|---|---|
+| CV-112D6 | `brief.history()` shows each run's `block_status` and clipped `error` | fewer repeat failures on retried tasks (second run fails for the same reason); requeue rate on `failed` tasks down | pending | Sonnet 5.5 | 2026-11 |

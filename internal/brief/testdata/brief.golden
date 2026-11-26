@@ -27,7 +27,7 @@ Next: wire up UI
 
 ## Recent runs
 
-- run 2: second line two
+- run 2 [failed]: second line two | error: exit 1: tests failed
 - run 3: third
 - run 4: fourth
 
