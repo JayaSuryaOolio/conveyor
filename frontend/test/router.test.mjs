@@ -8,7 +8,7 @@ const strip = v => JSON.parse(JSON.stringify(v)) // drop undefined fields
 
 test('every view survives a URL round trip', () => {
     for (const v of [{name: 'board'}, {name: 'board', label: 'epic'}, {name: 'board', repo: 'a/b'}, {name: 'task', key: 'CV-4A6D'},
-        {name: 'epic', key: 'CV-4A6'}, {name: 'epic', key: 'CV-4A6', task: 'CV-4A6D'}, {name: 'logs'}])
+        {name: 'epic', key: 'CV-4A6'}, {name: 'epic', key: 'CV-4A6', task: 'CV-4A6D'}, {name: 'logs'}, {name: 'automations', q: 'pr sweep'}])
         assert.deepEqual(strip(fromLocation(loc(toPath(v)))), v, toPath(v))
 })
 
