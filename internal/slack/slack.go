@@ -149,9 +149,17 @@ func (s *Slack) Ready() bool {
 // call posts a JSON Web API method with token and returns the decoded response.
 func call(token, method string, args any) (map[string]any, error) {
 	body, _ := json.Marshal(args)
+	ctype := "application/json; charset=utf-8"
+	if strings.HasPrefix(method, "conversations.") { // Slack's read methods reject JSON bodies (invalid_arguments)
+		form := url.Values{}
+		for k, v := range args.(map[string]any) {
+			form.Set(k, fmt.Sprint(v))
+		}
+		body, ctype = []byte(form.Encode()), "application/x-www-form-urlencoded"
+	}
 	req, _ := http.NewRequest("POST", api+method, strings.NewReader(string(body)))
 	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("Content-Type", "application/json; charset=utf-8")
+	req.Header.Set("Content-Type", ctype)
 	resp, err := (&http.Client{Timeout: 15 * time.Second}).Do(req)
 	if err != nil {
 		return nil, err
@@ -484,6 +492,8 @@ func (s *Slack) event(payload []byte, handle func(chat.In) string) {
 	h, err := call(bot, "conversations.replies", map[string]any{"channel": e.Channel, "ts": e.ThreadTS, "limit": 200})
 	if err != nil {
 		log.Printf("chat: slack thread %s: %v", e.ThreadTS, err)
+		// no link and the thread is unreadable: most likely a pruned (closed) task's thread
+		reply(e.ThreadTS, chat.Closed+"this thread's task is closed or unknown. Start the message with a task key (`CV-12 your comment`), or send `new [REPO] ...` to start a new task.")
 		return
 	}
 	msgs, _ := h["messages"].([]any)
