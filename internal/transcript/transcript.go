@@ -229,6 +229,29 @@ type Waste struct {
 	Rereads     int // Read calls of a file_path the run already read
 	DupBash     int // Bash calls repeating a command the run already ran
 	BigResults  int // tool results over BigResult chars
+	// Failures counts failed tool calls by cause: "hook PreToolUse:Bash RTK" (a hook refused the call;
+	// event:tool and the message up to its first colon) or "tool Bash" (is_error result), for the weekly review.
+	Failures map[string]int
+}
+
+// hookCause names the hook behind a "<Event>:<Tool> hook error: <message>" tool result:
+// "<Event>:<Tool> <message up to its first colon, max 40 chars>", "" when the text only quotes the phrase.
+func hookCause(text string) string {
+	head, msg, ok := strings.Cut(text, " hook error:")
+	if !ok {
+		return ""
+	}
+	if i := strings.LastIndexAny(head, " \n"); i >= 0 {
+		head = head[i+1:]
+	}
+	msg = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(msg), ":"))
+	if i := strings.Index(msg, ":"); i >= 0 {
+		msg = msg[:i]
+	}
+	if len(msg) > 40 {
+		msg = msg[:40]
+	}
+	return strings.TrimSpace(head + " " + msg)
 }
 
 // BigResult is the tool_result size (chars) that Waste counts as big.
@@ -245,7 +268,8 @@ func CountWaste(path, promptText string) (Waste, error) {
 	want := strings.TrimSpace(promptText)
 	var w Waste
 	var read, ran map[string]bool
-	reset := func() { w, read, ran = Waste{}, map[string]bool{}, map[string]bool{} }
+	tools := map[string]string{} // tool_use id -> tool name
+	reset := func() { w, read, ran = Waste{Failures: map[string]int{}}, map[string]bool{}, map[string]bool{} }
 	reset()
 	sc := bufio.NewScanner(f)
 	sc.Buffer(make([]byte, 1<<20), 64<<20)
@@ -261,8 +285,10 @@ func CountWaste(path, promptText string) (Waste, error) {
 				continue
 			}
 			var blocks []struct {
-				Type    string          `json:"type"`
-				Content json.RawMessage `json:"content"`
+				Type      string          `json:"type"`
+				Content   json.RawMessage `json:"content"`
+				ToolUseID string          `json:"tool_use_id"`
+				IsError   bool            `json:"is_error"`
 			}
 			if json.Unmarshal(l.Message.Content, &blocks) != nil {
 				continue
@@ -274,12 +300,27 @@ func CountWaste(path, promptText string) (Waste, error) {
 				text := userText(b.Content)
 				if strings.Contains(text, "hook error") {
 					w.HookDenials++
+					if c := hookCause(text); c != "" {
+						w.Failures["hook "+c]++
+					}
+				} else if b.IsError && !strings.HasPrefix(text, "Exit code") { // non-zero exits are ordinary command results, not tool failures
+					name := tools[b.ToolUseID]
+					if name == "" {
+						name = "?"
+					}
+					w.Failures["tool "+name]++
 				}
 				if len(text) > BigResult {
 					w.BigResults++
 				}
 			}
 		case "assistant":
+			var ids []struct{ ID, Name string }
+			if json.Unmarshal(l.Message.Content, &ids) == nil {
+				for _, b := range ids {
+					tools[b.ID] = b.Name
+				}
+			}
 			for _, u := range toolUses(l.Message.Content) {
 				switch {
 				case u.Name == "Read" && u.FilePath != "":

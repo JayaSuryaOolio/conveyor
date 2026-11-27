@@ -87,6 +87,7 @@ type Run struct {
 	Rereads      int64   `json:"rereads"`
 	DupBash      int64   `json:"dup_bash"`
 	BigResults   int64   `json:"big_results"`
+	ToolFailures string  `json:"tool_failures"` // JSON {"hook PreToolUse:Bash RTK": n, "tool Bash": n}; "" before it was stored
 	Error        *string `json:"error"`
 	StartedAt    string  `json:"started_at"`
 	EndedAt      *string `json:"ended_at"`

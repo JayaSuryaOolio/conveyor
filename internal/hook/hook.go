@@ -246,6 +246,8 @@ func ProcessStop(db *sql.DB, task store.Task, run store.Run, lastAssistantMessag
 		if w, err := transcript.CountWaste(transcriptPath, run.Prompt); err == nil {
 			run.HookDenials, run.Rereads = int64(w.HookDenials), int64(w.Rereads)
 			run.DupBash, run.BigResults = int64(w.DupBash), int64(w.BigResults)
+			b, _ := json.Marshal(w.Failures) // "{}" when scanned and clean, so runs_with_data counts scanned runs
+			run.ToolFailures = string(b)
 		} // a read error is already recorded by Sum above
 	}
 	run.FinalMessage = &final

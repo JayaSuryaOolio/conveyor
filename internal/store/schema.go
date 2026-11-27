@@ -303,6 +303,9 @@ UPDATE labels SET name=lower(name) WHERE name IN ('approved','archived')`); err 
 	if err := migrateAddRunModel(db); err != nil {
 		return err
 	}
+	if err := migrateAddRunToolFailures(db); err != nil {
+		return err
+	}
 	if err := migrateTerminalTemplate(db); err != nil {
 		return err
 	}
@@ -525,6 +528,20 @@ func migrateAddRunModel(db *sql.DB) error {
 	if n == 0 {
 		if _, err := db.Exec(`ALTER TABLE runs ADD COLUMN model TEXT NOT NULL DEFAULT ''`); err != nil {
 			return fmt.Errorf("add runs.model: %w", err)
+		}
+	}
+	return nil
+}
+
+// migrateAddRunToolFailures adds runs.tool_failures; older runs read "" (not recorded).
+func migrateAddRunToolFailures(db *sql.DB) error {
+	var n int
+	if err := db.QueryRow(`SELECT count(*) FROM pragma_table_info('runs') WHERE name='tool_failures'`).Scan(&n); err != nil {
+		return fmt.Errorf("check runs.tool_failures: %w", err)
+	}
+	if n == 0 {
+		if _, err := db.Exec(`ALTER TABLE runs ADD COLUMN tool_failures TEXT NOT NULL DEFAULT ''`); err != nil {
+			return fmt.Errorf("add runs.tool_failures: %w", err)
 		}
 	}
 	return nil
