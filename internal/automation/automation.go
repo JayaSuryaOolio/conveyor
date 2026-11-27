@@ -396,10 +396,28 @@ func pruneClosed(svc *core.Service, olderThan time.Duration, at time.Time) (stri
 	if err != nil {
 		return "", err
 	}
+	all, err := store.ListTasks(svc.DB)
+	if err != nil {
+		return "", err
+	}
+	// A closed task with an open descendant stays: deleting it would orphan the open children.
+	parent := map[int64]*int64{}
+	for _, t := range all {
+		parent[t.ID] = t.ParentID
+	}
+	hasOpen := map[int64]bool{}
+	for _, t := range all {
+		if t.Status == store.StatusDone || t.Status == store.StatusCancelled {
+			continue
+		}
+		for p := t.ParentID; p != nil && !hasOpen[*p]; p = parent[*p] {
+			hasOpen[*p] = true
+		}
+	}
 	var del []int64
 	kept := 0
 	for _, t := range ts {
-		if t.UpdatedAt >= cutoff {
+		if t.UpdatedAt >= cutoff || hasOpen[t.ID] {
 			continue
 		}
 		if !slices.Contains(t.Labels, store.LabelArchived) {
