@@ -316,6 +316,41 @@ func TestPruneClosed(t *testing.T) {
 	}
 }
 
+func TestPruneClosedKeepsOpenDescendants(t *testing.T) {
+	svc, _ := env(t)
+	fake, _ := store.GetRepoByName(svc.DB, "a")
+	old := time.Now().Add(-30 * 24 * time.Hour).UTC().Format(time.RFC3339)
+	mk := func(status store.Status, parent *int64) store.Task {
+		tk, err := store.CreateTask(svc.DB, store.Task{Title: "T", Status: status, ParentID: parent}, []store.TaskRepo{{RepoID: fake.ID, IsPrimary: true, Branch: "t"}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		svc.DB.Exec(`UPDATE tasks SET updated_at=? WHERE id=?`, old, tk.ID)
+		return tk
+	}
+	gp := mk(store.StatusDone, nil)
+	p := mk(store.StatusCancelled, &gp.ID)
+	child := mk(store.StatusReview, &p.ID)
+	a := Templates["prune-closed"]
+	if _, err := RunOne(context.Background(), svc, a); err != nil {
+		t.Fatal(err)
+	}
+	for _, k := range []string{gp.Key, p.Key, child.Key} {
+		if _, err := store.GetTaskByKey(svc.DB, k); err != nil {
+			t.Fatalf("%s pruned while a descendant is open", k)
+		}
+	}
+	svc.DB.Exec(`UPDATE tasks SET status=?, updated_at=? WHERE id=?`, string(store.StatusDone), old, child.ID)
+	if _, err := RunOne(context.Background(), svc, a); err != nil {
+		t.Fatal(err)
+	}
+	for _, k := range []string{gp.Key, p.Key, child.Key} {
+		if _, err := store.GetTaskByKey(svc.DB, k); err == nil {
+			t.Errorf("%s kept after all closed", k)
+		}
+	}
+}
+
 func TestPruneSeededAndDue(t *testing.T) {
 	svc, _ := env(t)
 	if err := Tick(context.Background(), svc, time.Now()); err != nil {
