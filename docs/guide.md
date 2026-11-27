@@ -123,7 +123,7 @@ The description can be edited in any status (pencil on the task page, or `convey
 Once one of a task's PRs is merged, a comment on it no longer simply reopens it: a task keeps one branch and at most one PR per repo. The app asks what the comment is for:
 
 - **More work** (the default, and what the CLI and automations do): Conveyor creates a follow-up sub-task (`CV-9` → `CV-9A`, in todo, same repos and agent, a fresh branch from the default branch) whose description is your comment, closes the original as done, and says so in a system note on both threads. The follow-up's `BRIEF.md` carries the parent's description, acceptance criteria, latest run, run summaries and comments, so its agent starts from where the parent ended without the parent's transcript.
-- **A question** (`conveyor task comment KEY "..." --ask`): the task is requeued with a system note telling its agent to answer without changing code or opening a PR.
+- **A question** (`conveyor task comment KEY "..." --ask`; from an agent session the comment is authored as agent and never requeues, `--as human` overrides): the task is requeued with a system note telling its agent to answer without changing code or opening a PR.
 - **Just a note** (`--note`): the comment is saved and nothing runs.
 
 When the dispatcher launches a task that already has runs, it chooses between:
@@ -313,7 +313,7 @@ conveyor repo add <path> [--name n]       conveyor repo list | rm <name> | setup
 conveyor task new "<title>" --repo a[,b] [--primary r] [--desc t | --desc-file f]
                   [--todo] [--model m] [--agent a] [--runner r] [--parent KEY] [--priority n]
 conveyor task list [--status a,b]         conveyor task show KEY [--thread] [--runs]
-conveyor task comment KEY <text|-> [--ask|--note]   conveyor task move KEY <status> [--stop]
+conveyor task comment KEY <text|-> [--ask|--note] [--as human|agent]   conveyor task move KEY <status> [--stop]
 conveyor task done KEY [--stop]           conveyor task cancel KEY
 conveyor task stop KEY                    conveyor task sessions KEY [--json]
 conveyor task repo KEY add|rm NAME

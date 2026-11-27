@@ -17,6 +17,7 @@ import (
 var bin string
 
 func TestMain(m *testing.M) {
+	os.Unsetenv("CONVEYOR_HOOKS") // an agent session sets it; the CLI tests act as a human
 	dir, err := os.MkdirTemp("", "cvbin")
 	if err != nil {
 		panic(err)

@@ -317,18 +317,38 @@ func taskShow(s *core.Service, args []string) error {
 	return nil
 }
 
-// taskComment posts a human comment. Once a PR of the task is merged it starts
+// commentAuthor picks who a CLI comment is from: --as, else an agent inside a Conveyor session
+// ($CONVEYOR_HOOKS, set by its settings) and a human anywhere else. An agent comment never requeues.
+func commentAuthor(as string) (string, error) {
+	switch as {
+	case "":
+		if os.Getenv("CONVEYOR_HOOKS") != "" {
+			return store.AuthorAgent, nil
+		}
+		return store.AuthorHuman, nil
+	case store.AuthorHuman, store.AuthorAgent:
+		return as, nil
+	}
+	return "", fmt.Errorf("--as must be human or agent, got %q", as)
+}
+
+// taskComment posts a comment (human, or agent from an agent session, see commentAuthor). Once a PR of the task is merged it starts
 // a follow-up sub-task, unless --ask (requeue to answer) or --note (just comment).
 func taskComment(s *core.Service, args []string) error {
 	fs := flag.NewFlagSet("task comment", flag.ContinueOnError)
 	ask := fs.Bool("ask", false, "after a merged PR: requeue the task to answer, without changing code")
 	note := fs.Bool("note", false, "after a merged PR: only add the comment")
+	as := fs.String("as", "", "author: human|agent (default: agent inside a Conveyor session, else human)")
 	args, err := parseArgs(fs, args)
 	if err != nil {
 		return err
 	}
 	if len(args) != 2 || *ask && *note {
-		return fmt.Errorf("usage: conveyor task comment KEY <text|-> [--ask|--note]")
+		return fmt.Errorf("usage: conveyor task comment KEY <text|-> [--ask|--note] [--as human|agent]")
+	}
+	author, err := commentAuthor(*as)
+	if err != nil {
+		return err
 	}
 	after := core.FollowUp
 	if *ask {
@@ -343,7 +363,7 @@ func taskComment(s *core.Service, args []string) error {
 		}
 		body = strings.TrimSpace(body)
 	}
-	_, err = s.AddComment(args[0], store.AuthorHuman, body, after)
+	_, err = s.AddComment(args[0], author, body, after)
 	return err
 }
 
