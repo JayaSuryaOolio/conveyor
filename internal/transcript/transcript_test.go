@@ -32,8 +32,11 @@ func TestCountWaste(t *testing.T) {
 		t.Fatal(err)
 	}
 	// the read of /a.go before the run prompt does not count; the run's second read does
-	if want := (Waste{HookDenials: 1, Rereads: 1, DupBash: 1, BigResults: 1}); got != want {
-		t.Fatalf("got %+v want %+v", got, want)
+	if got.HookDenials != 1 || got.Rereads != 1 || got.DupBash != 1 || got.BigResults != 1 {
+		t.Fatalf("got %+v", got)
+	}
+	if len(got.Failures) != 2 || got.Failures["hook PreToolUse:Bash blocked"] != 1 || got.Failures["tool Bash"] != 1 {
+		t.Fatalf("failures %v", got.Failures)
 	}
 	if all, _ := CountWaste(f, ""); all.Rereads != 2 {
 		t.Fatalf("whole file %+v", all)
